@@ -42,4 +42,9 @@ fi
 
 # Réactiver os-prober (détection des autres systèmes installés).
 sed -i "s/#GRUB_DISABLE_OS_PROBER=false/# OS_PROBER réactivé par l'installation Codebyr :\nGRUB_DISABLE_OS_PROBER=false/g" $CHROOT/etc/default/grub
+
+# Dans le flux Debian d'origine, c'est le post-install du paquet grub-efi/grub-pc
+# (via apt) qui créait /boot/grub. En hors-ligne, on le crée nous-mêmes, sinon
+# update-grub échoue (« cannot create /boot/grub/grub.cfg.new »).
+mkdir -p $CHROOT/boot/grub
 chroot $CHROOT /usr/sbin/update-grub

@@ -1,0 +1,45 @@
+#!/bin/bash
+# calamares-bootloader-config — version Codebyr OS (remplace celle de
+# calamares-settings-debian).
+#
+# L'original fait « apt-get install grub-efi/grub-pc » dans le système cible :
+# sans connexion internet, l'installation ÉCHOUE. Or tous les composants GRUB
+# (grub-efi-amd64-bin, grub-pc-bin, signed, shim, efibootmgr) sont déjà
+# embarqués dans l'image Codebyr : on ne passe par apt QUE si un composant
+# manque réellement (machine en ligne), sinon on n'en a pas besoin.
+# L'installation fonctionne donc 100 % hors-ligne.
+
+CHROOT=$(mount | grep proc | grep calamares | awk '{print $3}' | sed -e "s#/proc##g")
+
+# Chiffrement intégral : permissions strictes de l'initramfs + outils LUKS.
+if [ "$(mount | grep $CHROOT" " | cut -c -16)" = "/dev/mapper/luks" ]; then
+    echo "UMASK=0077" > $CHROOT/etc/initramfs-tools/conf.d/initramfs-permissions
+    if ! chroot $CHROOT dpkg -s cryptsetup-initramfs >/dev/null 2>&1; then
+        DEBIAN_FRONTEND=noninteractive chroot $CHROOT \
+            apt-get -y install cryptsetup-initramfs cryptsetup keyutils
+    fi
+fi
+
+echo "Running bootloader-config (Codebyr, hors-ligne d'abord)..."
+
+if [ -d /sys/firmware/efi/efivars ]; then
+    echo " * GRUB EFI (uefi)..."
+    if [ -d $CHROOT/usr/lib/grub/x86_64-efi ] && \
+       chroot $CHROOT sh -c 'command -v grub-install && command -v efibootmgr' >/dev/null 2>&1; then
+        echo "   composants déjà embarqués — rien à télécharger."
+    else
+        DEBIAN_FRONTEND=noninteractive chroot $CHROOT apt-get -y install grub-efi
+    fi
+else
+    echo " * GRUB BIOS (i386-pc)..."
+    if [ -d $CHROOT/usr/lib/grub/i386-pc ] && \
+       chroot $CHROOT sh -c 'command -v grub-install' >/dev/null 2>&1; then
+        echo "   composants déjà embarqués — rien à télécharger."
+    else
+        DEBIAN_FRONTEND=noninteractive chroot $CHROOT apt-get -y install grub-pc
+    fi
+fi
+
+# Réactiver os-prober (détection des autres systèmes installés).
+sed -i "s/#GRUB_DISABLE_OS_PROBER=false/# OS_PROBER réactivé par l'installation Codebyr :\nGRUB_DISABLE_OS_PROBER=false/g" $CHROOT/etc/default/grub
+chroot $CHROOT /usr/sbin/update-grub

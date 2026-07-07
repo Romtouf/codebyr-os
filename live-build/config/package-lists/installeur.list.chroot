@@ -13,8 +13,10 @@ squashfs-tools
 efibootmgr
 
 # Outils de partitionnement / chiffrement requis par l'installeur
+# (keyutils : exigé par le helper bootloader-config en cas de LUKS)
 cryptsetup
 cryptsetup-initramfs
+keyutils
 dosfstools
 e2fsprogs
 os-prober

@@ -1,0 +1,11 @@
+# Configuration GRUB par défaut — Codebyr OS
+# (voir /etc/grub.d/ et les infos de grub-mkconfig)
+
+GRUB_DEFAULT=0
+GRUB_TIMEOUT=5
+GRUB_DISTRIBUTOR="Codebyr"
+GRUB_CMDLINE_LINUX_DEFAULT="quiet splash"
+GRUB_CMDLINE_LINUX=""
+
+# Décommenté automatiquement à l'installation (détection des autres OS) :
+#GRUB_DISABLE_OS_PROBER=false

@@ -37,6 +37,8 @@ done
 
 # 3) Droits.
 [ -f /usr/bin/codebyr-installer ] && chmod 755 /usr/bin/codebyr-installer
+[ -f /usr/share/calamares/helpers/calamares-bootloader-config ] && \
+    chmod 755 /usr/share/calamares/helpers/calamares-bootloader-config
 [ -d /etc/calamares/branding/debian ] && \
     find /etc/calamares/branding/debian -type f -exec chmod 644 {} +
 

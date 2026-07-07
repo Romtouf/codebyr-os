@@ -1,0 +1,10 @@
+# Boutique d'applications — GNOME Logiciels + Flatpak/Flathub.
+#
+# Sans ces paquets, « Logiciels » ne propose RIEN (aucune source d'applications).
+# Le Flatpak sandboxé colle à la philosophie Codebyr : chaque appli isolée.
+flatpak
+gnome-software
+gnome-software-plugin-flatpak
+
+# Métadonnées de catalogue (noms, icônes, descriptions des applications)
+appstream

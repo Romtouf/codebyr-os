@@ -1,0 +1,13 @@
+#!/bin/sh
+# 0900-logiciels — vérifie la boutique d'applications (Flatpak + Flathub).
+#
+# Le dépôt Flathub est fourni STATIQUEMENT par
+# /etc/flatpak/remotes.d/flathub.flatpakrepo (include) : flatpak le charge
+# automatiquement comme remote système — aucun accès réseau requis au build.
+set -e
+
+command -v flatpak >/dev/null 2>&1 || { echo "0900 : flatpak ABSENT !" >&2; exit 1; }
+command -v gnome-software >/dev/null 2>&1 || { echo "0900 : gnome-software ABSENT !" >&2; exit 1; }
+[ -f /etc/flatpak/remotes.d/flathub.flatpakrepo ] || { echo "0900 : flathub.flatpakrepo ABSENT !" >&2; exit 1; }
+
+echo "0900-logiciels : boutique prête (GNOME Logiciels + Flatpak + Flathub préconfiguré)."

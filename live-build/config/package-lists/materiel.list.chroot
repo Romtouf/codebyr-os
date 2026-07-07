@@ -1,0 +1,21 @@
+# Support matériel — Wi-Fi, Bluetooth, audio.
+#
+# HISTORIQUE : le build coupe les firmwares automatiques (--firmware-chroot false)
+# car firmware-b43legacy-installer (téléchargement au moment de l'install) cassait
+# la construction. On liste donc explicitement les firmwares sûrs. Sans eux, la
+# plupart des cartes Wi-Fi sont INVISIBLES (pas de blob → pas de carte).
+
+# Moteur Wi-Fi de NetworkManager (Recommends, donc exclu par --apt-recommends false :
+# sans lui, AUCUN Wi-Fi même avec le bon firmware)
+wpasupplicant
+wireless-regdb
+
+# Firmwares (dépôt non-free-firmware)
+firmware-linux
+firmware-misc-nonfree
+firmware-iwlwifi
+firmware-realtek
+firmware-atheros
+firmware-brcm80211
+firmware-sof-signed
+bluez-firmware

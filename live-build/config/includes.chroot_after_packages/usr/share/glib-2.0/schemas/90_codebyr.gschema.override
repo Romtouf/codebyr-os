@@ -1,0 +1,40 @@
+# Codebyr OS — réglages GNOME par défaut
+# Compilé par le hook de branding. Ces valeurs sont les défauts ;
+# l'utilisateur reste libre de tout changer.
+
+[org.gnome.desktop.background]
+picture-uri='file:///usr/share/backgrounds/codebyr/codebyr-clair.png'
+picture-uri-dark='file:///usr/share/backgrounds/codebyr/codebyr-sombre.png'
+picture-options='zoom'
+primary-color='#0B1419'
+secondary-color='#0B1419'
+
+[org.gnome.desktop.screensaver]
+picture-uri='file:///usr/share/backgrounds/codebyr/codebyr-sombre.png'
+picture-options='zoom'
+primary-color='#0B1419'
+
+[org.gnome.desktop.interface]
+# Accent GNOME = « Sentinelle » (le teal de Codebyr)
+accent-color='teal'
+color-scheme='default'
+enable-hot-corners=true
+
+[org.gnome.desktop.wm.preferences]
+# Boutons Réduire / Agrandir / Fermer (GNOME les cache par défaut — inacceptable
+# pour un OS grand public, surtout venant de Windows).
+button-layout='appmenu:minimize,maximize,close'
+
+[org.gnome.desktop.input-sources]
+# Clavier AZERTY (français) par défaut.
+sources=[('xkb', 'fr')]
+
+[org.gnome.shell]
+favorite-apps=['io.codebyr.Assistant.desktop', 'firefox-esr.desktop', 'org.gnome.Nautilus.desktop', 'org.gnome.Software.desktop', 'org.gnome.Console.desktop', 'org.gnome.Settings.desktop']
+enabled-extensions=['codebyr@codebyr.io']
+disable-user-extensions=false
+
+[org.gnome.login-screen]
+# Logo affiché sur l'écran de connexion / déverrouillage (le Sceau, pas Debian)
+logo='/usr/share/backgrounds/codebyr/codebyr-logo.png'
+

@@ -1,0 +1,213 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+codebyr-config — Configuration de Codebyr OS.
+Permet à chacun de définir SES vrais sites bancaires (protégés + surveillés par
+le bouclier anti-hameçonnage) et de voir ses Espaces. 100% local.
+"""
+import json
+import os
+import shutil
+
+import gi
+gi.require_version("Gtk", "4.0")
+gi.require_version("Adw", "1")
+from gi.repository import Adw, Gtk, Gio, GLib  # noqa: E402
+
+SYSTEM = "/etc/codebyr/espaces.json"
+USER = os.path.expanduser("~/.config/codebyr/espaces.json")
+
+
+def load_registry():
+    path = USER if os.path.exists(USER) else SYSTEM
+    try:
+        with open(path, encoding="utf-8") as f:
+            return json.load(f)
+    except (OSError, ValueError):
+        return {"espaces": [], "apps": []}
+
+
+def save_registry(data):
+    os.makedirs(os.path.dirname(USER), exist_ok=True)
+    with open(USER, "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
+
+
+def espace_banque(data):
+    """Renvoie l'Espace à réseau restreint (Banque), ou None."""
+    for e in data.get("espaces", []):
+        r = e.get("reseau") or {}
+        if r.get("mode") == "liste-blanche":
+            return e
+    # sinon, on prend « banque » et on lui crée une liste blanche vide
+    for e in data.get("espaces", []):
+        if e.get("id") == "banque":
+            e["reseau"] = {"mode": "liste-blanche", "domaines": []}
+            return e
+    return None
+
+
+def capacites_machine():
+    """Capacités d'isolation réelles de cette machine (pour info honnête)."""
+    def user_ns():
+        try:
+            with open("/proc/sys/kernel/unprivileged_userns_clone") as f:
+                return f.read().strip() == "1"
+        except OSError:
+            return True
+    kvm = os.path.exists("/dev/kvm") and os.access("/dev/kvm", os.R_OK | os.W_OK)
+    return [
+        ("Bac à sable (bubblewrap)", bool(shutil.which("bwrap"))),
+        ("Isolation utilisateur", user_ns()),
+        ("Plafonds mémoire / processus", bool(shutil.which("systemd-run"))),
+        ("Accélération matérielle KVM", kvm),
+    ]
+
+
+class Fenetre(Adw.ApplicationWindow):
+    def __init__(self, app):
+        super().__init__(application=app, title="Configuration Codebyr")
+        self.set_default_size(720, 640)
+        self._data = load_registry()
+
+        self._page = Adw.PreferencesPage()
+        self._construire()
+
+        tv = Adw.ToolbarView()
+        header = Adw.HeaderBar()
+        header.set_title_widget(Adw.WindowTitle(title="Configuration Codebyr",
+                                                subtitle="Codebyr OS"))
+        tv.add_top_bar(header)
+        tv.set_content(self._page)
+        self.set_content(tv)
+
+    # ---- Reconstruit toute la page (après modification) ----
+    def _construire(self):
+        # vider la page
+        child = self._page.get_first_child()
+        # PreferencesPage n'expose pas remove aisément : on recrée les groupes.
+        for g in list(getattr(self, "_groupes", [])):
+            self._page.remove(g)
+        self._groupes = []
+
+        banque = espace_banque(self._data)
+
+        intro = Adw.PreferencesGroup(
+            title="Le bouclier anti-hameçonnage",
+            description="Codebyr n'autorise QUE ces sites dans l'Espace Banque, et "
+                        "vous alerte si un autre site tente de les imiter. Ajoutez "
+                        "ici les adresses de VOTRE banque.")
+        self._page.add(intro)
+        self._groupes.append(intro)
+
+        grp = Adw.PreferencesGroup(title="Sites de votre banque")
+        self._page.add(grp)
+        self._groupes.append(grp)
+
+        domaines = (banque.get("reseau", {}).get("domaines", []) if banque else [])
+        if not domaines:
+            vide = Adw.ActionRow(title="Aucun site pour l'instant",
+                                 subtitle="Ajoutez le site de votre banque ci-dessous.")
+            grp.add(vide)
+        for d in domaines:
+            row = Adw.ActionRow(title=d)
+            btn = Gtk.Button(icon_name="user-trash-symbolic", valign=Gtk.Align.CENTER)
+            btn.add_css_class("flat")
+            btn.connect("clicked", self._supprimer_domaine, d)
+            row.add_suffix(btn)
+            grp.add(row)
+
+        ajout = Adw.EntryRow(title="Ajouter un site (ex. mabanque.fr)")
+        badd = Gtk.Button(icon_name="list-add-symbolic", valign=Gtk.Align.CENTER)
+        badd.add_css_class("flat")
+        badd.connect("clicked", lambda _b: self._ajouter_domaine(ajout.get_text()))
+        ajout.add_suffix(badd)
+        ajout.connect("entry-activated", lambda _r: self._ajouter_domaine(ajout.get_text()))
+        grp.add(ajout)
+
+        # Espaces + blindage
+        gesp = Adw.PreferencesGroup(
+            title="Vos Espaces et leur blindage",
+            description="Le Blindage renforce l'isolation d'un Espace : bac à sable "
+                        "utilisateur, zéro privilège, session neuve. Idéal pour la Banque.")
+        self._page.add(gesp)
+        self._groupes.append(gesp)
+        for e in self._data.get("espaces", []):
+            tag = "  (éphémère)" if e.get("ephemere") else ""
+            row = Adw.SwitchRow(title=e.get("nom", e.get("id")) + tag,
+                                subtitle=e.get("couleur", ""))
+            row.set_active(e.get("blindage") == "renforce")
+            pastille = Gtk.Box()
+            pastille.set_size_request(18, 18)
+            pastille.set_valign(Gtk.Align.CENTER)
+            css = Gtk.CssProvider()
+            css.load_from_data(
+                ("box{background:%s;border-radius:9px;}" % e.get("couleur", "#888")).encode())
+            pastille.get_style_context().add_provider(css, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
+            row.add_prefix(pastille)
+            row.connect("notify::active", self._basculer_blindage, e.get("id"))
+            gesp.add(row)
+
+        # Capacités réelles de la machine (transparence)
+        gcap = Adw.PreferencesGroup(
+            title="Isolation disponible sur cette machine",
+            description="Codebyr s'adapte au matériel. Le Jetable d'une pièce jointe "
+                        "s'ouvre toujours blindé ET sans réseau.")
+        self._page.add(gcap)
+        self._groupes.append(gcap)
+        for nom, dispo in capacites_machine():
+            r = Adw.ActionRow(title=nom)
+            ic = Gtk.Image.new_from_icon_name(
+                "emblem-ok-symbolic" if dispo else "window-close-symbolic")
+            ic.add_css_class("success" if dispo else "dim-label")
+            r.add_suffix(ic)
+            gcap.add(r)
+
+    def _ajouter_domaine(self, texte):
+        d = (texte or "").strip().lower().lstrip("www.")
+        if not d or "." not in d:
+            return
+        banque = espace_banque(self._data)
+        if banque is None:
+            return
+        banque.setdefault("reseau", {"mode": "liste-blanche", "domaines": []})
+        doms = banque["reseau"].setdefault("domaines", [])
+        # on ajoute aussi le motif *.domaine pour couvrir les sous-domaines
+        for cible in (d, "*." + d):
+            if cible not in doms:
+                doms.append(cible)
+        save_registry(self._data)
+        self._construire()
+
+    def _basculer_blindage(self, row, _pspec, esp_id):
+        for e in self._data.get("espaces", []):
+            if e.get("id") == esp_id:
+                if row.get_active():
+                    e["blindage"] = "renforce"
+                else:
+                    e.pop("blindage", None)
+                break
+        save_registry(self._data)
+
+    def _supprimer_domaine(self, _btn, d):
+        banque = espace_banque(self._data)
+        if banque is None:
+            return
+        doms = banque.get("reseau", {}).get("domaines", [])
+        banque["reseau"]["domaines"] = [x for x in doms if x != d]
+        save_registry(self._data)
+        self._construire()
+
+
+class Config(Adw.Application):
+    def __init__(self):
+        super().__init__(application_id="io.codebyr.Config",
+                         flags=Gio.ApplicationFlags.FLAGS_NONE)
+
+    def do_activate(self):
+        win = self.props.active_window or Fenetre(self)
+        win.present()
+
+
+if __name__ == "__main__":
+    Config().run(None)

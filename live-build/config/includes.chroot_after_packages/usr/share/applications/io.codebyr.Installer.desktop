@@ -1,0 +1,13 @@
+[Desktop Entry]
+Type=Application
+Name=Installer Codebyr OS
+Name[fr]=Installer Codebyr OS
+Comment=Installer Codebyr OS sur ce disque
+Comment[fr]=Installer Codebyr OS sur ce disque
+Exec=codebyr-installer
+TryExec=calamares
+Icon=io.codebyr.Installer
+Terminal=false
+Categories=System;
+Keywords=install;installer;calamares;disque;
+StartupNotify=true

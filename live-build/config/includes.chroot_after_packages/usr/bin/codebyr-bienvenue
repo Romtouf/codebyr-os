@@ -1,0 +1,178 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+codebyr-bienvenue — tour de bienvenue de Codebyr OS (montré au premier démarrage).
+"""
+import os
+import sys
+import shutil
+
+import gi
+gi.require_version("Gtk", "4.0")
+gi.require_version("Adw", "1")
+from gi.repository import Adw, Gtk, Gio, GLib  # noqa: E402
+
+MARQUEUR = os.path.expanduser("~/.config/codebyr/bienvenue-vu")
+
+ESPACES = [
+    ("Personnel", "#4E8FEF"), ("Travail", "#8F6CF0"), ("Banque", "#2FA36B"),
+    ("Navigation", "#E09A32"), ("Jetable", "#E25551"),
+]
+
+
+def page(titre, lignes, widget_extra=None):
+    box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=16,
+                  valign=Gtk.Align.CENTER, halign=Gtk.Align.CENTER)
+    box.set_margin_top(24); box.set_margin_bottom(24)
+    box.set_margin_start(48); box.set_margin_end(48)
+    t = Gtk.Label(label=titre)
+    t.add_css_class("title-1")
+    t.set_wrap(True); t.set_justify(Gtk.Justification.CENTER)
+    box.append(t)
+    for l in lignes:
+        lab = Gtk.Label(label=l)
+        lab.set_wrap(True); lab.set_justify(Gtk.Justification.CENTER)
+        lab.set_max_width_chars(46)
+        lab.add_css_class("body")
+        box.append(lab)
+    if widget_extra is not None:
+        box.append(widget_extra)
+    return box
+
+
+def sceau(taille, couleur="#43C7DF"):
+    svg = ('<svg xmlns="http://www.w3.org/2000/svg" viewBox="-8 -8 116 116">'
+           '<g fill="none" stroke="%s" stroke-width="13" stroke-linecap="round">'
+           '<path d="M 84.64 70 A 40 40 0 0 1 19.36 75.71"/>'
+           '<path d="M 13.75 66.91 A 40 40 0 0 1 36.32 12.42"/>'
+           '<path d="M 46.51 10.15 A 40 40 0 0 1 84.64 30"/></g>'
+           '<circle cx="50" cy="50" r="9.5" fill="%s"/></svg>' % (couleur, couleur))
+    loader = Gio.MemoryInputStream.new_from_bytes(GLib.Bytes.new(svg.encode()))
+    from gi.repository import GdkPixbuf, Gdk
+    pb = GdkPixbuf.Pixbuf.new_from_stream_at_scale(loader, taille, taille, True, None)
+    img = Gtk.Picture.new_for_paintable(Gdk.Texture.new_for_pixbuf(pb))
+    img.set_size_request(taille, taille)
+    return img
+
+
+def legende_espaces():
+    grille = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8,
+                     halign=Gtk.Align.CENTER)
+    grille.set_margin_top(8)
+    for nom, coul in ESPACES:
+        ligne = Gtk.Box(spacing=10, halign=Gtk.Align.START)
+        p = Gtk.Box(); p.set_size_request(16, 16); p.set_valign(Gtk.Align.CENTER)
+        css = Gtk.CssProvider()
+        css.load_from_data(("box{background:%s;border-radius:8px;}" % coul).encode())
+        p.get_style_context().add_provider(css, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
+        ligne.append(p)
+        ligne.append(Gtk.Label(label=nom, xalign=0))
+        grille.append(ligne)
+    return grille
+
+
+class Fenetre(Adw.ApplicationWindow):
+    def __init__(self, app):
+        super().__init__(application=app, title="Bienvenue")
+        self.set_default_size(560, 620)
+
+        self._carousel = Adw.Carousel()
+        self._carousel.set_vexpand(True)
+
+        self._carousel.append(page(
+            "Bienvenue dans Codebyr OS",
+            ["Sécurisé par conception. Simple par conviction.",
+             "Un ordinateur qui protège vos données sans vous compliquer la vie."],
+            sceau(96)))
+        self._carousel.append(page(
+            "Vos Espaces",
+            ["Votre vie numérique, rangée en bulles étanches et colorées.",
+             "Si l'une est un jour piégée, les autres restent intactes."],
+            legende_espaces()))
+        self._carousel.append(page(
+            "Comment ça marche",
+            ["L'icône du Sceau, en haut à droite, ouvre vos Espaces.",
+             "Le liseré coloré autour d'une fenêtre dit à quel Espace elle appartient.",
+             "L'Assistant de sécurité répond à toutes vos questions, en clair."]))
+        # Bouton d'installation, seulement en session live (Calamares présent).
+        bouton_install = None
+        if shutil.which("calamares") and shutil.which("codebyr-installer"):
+            bouton_install = Gtk.Button(label="Installer Codebyr OS sur ce disque")
+            bouton_install.add_css_class("suggested-action")
+            bouton_install.add_css_class("pill")
+            bouton_install.set_halign(Gtk.Align.CENTER)
+            bouton_install.set_margin_top(10)
+            bouton_install.connect("clicked", self._installer)
+        self._carousel.append(page(
+            "Vous êtes prêt !",
+            ["Un lien ou un fichier douteux ? Ouvrez-le « en Jetable ».",
+             "Votre banque ? L'Espace Banque veille sur elle.",
+             "Cliquez sur le Sceau pour commencer votre exploration."],
+            bouton_install))
+
+        dots = Adw.CarouselIndicatorDots(carousel=self._carousel)
+
+        self._btn = Gtk.Button(label="Suivant")
+        self._btn.add_css_class("suggested-action")
+        self._btn.add_css_class("pill")
+        self._btn.set_halign(Gtk.Align.CENTER)
+        self._btn.connect("clicked", self._suivant)
+        self._carousel.connect("page-changed", self._maj_bouton)
+
+        bas = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=14)
+        bas.set_margin_bottom(24)
+        bas.append(dots)
+        bas.append(self._btn)
+
+        contenu = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+        contenu.append(self._carousel)
+        contenu.append(bas)
+
+        tv = Adw.ToolbarView()
+        tv.add_top_bar(Adw.HeaderBar())
+        tv.set_content(contenu)
+        self.set_content(tv)
+
+    def _maj_bouton(self, _c, index):
+        dernier = self._carousel.get_n_pages() - 1
+        self._btn.set_label("Commencer" if index >= dernier else "Suivant")
+
+    def _installer(self, _b):
+        import subprocess
+        try:
+            subprocess.Popen(["codebyr-installer"])
+        except OSError:
+            pass
+        self.get_application().quit()
+
+    def _suivant(self, _b):
+        n = self._carousel.get_n_pages()
+        i = int(round(self._carousel.get_position()))
+        if i >= n - 1:
+            self.get_application().quit()
+        else:
+            self._carousel.scroll_to(self._carousel.get_nth_page(i + 1), True)
+
+
+class Bienvenue(Adw.Application):
+    def __init__(self):
+        super().__init__(application_id="io.codebyr.Bienvenue",
+                         flags=Gio.ApplicationFlags.FLAGS_NONE)
+
+    def do_activate(self):
+        (self.props.active_window or Fenetre(self)).present()
+
+    def do_shutdown(self):
+        try:
+            os.makedirs(os.path.dirname(MARQUEUR), exist_ok=True)
+            open(MARQUEUR, "w").close()
+        except OSError:
+            pass
+        Adw.Application.do_shutdown(self)
+
+
+if __name__ == "__main__":
+    # Ne s'affiche qu'une fois (marqueur). --force pour rouvrir.
+    if os.path.exists(MARQUEUR) and "--force" not in sys.argv:
+        sys.exit(0)
+    sys.exit(Bienvenue().run(None))

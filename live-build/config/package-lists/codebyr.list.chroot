@@ -1,0 +1,29 @@
+# Codebyr OS — composants propres à la distribution
+
+# Écran de démarrage brandé (thème Plymouth « codebyr »)
+plymouth
+plymouth-themes
+plymouth-label
+
+# Outils utilisés par les hooks de branding (rasterisation du logo, etc.)
+librsvg2-bin
+
+# Administration (compte user de la session live)
+sudo
+
+# Phase 2 — isolation des Espaces (bubblewrap)
+bubblewrap
+
+# Langues : support multilingue complet (comme une distro haut de gamme)
+# locales-all = TOUTES les langues disponibles ; français par défaut (hook 0600).
+locales
+locales-all
+firefox-esr-l10n-fr
+# Polices pour que tous les alphabets s'affichent (latin, cyrillique, grec,
+# arabe, hébreu, thaï, indien… + chinois/japonais/coréen).
+fonts-noto-core
+fonts-noto-cjk
+fonts-noto-color-emoji
+
+# NOTE Phase 2 : codebyr-spaced et codebyr-shell (gestion des Espaces)
+# seront ajoutés ici une fois empaquetés.

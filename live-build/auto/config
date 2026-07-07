@@ -1,0 +1,23 @@
+#!/bin/sh
+# Codebyr OS — configuration live-build (Phase 1 : ISO de base durcie + brandée)
+# Exécuté par `lb config`. Voir live-build/README.md pour l'usage.
+set -e
+
+lb config noauto \
+	--mode debian \
+	--distribution trixie \
+	--archive-areas "main contrib non-free non-free-firmware" \
+	--architectures amd64 \
+	--binary-images iso-hybrid \
+	--debian-installer none \
+	--linux-flavours amd64 \
+	--firmware-chroot false \
+	--firmware-binary false \
+	--apt-recommends false \
+	--bootappend-live "boot=live components locales=fr_FR.UTF-8 keyboard-layouts=fr live-config.hostname=codebyr quiet splash" \
+	--iso-application "Codebyr OS" \
+	--iso-volume "Codebyr OS trixie" \
+	--iso-preparer "Codebyr — live-build" \
+	--iso-publisher "Codebyr" \
+	--memtest none \
+	"${@}"

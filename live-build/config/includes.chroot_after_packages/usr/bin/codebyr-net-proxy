@@ -1,0 +1,133 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+codebyr-net-proxy — filtre réseau à liste blanche pour un Espace.
+
+N'autorise QUE les domaines passés en argument ; tout le reste est bloqué.
+Gère HTTPS (méthode CONNECT) et HTTP simple. Écoute sur 127.0.0.1.
+
+Usage : codebyr-net-proxy <port> <domaine> [<domaine> ...]
+"""
+import select
+import socket
+import sys
+import threading
+
+TAILLE = 65536
+
+
+def autorise(host, patterns):
+    host = (host or "").lower().strip(".")
+    for p in patterns:
+        p = p.lower().strip()
+        if p.startswith("*."):
+            base = p[2:]
+            if host == base or host.endswith("." + base):
+                return True
+        elif host == p:
+            return True
+    return False
+
+
+def tunnel(a, b):
+    try:
+        while True:
+            r, _, _ = select.select([a, b], [], [], 60)
+            if not r:
+                break
+            for s in r:
+                data = s.recv(TAILLE)
+                if not data:
+                    return
+                (b if s is a else a).sendall(data)
+    except OSError:
+        pass
+
+
+def bloque(client, host):
+    corps = (u"Codebyr — Espace à réseau restreint.\n"
+             u"Le domaine « %s » n'est pas autorisé dans cet Espace." % host).encode("utf-8")
+    entete = (b"HTTP/1.1 403 Forbidden\r\n"
+              b"Content-Type: text/plain; charset=utf-8\r\n"
+              b"Content-Length: " + str(len(corps)).encode() + b"\r\n"
+              b"Connection: close\r\n\r\n")
+    try:
+        client.sendall(entete + corps)
+    except OSError:
+        pass
+
+
+def gerer(client, patterns):
+    try:
+        client.settimeout(30)
+        premier = client.recv(TAILLE)
+        if not premier:
+            client.close()
+            return
+        ligne = premier.split(b"\r\n", 1)[0].decode("latin-1", "replace")
+        parts = ligne.split()
+        if len(parts) < 2:
+            client.close()
+            return
+        methode, cible = parts[0], parts[1]
+
+        if methode.upper() == "CONNECT":
+            host = cible.rsplit(":", 1)[0]
+            port = int(cible.rsplit(":", 1)[1]) if ":" in cible else 443
+            if not autorise(host, patterns):
+                bloque(client, host)
+                client.close()
+                return
+            amont = socket.create_connection((host, port), timeout=15)
+            client.sendall(b"HTTP/1.1 200 Connection established\r\n\r\n")
+            client.settimeout(None)
+            tunnel(client, amont)
+            amont.close()
+        else:
+            # HTTP simple : extraire l'hôte (Host: ou URL absolue)
+            host = ""
+            for l in premier.split(b"\r\n"):
+                if l.lower().startswith(b"host:"):
+                    host = l.split(b":", 1)[1].strip().decode("latin-1").rsplit(":", 1)[0]
+                    break
+            if not autorise(host, patterns):
+                bloque(client, host)
+                client.close()
+                return
+            amont = socket.create_connection((host, 80), timeout=15)
+            amont.sendall(premier)
+            client.settimeout(None)
+            tunnel(client, amont)
+            amont.close()
+    except (OSError, ValueError):
+        pass
+    finally:
+        try:
+            client.close()
+        except OSError:
+            pass
+
+
+def main(argv):
+    if len(argv) < 3:
+        sys.stderr.write(__doc__)
+        return 2
+    port = int(argv[1])
+    patterns = argv[2:]
+    srv = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    srv.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    srv.bind(("127.0.0.1", port))
+    srv.listen(64)
+    sys.stderr.write("codebyr-net-proxy : filtre actif sur 127.0.0.1:%d (%d domaine(s))\n"
+                     % (port, len(patterns)))
+    while True:
+        try:
+            client, _ = srv.accept()
+        except OSError:
+            break
+        threading.Thread(target=gerer, args=(client, patterns), daemon=True).start()
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv))

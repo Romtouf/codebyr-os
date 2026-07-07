@@ -1,0 +1,9 @@
+{
+  "uuid": "codebyr@codebyr.io",
+  "name": "Codebyr — Espaces",
+  "description": "Sélecteur d'Espaces et liserés colorés des fenêtres pour Codebyr OS. Chaque Espace isolé porte sa couleur ; les fenêtres qui lui appartiennent sont bordées de cette couleur.",
+  "shell-version": ["46", "47", "48"],
+  "url": "https://codebyr.io",
+  "version": 1,
+  "settings-schema": ""
+}

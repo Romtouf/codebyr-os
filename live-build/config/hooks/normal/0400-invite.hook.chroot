@@ -1,0 +1,48 @@
+#!/bin/sh
+# Codebyr OS — mode invité (#7) : une vraie session séparée pour prêter le PC.
+# L'invité est un utilisateur Unix distinct → il ne peut pas lire tes fichiers.
+# Sa session repart à neuf à chaque démarrage.
+set -e
+
+echo "P: Codebyr — mode invité"
+
+# — Compte invité (PAS sudo, groupes minimaux) —
+if ! id invite >/dev/null 2>&1; then
+	useradd --create-home --shell /bin/bash --uid 1001 --user-group \
+		--groups audio,video,plugdev,netdev --comment "Invité" invite
+fi
+# Mot de passe simple, à donner à la personne (v1 ; le sans-mot-de-passe viendra).
+echo 'invite:invite' | chpasswd
+
+# — Isole le dossier de l'utilisateur principal : l'invité ne peut pas le lire —
+chmod 700 /home/user 2>/dev/null || true
+
+# — Réinitialisation de la session invité à chaque démarrage (repart à neuf) —
+cat > /usr/bin/codebyr-invite-reset <<'EOF'
+#!/bin/sh
+# Remet le dossier de l'invité à l'état neuf (aucune trace d'un invité à l'autre).
+rm -rf /home/invite
+cp -a /etc/skel /home/invite
+chown -R invite:invite /home/invite
+chmod 700 /home/invite
+EOF
+chmod 755 /usr/bin/codebyr-invite-reset
+
+cat > /etc/systemd/system/codebyr-invite-reset.service <<'EOF'
+[Unit]
+Description=Codebyr — remise à neuf de la session invité
+DefaultDependencies=no
+After=local-fs.target
+Before=gdm.service display-manager.service
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/codebyr-invite-reset
+[Install]
+WantedBy=multi-user.target
+EOF
+# Activation robuste (systemctl enable est peu fiable en chroot) : lien manuel.
+mkdir -p /etc/systemd/system/multi-user.target.wants
+ln -sf /etc/systemd/system/codebyr-invite-reset.service \
+       /etc/systemd/system/multi-user.target.wants/codebyr-invite-reset.service
+
+echo "P: Codebyr — mode invité prêt (utilisateur « invite »)"

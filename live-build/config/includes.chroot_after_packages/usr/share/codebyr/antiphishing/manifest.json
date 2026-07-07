@@ -1,0 +1,15 @@
+{
+  "manifest_version": 2,
+  "name": "Codebyr — Bouclier anti-hameçonnage",
+  "description": "Avertit quand un site imite une banque protégée par Codebyr OS.",
+  "version": "1.0",
+  "browser_specific_settings": { "gecko": { "id": "antiphishing@codebyr.io" } },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content.js"],
+      "run_at": "document_start",
+      "all_frames": false
+    }
+  ]
+}

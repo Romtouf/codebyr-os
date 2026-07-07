@@ -1,0 +1,699 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+codebyr-space — lance des applications dans un Espace isolé (Codebyr OS, Phase 2 v1).
+
+Chaque Espace a :
+  - sa propre couleur (langage visuel, voir la charte) ;
+  - son propre dossier personnel isolé (données séparées entre Espaces) ;
+  - un marqueur de fenêtre « codebyr-<id> » pour que l'extension GNOME
+    colore ses fenêtres.
+
+Isolation v1 : bubblewrap si disponible (isolation réelle du système de
+fichiers), sinon repli sur un dossier personnel séparé. L'isolation forte
+par micro-VM viendra en Phase 3.
+
+Usage :
+  codebyr-space list
+  codebyr-space launch <espace> [-- commande...]
+  codebyr-space purge <espace>        (efface les données d'un Espace)
+"""
+import json
+import os
+import shutil
+import socket
+import sys
+import tempfile
+
+REGISTRY = "/etc/codebyr/espaces.json"
+USER_REGISTRY = os.path.expanduser("~/.config/codebyr/espaces.json")
+DATA_ROOT = os.path.expanduser("~/.local/share/codebyr/espaces")
+
+
+def load_espaces():
+    path = USER_REGISTRY if os.path.exists(USER_REGISTRY) else REGISTRY
+    try:
+        with open(path, encoding="utf-8") as f:
+            return {e["id"]: e for e in json.load(f).get("espaces", [])}
+    except (OSError, ValueError) as exc:
+        sys.stderr.write("codebyr-space : registre illisible (%s) : %s\n" % (path, exc))
+        return {}
+
+
+def desktop_exec(desktop_id):
+    """Résout un fichier .desktop vers sa commande (Exec), nettoyée des %-codes."""
+    for base in ("/usr/share/applications", "/var/lib/flatpak/exports/share/applications",
+                 os.path.expanduser("~/.local/share/applications")):
+        p = os.path.join(base, desktop_id)
+        if os.path.exists(p):
+            with open(p, encoding="utf-8") as f:
+                for line in f:
+                    if line.startswith("Exec="):
+                        parts = line[5:].strip().split()
+                        return [a for a in parts if not a.startswith("%")]
+    # Pas un .desktop : on suppose une commande brute
+    return [desktop_id.replace(".desktop", "")]
+
+
+def espace_home(esp):
+    if esp.get("ephemere"):
+        return tempfile.mkdtemp(prefix="codebyr-jetable-%s-" % esp["id"])
+    home = os.path.join(DATA_ROOT, esp["id"], "home")
+    os.makedirs(home, exist_ok=True)
+    return home
+
+
+def build_command(esp, home, app_cmd):
+    """Construit la ligne de commande, avec marqueur de fenêtre par Espace."""
+    wm_class = "codebyr-" + esp["id"]
+    prog = os.path.basename(app_cmd[0])
+
+    # Firefox : classe de fenêtre par Espace (colore la fenêtre).
+    # Pas de --profile : le dossier personnel isolé de l'Espace (HOME) suffit à
+    # séparer le profil, et un chemin --profile serait invalide dans le bac à
+    # sable bubblewrap (d'où l'erreur « Profile missing »).
+    if "firefox" in prog:
+        return app_cmd + ["--class", wm_class, "--name", wm_class]
+    return app_cmd
+
+
+def wrap_bwrap(home, cmd, env, renforce=False, hors_ligne=False):
+    """Enveloppe avec bubblewrap : dossier personnel isolé, /tmp isolé,
+    sockets GUI/audio partagés. Repli géré par l'appelant si bwrap échoue.
+
+    renforce   : Blindage — isolation utilisateur, abandon des privilèges,
+                 nouvelle session (anti-injection terminal).
+    hors_ligne : coupe tout accès réseau (namespace réseau isolé). Idéal pour
+                 examiner une pièce jointe douteuse : le piège explose sans
+                 jamais pouvoir téléphoner dehors.
+    """
+    runtime = env.get("XDG_RUNTIME_DIR", "/run/user/%d" % os.getuid())
+    bwrap = [
+        "bwrap",
+        "--ro-bind", "/usr", "/usr",
+        "--ro-bind", "/etc", "/etc",
+        "--symlink", "usr/lib", "/lib",
+        "--symlink", "usr/lib64", "/lib64",
+        "--symlink", "usr/bin", "/bin",
+        "--symlink", "usr/sbin", "/sbin",
+        "--proc", "/proc",
+        "--dev", "/dev",
+        "--dev-bind-try", "/dev/dri", "/dev/dri",
+        "--tmpfs", "/tmp",
+        "--bind", home, os.path.expanduser("~"),
+        "--ro-bind-try", runtime + "/wayland-0", runtime + "/wayland-0",
+        "--ro-bind-try", runtime + "/pipewire-0", runtime + "/pipewire-0",
+        "--ro-bind-try", runtime + "/bus", runtime + "/bus",
+        "--ro-bind-try", "/sys/dev/char", "/sys/dev/char",
+        "--ro-bind-try", "/sys/devices", "/sys/devices",
+        "--unshare-pid", "--unshare-uts", "--unshare-ipc",
+        "--die-with-parent",
+        "--setenv", "HOME", os.path.expanduser("~"),
+    ]
+    if hors_ligne:
+        # Aucune interface réseau : exfiltration impossible.
+        bwrap += ["--unshare-net"]
+    if renforce:
+        # Blindage : bac à sable utilisateur, zéro privilège, session neuve.
+        bwrap += ["--unshare-user-try", "--unshare-cgroup-try",
+                  "--new-session", "--cap-drop", "ALL"]
+    return bwrap + ["--"] + cmd
+
+
+_SCOPE_DISPO = None
+
+
+def _systemd_scope_dispo():
+    """systemd-run --scope utilisable ? (plafonds mémoire/processus par Espace).
+    Testé une seule fois puis mis en cache."""
+    global _SCOPE_DISPO
+    if _SCOPE_DISPO is None:
+        _SCOPE_DISPO = False
+        if shutil.which("systemd-run"):
+            import subprocess
+            try:
+                r = subprocess.run(
+                    ["systemd-run", "--user", "--scope", "--quiet", "--", "true"],
+                    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=6)
+                _SCOPE_DISPO = (r.returncode == 0)
+            except Exception:
+                _SCOPE_DISPO = False
+    return _SCOPE_DISPO
+
+
+def _plafonner_ressources(run):
+    """Enveloppe la commande dans un cgroup borné : un Espace compromis ne peut
+    pas épuiser la mémoire de la machine ni la saturer de processus (fork-bomb)."""
+    if _systemd_scope_dispo():
+        return ["systemd-run", "--user", "--scope", "--quiet",
+                "-p", "MemoryMax=2G", "-p", "MemorySwapMax=0",
+                "-p", "TasksMax=800", "--"] + run
+    return run
+
+
+def kvm_dispo():
+    """Accélération matérielle KVM présente ? (socle d'un futur vrai micro-VM)."""
+    return os.path.exists("/dev/kvm") and os.access("/dev/kvm", os.R_OK | os.W_OK)
+
+
+def user_ns_dispo():
+    """Espaces de noms utilisateur non privilégiés autorisés par le noyau ?"""
+    try:
+        with open("/proc/sys/kernel/unprivileged_userns_clone") as f:
+            return f.read().strip() == "1"
+    except OSError:
+        # Fichier absent = souvent activé par défaut (Debian récent).
+        return True
+
+
+def cmd_list(espaces):
+    print("Espaces disponibles :")
+    for e in espaces.values():
+        tag = "  (éphémère)" if e.get("ephemere") else ""
+        print("  \033[1m%-12s\033[0m %s  %s%s" % (e["id"], e["couleur"], e["nom"], tag))
+
+
+def _port_libre():
+    s = socket.socket()
+    s.bind(("127.0.0.1", 0))
+    port = s.getsockname()[1]
+    s.close()
+    return port
+
+
+def _preparer_profil_firefox(home, port):
+    """Pré-configure le profil Firefox de l'Espace pour passer par le filtre réseau."""
+    ffbase = os.path.join(home, ".mozilla", "firefox")
+    ffdir = os.path.join(ffbase, "codebyr.default")
+    os.makedirs(ffdir, exist_ok=True)
+    ini = os.path.join(ffbase, "profiles.ini")
+    if not os.path.exists(ini):
+        with open(ini, "w", encoding="utf-8") as f:
+            f.write("[Profile0]\nName=codebyr\nIsRelative=1\nPath=codebyr.default\n"
+                    "Default=1\n\n[General]\nStartWithLastProfile=1\nVersion=2\n")
+    prefs = [
+        'user_pref("network.proxy.type", 1);',
+        'user_pref("network.proxy.http", "127.0.0.1");',
+        'user_pref("network.proxy.http_port", %d);' % port,
+        'user_pref("network.proxy.ssl", "127.0.0.1");',
+        'user_pref("network.proxy.ssl_port", %d);' % port,
+        'user_pref("network.proxy.share_proxy_settings", true);',
+        'user_pref("network.proxy.allow_hijacking_localhost", true);',
+        'user_pref("network.trr.mode", 5);',
+    ]
+    with open(os.path.join(ffdir, "user.js"), "w", encoding="utf-8") as f:
+        f.write("\n".join(prefs) + "\n")
+
+
+def _demarrer_filtre_reseau(esp, home, app_cmd):
+    """Si l'Espace a une liste blanche et lance Firefox : démarre le filtre
+    et configure le navigateur pour l'utiliser. Renvoie le processus proxy."""
+    import subprocess
+    reseau = esp.get("reseau") or {}
+    if reseau.get("mode") != "liste-blanche":
+        return None
+    if "firefox" not in os.path.basename(app_cmd[0]):
+        return None
+    domaines = reseau.get("domaines") or []
+    if not domaines:
+        return None
+    try:
+        port = _port_libre()
+        proc = subprocess.Popen(["codebyr-net-proxy", str(port)] + domaines)
+        _preparer_profil_firefox(home, port)
+        print("Réseau restreint : seuls %d domaine(s) autorisé(s) dans %s."
+              % (len(domaines), esp["nom"]))
+        return proc
+    except OSError as exc:
+        sys.stderr.write("codebyr-space : filtre réseau indisponible (%s)\n" % exc)
+        return None
+
+
+BOUCLIER_DIR = "/usr/share/codebyr/antiphishing"
+BOUCLIER_ID = "antiphishing@codebyr.io"
+
+
+def _domaines_proteges(espaces):
+    """Domaines des banques protégées (liste blanche des Espaces à réseau restreint)."""
+    out = []
+    for e in espaces.values():
+        r = e.get("reseau") or {}
+        if r.get("mode") == "liste-blanche":
+            for d in (r.get("domaines") or []):
+                d = d.strip().lstrip("*.")
+                if d and d not in out:
+                    out.append(d)
+    return out
+
+
+def _installer_bouclier(esp, home, espaces):
+    """Installe le bouclier anti-hameçonnage dans le profil Firefox d'un Espace
+    de navigation : avertit si un site imite une banque protégée."""
+    import zipfile
+    doms = _domaines_proteges(espaces)
+    if not doms or not os.path.isdir(BOUCLIER_DIR):
+        return
+    ffbase = os.path.join(home, ".mozilla", "firefox")
+    ffdir = os.path.join(ffbase, "codebyr.default")
+    extdir = os.path.join(ffdir, "extensions")
+    os.makedirs(extdir, exist_ok=True)
+    ini = os.path.join(ffbase, "profiles.ini")
+    if not os.path.exists(ini):
+        with open(ini, "w", encoding="utf-8") as f:
+            f.write("[Profile0]\nName=codebyr\nIsRelative=1\nPath=codebyr.default\n"
+                    "Default=1\n\n[General]\nStartWithLastProfile=1\nVersion=2\n")
+    prefs = [
+        'user_pref("xpinstall.signatures.required", false);',
+        'user_pref("extensions.autoDisableScopes", 0);',
+        'user_pref("extensions.enabledScopes", 15);',
+    ]
+    with open(os.path.join(ffdir, "user.js"), "a", encoding="utf-8") as f:
+        f.write("\n".join(prefs) + "\n")
+    try:
+        with open(os.path.join(BOUCLIER_DIR, "content.js"), encoding="utf-8") as f:
+            content = f.read()
+        with open(os.path.join(BOUCLIER_DIR, "manifest.json"), encoding="utf-8") as f:
+            manifest = f.read()
+    except OSError:
+        return
+    liste = ",".join('"%s"' % d.replace('"', "") for d in doms)
+    content = content.replace("/*__DOMAINES__*/", liste)
+    xpi = os.path.join(extdir, BOUCLIER_ID + ".xpi")
+    with zipfile.ZipFile(xpi, "w", zipfile.ZIP_DEFLATED) as z:
+        z.writestr("manifest.json", manifest)
+        z.writestr("content.js", content)
+    print("Bouclier anti-hameçonnage actif (%d domaine(s) de banque protégé(s))." % len(doms))
+
+
+def _visionneuse_pour(nom):
+    """Choisit une visionneuse CONCRÈTE selon le type de fichier, pour ouvrir une
+    pièce jointe sans passer par xdg-open/gvfs — qui échoue dans le bac à sable
+    blindé et hors-ligne (pas de service de lancement, pas de fuse)."""
+    ext = os.path.splitext(nom)[1].lower()
+
+    def premier(*cands):
+        for c in cands:
+            if shutil.which(c):
+                return [c]
+        return None
+
+    v = None
+    if ext == ".pdf":
+        v = premier("evince", "papers", "xpdf", "qpdfview")
+    elif ext in (".png", ".jpg", ".jpeg", ".gif", ".bmp", ".webp",
+                 ".svg", ".tiff", ".tif", ".ico"):
+        v = premier("loupe", "eog")
+    elif ext in (".html", ".htm", ".xhtml", ".mhtml"):
+        v = premier("firefox-esr", "firefox")
+    elif ext in (".odt", ".doc", ".docx", ".xls", ".xlsx", ".ods",
+                 ".ppt", ".pptx", ".odp", ".rtf", ".csv"):
+        v = premier("libreoffice", "soffice")
+    # Défaut (texte, sans extension, type inconnu) : éditeur de texte.
+    if v is None:
+        v = premier("gnome-text-editor", "gedit", "evince", "papers")
+    return v or ["xdg-open"]
+
+
+def cmd_launch(espaces, esp_id, extra, fichier=None):
+    esp = espaces.get(esp_id)
+    if not esp:
+        sys.stderr.write("Espace inconnu : %s\n" % esp_id)
+        return 2
+    home = espace_home(esp)
+    use_bwrap = bool(shutil.which("bwrap"))
+    runtime_home = os.path.expanduser("~") if use_bwrap else home
+
+    # Niveau d'isolation : « renforce » déclaré dans le registre (ex. Banque),
+    # ou imposé automatiquement pour l'examen d'une pièce jointe.
+    renforce = esp.get("blindage") == "renforce"
+    hors_ligne = False
+
+    # Fichier partagé dans l'Espace (ouverture jetable d'une pièce jointe) :
+    # copié dans l'Espace pour être visible dans le bac à sable isolé.
+    if fichier and os.path.isfile(fichier):
+        partage = os.path.join(home, "Partagé")
+        os.makedirs(partage, exist_ok=True)
+        nom = os.path.basename(fichier)
+        try:
+            shutil.copy2(fichier, os.path.join(partage, nom))
+        except OSError as exc:
+            sys.stderr.write("codebyr-space : copie du fichier impossible (%s)\n" % exc)
+        if not extra:
+            chemin = os.path.join(runtime_home, "Partagé", nom)
+            extra = _visionneuse_pour(nom) + [chemin]
+        # Sous cloche : une pièce jointe s'examine blindée ET sans réseau.
+        renforce = True
+        hors_ligne = True
+
+    app_cmd = extra if extra else desktop_exec(esp.get("app", "org.gnome.Nautilus.desktop"))
+    cmd = build_command(esp, home, app_cmd)
+
+    # Bus de session privé par Espace : les apps « mono-instance » (Fichiers,
+    # éditeur…) démarrent alors un vrai processus isolé au lieu de rouvrir une
+    # fenêtre de la session partagée — ce qui rétablit l'isolation ET le liseré.
+    if shutil.which("dbus-run-session"):
+        cmd = ["dbus-run-session", "--"] + cmd
+
+    env = dict(os.environ)
+    env["CODEBYR_ESPACE"] = esp["id"]
+    env["CODEBYR_ESPACE_COULEUR"] = esp["couleur"]
+    # Sous Wayland, c'est MOZ_APP_REMOTINGNAME qui fixe l'app_id de Firefox
+    # (donc la « classe » que lit l'extension pour colorer la fenêtre).
+    if "firefox" in os.path.basename(app_cmd[0]):
+        env["MOZ_APP_REMOTINGNAME"] = "codebyr-" + esp["id"]
+        # Force Firefox à utiliser NOTRE profil (profiles.ini Default=1) au lieu
+        # d'en créer un « dédié par installation » — sinon les réglages proxy du
+        # filtre réseau ne s'appliquent pas.
+        env["MOZ_LEGACY_PROFILES"] = "1"
+        env["MOZ_ALLOW_DOWNGRADE"] = "1"
+
+    ephemere = esp.get("ephemere")
+    if use_bwrap:
+        run = wrap_bwrap(home, cmd, env, renforce=renforce, hors_ligne=hors_ligne)
+        if renforce:
+            run = _plafonner_ressources(run)
+            detail = "Blindage actif" + (" · hors-ligne (aucun réseau)" if hors_ligne else "")
+            print("🛡  %s dans l'Espace %s." % (detail, esp["nom"]))
+    else:
+        env["HOME"] = home
+        run = cmd
+        sys.stderr.write("codebyr-space : bubblewrap absent, isolation réduite "
+                         "(dossier personnel séparé).\n")
+
+    print("Ouverture de « %s » dans l'Espace %s…" % (os.path.basename(cmd[0]), esp["nom"]))
+    import subprocess
+    # Répertoire d'exécution partagé avec l'extension GNOME : on y note
+    # « ce processus (et ses enfants) appartient à tel Espace », pour que
+    # l'extension colore la fenêtre par filiation, même sans marqueur de classe.
+    rundir = os.path.join(
+        os.environ.get("XDG_RUNTIME_DIR", "/run/user/%d" % os.getuid()), "codebyr")
+    try:
+        os.makedirs(rundir, exist_ok=True)
+    except OSError:
+        pass
+
+    proxy = _demarrer_filtre_reseau(esp, home, app_cmd)
+    # Bouclier anti-hameçonnage dans les navigateurs des Espaces NON bancaires
+    # (Banque est déjà protégé par sa liste blanche réseau).
+    reseau = esp.get("reseau") or {}
+    if reseau.get("mode") != "liste-blanche" and "firefox" in os.path.basename(app_cmd[0]):
+        try:
+            _installer_bouclier(esp, home, espaces)
+        except OSError as exc:
+            sys.stderr.write("codebyr-space : bouclier indisponible (%s)\n" % exc)
+
+    proc = subprocess.Popen(run, env=env)
+    mapfile = os.path.join(rundir, "pid-%d" % proc.pid)
+    try:
+        with open(mapfile, "w", encoding="utf-8") as f:
+            f.write(esp["id"])
+    except OSError:
+        mapfile = None
+    try:
+        rc = proc.wait()
+    finally:
+        if proxy:
+            try:
+                proxy.terminate()
+            except OSError:
+                pass
+        if mapfile:
+            try:
+                os.remove(mapfile)
+            except OSError:
+                pass
+        if ephemere and os.path.isdir(home) and home.startswith(tempfile.gettempdir()):
+            shutil.rmtree(home, ignore_errors=True)
+            print("Espace jetable détruit.")
+    return rc
+
+
+def _rundir():
+    return os.path.join(
+        os.environ.get("XDG_RUNTIME_DIR", "/run/user/%d" % os.getuid()), "codebyr")
+
+
+def cmd_close(espaces, esp_id):
+    """Ferme toutes les fenêtres/processus ouverts d'un Espace."""
+    import signal
+    rundir = _rundir()
+    ferme = 0
+    try:
+        noms = os.listdir(rundir)
+    except OSError:
+        noms = []
+    for name in noms:
+        if not name.startswith("pid-"):
+            continue
+        path = os.path.join(rundir, name)
+        try:
+            with open(path, encoding="utf-8") as f:
+                eid = f.read().strip()
+        except OSError:
+            continue
+        if eid != esp_id:
+            continue
+        try:
+            pid = int(name[4:])
+        except ValueError:
+            continue
+        try:
+            os.kill(pid, signal.SIGTERM)
+            ferme += 1
+        except OSError:
+            try:
+                os.remove(path)
+            except OSError:
+                pass
+    print("Espace %s : %d fenêtre(s) fermée(s)." % (esp_id, ferme))
+    return 0
+
+
+def cmd_purge(espaces, esp_id):
+    esp = espaces.get(esp_id)
+    if not esp:
+        sys.stderr.write("Espace inconnu : %s\n" % esp_id)
+        return 2
+    cmd_close(espaces, esp_id)   # on ferme d'abord les fenêtres ouvertes
+    d = os.path.join(DATA_ROOT, esp_id)
+    if os.path.isdir(d):
+        shutil.rmtree(d, ignore_errors=True)
+        print("Données de l'Espace %s effacées." % esp["nom"])
+    else:
+        print("Rien à effacer pour %s." % esp["nom"])
+    return 0
+
+
+BACKUP_DIR = os.path.expanduser("~/Espaces-Codebyr")
+
+
+def cmd_export(espaces, esp_id, dest=None):
+    """Sauvegarde un Espace dans une archive portable (copiable sur clé USB)."""
+    import tarfile
+    import time
+    esp = espaces.get(esp_id)
+    if not esp:
+        sys.stderr.write("Espace inconnu : %s\n" % esp_id)
+        return 2
+    home = os.path.join(DATA_ROOT, esp_id, "home")
+    if not os.path.isdir(home):
+        print("L'Espace %s est vide — rien à sauvegarder." % esp["nom"])
+        return 0
+    os.makedirs(BACKUP_DIR, exist_ok=True)
+    path = dest or os.path.join(
+        BACKUP_DIR, "%s-%s.tar.gz" % (esp_id, time.strftime("%Y%m%d-%H%M")))
+    with tarfile.open(path, "w:gz") as tar:
+        tar.add(home, arcname=".")
+    print("Espace %s sauvegardé : %s" % (esp["nom"], path))
+    return 0
+
+
+def cmd_import(espaces, esp_id, source=None):
+    """Restaure un Espace depuis une archive (portabilité entre machines)."""
+    import glob
+    import tarfile
+    esp = espaces.get(esp_id)
+    if not esp:
+        sys.stderr.write("Espace inconnu : %s\n" % esp_id)
+        return 2
+    if not source:
+        cands = sorted(glob.glob(os.path.join(BACKUP_DIR, "%s-*.tar.gz" % esp_id)))
+        if not cands:
+            print("Aucune sauvegarde trouvée pour %s." % esp["nom"])
+            return 1
+        source = cands[-1]
+    if not os.path.exists(source):
+        sys.stderr.write("Archive introuvable : %s\n" % source)
+        return 1
+    cmd_close(espaces, esp_id)
+    home = os.path.join(DATA_ROOT, esp_id, "home")
+    shutil.rmtree(home, ignore_errors=True)
+    os.makedirs(home, exist_ok=True)
+    with tarfile.open(source, "r:gz") as tar:
+        try:
+            tar.extractall(home, filter="data")   # sûr (Python 3.12+)
+        except TypeError:
+            tar.extractall(home)
+    print("Espace %s restauré depuis %s" % (esp["nom"], os.path.basename(source)))
+    return 0
+
+
+BUILTIN_IDS = ("personnel", "travail", "banque", "navigation", "jetable")
+
+
+def _registre_complet():
+    """Charge le registre complet (espaces + apps), depuis la copie utilisateur
+    si elle existe, sinon depuis la copie système."""
+    path = USER_REGISTRY if os.path.exists(USER_REGISTRY) else REGISTRY
+    try:
+        with open(path, encoding="utf-8") as f:
+            return json.load(f)
+    except (OSError, ValueError):
+        return {"espaces": [], "apps": []}
+
+
+def _ecrire_registre_utilisateur(data):
+    os.makedirs(os.path.dirname(USER_REGISTRY), exist_ok=True)
+    with open(USER_REGISTRY, "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
+
+
+def cmd_create(nom, couleur):
+    """Crée un Espace personnalisé (persistant), écrit dans le registre utilisateur."""
+    import re
+    import unicodedata
+    nom = nom.strip()
+    if not nom:
+        sys.stderr.write("Nom d'Espace vide.\n")
+        return 2
+    if not couleur.startswith("#"):
+        couleur = "#" + couleur
+    data = _registre_complet()
+    base = unicodedata.normalize("NFKD", nom).encode("ascii", "ignore").decode().lower()
+    base = re.sub(r"[^a-z0-9]+", "-", base).strip("-") or "espace"
+    ids = {e.get("id") for e in data.get("espaces", [])}
+    esp_id = base
+    n = 2
+    while esp_id in ids:
+        esp_id = "%s-%d" % (base, n)
+        n += 1
+    data.setdefault("espaces", []).append({
+        "id": esp_id, "nom": nom, "couleur": couleur,
+        "app": "org.gnome.Nautilus.desktop", "ephemere": False,
+    })
+    _ecrire_registre_utilisateur(data)
+    print("Espace « %s » créé (%s)." % (nom, couleur))
+    return 0
+
+
+def cmd_delete(esp_id):
+    """Supprime un Espace personnalisé (les Espaces intégrés ne sont pas supprimables)."""
+    if esp_id in BUILTIN_IDS:
+        sys.stderr.write("L'Espace intégré « %s » ne peut pas être supprimé.\n" % esp_id)
+        return 2
+    espaces = load_espaces()
+    cmd_close(espaces, esp_id)
+    data = _registre_complet()
+    avant = len(data.get("espaces", []))
+    data["espaces"] = [e for e in data.get("espaces", []) if e.get("id") != esp_id]
+    if len(data["espaces"]) == avant:
+        print("Espace introuvable : %s" % esp_id)
+        return 1
+    _ecrire_registre_utilisateur(data)
+    d = os.path.join(DATA_ROOT, esp_id)
+    if os.path.isdir(d):
+        shutil.rmtree(d, ignore_errors=True)
+    print("Espace supprimé : %s" % esp_id)
+    return 0
+
+
+def cmd_isolation():
+    """Rapporte, en clair, le niveau d'isolation réellement disponible ici."""
+    def oui_non(v):
+        return "\033[32moui\033[0m" if v else "\033[31mnon\033[0m"
+
+    bwrap = bool(shutil.which("bwrap"))
+    print("Capacités d'isolation de cette machine :")
+    print("  Bac à sable bubblewrap ....... %s" % oui_non(bwrap))
+    print("  Isolation utilisateur (user-ns) %s" % oui_non(user_ns_dispo()))
+    print("  Coupure réseau par Espace .... %s" % oui_non(bwrap))
+    print("  Plafonds mémoire / processus . %s" % oui_non(_systemd_scope_dispo()))
+    print("  Accélération matérielle KVM .. %s" % oui_non(kvm_dispo()))
+    print()
+    if bwrap:
+        print("Niveau : Blindage disponible (bac à sable + coupure réseau).")
+    else:
+        print("Niveau : réduit (dossiers séparés seulement).")
+    if kvm_dispo():
+        print("KVM présent : socle prêt pour un futur micro-VM à isolation matérielle.")
+    else:
+        print("KVM absent (machine virtuelle imbriquée ?) : micro-VM indisponible ici.")
+    return 0
+
+
+def main(argv):
+    espaces = load_espaces()
+    if len(argv) < 2 or argv[1] in ("-h", "--help", "help"):
+        print(__doc__)
+        return 0
+    action = argv[1]
+    if action == "list":
+        cmd_list(espaces)
+        return 0
+    if action == "isolation":
+        return cmd_isolation()
+    if action == "launch":
+        if len(argv) < 3:
+            sys.stderr.write("Usage : codebyr-space launch <espace> [--fichier <f>] [-- commande...]\n")
+            return 2
+        esp_id = argv[2]
+        rest = argv[3:]
+        fichier = None
+        extra = []
+        i = 0
+        while i < len(rest):
+            if rest[i] == "--fichier" and i + 1 < len(rest):
+                fichier = rest[i + 1]
+                i += 2
+            elif rest[i] == "--":
+                extra = rest[i + 1:]
+                break
+            else:
+                i += 1
+        return cmd_launch(espaces, esp_id, extra, fichier)
+    if action == "close":
+        if len(argv) < 3:
+            sys.stderr.write("Usage : codebyr-space close <espace>\n")
+            return 2
+        return cmd_close(espaces, argv[2])
+    if action == "purge":
+        if len(argv) < 3:
+            sys.stderr.write("Usage : codebyr-space purge <espace>\n")
+            return 2
+        return cmd_purge(espaces, argv[2])
+    if action == "export":
+        if len(argv) < 3:
+            sys.stderr.write("Usage : codebyr-space export <espace> [fichier]\n")
+            return 2
+        return cmd_export(espaces, argv[2], argv[3] if len(argv) > 3 else None)
+    if action == "import":
+        if len(argv) < 3:
+            sys.stderr.write("Usage : codebyr-space import <espace> [fichier]\n")
+            return 2
+        return cmd_import(espaces, argv[2], argv[3] if len(argv) > 3 else None)
+    if action == "create":
+        if len(argv) < 4:
+            sys.stderr.write("Usage : codebyr-space create <nom> <couleur>\n")
+            return 2
+        return cmd_create(argv[2], argv[3])
+    if action == "delete":
+        if len(argv) < 3:
+            sys.stderr.write("Usage : codebyr-space delete <espace>\n")
+            return 2
+        return cmd_delete(argv[2])
+    sys.stderr.write("Action inconnue : %s\n" % action)
+    return 2
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv))

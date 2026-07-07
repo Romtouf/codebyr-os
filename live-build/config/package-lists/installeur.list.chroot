@@ -1,0 +1,33 @@
+# Installeur graphique Calamares + socle Debian éprouvé (séquence de modules)
+calamares
+calamares-settings-debian
+
+# Contrôle de qualité des mots de passe (libpwquality exige ce dictionnaire ;
+# sans lui, TOUT mot de passe est rejeté avec « error loading dictionary »)
+cracklib-runtime
+
+# Copie du système sur le disque (module unpackfs : décompresse le squashfs)
+squashfs-tools
+
+# Enregistrement de l'entrée de démarrage UEFI (appelé par grub-install)
+efibootmgr
+
+# Outils de partitionnement / chiffrement requis par l'installeur
+cryptsetup
+cryptsetup-initramfs
+dosfstools
+e2fsprogs
+os-prober
+parted
+
+# Amorçage posé par Calamares dans le système cible.
+# (Recommends désactivés au build → on liste tout explicitement.)
+grub-common
+grub2-common
+grub-pc-bin
+grub-efi-amd64-bin
+grub-efi-amd64-signed
+shim-signed
+
+# Root GUI fiable via XWayland (xhost autorise root sur l'affichage)
+x11-xserver-utils

@@ -1,0 +1,51 @@
+desktop-image: "../splash.png"
+title-color: "#43C7DF"
+title-font: "Unifont Regular 16"
+title-text: "Codebyr OS"
+message-font: "Unifont Regular 16"
+terminal-font: "Unifont Regular 16"
+
+#help bar at the bottom
++ label {
+        top = 100%-50
+        left = 0
+        width = 100%
+        height = 20
+        text = "@KEYMAP_SHORT@"
+        align = "center"
+        color = "#6E8A97"
+	font = "Unifont Regular 16"
+}
+
+#boot menu
++ boot_menu {
+        left = 25%
+        width = 50%
+        top = 55%
+        height = 40%-40
+        item_color = "#CBD8DE"
+	item_font = "Unifont Regular 16"
+        selected_item_color= "#43C7DF"
+	selected_item_font = "Unifont Regular 16"
+        item_height = 20
+        item_padding = 4
+        item_spacing = 6
+	icon_width = 0
+	icon_heigh = 0
+	item_icon_space = 0
+}
+
+#progress bar
++ progress_bar {
+        id = "__timeout__"
+        left = 25%
+        top = 100%-70
+        height = 14
+        width = 50%
+        font = "Unifont Regular 16"
+        text_color = "#0A1318"
+        fg_color = "#43C7DF"
+        bg_color = "#22333B"
+        border_color = "#2B3E47"
+        text = "@TIMEOUT_NOTIFICATION_LONG@"
+}

@@ -1,0 +1,18 @@
+#!/bin/sh
+# codebyr-nettoyage-installation — exécuté PAR CALAMARES dans le système cible,
+# à la fin de l'installation. Retire les artefacts de la session live :
+#  - le compte de démonstration « user » (affiché « Codebyr » sur l'écran de
+#    connexion) et son sudo sans mot de passe ;
+#  - la connexion automatique pointant sur ce compte (sauf si l'utilisateur a
+#    choisi la connexion auto pour SON compte : Calamares l'a alors réécrite).
+# Le compte « Invité » est conservé : c'est le Mode invité de Codebyr OS.
+
+userdel -r user 2>/dev/null || true
+rm -f /etc/sudoers.d/codebyr-live
+
+if grep -q '^AutomaticLogin=user$' /etc/gdm3/daemon.conf 2>/dev/null; then
+    sed -i -e 's/^AutomaticLoginEnable=.*/AutomaticLoginEnable=false/' \
+           -e '/^AutomaticLogin=user$/d' /etc/gdm3/daemon.conf
+fi
+
+exit 0

@@ -1,0 +1,25 @@
+# Codebyr OS — durcissement (actif par défaut, invisible pour l'utilisateur)
+
+# Contrôle d'accès obligatoire
+apparmor
+apparmor-profiles
+apparmor-profiles-extra
+apparmor-utils
+
+# Pare-feu (tout fermé en entrée par défaut, voir hook 0200)
+nftables
+
+# Mises à jour de sécurité automatiques
+unattended-upgrades
+apt-listchanges
+
+# Chiffrement du disque (LUKS) — support pour le système installé
+cryptsetup
+cryptsetup-initramfs
+
+# Micrologiciels pour un large éventail de matériel réel
+firmware-linux
+firmware-misc-nonfree
+firmware-iwlwifi
+firmware-realtek
+firmware-atheros

@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=Ouvrir en Jetable
+Name[fr]=Ouvrir en Jetable
+Comment=Ouvrir ce fichier dans un Espace jetable isolé qui s'autodétruit
+Exec=codebyr-jetable %f
+Icon=io.codebyr.Jetable
+Terminal=false
+NoDisplay=true
+Categories=System;Security;
+MimeType=application/pdf;application/msword;application/vnd.openxmlformats-officedocument.wordprocessingml.document;application/vnd.ms-excel;application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;application/vnd.ms-powerpoint;application/vnd.openxmlformats-officedocument.presentationml.presentation;application/rtf;application/vnd.oasis.opendocument.text;application/vnd.oasis.opendocument.spreadsheet;application/zip;application/x-rar;application/x-7z-compressed;application/gzip;text/html;application/x-executable;application/x-shellscript;application/x-ms-dos-executable;

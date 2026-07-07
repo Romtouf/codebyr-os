@@ -1,0 +1,32 @@
+#!/bin/sh
+# codebyr-installer — lance l'installeur Calamares en root, de façon fiable.
+#
+# Calamares est une appli Qt : sous Wayland, la faire tourner en root est
+# capricieux. On force donc XWayland (QT_QPA_PLATFORM=xcb) et on autorise
+# temporairement root à se connecter à l'affichage. Le compte live dispose
+# de sudo sans mot de passe, d'où l'absence d'invite.
+set -e
+
+# Journal : si « rien ne se passe », la cause est ici.
+LOG="${XDG_CACHE_HOME:-$HOME/.cache}/codebyr-installer.log"
+mkdir -p "$(dirname "$LOG")" 2>/dev/null || true
+exec >>"$LOG" 2>&1
+echo "=== codebyr-installer $(date) ==="
+
+if ! command -v calamares >/dev/null 2>&1; then
+    echo "Calamares n'est pas installé (système déjà installé ?)." >&2
+    exit 1
+fi
+
+# Autorise root sur l'affichage X/XWayland le temps de l'installation.
+xhost +SI:localuser:root >/dev/null 2>&1 || true
+
+sudo -E env QT_QPA_PLATFORM=xcb \
+    DISPLAY="${DISPLAY:-:0}" \
+    XAUTHORITY="${XAUTHORITY:-}" \
+    XDG_RUNTIME_DIR="${XDG_RUNTIME_DIR}" \
+    calamares
+rc=$?
+
+xhost -SI:localuser:root >/dev/null 2>&1 || true
+exit $rc

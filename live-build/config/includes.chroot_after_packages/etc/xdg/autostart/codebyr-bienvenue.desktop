@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=Bienvenue dans Codebyr OS
+Name[fr]=Bienvenue dans Codebyr OS
+Comment=Tour de bienvenue au premier démarrage
+Exec=codebyr-bienvenue
+Icon=io.codebyr.Config
+Terminal=false
+X-GNOME-Autostart-enabled=true
+X-GNOME-Autostart-Delay=3
+NoDisplay=true

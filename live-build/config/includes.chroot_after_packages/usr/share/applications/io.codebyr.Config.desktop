@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=Configuration Codebyr
+Name[fr]=Configuration Codebyr
+Comment=Configurer vos sites bancaires protégés et vos Espaces
+Exec=codebyr-config
+Icon=io.codebyr.Config
+Terminal=false
+Categories=System;Settings;Security;
+StartupWMClass=io.codebyr.Config
+Keywords=configuration;banque;espaces;sécurité;codebyr;

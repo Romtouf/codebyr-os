@@ -1,0 +1,164 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+codebyr-assistant — l'assistant de sécurité de Codebyr OS.
+Explique en clair les situations de sécurité du quotidien. 100% local, privé.
+"""
+import glob
+import json
+import os
+
+import gi
+gi.require_version("Gtk", "4.0")
+gi.require_version("Adw", "1")
+from gi.repository import Adw, Gtk, Gio, GLib  # noqa: E402
+
+REGISTRY = "/etc/codebyr/espaces.json"
+
+CONNAITRE = [
+    ("Qu'est-ce qu'un Espace ?",
+     "Un Espace est une bulle étanche. Ce que vous faites dans « Banque » ne peut "
+     "pas être vu par « Navigation », et inversement. Chaque Espace a sa couleur : "
+     "le liseré autour d'une fenêtre vous dit d'un coup d'œil à quelle bulle elle "
+     "appartient. Si un Espace est un jour compromis, les autres restent intacts."),
+    ("Pourquoi certains sites sont bloqués dans Banque ?",
+     "L'Espace Banque n'a le droit de contacter QUE les sites de votre banque. Tout "
+     "le reste est bloqué. Ainsi, même si une page piégée s'ouvrait dans Banque, elle "
+     "ne pourrait rien envoyer à un pirate. Un site bloqué dans Banque, c'est la "
+     "protection qui marche — pas une panne."),
+    ("À quoi sert l'Espace Jetable ?",
+     "Il s'autodétruit dès que vous le fermez. Idéal pour ouvrir un lien ou un "
+     "fichier douteux : s'il est piégé, le piège disparaît avec l'Espace, sans "
+     "laisser la moindre trace sur votre ordinateur."),
+]
+
+REAGIR = [
+    ("Un écran rouge dit « site suspect » — que faire ?",
+     "C'est le bouclier anti-hameçonnage de Codebyr OS. Ce site imite votre banque "
+     "sans en être le vrai site. NE SAISISSEZ JAMAIS vos identifiants ici. Fermez "
+     "l'onglet. Pour votre vraie banque, utilisez toujours l'Espace Banque."),
+    ("Une application demande ma caméra ou mon micro — est-ce normal ?",
+     "Posez-vous une question simple : est-ce cohérent avec ce que fait l'appli ? "
+     "Un logiciel d'appel vidéo qui demande la caméra : normal. Un site d'actualité "
+     "ou un jeu qui la réclame : méfiance, refusez. Dans le doute, refusez — vous "
+     "pourrez toujours autoriser plus tard si besoin."),
+    ("Comment ouvrir un lien douteux sans risque ?",
+     "Menu du Sceau (en haut à droite) → « Ouvrir un lien en Jetable ». Le lien "
+     "s'ouvre dans une bulle éphémère : même piégé, il ne touche pas à vos données, "
+     "et tout disparaît à la fermeture."),
+    ("Je pense avoir été infecté — que faire ?",
+     "Pas de panique : le problème est confiné à un seul Espace. 1) Fermez l'Espace "
+     "concerné (menu Sceau → l'Espace → « Fermer cet Espace »). 2) Videz ses données, "
+     "ou mieux : « Revenir à un instantané… » d'avant le problème. Les autres Espaces "
+     "ne sont pas touchés."),
+    ("Je prête mon ordinateur — comment protéger mes données ?",
+     "Menu du Sceau → « Mode invité (prêter le PC) ». La personne arrive dans une "
+     "session séparée qui ne voit AUCUN de vos fichiers et qui repart à zéro. Vos "
+     "données restent privées."),
+]
+
+
+def _domaines_banque():
+    try:
+        with open(REGISTRY, encoding="utf-8") as f:
+            data = json.load(f)
+        for e in data.get("espaces", []):
+            r = e.get("reseau") or {}
+            if r.get("mode") == "liste-blanche":
+                return [d.lstrip("*.") for d in (r.get("domaines") or [])]
+    except (OSError, ValueError):
+        pass
+    return []
+
+
+def _espaces_ouverts():
+    rundir = os.path.join(
+        os.environ.get("XDG_RUNTIME_DIR", "/run/user/%d" % os.getuid()), "codebyr")
+    ids = set()
+    for f in glob.glob(os.path.join(rundir, "pid-*")):
+        try:
+            with open(f, encoding="utf-8") as h:
+                ids.add(h.read().strip())
+        except OSError:
+            pass
+    return sorted(ids)
+
+
+class Fenetre(Adw.ApplicationWindow):
+    def __init__(self, app):
+        super().__init__(application=app, title="Assistant de sécurité")
+        self.set_default_size(720, 620)
+
+        page = Adw.PreferencesPage()
+
+        intro = Adw.PreferencesGroup(
+            title="Bonjour 👋",
+            description="Je suis l'assistant de Codebyr OS. Je réponds en clair aux "
+                        "questions de sécurité du quotidien. Tout reste sur votre "
+                        "ordinateur : je ne consulte aucun serveur.")
+        page.add(intro)
+
+        etat = Adw.PreferencesGroup(title="En ce moment")
+        etat.add(self._info("Bouclier anti-hameçonnage", "Actif — il veille sur vos "
+                            "Espaces de navigation.", "security-high-symbolic"))
+        doms = _domaines_banque()
+        if doms:
+            etat.add(self._info(
+                "Espace Banque", "Réseau restreint à %d site(s) de confiance : %s."
+                % (len(doms), ", ".join(doms)), "network-wireless-symbolic"))
+        ouverts = _espaces_ouverts()
+        etat.add(self._info(
+            "Espaces ouverts",
+            (", ".join(ouverts) if ouverts else "Aucun Espace ouvert pour l'instant."),
+            "view-grid-symbolic"))
+        page.add(etat)
+
+        g1 = Adw.PreferencesGroup(title="Comprendre Codebyr OS")
+        for q, a in CONNAITRE:
+            g1.add(self._qa(q, a))
+        page.add(g1)
+
+        g2 = Adw.PreferencesGroup(title="Réagir à une alerte")
+        for q, a in REAGIR:
+            g2.add(self._qa(q, a))
+        page.add(g2)
+
+        tv = Adw.ToolbarView()
+        header = Adw.HeaderBar()
+        header.set_title_widget(Adw.WindowTitle(title="Assistant de sécurité",
+                                                subtitle="Codebyr OS"))
+        tv.add_top_bar(header)
+        tv.set_content(page)
+        self.set_content(tv)
+
+    def _qa(self, question, reponse):
+        exp = Adw.ExpanderRow(title=question)
+        lbl = Gtk.Label(label=reponse, wrap=True, xalign=0)
+        lbl.set_margin_top(6)
+        lbl.set_margin_bottom(12)
+        lbl.set_margin_start(14)
+        lbl.set_margin_end(14)
+        lbl.add_css_class("body")
+        exp.add_row(lbl)
+        return exp
+
+    def _info(self, titre, sous_titre, icone):
+        row = Adw.ActionRow(title=titre, subtitle=sous_titre)
+        row.add_prefix(Gtk.Image.new_from_icon_name(icone))
+        return row
+
+
+class Assistant(Adw.Application):
+    def __init__(self):
+        super().__init__(application_id="io.codebyr.Assistant",
+                         flags=Gio.ApplicationFlags.FLAGS_NONE)
+
+    def do_activate(self):
+        win = self.props.active_window
+        if not win:
+            win = Fenetre(self)
+        win.present()
+
+
+if __name__ == "__main__":
+    Assistant().run(None)

@@ -1,0 +1,38 @@
+/* Codebyr OS — tokens officiels (source de vérité : charte-graphique.html) */
+
+:root {
+  /* Signature */
+  --cb-accent: #0B87A0;         /* texte / éléments interactifs */
+  --cb-accent-graphic: #10A5C2; /* logo, illustrations, grands aplats */
+
+  /* Neutres (biais cyan, jamais de gris pur) */
+  --cb-bg: #F4F7F8;
+  --cb-surface: #FFFFFF;
+  --cb-ink: #12222C;
+  --cb-ink-2: #4A5D68;
+  --cb-line: #DBE4E8;
+
+  /* Espaces — langage fonctionnel, jamais décoratif */
+  --esp-personnel: #4E8FEF;   /* Azur */
+  --esp-travail: #8F6CF0;     /* Améthyste */
+  --esp-banque: #2FA36B;      /* Émeraude */
+  --esp-navigation: #E09A32;  /* Ambre */
+  --esp-jetable: #E25551;     /* Braise — toujours avec trait pointillé */
+  --esp-systeme: #6E7E89;     /* Ardoise — réservé au système */
+
+  /* Fenêtres */
+  --cb-lisere: 3px;           /* liseré coloré des fenêtres */
+  --cb-pastille: 10px;        /* pastille de barre de titre */
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --cb-accent: #43C7DF;
+    --cb-accent-graphic: #2FB9D4;
+    --cb-bg: #0B1419;
+    --cb-surface: #111D24;
+    --cb-ink: #E7EEF1;
+    --cb-ink-2: #93A6B0;
+    --cb-line: #223540;
+  }
+}

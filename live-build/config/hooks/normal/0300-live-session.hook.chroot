@@ -1,0 +1,56 @@
+#!/bin/sh
+# Codebyr OS — session live : compte utilisateur, connexion automatique, hostname.
+# NOTE : réglages pensés pour la session live de démonstration (Phase 1).
+# La vraie création de compte sécurisée viendra avec l'installateur (Phase 4).
+set -e
+
+echo "P: Codebyr — configuration de la session live"
+
+# — Nom de machine —
+echo "codebyr" > /etc/hostname
+cat > /etc/hosts <<'EOF'
+127.0.0.1	localhost
+127.0.1.1	codebyr
+::1		localhost ip6-localhost ip6-allnodes ip6-allrouters
+ff02::1		ip6-allnodes
+ff02::2		ip6-allrouters
+EOF
+
+# — Compte de session « user » (mot de passe : live) —
+if ! id user >/dev/null 2>&1; then
+	useradd --create-home --shell /bin/bash --uid 1000 --user-group \
+		--groups sudo,audio,video,netdev,plugdev,cdrom,dip,users \
+		--comment "Codebyr" user
+fi
+echo 'user:live' | chpasswd
+
+# — Connexion automatique GDM (le bureau s'ouvre directement) —
+mkdir -p /etc/gdm3
+cat > /etc/gdm3/daemon.conf <<'EOF'
+[daemon]
+AutomaticLoginEnable=true
+AutomaticLogin=user
+WaylandEnable=true
+
+[security]
+
+[xdmcp]
+
+[chooser]
+
+[debug]
+EOF
+
+# — sudo sans mot de passe pour la démo live —
+mkdir -p /etc/sudoers.d
+echo 'user ALL=(ALL) NOPASSWD:ALL' > /etc/sudoers.d/codebyr-live
+chmod 440 /etc/sudoers.d/codebyr-live
+
+# — On neutralise les composants live-config qui géreraient (mal) compte/login,
+#   pour que NOTRE configuration soit la seule et fasse foi. —
+rm -f /lib/live/config/0030-live-debconfig_passwd \
+      /lib/live/config/0030-user-setup \
+      /lib/live/config/0040-sudo \
+      /lib/live/config/1130-login 2>/dev/null || true
+
+echo "P: Codebyr — session live prête (user / live, connexion auto)"

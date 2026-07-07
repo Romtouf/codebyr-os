@@ -1,0 +1,22 @@
+#!/bin/sh
+# Codebyr OS — support multilingue : toutes les langues dispo, français par défaut.
+set -e
+echo "P: Codebyr — configuration des langues"
+
+# Si locales-all est présent, TOUTES les locales sont déjà là : on ne relance
+# PAS locale-gen (il réduirait l'archive à fr_FR/en_US seulement).
+if ! dpkg -l locales-all 2>/dev/null | grep -q '^ii'; then
+	cat > /etc/locale.gen <<'EOF'
+fr_FR.UTF-8 UTF-8
+en_US.UTF-8 UTF-8
+EOF
+	command -v locale-gen >/dev/null 2>&1 && locale-gen
+fi
+
+# Langue par défaut du système : français
+cat > /etc/default/locale <<'EOF'
+LANG=fr_FR.UTF-8
+LANGUAGE=fr_FR:fr
+EOF
+
+echo "P: Codebyr — langues prêtes (toutes dispo, fr_FR par défaut)"

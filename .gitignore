@@ -1,0 +1,14 @@
+# Images ISO et artefacts de build (trop lourds pour git — voir Releases)
+dist/
+*.iso
+*.iso.sha256
+
+# Arbres de build live-build (générés)
+.build/
+cache/
+chroot/
+binary/
+
+# Divers
+*.log
+*.tmp

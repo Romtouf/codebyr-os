@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 96" width="400" height="96">
+  <!-- Logo horizontal pour l'écran de connexion (remplace le logo Debian+version) -->
+  <g transform="translate(48,48) scale(0.82) translate(-50,-50)" fill="none" stroke-width="13" stroke-linecap="round">
+    <path d="M 84.64 70 A 40 40 0 0 1 19.36 75.71" stroke="#43C7DF"/>
+    <path d="M 13.75 66.91 A 40 40 0 0 1 36.32 12.42" stroke="#43C7DF"/>
+    <path d="M 46.51 10.15 A 40 40 0 0 1 84.64 30" stroke="#43C7DF"/>
+  </g>
+  <circle cx="48" cy="48" r="8" fill="#43C7DF"/>
+  <text x="104" y="60" font-family="DejaVu Sans, sans-serif" font-size="42" font-weight="bold"
+        letter-spacing="-1" fill="#E7EEF1">codebyr<tspan fill="#43C7DF"> OS</tspan></text>
+</svg>

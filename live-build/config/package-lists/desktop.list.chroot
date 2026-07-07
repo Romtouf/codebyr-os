@@ -1,0 +1,26 @@
+# Codebyr OS — bureau GNOME (base épurée et fluide)
+# Le cœur GNOME : Shell, GDM, Fichiers, Réglages, réseau, etc.
+gnome-core
+gdm3
+
+# Terminal moderne + gestionnaire d'archives + visionneuses
+gnome-console
+file-roller
+loupe
+evince
+
+# Boutique d'applications orientée Flatpak (modèle de permissions smartphone)
+gnome-software
+gnome-software-plugin-flatpak
+flatpak
+
+# Réglages avancés + navigateur par défaut
+gnome-tweaks
+firefox-esr
+
+# Polices (Adwaita Sans = base GNOME, alignée sur l'identité Codebyr)
+fonts-recommended
+fonts-noto-color-emoji
+
+# Réseau (Wi-Fi/VPN via l'interface GNOME)
+network-manager-gnome

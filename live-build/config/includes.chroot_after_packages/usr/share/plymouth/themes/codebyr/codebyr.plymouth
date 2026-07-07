@@ -1,0 +1,8 @@
+[Plymouth Theme]
+Name=Codebyr OS
+Description=Écran de démarrage de Codebyr OS
+ModuleName=script
+
+[script]
+ImageDir=/usr/share/plymouth/themes/codebyr
+ScriptFile=/usr/share/plymouth/themes/codebyr/codebyr.script

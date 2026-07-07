@@ -1,0 +1,95 @@
+#!/bin/sh
+# Codebyr OS — supprime les derniers restes de branding Debian visibles.
+set -e
+
+echo "P: Codebyr — dé-branding Debian"
+
+# — Identité complète (os-release : logo + version propre) —
+cat > /etc/os-release <<'EOF'
+PRETTY_NAME="Codebyr OS 1.0"
+NAME="Codebyr OS"
+VERSION_ID="1.0"
+VERSION="1.0"
+VERSION_CODENAME=codebyr
+ID=codebyr
+ID_LIKE=debian
+LOGO=codebyr-logo
+HOME_URL="https://codebyr.io/"
+SUPPORT_URL="https://codebyr.io/aide"
+BUG_REPORT_URL="https://codebyr.io/bug"
+EOF
+# /usr/lib/os-release est lu par certains outils : on l'aligne.
+cp -f /etc/os-release /usr/lib/os-release 2>/dev/null || true
+
+# — lsb-release (lu par lsb_release, certains outils système) —
+cat > /etc/lsb-release <<'EOF'
+DISTRIB_ID=Codebyr
+DISTRIB_RELEASE=1.0
+DISTRIB_CODENAME=codebyr
+DISTRIB_DESCRIPTION="Codebyr OS 1.0"
+EOF
+
+# — Clavier système AZERTY (console + défaut X/Wayland) —
+cat > /etc/default/keyboard <<'EOF'
+XKBMODEL="pc105"
+XKBLAYOUT="fr"
+XKBVARIANT=""
+XKBOPTIONS=""
+BACKSPACE="guess"
+EOF
+
+# — Remplace l'emblème/logo Debian par le Sceau Codebyr (là où il s'afficherait) —
+LOGO=/usr/share/icons/hicolor/scalable/apps/codebyr-logo.svg
+if [ -f "$LOGO" ]; then
+	for f in $(find /usr/share/icons -iname "emblem-debian*.svg" 2>/dev/null); do
+		cp -f "$LOGO" "$f"
+	done
+	# distributor-logo éventuel
+	for f in $(find /usr/share/icons -iname "*distributor-logo*.svg" 2>/dev/null); do
+		cp -f "$LOGO" "$f"
+	done
+	if command -v rsvg-convert >/dev/null 2>&1; then
+		for f in $(find /usr/share/icons -iname "emblem-debian*.png" 2>/dev/null); do
+			sz=$(basename "$(dirname "$(dirname "$f")")" | cut -dx -f1)
+			[ -n "$sz" ] && [ "$sz" -eq "$sz" ] 2>/dev/null && \
+				rsvg-convert -w "$sz" -h "$sz" "$LOGO" -o "$f" 2>/dev/null || true
+		done
+	fi
+fi
+
+# — Logo Debian + version « Debian 13 » du greeter → logo Codebyr « codebyr OS » —
+GL=/usr/share/backgrounds/codebyr/greeter-logo.svg
+DL=/usr/share/desktop-base/debian-logos
+if [ -f "$GL" ] && command -v rsvg-convert >/dev/null 2>&1; then
+	for h in 64 128 256; do
+		[ -e "$DL/logo-text-version-$h.png" ] && \
+			rsvg-convert -h "$h" "$GL" -o "$DL/logo-text-version-$h.png" 2>/dev/null || true
+	done
+	[ -e "$DL/logo-text-version.svg" ] && cp -f "$GL" "$DL/logo-text-version.svg" || true
+	# Autres logos Debian carrés (image simple) -> le Sceau
+	# (on exclut logo-text-version* déjà traité en logo textuel juste au-dessus)
+	for f in $(find "$DL" -iname "logo-*.png" ! -iname "logo-text-version*" 2>/dev/null); do
+		sz=$(basename "$f" .png | sed 's/[^0-9]//g')
+		[ -n "$sz" ] && rsvg-convert -w "$sz" -h "$sz" "$LOGO" -o "$f" 2>/dev/null || true
+	done
+fi
+# Autres logos Debian visibles (pixmaps, emblème « vendor »)
+[ -f /usr/share/pixmaps/debian-logo.png ] && command -v rsvg-convert >/dev/null 2>&1 && \
+	rsvg-convert -w 96 -h 96 "$LOGO" -o /usr/share/pixmaps/debian-logo.png 2>/dev/null || true
+for f in $(find /usr/share/icons/vendor -iname "emblem-vendor*.svg" 2>/dev/null); do
+	cp -f "$LOGO" "$f"
+done
+
+# — Remplace les fonds Debian (connexion / verrouillage) par le fond Codebyr —
+BG=/usr/share/backgrounds/codebyr/codebyr-sombre.svg
+if [ -f "$BG" ]; then
+	for f in $(find /usr/share/desktop-base -path "*login*" -name "*.svg" -o \
+	                -path "*lockscreen*" -name "*.svg" 2>/dev/null); do
+		cp -f "$BG" "$f"
+	done
+fi
+
+# — Rafraîchit le cache d'icônes —
+gtk-update-icon-cache -f /usr/share/icons/hicolor 2>/dev/null || true
+
+echo "P: Codebyr — dé-branding terminé"

@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 3840 2160" width="3840" height="2160">
+  <defs>
+    <linearGradient id="fond" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0A1318"/>
+      <stop offset="1" stop-color="#0E1E27"/>
+    </linearGradient>
+    <radialGradient id="lueur" cx="0.5" cy="0.5" r="0.6">
+      <stop offset="0" stop-color="#10A5C2" stop-opacity="0.12"/>
+      <stop offset="1" stop-color="#10A5C2" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="3840" height="2160" fill="url(#fond)"/>
+  <rect width="3840" height="2160" fill="url(#lueur)"/>
+  <!-- Le Sceau, centré -->
+  <g transform="translate(1920,1080) scale(13) translate(-50,-50)" fill="none" stroke-width="13" stroke-linecap="round">
+    <path d="M 84.64 70 A 40 40 0 0 1 19.36 75.71" stroke="#4E8FEF" stroke-opacity="0.10"/>
+    <path d="M 13.75 66.91 A 40 40 0 0 1 36.32 12.42" stroke="#8F6CF0" stroke-opacity="0.10"/>
+    <path d="M 46.51 10.15 A 40 40 0 0 1 84.64 30" stroke="#2FA36B" stroke-opacity="0.10"/>
+  </g>
+  <circle cx="1920" cy="1080" r="34" fill="#43C7DF" fill-opacity="0.45"/>
+</svg>

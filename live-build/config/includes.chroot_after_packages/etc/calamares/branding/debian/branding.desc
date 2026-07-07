@@ -1,0 +1,44 @@
+# Habillage Codebyr OS pour Calamares.
+# Structure calquée sur le branding.desc officiel de calamares-settings-debian
+# (mêmes clés, mêmes sections — seul le contenu est Codebyr). Le composant
+# garde le nom « debian » car le settings.conf du paquet y fait référence :
+# on réutilise ainsi sa séquence de modules (partition, bootloader…) éprouvée.
+---
+componentName:   debian
+welcomeStyleCalamares: true
+welcomeExpandingLogo: true
+windowExpanding: normal
+windowSize: 820px,560px
+windowPlacement: center
+
+strings:
+    productName:         Codebyr OS
+    shortProductName:    Codebyr
+    version:             1.0
+    shortVersion:        1.0
+    versionedName:       Codebyr OS 1.0
+    shortVersionedName:  Codebyr 1.0
+    bootloaderEntryName: Codebyr
+    productUrl:          https://codebyr.io
+    supportUrl:          https://codebyr.io
+    knownIssuesUrl:      https://codebyr.io
+    releaseNotesUrl:     https://codebyr.io
+    donateUrl:           https://codebyr.io
+
+sidebar: widget
+navigation: widget
+
+images:
+    productLogo:         "logo.svg"
+    productIcon:         "logo.svg"
+    productWelcome:      "logo.svg"
+
+slideshow:               "show.qml"
+
+style:
+   SidebarBackground:    "#12222C"
+   SidebarText:          "#FFFFFF"
+   SidebarTextCurrent:   "#43C7DF"
+   SidebarBackgroundCurrent: "#0E1B24"
+
+slideshowAPI: 2

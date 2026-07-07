@@ -1,0 +1,54 @@
+#!/bin/sh
+# Codebyr OS — durcissement appliqué à l'image (Phase 1).
+# La sécurité est le défaut : l'utilisateur n'a rien à configurer.
+set -e
+
+echo "P: Codebyr — durcissement du système"
+
+# — AppArmor en enforce dès le démarrage —
+systemctl enable apparmor.service || true
+
+# — Pare-feu nftables : entrée fermée par défaut —
+cat > /etc/nftables.conf <<'EOF'
+#!/usr/sbin/nft -f
+flush ruleset
+table inet filter {
+	chain input {
+		type filter hook input priority 0; policy drop;
+		ct state established,related accept
+		iif "lo" accept
+		ct state invalid drop
+		ip protocol icmp accept
+		ip6 nexthdr ipv6-icmp accept
+		# Phase 2 : les Espaces déclareront ici leurs autorisations réseau.
+	}
+	chain forward { type filter hook forward priority 0; policy drop; }
+	chain output  { type filter hook output priority 0; policy accept; }
+}
+EOF
+chmod 755 /etc/nftables.conf
+systemctl enable nftables.service || true
+
+# — Mises à jour de sécurité automatiques —
+cat > /etc/apt/apt.conf.d/20auto-upgrades <<'EOF'
+APT::Periodic::Update-Package-Lists "1";
+APT::Periodic::Unattended-Upgrade "1";
+EOF
+systemctl enable unattended-upgrades.service || true
+
+# — Durcissement noyau (sysctl) —
+cat > /etc/sysctl.d/90-codebyr-hardening.conf <<'EOF'
+kernel.kptr_restrict=2
+kernel.dmesg_restrict=1
+kernel.yama.ptrace_scope=1
+net.ipv4.conf.all.rp_filter=1
+net.ipv4.conf.all.accept_redirects=0
+net.ipv6.conf.all.accept_redirects=0
+net.ipv4.conf.all.send_redirects=0
+fs.protected_hardlinks=1
+fs.protected_symlinks=1
+fs.protected_fifos=1
+fs.protected_regular=2
+EOF
+
+echo "P: Codebyr — durcissement terminé"

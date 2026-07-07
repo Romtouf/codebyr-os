@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 120" width="320" height="120">
+  <g fill="none" stroke="#43C7DF" stroke-width="11" stroke-linecap="round">
+    <path d="M 94.64 80 A 40 40 0 0 1 29.36 85.71"/>
+    <path d="M 23.75 76.91 A 40 40 0 0 1 46.32 22.42"/>
+    <path d="M 56.51 20.15 A 40 40 0 0 1 94.64 40"/>
+  </g>
+  <circle cx="60" cy="60" r="9" fill="#43C7DF"/>
+  <text x="120" y="72" font-family="Cantarell, DejaVu Sans, sans-serif" font-size="42" font-weight="700" fill="#12222C">codebyr</text>
+  <text x="120" y="72" font-family="Cantarell, DejaVu Sans, sans-serif" font-size="42" font-weight="700" fill="#12222C" opacity="0"> </text>
+  <text x="285" y="52" font-family="Cantarell, DejaVu Sans, sans-serif" font-size="18" font-weight="600" fill="#43C7DF">OS</text>
+</svg>

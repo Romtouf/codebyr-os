@@ -1,0 +1,19 @@
+#!/bin/sh
+# 0700-permissions — garantit que les exécutables et scripts Codebyr sont bien
+# exécutables, indépendamment de la façon dont les fichiers ont été copiés
+# (le montage Windows/WSL peut perdre le bit +x).
+set -e
+
+for f in /usr/bin/codebyr-*; do
+    [ -f "$f" ] && chmod 755 "$f"
+done
+
+# Extension GNOME Shell (JS lu, pas exécuté, mais on normalise les droits).
+if [ -d /usr/share/gnome-shell/extensions/codebyr@codebyr.io ]; then
+    find /usr/share/gnome-shell/extensions/codebyr@codebyr.io -type f -exec chmod 644 {} +
+fi
+
+# Filtre réseau et bouclier : lisibles.
+[ -d /usr/share/codebyr ] && find /usr/share/codebyr -type f -exec chmod 644 {} + || true
+
+echo "0700-permissions : droits des composants Codebyr normalisés."

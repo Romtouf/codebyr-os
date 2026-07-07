@@ -1,0 +1,5 @@
+# Distro Linux : tout en LF, toujours (les scripts CRLF cassent dans le chroot)
+* text=auto eol=lf
+*.png binary
+*.jpg binary
+*.ico binary

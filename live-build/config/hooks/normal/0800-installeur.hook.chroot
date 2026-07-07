@@ -1,0 +1,43 @@
+#!/bin/sh
+# 0800-installeur — intègre l'installeur Calamares habillé Codebyr.
+set -e
+
+# 1) Forcer l'usage de NOTRE habillage (dossier branding/debian) quelle que soit
+#    la valeur par défaut fournie par calamares-settings-debian.
+if [ -f /etc/calamares/settings.conf ]; then
+    if grep -q '^branding:' /etc/calamares/settings.conf; then
+        sed -i 's/^branding:.*/branding: debian/' /etc/calamares/settings.conf
+    else
+        echo 'branding: debian' >> /etc/calamares/settings.conf
+    fi
+fi
+
+# 2) Nettoyage post-installation : insérer notre job shellprocess@codebyr
+#    dans la séquence (après « packages »), et déclarer son instance.
+if [ -f /etc/calamares/settings.conf ] && \
+   ! grep -q 'shellprocess@codebyr' /etc/calamares/settings.conf; then
+    sed -i '/^  - packages$/a\  - shellprocess@codebyr' /etc/calamares/settings.conf
+    cat >> /etc/calamares/settings.conf <<'EOF'
+
+# Instance Codebyr : nettoyage des artefacts live dans le système installé.
+instances:
+- id: codebyr
+  module: shellprocess
+  config: shellprocess-codebyr.conf
+EOF
+fi
+
+# 2bis) Masquer les lanceurs Calamares génériques : on ne garde que le nôtre
+#    (« Installer Codebyr OS »).
+for d in /usr/share/applications/calamares*.desktop \
+         /usr/share/applications/install-debian.desktop; do
+    [ -f "$d" ] || continue
+    grep -q '^NoDisplay=true' "$d" || echo 'NoDisplay=true' >> "$d"
+done
+
+# 3) Droits.
+[ -f /usr/bin/codebyr-installer ] && chmod 755 /usr/bin/codebyr-installer
+[ -d /etc/calamares/branding/debian ] && \
+    find /etc/calamares/branding/debian -type f -exec chmod 644 {} +
+
+echo "0800-installeur : Calamares habillé Codebyr, lanceur unique."

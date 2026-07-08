@@ -19,3 +19,16 @@ firmware-atheros
 firmware-brcm80211
 firmware-sof-signed
 bluez-firmware
+
+# Gestion de l'énergie (portables) — sans lui, le panneau Alimentation de
+# GNOME est vide et la batterie n'est pas optimisée.
+power-profiles-daemon
+
+# Impression : découverte + config + impression sans pilote (IPP moderne)
+cups-browsed
+cups-filters
+ipp-usb
+system-config-printer
+
+# Mises à jour de firmware/BIOS (LVFS)
+fwupd

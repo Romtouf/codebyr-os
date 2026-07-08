@@ -1,0 +1,7 @@
+# Codecs multimédia — sans eux, de nombreuses vidéos web et fichiers
+# audio/vidéo (mp3, h264, aac…) ne se lisent pas. Recommends écartés par
+# --apt-recommends false, d'où la liste explicite.
+gstreamer1.0-plugins-ugly
+gstreamer1.0-libav
+gstreamer1.0-pipewire
+ffmpeg

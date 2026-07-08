@@ -23,3 +23,6 @@ firmware-misc-nonfree
 firmware-iwlwifi
 firmware-realtek
 firmware-atheros
+
+# Vérification GPG des téléchargements Codebyr (codebyr-verifier)
+gnupg

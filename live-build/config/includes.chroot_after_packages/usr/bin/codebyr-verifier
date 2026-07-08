@@ -1,0 +1,51 @@
+#!/bin/sh
+# codebyr-verifier — vérifie l'authenticité et l'intégrité d'un téléchargement
+# Codebyr OS (ISO ou mise à jour) à l'aide de la clé publique du projet,
+# embarquée dans le système.
+#
+# Usage :
+#   codebyr-verifier <SHA256SUMS> [SHA256SUMS.asc]
+#
+# Place SHA256SUMS, SHA256SUMS.asc et l'ISO dans le même dossier, puis :
+#   codebyr-verifier SHA256SUMS
+set -e
+
+CLE=/usr/share/codebyr/codebyr-signing-key.asc
+EMPREINTE="E6FB6616EC58E15F40DA876CB1E8C803CE596E68"
+
+if [ $# -lt 1 ]; then
+    echo "Usage : codebyr-verifier <SHA256SUMS> [SHA256SUMS.asc]" >&2
+    exit 2
+fi
+SUMS="$1"
+ASC="${2:-$1.asc}"
+
+for f in "$CLE" "$SUMS" "$ASC"; do
+    [ -f "$f" ] || { echo "Fichier introuvable : $f" >&2; exit 2; }
+done
+command -v gpg >/dev/null 2>&1 || { echo "gpg absent." >&2; exit 2; }
+
+GNUPGHOME="$(mktemp -d)"
+export GNUPGHOME
+trap 'rm -rf "$GNUPGHOME"' EXIT
+chmod 700 "$GNUPGHOME"
+
+gpg --quiet --import "$CLE" 2>/dev/null
+
+printf '→ Clé de signature attendue : %s\n' "$EMPREINTE"
+printf '→ Vérification de la signature…\n'
+if gpg --status-fd 1 --verify "$ASC" "$SUMS" 2>/dev/null | grep -q "VALIDSIG $EMPREINTE"; then
+    printf '  \033[32m✓ Signature authentique (Codebyr OS).\033[0m\n'
+else
+    printf '  \033[31m✗ SIGNATURE INVALIDE — n'\''utilisez PAS ce fichier.\033[0m\n' >&2
+    exit 1
+fi
+
+printf '→ Vérification de l'\''empreinte du fichier…\n'
+DIR="$(dirname "$SUMS")"
+if ( cd "$DIR" && sha256sum -c "$(basename "$SUMS")" ); then
+    printf '\033[32m✓ Tout est bon : le téléchargement est authentique et intact.\033[0m\n'
+else
+    printf '\033[31m✗ Empreinte incorrecte — fichier corrompu ou altéré.\033[0m\n' >&2
+    exit 1
+fi

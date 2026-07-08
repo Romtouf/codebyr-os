@@ -439,7 +439,9 @@ class Indicateur extends PanelMenu.Button {
             y_align: Clutter.ActorAlign.CENTER,
         });
         sub.insert_child_at_index(pastille, 1);
-        for (const app of this._apps)
+        // Applications propres à l'Espace si définies (e.apps), sinon liste commune.
+        const apps = (Array.isArray(e.apps) && e.apps.length) ? e.apps : this._apps;
+        for (const app of apps)
             sub.menu.addAction(app.nom, () => this._lancer(e.id, app.cmd));
         sub.menu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
         sub.menu.addAction('Fermer cet Espace', () => this._gerer('close', e.id, e.nom));

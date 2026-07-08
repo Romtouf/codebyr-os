@@ -8,3 +8,8 @@ gnome-software-plugin-flatpak
 
 # Métadonnées de catalogue (noms, icônes, descriptions des applications)
 appstream
+
+# Certificats racines TLS — SANS eux, AUCUN HTTPS système ne fonctionne
+# (flatpak : « [77] Problem with the SSL CA cert »). Recommends éliminé
+# par --apt-recommends false, d'où sa présence explicite ici.
+ca-certificates

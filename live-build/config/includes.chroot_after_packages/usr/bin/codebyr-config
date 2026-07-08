@@ -5,8 +5,11 @@ codebyr-config — Configuration de Codebyr OS.
 Permet à chacun de définir SES vrais sites bancaires (protégés + surveillés par
 le bouclier anti-hameçonnage) et de voir ses Espaces. 100% local.
 """
+import configparser
+import glob
 import json
 import os
+import re
 import shutil
 
 import gi
@@ -64,11 +67,51 @@ def capacites_machine():
     ]
 
 
+def apps_installees():
+    """Détecte les applications installées via leurs fichiers .desktop
+    (système, utilisateur, Flatpak). Renvoie une liste triée de (nom, commande),
+    codes de champ (%U, %f…) retirés, sans doublons ni entrées cachées."""
+    dossiers = [
+        "/usr/share/applications",
+        "/var/lib/flatpak/exports/share/applications",
+        os.path.expanduser("~/.local/share/applications"),
+        os.path.expanduser("~/.local/share/flatpak/exports/share/applications"),
+    ]
+    vus = {}
+    for d in dossiers:
+        for f in sorted(glob.glob(os.path.join(d, "*.desktop"))):
+            cp = configparser.RawConfigParser(interpolation=None, strict=False)
+            try:
+                cp.read(f, encoding="utf-8")
+            except (OSError, configparser.Error):
+                continue
+            if not cp.has_section("Desktop Entry"):
+                continue
+            de = cp["Desktop Entry"]
+            if (de.get("Type") != "Application"
+                    or de.get("NoDisplay", "false").lower() == "true"
+                    or de.get("Hidden", "false").lower() == "true"):
+                continue
+            base = os.path.basename(f).lower()
+            if base.startswith(("io.codebyr.", "codebyr")):
+                continue  # nos propres lanceurs internes
+            nom = de.get("Name[fr]") or de.get("Name")
+            exe = de.get("Exec", "")
+            if not nom or not exe:
+                continue
+            cmd = re.sub(r"%[fFuUdDnNickvm]", "", exe)
+            cmd = re.sub(r"\s+", " ", cmd).strip()
+            if cmd and nom not in vus:
+                vus[nom] = cmd
+    return sorted(vus.items(), key=lambda x: x[0].lower())
+
+
 class Fenetre(Adw.ApplicationWindow):
     def __init__(self, app):
         super().__init__(application=app, title="Configuration Codebyr")
         self.set_default_size(720, 640)
         self._data = load_registry()
+        self._scope_idx = 0  # 0 = liste commune ; 1..N = un Espace
 
         self._page = Adw.PreferencesPage()
         self._construire()
@@ -162,6 +205,143 @@ class Fenetre(Adw.ApplicationWindow):
             ic.add_css_class("success" if dispo else "dim-label")
             r.add_suffix(ic)
             gcap.add(r)
+
+        self._groupe_applications()
+
+    # ---- Section « Applications du menu » (par Espace ou commune) ----
+    def _espaces_registre(self):
+        return self._data.get("espaces", [])
+
+    def _espace_scope(self):
+        """Espace sélectionné (scope_idx 1..N), ou None pour la liste commune."""
+        if self._scope_idx <= 0:
+            return None
+        espaces = self._espaces_registre()
+        i = self._scope_idx - 1
+        return espaces[i] if 0 <= i < len(espaces) else None
+
+    def _apps_effectives(self):
+        """(liste, personnalisé) pour la portée courante. Un Espace sans liste
+        propre hérite de la liste commune (personnalisé = False)."""
+        esp = self._espace_scope()
+        if esp is None:
+            return self._data.setdefault("apps", []), True
+        if isinstance(esp.get("apps"), list):
+            return esp["apps"], True
+        return self._data.get("apps", []), False
+
+    def _liste_modifiable(self):
+        """Retourne la liste à modifier, en la matérialisant si un Espace héritait."""
+        esp = self._espace_scope()
+        if esp is None:
+            return self._data.setdefault("apps", [])
+        if not isinstance(esp.get("apps"), list):
+            esp["apps"] = [dict(a) for a in self._data.get("apps", [])]
+        return esp["apps"]
+
+    def _groupe_applications(self):
+        esp = self._espace_scope()
+        titre_scope = "la liste commune" if esp is None else "« %s »" % esp.get("nom", "")
+        grp = Adw.PreferencesGroup(
+            title="Applications du menu",
+            description="Ce qui apparaît dans le menu du Sceau. Choisissez la portée : "
+                        "la liste commune (tous les Espaces) ou un Espace précis.")
+        self._page.add(grp)
+        self._groupes.append(grp)
+
+        # Sélecteur de portée
+        noms = ["Tous les Espaces (liste commune)"] + \
+               [e.get("nom", e.get("id")) for e in self._espaces_registre()]
+        modele = Gtk.StringList.new(noms)
+        combo = Adw.ComboRow(title="Configurer les applications de")
+        combo.set_model(modele)
+        combo.set_selected(min(self._scope_idx, len(noms) - 1))
+        combo.connect("notify::selected", self._scope_change)
+        grp.add(combo)
+
+        apps, perso = self._apps_effectives()
+        if esp is not None and not perso:
+            info = Adw.ActionRow(
+                title="Cet Espace utilise la liste commune",
+                subtitle="Ajoutez ou retirez une application pour la personnaliser.")
+            info.add_css_class("dim-label")
+            grp.add(info)
+
+        for app in apps:
+            row = Adw.ActionRow(title=app.get("nom", ""), subtitle=app.get("cmd", ""))
+            btn = Gtk.Button(icon_name="user-trash-symbolic", valign=Gtk.Align.CENTER)
+            btn.add_css_class("flat")
+            btn.connect("clicked", self._supprimer_app, app.get("cmd", ""))
+            row.add_suffix(btn)
+            grp.add(row)
+
+        ajout = Adw.ActionRow(title="Ajouter une application à %s" % titre_scope)
+        badd = Gtk.Button(icon_name="list-add-symbolic", valign=Gtk.Align.CENTER,
+                          label="Choisir…")
+        badd.add_css_class("suggested-action")
+        badd.connect("clicked", lambda _b: self._ouvrir_selecteur_app())
+        ajout.add_suffix(badd)
+        grp.add(ajout)
+
+    def _scope_change(self, combo, _pspec):
+        self._scope_idx = combo.get_selected()
+        self._construire()
+
+    def _supprimer_app(self, _btn, cmd):
+        lst = self._liste_modifiable()
+        lst[:] = [a for a in lst if a.get("cmd") != cmd]
+        save_registry(self._data)
+        self._construire()
+
+    def _ajouter_app(self, nom, cmd):
+        lst = self._liste_modifiable()
+        if not any(a.get("cmd") == cmd for a in lst):
+            lst.append({"nom": nom, "cmd": cmd})
+            save_registry(self._data)
+        self._construire()
+
+    def _ouvrir_selecteur_app(self):
+        dlg = Adw.Window(transient_for=self, modal=True,
+                         default_width=460, default_height=560, title="Ajouter une application")
+        tv = Adw.ToolbarView()
+        tv.add_top_bar(Adw.HeaderBar())
+        boite = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
+        boite.set_margin_top(6); boite.set_margin_bottom(6)
+        boite.set_margin_start(6); boite.set_margin_end(6)
+        recherche = Gtk.SearchEntry(placeholder_text="Rechercher une application…")
+        boite.append(recherche)
+        defilement = Gtk.ScrolledWindow(vexpand=True)
+        liste = Gtk.ListBox()
+        liste.add_css_class("boxed-list")
+        liste.set_selection_mode(Gtk.SelectionMode.NONE)
+        defilement.set_child(liste)
+        boite.append(defilement)
+        tv.set_content(boite)
+        dlg.set_content(tv)
+
+        toutes = apps_installees()
+
+        def peupler(filtre=""):
+            child = liste.get_first_child()
+            while child is not None:
+                nxt = child.get_next_sibling()
+                liste.remove(child)
+                child = nxt
+            f = filtre.strip().lower()
+            for nom, cmd in toutes:
+                if f and f not in nom.lower():
+                    continue
+                row = Adw.ActionRow(title=nom, subtitle=cmd, activatable=True)
+                row.connect("activated", self._app_choisie, nom, cmd, dlg)
+                liste.append(row)
+
+        recherche.connect("search-changed", lambda e: peupler(e.get_text()))
+        peupler()
+        dlg.present()
+
+    def _app_choisie(self, _row, nom, cmd, dlg):
+        dlg.close()
+        self._ajouter_app(nom, cmd)
 
     def _ajouter_domaine(self, texte):
         d = (texte or "").strip().lower().lstrip("www.")

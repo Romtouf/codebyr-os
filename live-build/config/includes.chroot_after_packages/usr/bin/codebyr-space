@@ -373,11 +373,20 @@ def cmd_launch(espaces, esp_id, extra, fichier=None):
 
     ephemere = esp.get("ephemere")
     if est_flatpak:
-        # Lancée telle quelle : Flatpak fournit son propre bac à sable. On la
-        # marque quand même pour le liseré (filiation PID, meilleur effort).
-        run = cmd
-        print("Note : application Flatpak — elle tourne dans son propre bac à "
-              "sable Flatpak ; le liseré de l'Espace reste indicatif.")
+        appid = app_cmd[-1] if len(app_cmd) >= 2 else ""
+        if appid and _flatpak_app_dans_espace(esp["id"], appid):
+            # Installée DANS l'Espace : installation Flatpak dédiée +
+            # données isolées (HOME de l'Espace → ~/.var/app séparé).
+            env["FLATPAK_USER_DIR"] = _espace_flatpak_dir(esp["id"])
+            env["HOME"] = home
+            run = cmd
+            print("Application Flatpak propre à l'Espace %s (isolée)." % esp["nom"])
+        else:
+            # App Flatpak système : déjà isolée par Flatpak, mais partagée
+            # entre Espaces. Marquée pour le liseré (meilleur effort).
+            run = cmd
+            print("Note : application Flatpak système — son propre bac à sable "
+                  "Flatpak ; le liseré de l'Espace reste indicatif.")
     elif use_bwrap:
         run = wrap_bwrap(home, cmd, env, renforce=renforce, hors_ligne=hors_ligne)
         if renforce:
@@ -550,6 +559,123 @@ def cmd_import(espaces, esp_id, source=None):
 
 BUILTIN_IDS = ("personnel", "travail", "banque", "navigation", "jetable")
 
+FLATHUB_REPO = "/etc/flatpak/remotes.d/flathub.flatpakrepo"
+
+
+def _espace_flatpak_dir(esp_id):
+    """Répertoire d'installation Flatpak DÉDIÉ à un Espace (binaires isolés)."""
+    return os.path.join(DATA_ROOT, esp_id, "flatpak")
+
+
+def _flatpak_env(esp_id):
+    """Environnement pointant l'installation Flatpak propre à l'Espace."""
+    d = _espace_flatpak_dir(esp_id)
+    os.makedirs(d, exist_ok=True)
+    env = dict(os.environ)
+    env["FLATPAK_USER_DIR"] = d
+    return env, d
+
+
+def _flatpak_app_dans_espace(esp_id, appid):
+    """L'application est-elle installée DANS l'Espace (et non au niveau système) ?"""
+    return os.path.isdir(os.path.join(_espace_flatpak_dir(esp_id), "app", appid))
+
+
+def _assurer_flathub(env):
+    """Ajoute le dépôt Flathub à l'installation de l'Espace (fichier local → hors-ligne OK)."""
+    import subprocess
+    src = FLATHUB_REPO if os.path.exists(FLATHUB_REPO) else \
+        "https://flathub.org/repo/flathub.flatpakrepo"
+    subprocess.run(["flatpak", "--user", "remote-add", "--if-not-exists", "flathub", src],
+                   env=env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+
+def _flatpak_nom_lisible(env, appid):
+    import subprocess
+    try:
+        out = subprocess.check_output(
+            ["flatpak", "--user", "list", "--app", "--columns=application,name"],
+            env=env, text=True, stderr=subprocess.DEVNULL)
+    except (subprocess.CalledProcessError, OSError):
+        return None
+    for line in out.splitlines():
+        parts = line.split("\t")
+        if len(parts) >= 2 and parts[0] == appid:
+            return parts[1].strip()
+    return None
+
+
+def _enregistrer_app(esp_id, nom, cmd):
+    """Ajoute l'application au menu de CET Espace (registre utilisateur)."""
+    data = _registre_complet()
+    for e in data.get("espaces", []):
+        if e.get("id") == esp_id:
+            apps = e.setdefault("apps", [])
+            if not any(a.get("cmd") == cmd for a in apps):
+                apps.append({"nom": nom, "cmd": cmd})
+            break
+    _ecrire_registre_utilisateur(data)
+
+
+def cmd_install(esp_id, appid):
+    """Installe une application Flatpak DANS un Espace (isolée : binaires + données)."""
+    import subprocess
+    espaces = load_espaces()
+    esp = espaces.get(esp_id)
+    if not esp:
+        sys.stderr.write("Espace inconnu : %s\n" % esp_id)
+        return 2
+    if not shutil.which("flatpak"):
+        sys.stderr.write("Flatpak n'est pas installé.\n")
+        return 2
+    env, _ = _flatpak_env(esp_id)
+    _assurer_flathub(env)
+    print("Installation de « %s » dans l'Espace %s…" % (appid, esp["nom"]))
+    rc = subprocess.call(["flatpak", "--user", "install", "-y", "flathub", appid], env=env)
+    if rc != 0:
+        sys.stderr.write("Échec de l'installation de %s.\n" % appid)
+        return rc
+    nom = _flatpak_nom_lisible(env, appid) or appid
+    _enregistrer_app(esp_id, nom, "flatpak run " + appid)
+    print("« %s » installée dans l'Espace %s." % (nom, esp["nom"]))
+    return 0
+
+
+def cmd_apps(esp_id):
+    """Liste les applications installées dans un Espace."""
+    import subprocess
+    espaces = load_espaces()
+    esp = espaces.get(esp_id)
+    if not esp:
+        sys.stderr.write("Espace inconnu : %s\n" % esp_id)
+        return 2
+    env, _ = _flatpak_env(esp_id)
+    print("Applications de l'Espace %s :" % esp["nom"])
+    subprocess.call(["flatpak", "--user", "list", "--app",
+                     "--columns=application,name,version"], env=env)
+    return 0
+
+
+def cmd_remove_app(esp_id, appid):
+    """Désinstalle une application d'un Espace et la retire de son menu."""
+    import subprocess
+    espaces = load_espaces()
+    esp = espaces.get(esp_id)
+    if not esp:
+        sys.stderr.write("Espace inconnu : %s\n" % esp_id)
+        return 2
+    env, _ = _flatpak_env(esp_id)
+    rc = subprocess.call(["flatpak", "--user", "uninstall", "-y", appid], env=env)
+    data = _registre_complet()
+    for e in data.get("espaces", []):
+        if e.get("id") == esp_id:
+            e["apps"] = [a for a in e.get("apps", [])
+                         if a.get("cmd") != "flatpak run " + appid]
+            break
+    _ecrire_registre_utilisateur(data)
+    print("« %s » retirée de l'Espace %s." % (appid, esp["nom"]))
+    return rc
+
 
 def _registre_complet():
     """Charge le registre complet (espaces + apps), depuis la copie utilisateur
@@ -701,6 +827,21 @@ def main(argv):
             sys.stderr.write("Usage : codebyr-space delete <espace>\n")
             return 2
         return cmd_delete(argv[2])
+    if action == "install":
+        if len(argv) < 4:
+            sys.stderr.write("Usage : codebyr-space install <espace> <app-id-flatpak>\n")
+            return 2
+        return cmd_install(argv[2], argv[3])
+    if action == "apps":
+        if len(argv) < 3:
+            sys.stderr.write("Usage : codebyr-space apps <espace>\n")
+            return 2
+        return cmd_apps(argv[2])
+    if action == "remove-app":
+        if len(argv) < 4:
+            sys.stderr.write("Usage : codebyr-space remove-app <espace> <app-id-flatpak>\n")
+            return 2
+        return cmd_remove_app(argv[2], argv[3])
     sys.stderr.write("Action inconnue : %s\n" % action)
     return 2
 

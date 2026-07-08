@@ -11,6 +11,7 @@ import json
 import os
 import re
 import shutil
+import subprocess
 
 import gi
 gi.require_version("Gtk", "4.0")
@@ -129,7 +130,29 @@ class Fenetre(Adw.ApplicationWindow):
                                                 subtitle="Codebyr OS"))
         tv.add_top_bar(header)
         tv.set_content(self._page)
-        self.set_content(tv)
+        self._toaster = Adw.ToastOverlay()
+        self._toaster.set_child(tv)
+        self.set_content(self._toaster)
+
+        # Recharge le registre quand la fenêtre reprend le focus : une
+        # installation lancée en terminal aura modifié le fichier.
+        self._registre_mtime = self._mtime_registre()
+        self.connect("notify::is-active", self._peut_etre_recharger)
+
+    def _mtime_registre(self):
+        try:
+            return os.path.getmtime(USER if os.path.exists(USER) else SYSTEM)
+        except OSError:
+            return 0
+
+    def _peut_etre_recharger(self, *_a):
+        if not self.is_active():
+            return
+        m = self._mtime_registre()
+        if m != self._registre_mtime:
+            self._registre_mtime = m
+            self._data = load_registry()
+            self._construire()
 
     # ---- Reconstruit toute la page (après modification) ----
     def _construire(self):
@@ -282,7 +305,9 @@ class Fenetre(Adw.ApplicationWindow):
             row.add_suffix(btn)
             grp.add(row)
 
-        ajout = Adw.ActionRow(title="Ajouter une application à %s" % titre_scope)
+        ajout = Adw.ActionRow(
+            title="Ajouter une application déjà installée",
+            subtitle="Vers %s" % titre_scope)
         badd = Gtk.Button(icon_name="list-add-symbolic", valign=Gtk.Align.CENTER,
                           label="Choisir…")
         badd.add_css_class("suggested-action")
@@ -290,11 +315,42 @@ class Fenetre(Adw.ApplicationWindow):
         ajout.add_suffix(badd)
         grp.add(ajout)
 
+        # Installation d'une NOUVELLE application, dédiée à un Espace précis
+        # (isolée dans cet Espace). Sans objet pour la liste commune.
+        if esp is not None and shutil.which("flatpak"):
+            inst = Adw.ActionRow(
+                title="Installer une nouvelle application dans « %s »" % esp.get("nom", ""),
+                subtitle="Depuis Flathub — installée et isolée dans cet Espace uniquement")
+            binst = Gtk.Button(icon_name="folder-download-symbolic",
+                               valign=Gtk.Align.CENTER, label="Installer…")
+            binst.connect("clicked", lambda _b, e=esp: self._ouvrir_installeur_flathub(e))
+            inst.add_suffix(binst)
+            grp.add(inst)
+
     def _scope_change(self, combo, _pspec):
         self._scope_idx = combo.get_selected()
         self._construire()
 
     def _supprimer_app(self, _btn, cmd):
+        esp = self._espace_scope()
+        # App Flatpak installée DANS cet Espace → on la désinstalle vraiment.
+        if (esp is not None and cmd.startswith("flatpak run ")
+                and shutil.which("flatpak")):
+            appid = cmd.split()[-1]
+            d = os.path.expanduser(
+                "~/.local/share/codebyr/espaces/%s/flatpak/app/%s" % (esp.get("id"), appid))
+            if os.path.isdir(d):
+                term_cmd = ("codebyr-space remove-app %s %s; echo; "
+                            "echo '— Terminé. Fermez cette fenêtre. —'; read _"
+                            % (esp.get("id"), appid))
+                for term in ("kgx", "gnome-terminal", "xterm"):
+                    if shutil.which(term):
+                        try:
+                            subprocess.Popen([term, "--", "sh", "-c", term_cmd])
+                        except OSError:
+                            continue
+                        break
+                return  # le rechargement au focus rafraîchira la liste
         lst = self._liste_modifiable()
         lst[:] = [a for a in lst if a.get("cmd") != cmd]
         save_registry(self._data)
@@ -349,6 +405,99 @@ class Fenetre(Adw.ApplicationWindow):
     def _app_choisie(self, _row, nom, cmd, dlg):
         dlg.close()
         self._ajouter_app(nom, cmd)
+
+    # ---- Installation d'une nouvelle app Flathub dans un Espace ----
+    def _ouvrir_installeur_flathub(self, esp):
+        dlg = Adw.Window(transient_for=self, modal=True, default_width=500,
+                         default_height=600,
+                         title="Installer dans « %s »" % esp.get("nom", ""))
+        tv = Adw.ToolbarView()
+        tv.add_top_bar(Adw.HeaderBar())
+        boite = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
+        for m in ("top", "bottom", "start", "end"):
+            getattr(boite, "set_margin_" + m)(8)
+        recherche = Gtk.SearchEntry(
+            placeholder_text="Rechercher sur Flathub (ex. brave, gimp, vlc)…")
+        boite.append(recherche)
+        etat = Gtk.Label(label="Tapez le nom d'une application, puis Entrée.",
+                         wrap=True, xalign=0)
+        etat.add_css_class("dim-label")
+        boite.append(etat)
+        defilement = Gtk.ScrolledWindow(vexpand=True)
+        liste = Gtk.ListBox()
+        liste.add_css_class("boxed-list")
+        liste.set_selection_mode(Gtk.SelectionMode.NONE)
+        defilement.set_child(liste)
+        boite.append(defilement)
+        tv.set_content(boite)
+        dlg.set_content(tv)
+
+        def vider():
+            child = liste.get_first_child()
+            while child is not None:
+                nxt = child.get_next_sibling()
+                liste.remove(child)
+                child = nxt
+
+        def rechercher(_e):
+            terme = recherche.get_text().strip()
+            vider()
+            if len(terme) < 2:
+                return
+            etat.set_text("Recherche…")
+            resultats = self._flathub_search(terme)
+            if not resultats:
+                etat.set_text("Aucun résultat (ou catalogue pas encore chargé).")
+                return
+            etat.set_text("%d résultat(s) — cliquez pour installer :" % len(resultats))
+            for appid, nom, desc in resultats:
+                row = Adw.ActionRow(title=nom, subtitle=desc or appid, activatable=True)
+                row.connect("activated", self._installer_flathub, esp, appid, nom, dlg)
+                liste.append(row)
+
+        recherche.connect("activate", rechercher)
+        recherche.connect("search-changed",
+                          lambda e: rechercher(e) if len(e.get_text()) >= 3 else None)
+        dlg.present()
+
+    def _flathub_search(self, terme):
+        """Recherche Flathub via l'outil flatpak. Renvoie [(appid, nom, desc)]."""
+        try:
+            out = subprocess.run(
+                ["flatpak", "search", "--columns=application,name,description", terme],
+                capture_output=True, text=True, timeout=25).stdout
+        except (OSError, subprocess.SubprocessError):
+            return []
+        res = []
+        for line in out.splitlines():
+            parts = line.split("\t")
+            if len(parts) >= 2 and "." in parts[0]:
+                appid = parts[0].strip()
+                nom = parts[1].strip() or appid
+                desc = parts[2].strip() if len(parts) >= 3 else ""
+                res.append((appid, nom, desc))
+        return res[:40]
+
+    def _installer_flathub(self, _row, esp, appid, nom, dlg):
+        """Lance l'installation dans un terminal (progression visible)."""
+        dlg.close()
+        cmd = ("codebyr-space install %s %s; echo; "
+               "echo '— Terminé. Fermez cette fenêtre. —'; "
+               "read _" % (esp.get("id"), appid))
+        lance = False
+        for term in ("kgx", "gnome-terminal", "xterm"):
+            if shutil.which(term):
+                try:
+                    subprocess.Popen([term, "--", "sh", "-c", cmd])
+                    lance = True
+                    break
+                except OSError:
+                    continue
+        toast = Adw.Toast(title=("Installation de « %s » lancée dans l'Espace %s…"
+                                 % (nom, esp.get("nom", "")))
+                          if lance else "Impossible d'ouvrir un terminal.")
+        if hasattr(self, "_toaster"):
+            self._toaster.add_toast(toast)
 
     def _ajouter_domaine(self, texte):
         d = (texte or "").strip().lower().lstrip("www.")

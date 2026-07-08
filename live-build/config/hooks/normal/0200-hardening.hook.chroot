@@ -51,4 +51,5 @@ fs.protected_fifos=1
 fs.protected_regular=2
 EOF
 
+systemctl enable systemd-timesyncd.service || true
 echo "P: Codebyr — durcissement terminé"

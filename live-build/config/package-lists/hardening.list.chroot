@@ -26,3 +26,6 @@ firmware-atheros
 
 # Vérification GPG des téléchargements Codebyr (codebyr-verifier)
 gnupg
+
+# Synchronisation automatique de l'horloge (sinon TLS casse : date fausse)
+systemd-timesyncd

@@ -641,6 +641,37 @@ def cmd_install(esp_id, appid):
     return 0
 
 
+def cmd_add_app(esp_id, nom, fichier, extra):
+    """Ajoute un programme LOCAL (binaire téléchargé, script…) au menu d'un Espace.
+    Gère la correspondance des chemins entre l'hôte et le bac à sable."""
+    espaces = load_espaces()
+    esp = espaces.get(esp_id)
+    if not esp:
+        sys.stderr.write("Espace inconnu : %s\n" % esp_id)
+        return 2
+    cible = os.path.abspath(os.path.expanduser(fichier))
+    esp_home = os.path.join(DATA_ROOT, esp_id, "home")
+    if os.path.isfile(cible):
+        try:
+            os.chmod(cible, 0o755)  # rendre exécutable
+        except OSError:
+            pass
+        # Chemin tel que vu DANS le bac à sable (le home de l'Espace est monté sur ~).
+        if cible.startswith(esp_home + os.sep):
+            rel = os.path.relpath(cible, esp_home)
+            cmd = os.path.join(os.path.expanduser("~"), rel)
+        else:
+            cmd = cible  # hors home de l'Espace (ex. /usr, /opt en lecture seule)
+    else:
+        cmd = fichier  # commande du PATH (ex. « gimp »)
+    if extra:
+        cmd = cmd + " " + " ".join(extra)
+    _enregistrer_app(esp_id, nom, cmd)
+    print("« %s » ajoutée au menu de l'Espace %s." % (nom, esp["nom"]))
+    print("  Commande : %s" % cmd)
+    return 0
+
+
 def cmd_apps(esp_id):
     """Liste les applications installées dans un Espace."""
     import subprocess
@@ -837,6 +868,11 @@ def main(argv):
             sys.stderr.write("Usage : codebyr-space apps <espace>\n")
             return 2
         return cmd_apps(argv[2])
+    if action == "add-app":
+        if len(argv) < 5:
+            sys.stderr.write("Usage : codebyr-space add-app <espace> <nom> <fichier|commande> [args...]\n")
+            return 2
+        return cmd_add_app(argv[2], argv[3], argv[4], argv[5:])
     if action == "remove-app":
         if len(argv) < 4:
             sys.stderr.write("Usage : codebyr-space remove-app <espace> <app-id-flatpak>\n")

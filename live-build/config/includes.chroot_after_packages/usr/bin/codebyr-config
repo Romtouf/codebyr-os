@@ -79,6 +79,7 @@ def apps_installees():
     ]
     vus = {}
     for d in dossiers:
+        est_flatpak = "flatpak" in d
         for f in sorted(glob.glob(os.path.join(d, "*.desktop"))):
             cp = configparser.RawConfigParser(interpolation=None, strict=False)
             try:
@@ -92,15 +93,21 @@ def apps_installees():
                     or de.get("NoDisplay", "false").lower() == "true"
                     or de.get("Hidden", "false").lower() == "true"):
                 continue
-            base = os.path.basename(f).lower()
-            if base.startswith(("io.codebyr.", "codebyr")):
+            base = os.path.basename(f)
+            if base.lower().startswith(("io.codebyr.", "codebyr")):
                 continue  # nos propres lanceurs internes
             nom = de.get("Name[fr]") or de.get("Name")
             exe = de.get("Exec", "")
             if not nom or not exe:
                 continue
-            cmd = re.sub(r"%[fFuUdDnNickvm]", "", exe)
-            cmd = re.sub(r"\s+", " ", cmd).strip()
+            if est_flatpak:
+                # Commande propre et fiable pour un Flatpak : « flatpak run <ID> »
+                # (l'ID = nom du .desktop). Évite les jetons @@ de la ligne Exec.
+                app_id = base[:-len(".desktop")]
+                cmd = "flatpak run " + app_id
+            else:
+                cmd = re.sub(r"%[fFuUdDnNickvm]", "", exe)
+                cmd = re.sub(r"\s+", " ", cmd).strip()
             if cmd and nom not in vus:
                 vus[nom] = cmd
     return sorted(vus.items(), key=lambda x: x[0].lower())

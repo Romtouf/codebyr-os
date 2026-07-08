@@ -346,12 +346,16 @@ def cmd_launch(espaces, esp_id, extra, fichier=None):
         hors_ligne = True
 
     app_cmd = extra if extra else desktop_exec(esp.get("app", "org.gnome.Nautilus.desktop"))
+    # Une application Flatpak s'isole DÉJÀ dans son propre bac à sable : on ne
+    # peut ni l'enfermer dans le nôtre (sandbox imbriqué = échec), ni lui donner
+    # un bus de session privé (elle a besoin du vrai bus pour ses portails).
+    est_flatpak = os.path.basename(app_cmd[0]) == "flatpak" or app_cmd[0].endswith("/flatpak")
     cmd = build_command(esp, home, app_cmd)
 
     # Bus de session privé par Espace : les apps « mono-instance » (Fichiers,
     # éditeur…) démarrent alors un vrai processus isolé au lieu de rouvrir une
     # fenêtre de la session partagée — ce qui rétablit l'isolation ET le liseré.
-    if shutil.which("dbus-run-session"):
+    if not est_flatpak and shutil.which("dbus-run-session"):
         cmd = ["dbus-run-session", "--"] + cmd
 
     env = dict(os.environ)
@@ -368,7 +372,13 @@ def cmd_launch(espaces, esp_id, extra, fichier=None):
         env["MOZ_ALLOW_DOWNGRADE"] = "1"
 
     ephemere = esp.get("ephemere")
-    if use_bwrap:
+    if est_flatpak:
+        # Lancée telle quelle : Flatpak fournit son propre bac à sable. On la
+        # marque quand même pour le liseré (filiation PID, meilleur effort).
+        run = cmd
+        print("Note : application Flatpak — elle tourne dans son propre bac à "
+              "sable Flatpak ; le liseré de l'Espace reste indicatif.")
+    elif use_bwrap:
         run = wrap_bwrap(home, cmd, env, renforce=renforce, hors_ligne=hors_ligne)
         if renforce:
             run = _plafonner_ressources(run)

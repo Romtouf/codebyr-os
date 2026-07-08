@@ -98,6 +98,28 @@ hooks de branding/durcissement, et rapatrie l'ISO dans `dist/`.
 3. Pour installer : bouton **« Installer Codebyr OS sur ce disque »** à la fin du
    tour de bienvenue, ou l'application « Installer Codebyr OS ».
 
+## Vérifier votre téléchargement (recommandé)
+
+Chaque version est **signée avec la clé GPG du projet**. Vérifiez l'intégrité ET
+l'authenticité de votre ISO :
+
+```bash
+# 1) Importer la clé publique Codebyr (une seule fois)
+gpg --import codebyr-signing-key.asc      # depuis le dépôt
+
+# 2) Vérifier la signature du fichier d'empreintes
+gpg --verify SHA256SUMS.asc SHA256SUMS
+#   → doit afficher : Good signature from "Codebyr OS ... "
+
+# 3) Vérifier l'empreinte de l'ISO
+sha256sum -c SHA256SUMS
+#   → doit afficher : ...amd64.iso : Réussi
+```
+
+Empreinte de la clé de signature :
+`E6FB 6616 EC58 E15F 40DA  876C B1E8 C803 CE59 6E68`.
+Si la signature n'est pas « Good » / « valide », **n'utilisez pas l'ISO**.
+
 ## Structure du dépôt
 
 ```

@@ -43,8 +43,30 @@ utilisateur non technique.
 jamais « rend invulnérable ». Toute contribution qui gonflerait la promesse
 au-delà de ce que le code garantit sera refusée.
 
+## Intégrité des versions
+
+Chaque ISO est signée avec la clé GPG du projet. Le fichier `SHA256SUMS` (empreinte
+de l'ISO) est accompagné de `SHA256SUMS.asc` (signature détachée). La clé publique
+est dans le dépôt (`codebyr-signing-key.asc`), empreinte
+`E6FB6616EC58E15F40DA876CB1E8C803CE596E68`. Procédure de vérification : voir le
+README. N'utilisez jamais une ISO dont la signature n'est pas valide.
+
 ## Durcissement de la base
 
-Debian stable, AppArmor actif, pare-feu nftables, Wayland, mises à jour de
-sécurité automatiques (`unattended-upgrades`), surface applicative minimale
-(`--apt-recommends false`).
+Debian stable, AppArmor actif, pare-feu nftables (`policy drop` en entrée),
+Wayland, mises à jour de sécurité automatiques (`unattended-upgrades`),
+`sysctl` durcis (kptr_restrict, ptrace_scope, protections liens/fifo…),
+surface applicative minimale (`--apt-recommends false`).
+
+## Limites connues (transparence)
+
+- **Extensions Firefox non signées** : le bouclier anti-hameçonnage est chargé
+  via `xpinstall.signatures.required=false` dans les profils concernés, ce qui
+  abaisse la vérification des signatures d'extensions dans ces profils.
+  Objectif : faire signer le bouclier par Mozilla (AMO, distribution privée).
+- **Filtre réseau bancaire** : appliqué au niveau du profil navigateur ; un code
+  hostile déjà exécuté *dans* l'Espace pourrait le contourner. Il protège du web
+  et de l'hameçonnage, pas d'un binaire malveillant lancé dans l'Espace.
+- **Compositeur Wayland et audio (PipeWire) partagés** entre Espaces.
+- **Applications Flatpak** : proviennent de Flathub — confiance déléguée à
+  Flathub et à l'éditeur de chaque application.

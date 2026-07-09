@@ -327,6 +327,18 @@ class Fenetre(Adw.ApplicationWindow):
             inst.add_suffix(binst)
             grp.add(inst)
 
+        # Ajout d'un programme LOCAL téléchargé (binaire, AppImage…) au menu.
+        if esp is not None:
+            prog = Adw.ActionRow(
+                title="Ajouter un programme téléchargé",
+                subtitle="Un fichier exécutable présent sur le disque, vers « %s »"
+                         % esp.get("nom", ""))
+            bprog = Gtk.Button(icon_name="document-open-symbolic",
+                               valign=Gtk.Align.CENTER, label="Parcourir…")
+            bprog.connect("clicked", lambda _b, e=esp: self._ouvrir_ajout_programme(e))
+            prog.add_suffix(bprog)
+            grp.add(prog)
+
     def _scope_change(self, combo, _pspec):
         self._scope_idx = combo.get_selected()
         self._construire()
@@ -498,6 +510,81 @@ class Fenetre(Adw.ApplicationWindow):
                           if lance else "Impossible d'ouvrir un terminal.")
         if hasattr(self, "_toaster"):
             self._toaster.add_toast(toast)
+
+    # ---- Ajout d'un programme LOCAL (binaire téléchargé) au menu d'un Espace ----
+    def _ouvrir_ajout_programme(self, esp):
+        dialog = Gtk.FileDialog(title="Choisir un programme")
+        dl = os.path.expanduser(
+            "~/.local/share/codebyr/espaces/%s/home/Téléchargements" % esp.get("id"))
+        if os.path.isdir(dl):
+            dialog.set_initial_folder(Gio.File.new_for_path(dl))
+        dialog.open(self, None, self._programme_choisi, esp)
+
+    def _programme_choisi(self, dialog, result, esp):
+        try:
+            fichier = dialog.open_finish(result)
+        except GLib.Error:
+            return
+        if fichier is None:
+            return
+        self._dialogue_nom_programme(esp, fichier.get_path())
+
+    def _dialogue_nom_programme(self, esp, chemin):
+        dlg = Adw.Window(transient_for=self, modal=True, default_width=440,
+                         title="Ajouter au menu")
+        tv = Adw.ToolbarView()
+        tv.add_top_bar(Adw.HeaderBar())
+        page = Adw.PreferencesPage()
+        grp = Adw.PreferencesGroup(
+            title="Ajouter « %s »" % os.path.basename(chemin),
+            description="Ce programme apparaîtra dans le menu du Sceau de l'Espace "
+                        "« %s »." % esp.get("nom", ""))
+        nom_row = Adw.EntryRow(title="Nom affiché")
+        nom_row.set_text(os.path.splitext(os.path.basename(chemin))[0].capitalize())
+        grp.add(nom_row)
+        sw = Adw.SwitchRow(
+            title="Application Electron / Chromium",
+            subtitle="Ajoute « --no-sandbox » (VS Code, Antigravity, navigateurs…)")
+        grp.add(sw)
+        page.add(grp)
+
+        bar = Gtk.Box(halign=Gtk.Align.END, spacing=8)
+        for m in ("top", "bottom", "start", "end"):
+            getattr(bar, "set_margin_" + m)(12)
+        annuler = Gtk.Button(label="Annuler")
+        annuler.connect("clicked", lambda _b: dlg.close())
+        ajouter = Gtk.Button(label="Ajouter au menu")
+        ajouter.add_css_class("suggested-action")
+        ajouter.connect("clicked", lambda _b: self._ajouter_programme(
+            esp, chemin, nom_row.get_text(), sw.get_active(), dlg))
+        bar.append(annuler)
+        bar.append(ajouter)
+
+        boite = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+        boite.append(page)
+        boite.append(bar)
+        tv.set_content(boite)
+        dlg.set_content(tv)
+        dlg.present()
+
+    def _ajouter_programme(self, esp, chemin, nom, nosandbox, dlg):
+        dlg.close()
+        nom = (nom or os.path.basename(chemin)).strip()
+        args = ["codebyr-space", "add-app", esp.get("id"), nom, chemin]
+        if nosandbox:
+            args.append("--no-sandbox")
+        ok = True
+        try:
+            subprocess.run(args, timeout=30, check=True)
+        except (OSError, subprocess.SubprocessError):
+            ok = False
+        self._data = load_registry()
+        self._registre_mtime = self._mtime_registre()
+        self._construire()
+        if hasattr(self, "_toaster"):
+            self._toaster.add_toast(Adw.Toast(
+                title=("« %s » ajouté au menu de %s" % (nom, esp.get("nom", "")))
+                if ok else "Impossible d'ajouter ce programme."))
 
     def _ajouter_domaine(self, texte):
         d = (texte or "").strip().lower().lstrip("www.")

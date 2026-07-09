@@ -91,6 +91,28 @@ Le build recopie la configuration vers `/var/tmp/codebyr-build` (jamais de build
 sur un montage Windows/9p), télécharge les paquets Debian trixie, applique les
 hooks de branding/durcissement, et rapatrie l'ISO dans `dist/`.
 
+## Configuration requise
+
+Codebyr fait tourner plusieurs Espaces isolés (chacun avec ses applications) :
+la RAM est donc le facteur le plus important.
+
+| | Minimum (usage léger) | Recommandé (confort) |
+|---|---|---|
+| Processeur | 64 bits (x86-64), 2 cœurs | 4 cœurs récents |
+| **RAM** | **4 Go** (1-2 Espaces à la fois) | **8 Go** (plusieurs Espaces) |
+| Disque | 20 Go libres | 30 Go+, SSD conseillé |
+| Carte graphique | Intel/AMD/NVIDIA avec OpenGL (depuis ~2012) | idem |
+| Démarrage | UEFI **ou** BIOS | UEFI |
+| Installation | une clé USB de 2 Go+ | idem |
+
+Notes :
+- **Architecture x86-64 uniquement** pour l'instant (pas d'ARM / Raspberry Pi /
+  Apple Silicon).
+- La virtualisation matérielle (VT-x/AMD-V) n'est **pas** requise — l'isolation
+  repose sur le noyau. Elle servira au futur socle micro-VM.
+- Codebyr redonne vie à un portable modeste (un laptop de 2015 avec 8 Go tourne
+  très bien), là où Qubes exige 16 Go et du matériel haut de gamme.
+
 ## Essayer / installer
 
 1. Écrivez l'ISO sur une clé USB (Rufus, balenaEtcher, `dd`).

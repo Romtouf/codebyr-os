@@ -23,7 +23,9 @@ services:
       - "autoheal=true"
 
     healthcheck:
-      test: ["CMD-SHELL", "wget -q --spider http://localhost/ || exit 1"]
+      # 127.0.0.1 et non « localhost » : dans le conteneur, localhost peut
+      # résoudre vers ::1 en premier et faire échouer le test à tort.
+      test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1/ || exit 1"]
       interval: 30s
       timeout: 5s
       retries: 3

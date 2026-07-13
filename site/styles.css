@@ -391,7 +391,9 @@ thead .cmp__us { color: var(--accent) !important; border-radius: 10px 10px 0 0; 
 .cta h2 { font-size: clamp(30px, 5vw, 50px); font-weight: 800; letter-spacing: -.03em; margin-top: 22px; }
 .cta p { margin-top: 18px; color: var(--ink-2); font-size: 18px; line-height: 1.6; }
 .cta__buttons { display: flex; gap: 14px; margin-top: 34px; flex-wrap: wrap; justify-content: center; }
-.cta__fine { margin-top: 26px; font-family: var(--font-mono); font-size: 12.5px; letter-spacing: .04em; color: var(--ink-2); }
+.cta__fine { margin-top: 26px; font-family: var(--font-mono); font-size: 12.5px; letter-spacing: .04em; color: var(--ink-2); line-height: 1.9; }
+.cta__fine strong { color: var(--ink); font-weight: 600; }
+.cta__fine a { color: var(--accent); text-decoration: underline; text-underline-offset: 3px; }
 
 /* ── Footer ──────────────────────────────────────────────────── */
 .foot { border-top: 1px solid var(--line); background: var(--bg-2); padding: 54px 0 32px; }

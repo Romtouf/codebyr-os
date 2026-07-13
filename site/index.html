@@ -1,0 +1,491 @@
+<!doctype html>
+<html lang="fr" data-theme="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Codebyr OS — Sécurisé par conception. Simple par conviction.</title>
+  <meta name="description" content="Codebyr OS est une distribution Linux basée sur Debian qui apporte la sécurité par compartimentation — l'idée de Qubes OS — à tous, sans matériel d'exception ni expertise technique. En français, gratuite, open source.">
+  <meta name="theme-color" content="#0B1419">
+  <link rel="canonical" href="https://os.codebyr.dev/">
+
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://os.codebyr.dev/">
+  <meta property="og:title" content="Codebyr OS — Sécurisé par conception. Simple par conviction.">
+  <meta property="og:description" content="La compartimentation de Qubes, pour tout le monde. Des Espaces isolés, une couleur par Espace, aucune expertise requise.">
+  <meta property="og:locale" content="fr_FR">
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,600;12..96,700;12..96,800&family=Inter:wght@400;450;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='-8 -8 116 116'%3E%3Cg fill='none' stroke='%2310A5C2' stroke-width='13' stroke-linecap='round'%3E%3Cpath d='M 84.64 70 A 40 40 0 0 1 19.36 75.71'/%3E%3Cpath d='M 13.75 66.91 A 40 40 0 0 1 36.32 12.42'/%3E%3Cpath d='M 46.51 10.15 A 40 40 0 0 1 84.64 30'/%3E%3C/g%3E%3Ccircle cx='50' cy='50' r='9.5' fill='%2310A5C2'/%3E%3C/svg%3E">
+</head>
+<body>
+
+<!-- ══════════ NAV ══════════ -->
+<header class="nav" id="top">
+  <a class="nav__brand" href="#top" aria-label="Codebyr OS — accueil">
+    <svg class="seal seal--sm" viewBox="-8 -8 116 116" aria-hidden="true">
+      <g fill="none" stroke="currentColor" stroke-width="13" stroke-linecap="round">
+        <path d="M 84.64 70 A 40 40 0 0 1 19.36 75.71"/>
+        <path d="M 13.75 66.91 A 40 40 0 0 1 36.32 12.42"/>
+        <path d="M 46.51 10.15 A 40 40 0 0 1 84.64 30"/>
+      </g>
+      <circle cx="50" cy="50" r="9.5" fill="currentColor"/>
+    </svg>
+    <span>Codebyr<b>OS</b></span>
+  </a>
+  <nav class="nav__links" aria-label="Sections">
+    <a href="#concept">Le concept</a>
+    <a href="#fonctionnalites">Fonctionnalités</a>
+    <a href="#honnetete">Honnêteté</a>
+    <a href="#feuille-de-route">Feuille de route</a>
+  </nav>
+  <div class="nav__actions">
+    <button class="theme-toggle" id="themeToggle" aria-label="Changer de thème" title="Changer de thème">
+      <svg class="ico-sun" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4.2"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M19.1 4.9L17 7M7 17l-2.1 2.1"/></svg>
+      <svg class="ico-moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 14.5A8.5 8.5 0 1 1 9.5 4a6.6 6.6 0 0 0 10.5 10.5z"/></svg>
+    </button>
+    <a class="btn btn--ghost" href="https://github.com/Romtouf/codebyr-os" target="_blank" rel="noopener">GitHub ↗</a>
+  </div>
+</header>
+
+<main>
+
+<!-- ══════════ HERO ══════════ -->
+<section class="hero">
+  <div class="hero__bg" aria-hidden="true"></div>
+  <div class="wrap hero__inner">
+    <p class="eyebrow reveal">Distribution Linux · basée Debian · GPL-3.0</p>
+
+    <div class="hero__mark reveal" aria-hidden="true">
+      <svg class="seal seal--hero" viewBox="-8 -8 116 116">
+        <g fill="none" stroke="currentColor" stroke-width="13" stroke-linecap="round">
+          <path d="M 84.64 70 A 40 40 0 0 1 19.36 75.71"/>
+          <path d="M 13.75 66.91 A 40 40 0 0 1 36.32 12.42"/>
+          <path d="M 46.51 10.15 A 40 40 0 0 1 84.64 30"/>
+        </g>
+        <circle cx="50" cy="50" r="9.5" fill="currentColor"/>
+      </svg>
+    </div>
+
+    <h1 class="hero__title reveal">
+      Compartimentez votre <span class="grad">vie numérique</span>.<br>
+      Sans devenir expert.
+    </h1>
+
+    <p class="hero__tagline reveal">
+      Codebyr OS enferme chaque piège — fichier vérolé, site frauduleux,
+      téléchargement douteux — dans un compartiment isolé.
+      <em>Sécurisé par conception. Simple par conviction.</em>
+    </p>
+
+    <div class="hero__cta reveal">
+      <a class="btn btn--primary" href="#essayer">Essayer Codebyr OS</a>
+      <a class="btn btn--ghost" href="#concept">Découvrir les Espaces</a>
+    </div>
+
+    <p class="hero__state reveal">
+      <span class="dot"></span> État du projet — ISO live <strong>installable et testée sur machine réelle</strong>
+    </p>
+  </div>
+
+  <div class="wrap hero__shot reveal">
+    <figure class="shot shot--hero">
+      <img src="captures/01-bureau.png" width="1920" height="1080"
+           alt="Le bureau de Codebyr OS : vue d'ensemble GNOME, fond d'écran au Sceau, dock des applications.">
+    </figure>
+  </div>
+
+  <div class="marquee" aria-hidden="true">
+    <div class="marquee__track">
+      <span>Français d'abord</span><i>·</i>
+      <span>Aucun matériel d'exception</span><i>·</i>
+      <span>Zéro expertise requise</span><i>·</i>
+      <span>Gratuit & open source</span><i>·</i>
+      <span>Chiffrement LUKS</span><i>·</i>
+      <span>Basé sur Debian</span><i>·</i>
+      <span>Français d'abord</span><i>·</i>
+      <span>Aucun matériel d'exception</span><i>·</i>
+      <span>Zéro expertise requise</span><i>·</i>
+      <span>Gratuit & open source</span><i>·</i>
+      <span>Chiffrement LUKS</span><i>·</i>
+      <span>Basé sur Debian</span><i>·</i>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════ 01 · LE CONCEPT ══════════ -->
+<section class="chap" id="concept">
+  <div class="wrap">
+    <header class="chap__head reveal">
+      <span class="num">01</span>
+      <h2>Le concept : les Espaces</h2>
+      <p class="lead">
+        Là où Qubes parle de « qubes », de « domaines » et de « VM templates »,
+        Codebyr parle d'<strong>Espaces</strong> : des compartiments isolés, avec un nom
+        humain et une couleur propre. Chaque fenêtre porte un liseré à la couleur de
+        son Espace. L'utilisateur n'a jamais besoin de savoir ce qu'est un conteneur —
+        <em>la couleur dit tout.</em>
+      </p>
+    </header>
+
+    <!-- Vraies captures : le menu du Sceau et le liseré coloré -->
+    <div class="showcase reveal">
+      <figure class="shot">
+        <img src="captures/02-menu-sceau.png" width="407" height="554" loading="lazy"
+             alt="Le menu du Sceau : sélecteur d'Espaces — Personnel, Travail, Banque, Navigation — puis Jetable, Mode invité et Assistant de sécurité.">
+        <figcaption>Le menu du Sceau — ouvrir une application dans l'Espace de son choix.</figcaption>
+      </figure>
+      <figure class="shot">
+        <img src="captures/05-lisere-fenetre.png" width="1002" height="611" loading="lazy"
+             alt="La fenêtre Fichiers, entourée d'un liseré bleu et marquée d'une pastille « Personnel ».">
+        <figcaption>Chaque fenêtre porte le liseré de son Espace. <em>La couleur dit tout.</em></figcaption>
+      </figure>
+    </div>
+
+    <div class="spaces">
+      <article class="space space--personnel reveal">
+        <span class="space__chip">Azur</span>
+        <h3>Personnel</h3>
+        <p>Votre vie quotidienne, vos fichiers personnels.</p>
+      </article>
+      <article class="space space--travail reveal">
+        <span class="space__chip">Améthyste</span>
+        <h3>Travail</h3>
+        <p>Documents et outils professionnels, à part.</p>
+      </article>
+      <article class="space space--banque reveal">
+        <span class="space__chip">Émeraude</span>
+        <h3>Banque</h3>
+        <p>Uniquement vos sites financiers. Rien d'autre n'y entre.</p>
+      </article>
+      <article class="space space--navigation reveal">
+        <span class="space__chip">Ambre</span>
+        <h3>Navigation</h3>
+        <p>Le web ordinaire, isolé du reste de votre vie.</p>
+      </article>
+      <article class="space space--jetable reveal">
+        <span class="space__chip">Braise</span>
+        <h3>Jetable</h3>
+        <p>Éphémère — s'autodétruit à la fermeture.</p>
+      </article>
+      <article class="space space--custom reveal">
+        <span class="space__chip">+ à vous</span>
+        <h3>Vos Espaces</h3>
+        <p>Créez vos propres Espaces persistants (nom + couleur) en deux clics.</p>
+      </article>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════ 02 · FONCTIONNALITÉS ══════════ -->
+<section class="chap chap--alt" id="fonctionnalites">
+  <div class="wrap">
+    <header class="chap__head reveal">
+      <span class="num">02</span>
+      <h2>Ce qui fonctionne <em>aujourd'hui</em></h2>
+      <p class="lead">
+        Pas une promesse : du code livré, dans une ISO qu'on installe. Voici la
+        protection réelle qui tourne déjà sur une machine ordinaire.
+      </p>
+    </header>
+
+    <div class="grid">
+      <article class="card reveal">
+        <div class="card__ico">◧</div>
+        <h3>Espaces isolés</h3>
+        <p>Bac à sable bubblewrap, dossier personnel séparé, bus D-Bus privé, liserés colorés par fenêtre via une extension GNOME Shell dédiée.</p>
+      </article>
+      <article class="card reveal">
+        <div class="card__ico">🛡</div>
+        <h3>Le Blindage</h3>
+        <p>Isolation renforcée : espace de noms utilisateur, zéro privilège (<code>--cap-drop ALL</code>), session neuve, plafonds mémoire/processus anti fork-bomb. Actif par défaut sur Banque.</p>
+      </article>
+      <article class="card reveal">
+        <div class="card__ico">✷</div>
+        <h3>Jetable automatique</h3>
+        <p>Un lien ou une pièce jointe douteuse s'ouvre dans une bulle <strong>blindée et sans réseau</strong> qui s'autodétruit. Clic droit → « Ouvrir en Jetable ».</p>
+      </article>
+      <article class="card reveal">
+        <div class="card__ico">⛨</div>
+        <h3>Bouclier anti-hameçonnage</h3>
+        <p>L'Espace Banque n'autorise QUE vos domaines bancaires (filtre réseau à liste blanche). Ailleurs, une extension alerte si un site imite l'un de vos sites protégés.</p>
+      </article>
+      <article class="card reveal">
+        <div class="card__ico">⇄</div>
+        <h3>Réseau par Espace</h3>
+        <p>Politique réseau propre à chaque Espace : libre, liste blanche, ou coupure totale.</p>
+      </article>
+      <article class="card reveal">
+        <div class="card__ico">↺</div>
+        <h3>Retour dans le temps</h3>
+        <p>Instantanés d'un Espace (export / import), restauration en un clic depuis le menu du Sceau.</p>
+      </article>
+      <article class="card reveal">
+        <div class="card__ico">⇱</div>
+        <h3>Espace portable</h3>
+        <p>Exportez un Espace complet, réimportez-le sur une autre machine. Vos compartiments vous suivent.</p>
+      </article>
+      <article class="card reveal">
+        <div class="card__ico">◌</div>
+        <h3>Mode invité</h3>
+        <p>Session vierge, nettoyée automatiquement à la déconnexion. Prêtez votre machine sans arrière-pensée.</p>
+      </article>
+      <article class="card reveal">
+        <div class="card__ico">✦</div>
+        <h3>Assistant de sécurité</h3>
+        <p>Des réponses claires, en français, aux questions de sécurité du quotidien. 100 % local — aucune donnée n'en sort.</p>
+      </article>
+    </div>
+
+    <p class="grid__more reveal">
+      Et aussi&nbsp;: installeur graphique <strong>Calamares</strong> (chiffrement LUKS optionnel),
+      ~150 locales &amp; polices Noto, clavier AZERTY par défaut, tour de bienvenue au premier démarrage,
+      et un rapport honnête des capacités de votre machine&nbsp;: <code>codebyr-space isolation</code>.
+    </p>
+
+    <div class="gallery">
+      <figure class="shot reveal">
+        <img src="captures/03-espace-menu.png" width="331" height="815" loading="lazy"
+             alt="Sous-menu d'un Espace : Navigateur, Fichiers, Terminal, Éditeur, Calculatrice, puis fermer l'Espace, vider ses données, créer ou restaurer un instantané.">
+        <figcaption>Les applications et actions d'un Espace, d'un clic.</figcaption>
+      </figure>
+      <figure class="shot reveal">
+        <img src="captures/04-lien-jetable.png" width="694" height="397" loading="lazy"
+             alt="Boîte de dialogue « Ouvrir un lien en Jetable » : le lien s'ouvrira dans une bulle isolée qui s'autodétruit à la fermeture.">
+        <figcaption>Un lien douteux&nbsp;? Il s'ouvre dans une bulle jetable, sans réseau.</figcaption>
+      </figure>
+      <figure class="shot reveal">
+        <img src="captures/10-assistant.png" width="791" height="701" loading="lazy"
+             alt="L'Assistant de sécurité : état du bouclier, réseau de l'Espace Banque, Espaces ouverts, et réponses aux questions courantes.">
+        <figcaption>L'Assistant de sécurité — des réponses claires, 100&nbsp;% local.</figcaption>
+      </figure>
+      <figure class="shot reveal">
+        <img src="captures/06-config-bouclier.png" width="786" height="403" loading="lazy"
+             alt="Configuration Codebyr : le bouclier anti-hameçonnage, avec la liste des sites de votre banque.">
+        <figcaption>Le bouclier anti-hameçonnage&nbsp;: vos vraies banques, rien d'autre.</figcaption>
+      </figure>
+      <figure class="shot reveal">
+        <img src="captures/07-config-blindage.png" width="800" height="483" loading="lazy"
+             alt="Configuration Codebyr : le blindage, activable Espace par Espace, actif par défaut sur Banque.">
+        <figcaption>Le Blindage, réglable Espace par Espace.</figcaption>
+      </figure>
+      <figure class="shot reveal">
+        <img src="captures/08-config-isolation.png" width="785" height="382" loading="lazy"
+             alt="Configuration Codebyr : les capacités d'isolation réellement disponibles sur la machine — bac à sable, isolation utilisateur, plafonds mémoire, KVM.">
+        <figcaption>Un rapport <em>honnête</em> de ce que votre machine sait faire.</figcaption>
+      </figure>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════ 03 · HONNÊTETÉ ══════════ -->
+<section class="chap" id="honnetete">
+  <div class="wrap">
+    <header class="chap__head reveal">
+      <span class="num">03</span>
+      <h2>Honnêteté sur le modèle de sécurité</h2>
+      <p class="lead">
+        La sécurité qui ment est pire que l'absence de sécurité. Voici, sans détour,
+        ce que Codebyr protège — et ce qu'il ne prétend pas encore protéger.
+      </p>
+    </header>
+
+    <div class="honesty reveal">
+      <div class="honesty__col honesty__col--yes">
+        <h3><span class="tick">✓</span> Ce que Codebyr couvre</h3>
+        <ul>
+          <li>La compromission d'un site ou d'une application qui tente d'accéder aux données des <strong>autres</strong> Espaces.</li>
+          <li>Une pièce jointe piégée&nbsp;: elle explose dans une bulle jetable, sans réseau.</li>
+          <li>Une extension de navigateur malveillante, cantonnée à son Espace.</li>
+          <li>Le vol de l'ordinateur, grâce au chiffrement LUKS du disque.</li>
+        </ul>
+      </div>
+      <div class="honesty__col honesty__col--no">
+        <h3><span class="cross">—</span> Ce qu'il ne prétend pas faire</h3>
+        <ul>
+          <li>Résister à une compromission du <strong>noyau partagé</strong>&nbsp;: l'isolation repose sur les espaces de noms Linux (bubblewrap), pas sur des machines virtuelles matérielles. Un exploit noyau peut théoriquement en sortir.</li>
+          <li>Protéger contre un attaquant physique avec accès répété à la machine.</li>
+          <li>Protéger contre du matériel déjà compromis.</li>
+        </ul>
+      </div>
+    </div>
+
+    <p class="honesty__note reveal">
+      <strong>Ce n'est pas Qubes</strong>, et Codebyr ne le prétendra jamais. Mais c'est une
+      protection <em>réelle</em>, qui réduit drastiquement les dégâts d'un piège — sur une machine
+      que tout le monde possède déjà. La détection des capacités est transparente&nbsp;:
+      <code>codebyr-space isolation</code> vous dit exactement ce que votre machine sait faire.
+      Le palier supérieur — l'isolation matérielle par micro-VM (KVM) — est le prochain jalon
+      de la <a href="#feuille-de-route">feuille de route</a>.
+    </p>
+  </div>
+</section>
+
+<!-- ══════════ 04 · CODEBYR vs QUBES ══════════ -->
+<section class="chap chap--alt" id="comparaison">
+  <div class="wrap">
+    <header class="chap__head reveal">
+      <span class="num">04</span>
+      <h2>La compartimentation, sans le prix d'entrée</h2>
+      <p class="lead">
+        Qubes exige la machine. Codebyr s'adapte à elle&nbsp;: le même système offre le
+        meilleur niveau d'isolation que votre matériel permet.
+      </p>
+    </header>
+
+    <div class="versus reveal">
+      <table class="cmp">
+        <thead>
+          <tr><th></th><th>Qubes OS</th><th class="cmp__us">Codebyr OS</th></tr>
+        </thead>
+        <tbody>
+          <tr><th>Mémoire requise</th><td>16 Go et plus</td><td class="cmp__us">4 Go (8 Go conseillés)</td></tr>
+          <tr><th>Matériel</th><td>Liste de compatibilité stricte</td><td class="cmp__us">Un laptop ordinaire, même de 2015</td></tr>
+          <tr><th>Expertise</th><td>Notion de VM, domaines, templates</td><td class="cmp__us">Une couleur par Espace, rien à configurer</td></tr>
+          <tr><th>Langue</th><td>Anglais d'abord</td><td class="cmp__us">Français d'abord (~150 locales)</td></tr>
+          <tr><th>Isolation</th><td>Machines virtuelles matérielles (Xen)</td><td class="cmp__us">Espaces de noms noyau · micro-VM à venir</td></tr>
+          <tr><th>Prix</th><td>Gratuit, open source</td><td class="cmp__us">Gratuit, open source (GPL-3.0)</td></tr>
+        </tbody>
+      </table>
+      <p class="versus__foot">
+        Codebyr redonne vie à un portable modeste là où Qubes exige du matériel haut de gamme.
+        La même idée fondatrice — compartimenter — rendue accessible.
+      </p>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════ 05 · FEUILLE DE ROUTE ══════════ -->
+<section class="chap" id="feuille-de-route">
+  <div class="wrap">
+    <header class="chap__head reveal">
+      <span class="num">05</span>
+      <h2>Feuille de route</h2>
+      <p class="lead">Où en est le projet, sans enjoliver&nbsp;: quatre phases livrées, deux à venir.</p>
+    </header>
+
+    <ol class="road reveal">
+      <li class="road__item is-done">
+        <span class="road__mark">✓</span>
+        <div><span class="road__ph">Phase 0 — Identité</span><p>Branding complet, charte graphique, architecture.</p></div>
+      </li>
+      <li class="road__item is-done">
+        <span class="road__mark">✓</span>
+        <div><span class="road__ph">Phase 1 — ISO de base</span><p>Debian trixie + GNOME, durcie, débrandée, AZERTY.</p></div>
+      </li>
+      <li class="road__item is-done">
+        <span class="road__mark">✓</span>
+        <div><span class="road__ph">Phase 2 — Les Espaces</span><p>Isolation bubblewrap, liserés colorés, menu du Sceau.</p></div>
+      </li>
+      <li class="road__item is-done">
+        <span class="road__mark">✓</span>
+        <div><span class="road__ph">Phase 3 — Les fonctionnalités</span><p>Jetable, Bouclier, Réseau par Espace, Portable, Retour dans le temps, Assistant, Mode invité, Blindage.</p></div>
+      </li>
+      <li class="road__item is-done">
+        <span class="road__mark">✓</span>
+        <div><span class="road__ph">Phase 4 — Installeur</span><p>Calamares Codebyr, installation vérifiée sur machine réelle.</p></div>
+      </li>
+      <li class="road__item is-next">
+        <span class="road__mark">→</span>
+        <div><span class="road__ph">Phase 5 — Diffusion</span><p>ISO signées, CI de build, site, premiers testeurs.</p></div>
+      </li>
+      <li class="road__item">
+        <span class="road__mark"></span>
+        <div><span class="road__ph">Phase 6 — Micro-VM</span><p>Isolation matérielle KVM pour les Espaces sensibles — le palier au-dessus de bubblewrap.</p></div>
+      </li>
+    </ol>
+  </div>
+</section>
+
+<!-- ══════════ 06 · CONFIGURATION ══════════ -->
+<section class="chap chap--alt" id="config">
+  <div class="wrap">
+    <header class="chap__head reveal">
+      <span class="num">06</span>
+      <h2>Configuration requise</h2>
+      <p class="lead">Codebyr fait tourner plusieurs Espaces isolés à la fois&nbsp;: la RAM est le facteur le plus important.</p>
+    </header>
+
+    <div class="specs reveal">
+      <table class="specs__table">
+        <thead>
+          <tr><th></th><th>Minimum</th><th class="cmp__us">Recommandé</th></tr>
+        </thead>
+        <tbody>
+          <tr><th>Processeur</th><td>x86-64, 2 cœurs</td><td class="cmp__us">4 cœurs récents</td></tr>
+          <tr><th>Mémoire (RAM)</th><td><strong>4 Go</strong> — 1 à 2 Espaces</td><td class="cmp__us"><strong>8 Go</strong> — plusieurs Espaces</td></tr>
+          <tr><th>Disque</th><td>20 Go libres</td><td class="cmp__us">30 Go+, SSD conseillé</td></tr>
+          <tr><th>Graphique</th><td>Intel / AMD / NVIDIA OpenGL (~2012)</td><td class="cmp__us">idem</td></tr>
+          <tr><th>Démarrage</th><td>UEFI ou BIOS</td><td class="cmp__us">UEFI</td></tr>
+        </tbody>
+      </table>
+      <ul class="specs__notes">
+        <li><strong>x86-64 uniquement</strong> pour l'instant (pas d'ARM / Raspberry Pi / Apple Silicon).</li>
+        <li>La virtualisation matérielle (VT-x / AMD-V) n'est <strong>pas</strong> requise aujourd'hui — elle servira au futur socle micro-VM.</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════ CTA / ESSAYER ══════════ -->
+<section class="cta" id="essayer">
+  <div class="wrap cta__inner reveal">
+    <svg class="seal seal--cta" viewBox="-8 -8 116 116" aria-hidden="true">
+      <g fill="none" stroke="currentColor" stroke-width="13" stroke-linecap="round">
+        <path d="M 84.64 70 A 40 40 0 0 1 19.36 75.71"/>
+        <path d="M 13.75 66.91 A 40 40 0 0 1 36.32 12.42"/>
+        <path d="M 46.51 10.15 A 40 40 0 0 1 84.64 30"/>
+      </g>
+      <circle cx="50" cy="50" r="9.5" fill="currentColor"/>
+    </svg>
+    <h2>Reprenez le contrôle,<br>sans devenir expert.</h2>
+    <p>
+      Écrivez l'ISO sur une clé USB, démarrez dessus&nbsp;: session live immédiate,
+      aucune installation forcée. Essayez avant d'installer.
+    </p>
+    <div class="cta__buttons">
+      <a class="btn btn--primary btn--lg" href="https://github.com/Romtouf/codebyr-os" target="_blank" rel="noopener">Obtenir Codebyr OS sur GitHub ↗</a>
+      <a class="btn btn--ghost btn--lg" href="https://github.com/Romtouf/codebyr-os#construire-liso" target="_blank" rel="noopener">Construire l'ISO soi-même</a>
+    </div>
+    <p class="cta__fine">Gratuit &amp; open source · GPL-3.0 · basé sur Debian &amp; Calamares</p>
+  </div>
+</section>
+
+</main>
+
+<!-- ══════════ FOOTER ══════════ -->
+<footer class="foot">
+  <div class="wrap foot__inner">
+    <div class="foot__brand">
+      <svg class="seal seal--sm" viewBox="-8 -8 116 116" aria-hidden="true">
+        <g fill="none" stroke="currentColor" stroke-width="13" stroke-linecap="round">
+          <path d="M 84.64 70 A 40 40 0 0 1 19.36 75.71"/>
+          <path d="M 13.75 66.91 A 40 40 0 0 1 36.32 12.42"/>
+          <path d="M 46.51 10.15 A 40 40 0 0 1 84.64 30"/>
+        </g>
+        <circle cx="50" cy="50" r="9.5" fill="currentColor"/>
+      </svg>
+      <div>
+        <b>Codebyr OS</b>
+        <span>Sécurisé par conception. Simple par conviction.</span>
+      </div>
+    </div>
+    <nav class="foot__links" aria-label="Pied de page">
+      <a href="#concept">Le concept</a>
+      <a href="#fonctionnalites">Fonctionnalités</a>
+      <a href="#honnetete">Honnêteté</a>
+      <a href="#feuille-de-route">Feuille de route</a>
+      <a href="https://github.com/Romtouf/codebyr-os" target="_blank" rel="noopener">GitHub ↗</a>
+    </nav>
+  </div>
+  <div class="wrap foot__legal">
+    <span>© <span id="year">2026</span> Contributeurs Codebyr OS — GPL-3.0 · <a href="https://os.codebyr.dev">os.codebyr.dev</a></span>
+    <span>Basé sur <a href="https://www.debian.org/" target="_blank" rel="noopener">Debian</a> · installeur <a href="https://calamares.io/" target="_blank" rel="noopener">Calamares</a></span>
+  </div>
+</footer>
+
+<script src="app.js"></script>
+</body>
+</html>

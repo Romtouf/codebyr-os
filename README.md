@@ -2,6 +2,8 @@
 
 > **Sécurisé par conception. Simple par conviction.**
 
+**🌐 Site officiel : [os.codebyr.dev](https://os.codebyr.dev)**
+
 Codebyr OS est une distribution Linux basée sur Debian qui apporte la sécurité par
 compartimentation — l'idée fondatrice de Qubes OS — à tous les utilisateurs, sans
 matériel d'exception ni expertise technique. En français d'abord, gratuite,
@@ -9,6 +11,8 @@ open source (GPL-3.0).
 
 **État du projet : ISO live installable et fonctionnelle** — construite, testée et
 installée sur machine réelle. Voir la [feuille de route](#feuille-de-route).
+
+![Bureau Codebyr OS — vue d'ensemble GNOME, fond d'écran au Sceau, dock des applications](captures_ecran/01-bureau.png)
 
 ## Le concept : les Espaces
 
@@ -27,6 +31,17 @@ l'utilisateur n'a jamais besoin de savoir ce qu'est un conteneur : la couleur di
 
 Et vous pouvez créer vos propres Espaces persistants (nom + couleur) en deux clics
 depuis le menu du Sceau.
+
+<table>
+  <tr>
+    <td width="50%"><img src="captures_ecran/02-menu-sceau.png" alt="Menu du Sceau : sélecteur d'Espaces (Personnel, Travail, Banque, Navigation…), Jetable, Mode invité, Assistant"></td>
+    <td width="50%"><img src="captures_ecran/05-lisere-fenetre.png" alt="Fenêtre Fichiers avec liseré bleu et pastille « Personnel » : la couleur signale l'Espace propriétaire"></td>
+  </tr>
+  <tr>
+    <td align="center"><em>Le menu du Sceau : ouvrir une app dans l'Espace de son choix.</em></td>
+    <td align="center"><em>Chaque fenêtre porte le liseré de son Espace. La couleur dit tout.</em></td>
+  </tr>
+</table>
 
 ## Ce qui fonctionne aujourd'hui
 
@@ -58,6 +73,35 @@ depuis le menu du Sceau.
 - **Multilingue** : français par défaut, ~150 locales disponibles, polices
   Noto (latin, CJK, emoji). Clavier AZERTY par défaut.
 - **Tour de bienvenue** au premier démarrage.
+
+## Codebyr OS en images
+
+<table>
+  <tr>
+    <td width="50%"><img src="captures_ecran/03-espace-menu.png" alt="Sous-menu d'un Espace : applications (Navigateur, Fichiers, Terminal…) et actions (fermer, vider, instantanés)"></td>
+    <td width="50%"><img src="captures_ecran/04-lien-jetable.png" alt="Boîte de dialogue « Ouvrir un lien en Jetable » : le lien s'ouvre dans une bulle isolée qui s'autodétruit"></td>
+  </tr>
+  <tr>
+    <td align="center"><em>Les applications et actions d'un Espace, d'un clic.</em></td>
+    <td align="center"><em>Ouvrir un lien douteux dans une bulle jetable, sans réseau.</em></td>
+  </tr>
+  <tr>
+    <td width="50%"><img src="captures_ecran/06-config-bouclier.png" alt="Configuration Codebyr : bouclier anti-hameçonnage, liste blanche des sites bancaires"></td>
+    <td width="50%"><img src="captures_ecran/07-config-blindage.png" alt="Configuration Codebyr : blindage activable par Espace, actif par défaut sur Banque"></td>
+  </tr>
+  <tr>
+    <td align="center"><em>Le bouclier anti-hameçonnage : vos vraies banques, rien d'autre.</em></td>
+    <td align="center"><em>Le Blindage, réglable Espace par Espace.</em></td>
+  </tr>
+  <tr>
+    <td width="50%"><img src="captures_ecran/08-config-isolation.png" alt="Configuration Codebyr : rapport honnête des capacités d'isolation de la machine (bubblewrap, KVM…)"></td>
+    <td width="50%"><img src="captures_ecran/10-assistant.png" alt="Assistant de sécurité : état en temps réel et réponses en clair, 100 % local"></td>
+  </tr>
+  <tr>
+    <td align="center"><em>Un rapport honnête de ce que votre machine sait faire.</em></td>
+    <td align="center"><em>L'Assistant de sécurité : des réponses claires, 100 % local.</em></td>
+  </tr>
+</table>
 
 ## Honnêteté sur le modèle de sécurité
 

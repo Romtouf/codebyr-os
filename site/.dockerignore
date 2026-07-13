@@ -1,5 +1,6 @@
+# Allège le contexte de build. Ne PAS y mettre nginx.conf : le Dockerfile
+# en a besoin (un fichier ignoré ici est invisible pour COPY).
 Dockerfile
 .dockerignore
 docker-compose.yml
-nginx.conf
 README.md

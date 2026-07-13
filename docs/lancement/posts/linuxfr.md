@@ -1,4 +1,4 @@
-# Journal LinuxFr — à coller tel quel (adapter les liens vidéo/captures)
+# Journal LinuxFr — à coller tel quel
 
 **Titre : J'ai construit Codebyr OS — la compartimentation de Qubes, mais pour ma mère**
 
@@ -6,7 +6,7 @@ Bonjour 'nal,
 
 Il y a quelques mois, je me suis posé une question simple : pourquoi la meilleure
 idée de la sécurité desktop — la compartimentation façon Qubes OS — reste-t-elle
-réservée aux experts avec 32 Go de RAM et une tolérance infinie à la friction ?
+réservée aux experts avec 16 Go de RAM et une tolérance infinie à la friction ?
 
 J'ai donc construit **Codebyr OS** : une distribution basée sur Debian stable qui
 reprend cette idée, mais avec des mots humains et zéro configuration.
@@ -47,10 +47,16 @@ invulnérable, et je refuse de prétendre le contraire.
 
 v1.0 : ISO live installable, testée sur machines réelles (UEFI, hors-ligne,
 Wi-Fi, boutique Flatpak/Flathub incluse). Code sous GPL-3.0, tout est
-constructible avec live-build en trois commandes.
+constructible avec live-build en trois commandes. Les versions sont **signées
+avec GPG** — et la procédure de vérification du README fonctionne réellement,
+de bout en bout.
 
-→ **Dépôt + ISO** : https://github.com/Romtouf/codebyr-os
-→ Vidéo de 30 secondes du Jetable en action : [LIEN VIDÉO]
+→ **Le site (captures d'écran)** : https://os.codebyr.dev
+→ **Dépôt + ISO signée** : https://github.com/Romtouf/codebyr-os
+
+(Le site est auto-hébergé, ne charge aucune ressource tierce — polices
+comprises — et n'a ni traceur ni CDN. La moindre des choses pour un projet
+qui parle de vie privée.)
 
 Je cherche des testeurs (surtout non techniques !), des retours francs, et des
 contributeurs. Et je prends volontiers vos critiques sur le modèle de sécurité —

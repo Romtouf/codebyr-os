@@ -4,7 +4,7 @@
 
 Show HN: Codebyr OS – Qubes-style compartmentalization for non-technical users
 
-**URL:** https://github.com/Romtouf/codebyr-os
+**URL:** https://os.codebyr.dev
 
 **First comment (post it yourself immediately after submitting — sets the tone):**
 
@@ -37,6 +37,13 @@ threats", never "unhackable".
 
 State: v1.0 live ISO, installable (Calamares, works fully offline),
 tested on real hardware, French-first but ~150 locales, GPL-3.0.
+Releases are GPG-signed — the verification steps are in the README and
+they actually work end-to-end.
+
+Source + signed ISO: https://github.com/Romtouf/codebyr-os
+(Screenshots in the README, and the site serves no third-party requests —
+self-hosted fonts, no analytics, no CDN. Seemed like the least I could do
+for a project that sells privacy.)
 
 I'd genuinely value adversarial feedback on the security model — that's
 how it gets better. Happy to answer anything.

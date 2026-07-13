@@ -1,4 +1,11 @@
-# Mastodon + X — avec la vidéo 30 s en pièce jointe
+# Mastodon + X — avec 2 à 4 captures d'écran en pièces jointes
+
+**Captures à joindre** (dans cet ordre — la 1re est celle qu'on voit en aperçu) :
+
+1. `captures_ecran/02-menu-sceau.png` — le menu du Sceau, les Espaces colorés
+2. `captures_ecran/05-lisere-fenetre.png` — le liseré coloré d'une fenêtre
+3. `captures_ecran/04-lien-jetable.png` — « Ouvrir un lien en Jetable »
+4. `captures_ecran/06-config-bouclier.png` — le bouclier anti-hameçonnage
 
 ## Version française (Mastodon : framapiaf/mastodon.social, X)
 
@@ -10,9 +17,8 @@ Qubes, mais simple — pour vos parents, pas pour des sysadmins.
 🏦 Espace Banque verrouillé sur VOS domaines bancaires
 
 Gratuit, GPL-3.0, base Debian, en français.
-⬇ ISO + code : https://github.com/Romtouf/codebyr-os
-
-[VIDÉO 30s]
+🌐 https://os.codebyr.dev
+⬇ ISO signée + code : https://github.com/Romtouf/codebyr-os
 
 #Linux #Sécurité #OpenSource #Debian
 
@@ -26,14 +32,23 @@ enough for your parents.
 🏦 Bank Space locked to YOUR bank's domains only
 
 Free, GPL-3.0, Debian-based, French-first (150 locales).
-⬇ ISO + source: https://github.com/Romtouf/codebyr-os
-
-[VIDEO 30s]
+🌐 https://os.codebyr.dev
+⬇ Signed ISO + source: https://github.com/Romtouf/codebyr-os
 
 #Linux #InfoSec #OpenSource #Debian
 
 ---
 
 **Notes :** poster la version FR d'abord (9 h 30), l'EN en réponse ou en fil.
-Épingler le post. Sur Mastodon, ajouter le texte alternatif à la vidéo
-(accessibilité — la communauté y tient et c'est cohérent avec nos valeurs).
+Épingler le post. Sur Mastodon, **ajouter un texte alternatif à chaque capture**
+(accessibilité — la communauté y tient, et c'est cohérent avec nos valeurs).
+
+Textes alternatifs suggérés :
+1. « Le menu du Sceau de Codebyr OS : la liste des Espaces isolés — Personnel,
+   Travail, Banque, Navigation — chacun avec sa pastille de couleur. »
+2. « Une fenêtre du gestionnaire de fichiers, entourée d'un liseré bleu et
+   marquée « Personnel » : la couleur indique à quel Espace elle appartient. »
+3. « La boîte de dialogue « Ouvrir un lien en Jetable » : le lien s'ouvrira dans
+   une bulle isolée qui s'autodétruit à la fermeture. »
+4. « L'écran du bouclier anti-hameçonnage : la liste blanche des sites bancaires
+   autorisés dans l'Espace Banque. »

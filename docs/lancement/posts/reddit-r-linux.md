@@ -32,11 +32,13 @@ isolation and the README/SECURITY.md say so explicitly. KVM micro-VMs are the
 planned next tier (hardware detection already ships). The promise is
 "drastically reduce everyday damage", not "unhackable".
 
-GPL-3.0, reproducible with live-build in 3 commands:
-https://github.com/Romtouf/codebyr-os
+GPL-3.0, reproducible with live-build in 3 commands. Releases are GPG-signed
+and the verification steps in the README work end-to-end.
 
-Screenshots in the README. Feedback — especially adversarial security
-feedback — very welcome.
+- Site + screenshots: https://os.codebyr.dev
+- Source + signed ISO: https://github.com/Romtouf/codebyr-os
+
+Feedback — especially adversarial security feedback — very welcome.
 
 ---
 

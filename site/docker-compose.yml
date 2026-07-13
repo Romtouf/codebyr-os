@@ -1,0 +1,39 @@
+# Codebyr OS — site vitrine (os.codebyr.dev)
+#
+# Le conteneur ne publie AUCUN port : Nginx Proxy Manager lui parle
+# directement sur le réseau Docker partagé, par son nom de conteneur.
+# C'est plus sûr qu'exposer un port sur l'hôte.
+#
+#   Démarrer :  docker compose up -d --build
+#   Mettre à jour : git pull && docker compose up -d --build
+
+services:
+  codebyr-os-site:
+    build: .
+    image: codebyr-os-site:latest
+    container_name: codebyr-os-site
+    restart: unless-stopped
+
+    networks:
+      - proxy
+
+    # Tu fais tourner « autoheal » : ce label lui dit de redémarrer
+    # le conteneur si le healthcheck ci-dessous échoue.
+    labels:
+      - "autoheal=true"
+
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://localhost/ || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+
+networks:
+  proxy:
+    external: true
+    # ⚠️ À ADAPTER : le nom exact du réseau Docker de Nginx Proxy Manager.
+    # Pour le trouver sur ton serveur :
+    #   docker inspect $(docker ps -qf name=nginx-proxy) \
+    #     --format '{{range $k,$v := .NetworkSettings.Networks}}{{$k}}{{"\n"}}{{end}}'
+    name: nginx-proxy-manager_default

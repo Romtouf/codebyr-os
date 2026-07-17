@@ -24,8 +24,10 @@ utilisateur non technique.
   persistance après fermeture.
 - Un Espace compromis n'accède pas aux fichiers des autres Espaces (dossiers
   personnels séparés, bus D-Bus privés, `/tmp` isolés).
-- L'Espace Banque ne peut joindre **que** les domaines de la liste blanche de
-  l'utilisateur.
+- Le **navigateur** de l'Espace Banque ne peut joindre que les domaines de la
+  liste blanche de l'utilisateur (proxy local — voir « Limites connues » :
+  c'est un garde-fou au niveau du navigateur, pas encore une règle réseau
+  imposée à tout l'Espace).
 - Le Blindage ajoute : espace de noms utilisateur, abandon de toutes les
   capabilities, session neuve (anti-injection TIOCSTI), plafonds
   mémoire/processus.

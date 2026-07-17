@@ -5,7 +5,7 @@
     { "id": "travail",    "nom": "Travail",    "couleur": "#8F6CF0", "app": "org.gnome.Nautilus.desktop", "ephemere": false },
     { "id": "banque",     "nom": "Banque",     "couleur": "#2FA36B", "app": "firefox-esr.desktop",        "ephemere": false, "blindage": "renforce", "reseau": { "mode": "liste-blanche", "domaines": ["example.com", "*.example.com"] } },
     { "id": "navigation", "nom": "Navigation", "couleur": "#E09A32", "app": "firefox-esr.desktop",        "ephemere": false },
-    { "id": "jetable",    "nom": "Jetable",    "couleur": "#E25551", "app": "firefox-esr.desktop",        "ephemere": true }
+    { "id": "jetable",    "nom": "Jetable",    "couleur": "#E25551", "app": "firefox-esr.desktop",        "ephemere": true,  "blindage": "renforce" }
   ],
   "apps": [
     { "nom": "Navigateur",       "cmd": "firefox-esr" },

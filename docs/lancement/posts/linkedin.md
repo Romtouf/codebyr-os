@@ -39,7 +39,7 @@ votre vie numérique en **Espaces** isolés, chacun avec sa couleur :
 
 🔵 Personnel — votre quotidien
 🟣 Travail — vos documents pro
-🟢 Banque — UNIQUEMENT les sites de votre banque, rien d'autre n'y entre
+🟢 Banque — son navigateur n'ouvre QUE les sites de votre banque
 🟠 Navigation — le web ordinaire, isolé du reste
 🔴 Jetable — éphémère, s'autodétruit à la fermeture
 

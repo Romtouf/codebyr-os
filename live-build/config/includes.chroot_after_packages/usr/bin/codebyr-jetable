@@ -3,9 +3,12 @@
 """
 codebyr-jetable — ouvre un lien OU un fichier dans un Espace Jetable éphémère.
 
-Un lien ou une pièce jointe douteux s'ouvrent dans une bulle isolée qui
-s'autodétruit à la fermeture : le piège explose dans le vide, sans toucher
-à tes données.
+Deux niveaux, selon la cible :
+  - FICHIER (pièce jointe) : bulle blindée ET sans réseau (le piège ne peut
+    ni téléphoner dehors, ni rien laisser derrière lui) ;
+  - LIEN : bulle blindée qui s'autodétruit — le réseau reste ouvert, il est
+    nécessaire pour charger la page. La protection est l'isolation et
+    l'éphémère, pas la coupure réseau.
 
 Usage :
   codebyr-jetable <url>

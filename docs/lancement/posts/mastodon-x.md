@@ -14,7 +14,7 @@ Qubes, mais simple — pour vos parents, pas pour des sysadmins.
 
 🔵🟣🟢🟠🔴 5 « Espaces » isolés et colorés
 📎 Pièce jointe douteuse → s'ouvre SANS réseau, s'autodétruit
-🏦 Espace Banque verrouillé sur VOS domaines bancaires
+🏦 Banque : navigateur verrouillé sur VOS domaines bancaires
 
 Gratuit, GPL-3.0, base Debian, en français.
 🌐 https://os.codebyr.dev
@@ -29,7 +29,7 @@ enough for your parents.
 
 🔵🟣🟢🟠🔴 5 color-coded isolated "Spaces"
 📎 Sketchy attachment? Opens with NO network, self-destructs on close
-🏦 Bank Space locked to YOUR bank's domains only
+🏦 Bank Space's browser locked to YOUR bank's domains only
 
 Free, GPL-3.0, Debian-based, French-first (150 locales).
 🌐 https://os.codebyr.dev

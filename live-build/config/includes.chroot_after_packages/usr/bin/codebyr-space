@@ -11,7 +11,7 @@ Chaque Espace a :
 
 Isolation v1 : bubblewrap si disponible (isolation réelle du système de
 fichiers), sinon repli sur un dossier personnel séparé. L'isolation forte
-par micro-VM viendra en Phase 3.
+par micro-VM viendra en Phase 6 (voir la feuille de route).
 
 Usage :
   codebyr-space list

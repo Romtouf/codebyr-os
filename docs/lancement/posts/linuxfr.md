@@ -23,9 +23,11 @@ Concrètement :
 - **La pièce jointe douteuse** ? Clic droit → « Ouvrir en Jetable » : elle s'ouvre
   dans une bulle **sans réseau** (namespace réseau isolé) qui **s'autodétruit** à
   la fermeture. Le piège explose dans le vide.
-- **La banque** ? L'Espace Banque n'a le droit de joindre QUE les domaines de
-  votre banque (liste blanche réseau), et un bouclier anti-hameçonnage surveille
-  les sites sosies dans les autres Espaces.
+- **La banque** ? Le navigateur de l'Espace Banque n'a le droit de joindre QUE
+  les domaines de votre banque (proxy local à liste blanche — un garde-fou
+  contre l'erreur humaine, pas encore une règle réseau système : c'est
+  documenté dans SECURITY.md), et un bouclier anti-hameçonnage surveille les
+  sites sosies dans les autres Espaces.
 - **Le reste** : instantanés par Espace (« retour dans le temps »), mode invité
   auto-nettoyé, assistant de sécurité 100 % local, ~150 langues (français par
   défaut), installeur graphique Calamares, installation 100 % hors-ligne possible.

@@ -19,8 +19,10 @@ Highlights:
 - **Right-click any sketchy attachment → "Open in Disposable"** → opens in a
   bubblewrap sandbox with an unshared network namespace (zero connectivity)
   that self-destructs on close.
-- **Bank Space** can only reach a whitelist of *your* bank's domains; other
-  Spaces get a look-alike-domain phishing detector in Firefox.
+- **Bank Space**'s browser can only reach a whitelist of *your* bank's domains
+  (local allow-list proxy — a guardrail against human error, not yet a
+  system-level network rule; see SECURITY.md); other Spaces get a
+  look-alike-domain phishing detector in Firefox.
 - Per-Space snapshots ("time machine"), auto-wiping guest mode, local-only
   security assistant, ~150 locales (French-first), Calamares installer that
   works fully offline, Flathub out of the box.

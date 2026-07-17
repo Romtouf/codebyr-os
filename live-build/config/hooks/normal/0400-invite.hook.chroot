@@ -1,7 +1,8 @@
 #!/bin/sh
 # Codebyr OS — mode invité (#7) : une vraie session séparée pour prêter le PC.
 # L'invité est un utilisateur Unix distinct → il ne peut pas lire tes fichiers.
-# Sa session repart à neuf à chaque démarrage.
+# Sa session repart à neuf à chaque DÉCONNEXION (hook GDM PostSession), avec
+# une remise à neuf supplémentaire au démarrage (ceinture et bretelles).
 set -e
 
 echo "P: Codebyr — mode invité"
@@ -17,16 +18,38 @@ echo 'invite:invite' | chpasswd
 # — Isole le dossier de l'utilisateur principal : l'invité ne peut pas le lire —
 chmod 700 /home/user 2>/dev/null || true
 
-# — Réinitialisation de la session invité à chaque démarrage (repart à neuf) —
+# — Script de remise à neuf (utilisé à la déconnexion ET au démarrage) —
 cat > /usr/bin/codebyr-invite-reset <<'EOF'
 #!/bin/sh
 # Remet le dossier de l'invité à l'état neuf (aucune trace d'un invité à l'autre).
+# On ferme d'abord ses éventuels processus restants : sans cela, sa session
+# systemd --user peut survivre à la déconnexion et recréer des fichiers
+# pendant ou après l'effacement.
+if command -v loginctl >/dev/null 2>&1; then
+	loginctl terminate-user invite 2>/dev/null || true
+fi
+pkill -KILL -u invite 2>/dev/null || true
 rm -rf /home/invite
 cp -a /etc/skel /home/invite
 chown -R invite:invite /home/invite
 chmod 700 /home/invite
 EOF
 chmod 755 /usr/bin/codebyr-invite-reset
+
+# — Réinitialisation à la DÉCONNEXION : hook GDM PostSession (exécuté en root
+#   à la fermeture de chaque session graphique). C'est ce qui rend vraie la
+#   promesse « nettoyée automatiquement à la déconnexion » : deux invités
+#   successifs ne se voient pas, même sans redémarrage. —
+mkdir -p /etc/gdm3/PostSession
+cat > /etc/gdm3/PostSession/Default <<'EOF'
+#!/bin/sh
+# Codebyr — l'invité repart à neuf dès la fermeture de sa session.
+if [ "$USER" = "invite" ]; then
+	/usr/bin/codebyr-invite-reset
+fi
+exit 0
+EOF
+chmod 755 /etc/gdm3/PostSession/Default
 
 cat > /etc/systemd/system/codebyr-invite-reset.service <<'EOF'
 [Unit]

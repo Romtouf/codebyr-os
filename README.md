@@ -50,14 +50,19 @@ depuis le menu du Sceau.
 - **Le Blindage** : niveau d'isolation renforcé par Espace — espace de noms
   utilisateur, zéro privilège (`--cap-drop ALL`), session neuve, plafonds
   mémoire/processus (anti fork-bomb). Actif par défaut sur Banque.
-- **Jetable automatique** : un lien ou une pièce jointe douteuse s'ouvre dans une
-  bulle **blindée et sans réseau** qui s'autodétruit à la fermeture. Clic droit →
-  « Ouvrir en Jetable ».
-- **Bouclier anti-hameçonnage** : l'Espace Banque n'autorise QUE vos domaines
-  bancaires (filtre réseau local à liste blanche) ; dans les autres Espaces, une
-  extension Firefox alerte si un site imite l'un de vos sites protégés.
-- **Réseau par Espace** : politique réseau propre à chaque Espace (libre,
-  liste blanche, ou coupure totale).
+- **Jetable automatique** : clic droit → « Ouvrir en Jetable ». Une pièce jointe
+  douteuse s'ouvre dans une bulle **blindée et sans réseau** (namespace réseau
+  isolé : le piège ne peut rien exfiltrer) ; un lien douteux s'ouvre dans une
+  bulle **blindée** qui s'autodétruit — le réseau y reste ouvert, il est
+  nécessaire pour charger la page.
+- **Bouclier anti-hameçonnage** : le navigateur de l'Espace Banque n'atteint QUE
+  vos domaines bancaires (proxy local à liste blanche — un garde-fou contre
+  l'erreur humaine, pas une règle réseau système : voir SECURITY.md) ; dans les
+  autres Espaces, une extension Firefox alerte si un site imite l'un de vos
+  sites protégés.
+- **Réseau par Espace** : libre, liste blanche (appliquée au navigateur de
+  l'Espace), ou coupure totale (namespace réseau isolé, comme le Jetable
+  fichier).
 - **Retour dans le temps** : instantanés d'un Espace (export/import), restauration
   en un clic depuis le menu du Sceau.
 - **Espace portable** : exportez un Espace complet, réimportez-le ailleurs.
@@ -83,7 +88,7 @@ depuis le menu du Sceau.
   </tr>
   <tr>
     <td align="center"><em>Les applications et actions d'un Espace, d'un clic.</em></td>
-    <td align="center"><em>Ouvrir un lien douteux dans une bulle jetable, sans réseau.</em></td>
+    <td align="center"><em>Ouvrir un lien douteux dans une bulle jetable blindée, qui s'autodétruit.</em></td>
   </tr>
   <tr>
     <td width="50%"><img src="captures_ecran/06-config-bouclier.png" alt="Configuration Codebyr : bouclier anti-hameçonnage, liste blanche des sites bancaires"></td>

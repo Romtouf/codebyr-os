@@ -22,8 +22,10 @@ The two features I'm most proud of:
   Disposable" → it opens in a sandbox with *no network* (unshared netns)
   that self-destructs on close. A malicious PDF can't phone home and
   leaves nothing behind.
-- **Bank Space**: network-whitelisted to *your* bank's domains only, plus
-  a look-alike-domain detector in other Spaces' browsers.
+- **Bank Space**: its browser is forced through a local allow-list proxy
+  (*your* bank's domains only — a guardrail against human error, not yet a
+  system-level network rule; documented in SECURITY.md), plus a
+  look-alike-domain detector in other Spaces' browsers.
 
 Isolation is bubblewrap (kernel namespaces) with a hardened mode: user
 namespace, cap-drop ALL, new session, memory/task cgroup limits, private

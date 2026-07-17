@@ -85,7 +85,7 @@ if [ -z "$ISO" ]; then
 	echo "ERREUR : aucune ISO produite (voir la sortie ci-dessus)." >&2
 	exit 1
 fi
-OUT="$DIST/codebyr-os-1.0-$(date +%Y%m%d)-amd64.iso"
+OUT="$DIST/codebyr-os-1.0.1-$(date +%Y%m%d)-amd64.iso"
 cp -f "$ISO" "$OUT"
 sync
 echo "==> ISO prête : $OUT  ($(du -h "$OUT" | cut -f1))"

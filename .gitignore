@@ -9,6 +9,20 @@ cache/
 chroot/
 binary/
 
+# Dépôt APT généré (voir packaging/publish-apt.sh) et paquets construits
+apt-repo/
+*.deb
+
+# Clés PRIVÉES et trousseaux binaires — ne JAMAIS committer.
+# (La clé PUBLIQUE codebyr-signing-key.asc, elle, est suivie : voir plus bas.)
+*-SECRETE.asc
+*secret*.asc
+*.gpg
+
 # Divers
 *.log
 *.tmp
+
+# Caches Python (tests de compilation)
+__pycache__/
+*.pyc

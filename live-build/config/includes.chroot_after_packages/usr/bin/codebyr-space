@@ -240,7 +240,7 @@ def _domaines_proteges(espaces):
         r = e.get("reseau") or {}
         if r.get("mode") == "liste-blanche":
             for d in (r.get("domaines") or []):
-                d = d.strip().lstrip("*.")
+                d = d.strip().removeprefix("*.")
                 if d and d not in out:
                     out.append(d)
     return out

@@ -1,0 +1,4 @@
+Types: deb
+URIs: https://apt.codebyr.dev
+Suites: ./
+Signed-By: /usr/share/keyrings/codebyr-archive-keyring.gpg

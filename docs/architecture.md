@@ -64,9 +64,12 @@ Démon système exposé sur D-Bus. Responsabilités :
 - Le backend est **invisible** : l'utilisateur voit « Banque », jamais « VM ».
 - Réseau par Espace : Banque n'accède qu'à une liste d'autorisation (résolue
   localement), Jetable passe par un réseau isolé, Personnel a le réseau normal.
-- Presse-papiers inter-Espaces **explicite** : copier dans un Espace, puis
-  raccourci global « coller vers… » avec confirmation visuelle colorée
-  (le modèle Qubes, simplifié).
+- Presse-papiers inter-Espaces **explicite** (implémenté dans l'extension
+  GNOME) : le presse-papiers est vidé dès que le focus change d'Espace ; pour
+  transférer, l'utilisateur passe par « Transférer le presse-papiers vers… »
+  avec confirmation colorée (le modèle Qubes, simplifié). Limite : compositeur
+  Wayland partagé → protection temporelle, pas étanchéité de VM (voir
+  SECURITY.md).
 - Fichiers : chaque Espace a son volume. Le transfert passe par « Envoyer
   vers l'Espace… » dans Fichiers, jamais par un montage partagé silencieux.
 

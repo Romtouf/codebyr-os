@@ -1,0 +1,31 @@
+#!/bin/sh
+# Codebyr OS — active le canal de mise à jour APT dans l'image.
+#
+# ⚠️ NE PAS placer ce hook dans live-build/config/hooks/normal/ TANT QUE
+# https://apt.codebyr.dev n'est pas EN LIGNE : un dépôt injoignable ferait
+# échouer « apt update » (et donc unattended-upgrades) sur toutes les machines.
+#
+# Pour l'activer, une fois le dépôt déployé :
+#   cp packaging/client/1000-canal-maj.hook.chroot \
+#      live-build/config/hooks/normal/
+#   cp codebyr-signing-key.asc \
+#      live-build/config/includes.chroot_after_packages/usr/share/keyrings/codebyr.asc
+#   cp packaging/client/codebyr.sources \
+#      live-build/config/includes.chroot_after_packages/etc/apt/sources.list.d/
+#   cp packaging/client/51codebyr-unattended \
+#      live-build/config/includes.chroot_after_packages/etc/apt/apt.conf.d/
+set -e
+
+KEY_ASC="/usr/share/keyrings/codebyr.asc"
+KEYRING="/usr/share/keyrings/codebyr-archive-keyring.gpg"
+
+if [ ! -f "$KEY_ASC" ]; then
+	echo "P: Codebyr — clé publique absente ($KEY_ASC), canal MAJ non activé." >&2
+	exit 0
+fi
+
+# Dé-armure la clé publique vers le trousseau binaire attendu par apt.
+gpg --dearmor < "$KEY_ASC" > "$KEYRING"
+chmod 0644 "$KEYRING"
+
+echo "P: Codebyr — canal de mise à jour APT activé (apt.codebyr.dev)."

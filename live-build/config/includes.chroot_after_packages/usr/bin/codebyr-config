@@ -587,7 +587,14 @@ class Fenetre(Adw.ApplicationWindow):
                 if ok else "Impossible d'ajouter ce programme."))
 
     def _ajouter_domaine(self, texte):
-        d = (texte or "").strip().lower().lstrip("www.")
+        # removeprefix, PAS lstrip("www.") : lstrip retire tout caractère de
+        # tête de l'ensemble {w, .}, donc « wise.com » deviendrait « ise.com ».
+        d = (texte or "").strip().lower()
+        if d.startswith("http://"):
+            d = d[7:]
+        elif d.startswith("https://"):
+            d = d[8:]
+        d = d.split("/", 1)[0].removeprefix("www.")
         if not d or "." not in d:
             return
         banque = espace_banque(self._data)

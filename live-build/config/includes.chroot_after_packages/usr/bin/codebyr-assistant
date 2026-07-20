@@ -65,7 +65,7 @@ def _domaines_banque():
         for e in data.get("espaces", []):
             r = e.get("reseau") or {}
             if r.get("mode") == "liste-blanche":
-                return [d.lstrip("*.") for d in (r.get("domaines") or [])]
+                return [d.removeprefix("*.") for d in (r.get("domaines") or [])]
     except (OSError, ValueError):
         pass
     return []

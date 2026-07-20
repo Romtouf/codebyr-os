@@ -1,0 +1,21 @@
+#!/bin/sh
+# Codebyr OS — post-installation de codebyr-tools.
+set -e
+
+case "$1" in
+	configure)
+		# Les scripts codebyr-* doivent être exécutables (ceinture + bretelles).
+		for f in /usr/bin/codebyr-*; do
+			[ -f "$f" ] && chmod 755 "$f" || true
+		done
+		# L'extension GNOME est déjà activable par l'utilisateur ; on ne force
+		# rien ici (pas de session graphique garantie pendant apt). Un
+		# rechargement de l'extension nécessite une reconnexion — signalé au
+		# besoin par GNOME lui-même.
+		if command -v update-desktop-database >/dev/null 2>&1; then
+			update-desktop-database -q /usr/share/applications 2>/dev/null || true
+		fi
+		;;
+esac
+
+exit 0

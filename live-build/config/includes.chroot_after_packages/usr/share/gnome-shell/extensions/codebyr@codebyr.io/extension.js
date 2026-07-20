@@ -13,6 +13,7 @@ import St from 'gi://St';
 import Gio from 'gi://Gio';
 import GLib from 'gi://GLib';
 import Clutter from 'gi://Clutter';
+import Meta from 'gi://Meta';
 
 import {Extension} from 'resource:///org/gnome/shell/extensions/extension.js';
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
@@ -272,6 +273,130 @@ class Coloriage {
     }
 }
 
+// Espace de la fenêtre actuellement focalisée (par classe, sinon filiation).
+function espaceFocalise(espaces, rundir) {
+    let win = null;
+    try { win = global.display.focus_window; } catch (e) {}
+    if (!win)
+        return null;
+    return espacePourFenetre(win, espaces) || espaceParProcessus(win, espaces, rundir);
+}
+
+// ── Presse-papiers inter-Espaces ─────────────────────────────────────────
+// Sous un compositeur Wayland partagé, tous les Espaces voient le MÊME
+// presse-papiers : un secret copié dans Banque resterait lisible en basculant
+// vers Navigation. Pour l'éviter, on VIDE le presse-papiers dès que le focus
+// passe à un Espace différent de celui qui l'a rempli. Le transfert volontaire
+// reste possible, mais EXPLICITE et confirmé (menu « Transférer vers… »).
+//
+// Limite assumée : ce n'est pas l'isolation matérielle de Qubes (compositeur
+// partagé). La protection est temporelle — réduire la fenêtre de fuite. Soupape
+// utilisateur : créer ~/.config/codebyr/presse-papiers-libre désactive tout
+// nettoyage automatique.
+class PressePapiers {
+    constructor(getEspaces, rundir) {
+        this._getEspaces = getEspaces;
+        this._rundir = rundir;
+        this._proprietaire = null;   // Espace ayant rempli le presse-papiers
+        this._transfert = null;      // {dest} transfert explicite autorisé
+        this._selId = 0;
+        this._focusId = 0;
+        this._nettoyageId = 0;
+        this._clip = St.Clipboard.get_default();
+    }
+
+    _actif() {
+        const f = GLib.get_home_dir() + '/.config/codebyr/presse-papiers-libre';
+        return !GLib.file_test(f, GLib.FileTest.EXISTS);
+    }
+
+    _espace() {
+        return espaceFocalise(this._getEspaces(), this._rundir);
+    }
+
+    activer() {
+        try {
+            const sel = global.display.get_selection();
+            this._selId = sel.connect('owner-changed', (_s, type) => {
+                if (type !== Meta.SelectionType.SELECTION_CLIPBOARD)
+                    return;
+                // Presse-papiers (re)rempli : on note l'Espace source, sauf si
+                // c'est nous qui venons de le vider (proprietaire déjà nul).
+                if (!this._transfert)
+                    this._proprietaire = this._espace();
+            });
+        } catch (e) {
+            logError(e, 'Codebyr: presse-papiers (sélection indisponible)');
+        }
+        try {
+            this._focusId = global.display.connect('notify::focus-window',
+                () => this._surFocus());
+        } catch (e) {}
+    }
+
+    _surFocus() {
+        if (!this._actif())
+            return;
+        const esp = this._espace();
+        if (!esp)
+            return;   // bureau / app système : ne jamais casser le presse-papiers
+        if (this._transfert) {
+            // le contenu « en transit » atteint sa destination : on le laisse,
+            // puis nettoyage différé pour ne pas qu'il traîne.
+            if (esp.id === this._transfert.dest)
+                this._planifierNettoyage();
+            return;
+        }
+        if (this._proprietaire && esp.id !== this._proprietaire.id)
+            this._vider();
+    }
+
+    _vider() {
+        try {
+            this._clip.set_text(St.ClipboardType.CLIPBOARD, '');
+            this._clip.set_text(St.ClipboardType.PRIMARY, '');
+        } catch (e) {}
+        this._proprietaire = null;
+    }
+
+    _planifierNettoyage() {
+        if (this._nettoyageId)
+            return;
+        this._nettoyageId = GLib.timeout_add_seconds(GLib.PRIORITY_DEFAULT, 45, () => {
+            this._vider();
+            this._transfert = null;
+            this._nettoyageId = 0;
+            return GLib.SOURCE_REMOVE;
+        });
+    }
+
+    // Autorise le contenu actuel à franchir la frontière vers un Espace donné.
+    autoriserTransfert(destId) {
+        this._transfert = {dest: destId};
+    }
+
+    // Y a-t-il un contenu copié à transférer ? (callback avec le texte)
+    lireContenu(cb) {
+        try {
+            this._clip.get_text(St.ClipboardType.CLIPBOARD, (_c, texte) => cb(texte || ''));
+        } catch (e) {
+            cb('');
+        }
+    }
+
+    detruire() {
+        if (this._focusId) {
+            try { global.display.disconnect(this._focusId); } catch (e) {}
+        }
+        if (this._selId) {
+            try { global.display.get_selection().disconnect(this._selId); } catch (e) {}
+        }
+        if (this._nettoyageId) {
+            try { GLib.Source.remove(this._nettoyageId); } catch (e) {}
+        }
+    }
+}
+
 const Indicateur = GObject.registerClass(
 class Indicateur extends PanelMenu.Button {
     _init(extension) {
@@ -314,6 +439,9 @@ class Indicateur extends PanelMenu.Button {
             this._ajouterEspace(jetable, true);
         this.menu.addAction('Ouvrir un lien en Jetable…', () => this._dialogueLienJetable());
         this.menu.addAction('Mode invité (prêter le PC)', () => this._modeInvite());
+        this.menu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
+        this.menu.addAction('📋  Transférer le presse-papiers vers…',
+            () => this._dialogueTransfert(espaces));
         this.menu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
         this.menu.addAction('🛡  Assistant de sécurité', () => {
             try {
@@ -426,6 +554,65 @@ class Indicateur extends PanelMenu.Button {
         entry.clutter_text.connect('activate', ouvrir);
         dlg.open();
         global.stage.set_key_focus(entry.clutter_text);
+    }
+
+    _dialogueTransfert(espaces) {
+        const pp = this._extension.pressePapiers;
+        if (!pp) {
+            Main.notify('Codebyr', 'Presse-papiers inter-Espaces indisponible.');
+            return;
+        }
+        pp.lireContenu((texte) => {
+            if (!texte || !texte.trim()) {
+                Main.notify('Codebyr — Presse-papiers',
+                    'Rien à transférer. Copiez d\'abord un texte (Ctrl+C) dans un Espace, '
+                    + 'puis rouvrez ce menu.');
+                return;
+            }
+            this._ouvrirTransfert(espaces, texte, pp);
+        });
+    }
+
+    _ouvrirTransfert(espaces, texte, pp) {
+        const rundir = GLib.get_user_runtime_dir() + '/codebyr';
+        const source = espaceFocalise(espaces, rundir);
+        const dlg = new ModalDialog.ModalDialog({destroyOnClose: true});
+        const boite = new St.BoxLayout({vertical: true, style: 'spacing: 10px; min-width: 460px;'});
+        boite.add_child(new St.Label({
+            text: 'Transférer le presse-papiers',
+            style: 'font-weight: 700; font-size: 15px;',
+        }));
+        // On n'affiche JAMAIS le contenu (ce peut être un mot de passe) : seulement
+        // sa taille et l'Espace d'origine. Le transfert entre Espaces est une
+        // action délibérée, pas une fuite silencieuse.
+        boite.add_child(new St.Label({
+            text: (source ? 'Contenu copié depuis « ' + source.nom + ' »' : 'Contenu copié')
+                + ' (' + texte.length + ' caractère' + (texte.length > 1 ? 's' : '') + ').'
+                + '\nVers quel Espace l\'autoriser ?',
+            style: 'color: #93A6B0;',
+        }));
+        for (const e of espaces) {
+            if (source && e.id === source.id)
+                continue;   // inutile de transférer vers soi-même
+            const b = new St.Button({
+                label: e.nom, can_focus: true, x_align: Clutter.ActorAlign.FILL,
+                style: 'padding: 9px 14px; border-radius: 8px; margin-top: 2px;'
+                    + 'background-color: ' + (e.couleur || '#43C7DF') + '22;'
+                    + 'border-left: 4px solid ' + (e.couleur || '#43C7DF') + ';',
+            });
+            b.connect('clicked', () => {
+                dlg.close();
+                pp.autoriserTransfert(e.id);
+                Main.notify('Codebyr — Presse-papiers',
+                    'Autorisé vers « ' + e.nom + ' ». Basculez sur cet Espace et collez '
+                    + '(Ctrl+V). Le presse-papiers sera ensuite effacé.');
+            });
+            boite.add_child(b);
+        }
+        dlg.contentLayout.add_child(boite);
+        dlg.setButtons([{label: 'Annuler', action: () => dlg.close(),
+            key: Clutter.KEY_Escape, default: true}]);
+        dlg.open();
     }
 
     _ajouterEspace(e, jetable) {
@@ -552,11 +739,20 @@ export default class CodebyrExtension extends Extension {
         } catch (e) {
             logError(e, 'Codebyr: activation du coloriage');
         }
+        try {
+            this.pressePapiers = new PressePapiers(
+                () => chargerEspaces(), GLib.get_user_runtime_dir() + '/codebyr');
+            this.pressePapiers.activer();
+        } catch (e) {
+            logError(e, 'Codebyr: activation du presse-papiers');
+        }
     }
 
     disable() {
         this._coloriage?.detruire();
         this._coloriage = null;
+        this.pressePapiers?.detruire();
+        this.pressePapiers = null;
         this._indicateur?.destroy();
         this._indicateur = null;
         this._espaces = null;

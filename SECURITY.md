@@ -31,6 +31,9 @@ utilisateur non technique.
 - Le Blindage ajoute : espace de noms utilisateur, abandon de toutes les
   capabilities, session neuve (anti-injection TIOCSTI), plafonds
   mémoire/processus.
+- Le presse-papiers ne « suit » pas passivement d'un Espace à l'autre : dès que
+  le focus passe à un Espace différent de celui qui l'a rempli, il est vidé.
+  Un transfert reste possible mais **explicite** (menu « Transférer vers… »).
 
 **Hors périmètre (assumé) :**
 - Exploits noyau : l'isolation repose sur les namespaces Linux (bubblewrap),
@@ -69,6 +72,12 @@ surface applicative minimale (`--apt-recommends false`).
 - **Filtre réseau bancaire** : appliqué au niveau du profil navigateur ; un code
   hostile déjà exécuté *dans* l'Espace pourrait le contourner. Il protège du web
   et de l'hameçonnage, pas d'un binaire malveillant lancé dans l'Espace.
-- **Compositeur Wayland et audio (PipeWire) partagés** entre Espaces.
+- **Compositeur Wayland et audio (PipeWire) partagés** entre Espaces. Comme le
+  presse-papiers Wayland dépend du compositeur, il est techniquement commun à
+  tous les Espaces : la protection Codebyr (vidage au changement d'Espace,
+  transfert explicite) est **temporelle** — elle réduit la fenêtre de fuite,
+  elle n'apporte pas l'étanchéité d'une VM. L'isolation forte du presse-papiers
+  suppose des compositeurs imbriqués (piste micro-VM, Phase 6). Soupape :
+  `~/.config/codebyr/presse-papiers-libre` désactive le vidage automatique.
 - **Applications Flatpak** : proviennent de Flathub — confiance déléguée à
   Flathub et à l'éditeur de chaque application.

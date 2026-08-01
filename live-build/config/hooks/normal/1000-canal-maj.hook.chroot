@@ -1,0 +1,43 @@
+#!/bin/sh
+# Codebyr OS — active le canal de mise à jour APT (apt.codebyr.dev) dans l'image.
+#
+# S'exécute en dernier : les fichiers Codebyr sont déjà posés
+# (includes.chroot_after_packages) et toutes les dépendances de codebyr-tools
+# sont déjà installées.
+#
+# ORDRE IMPORTANT : on n'écrit le sources.list Codebyr qu'APRÈS avoir généré le
+# trousseau. Un sources.list vers un dépôt signé sans son trousseau ferait
+# échouer tout « apt update » du build.
+set -e
+
+KEY_ASC="/usr/share/keyrings/codebyr.asc"
+KEYRING="/usr/share/keyrings/codebyr-archive-keyring.gpg"
+
+# 1) Faire de codebyr-tools un VRAI paquet dpkg : il adopte les fichiers déjà
+#    posés et devient suivi par apt/unattended-upgrades. Contenu identique
+#    (même source) → aucune modification, juste l'enregistrement dpkg.
+DEB="$(ls /opt/codebyr/codebyr-tools_*_all.deb 2>/dev/null | head -n1)"
+if [ -n "$DEB" ]; then
+	dpkg -i "$DEB" || apt-get -y -f install
+	rm -f "$DEB"
+	rmdir /opt/codebyr 2>/dev/null || true
+	echo "P: Codebyr — codebyr-tools installé comme paquet (MAJ par apt actives)."
+else
+	echo "P: Codebyr — paquet codebyr-tools non embarqué, MAJ auto indisponibles." >&2
+fi
+
+# 2) Trousseau apt PUIS sources.list (jamais l'inverse).
+if [ -f "$KEY_ASC" ]; then
+	gpg --dearmor < "$KEY_ASC" > "$KEYRING"
+	chmod 0644 "$KEYRING"
+	rm -f "$KEY_ASC"
+	cat > /etc/apt/sources.list.d/codebyr.sources <<'SRC'
+Types: deb
+URIs: https://apt.codebyr.dev
+Suites: ./
+Signed-By: /usr/share/keyrings/codebyr-archive-keyring.gpg
+SRC
+	echo "P: Codebyr — canal de mise à jour APT activé (apt.codebyr.dev)."
+else
+	echo "P: Codebyr — clé publique absente, canal MAJ non activé." >&2
+fi

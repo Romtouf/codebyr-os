@@ -58,6 +58,22 @@ if command -v rsvg-convert >/dev/null 2>&1 && [ -f "$REPO/branding/boot-splash.s
 	echo "==> Fond de démarrage Codebyr généré (splash.png)"
 fi
 
+# — Paquet codebyr-tools embarqué : le hook 1000 l'installera via dpkg pour que
+#   codebyr-tools soit un VRAI paquet (donc suivi par apt/unattended-upgrades).
+#   Construit ici pour être toujours cohérent avec la version courante du dépôt.
+if [ -f "$REPO/packaging/build-deb.sh" ]; then
+	echo "==> Construction du paquet codebyr-tools (embarqué pour les MAJ)"
+	CODEBYR_REPO="$REPO" bash "$REPO/packaging/build-deb.sh" >/dev/null
+	VER="$(tr -d ' \t\r\n' < "$REPO/VERSION")"
+	DEBSRC="$REPO/packaging/dist/codebyr-tools_${VER}_all.deb"
+	if [ -f "$DEBSRC" ]; then
+		mkdir -p "$WORK/config/includes.chroot_after_packages/opt/codebyr"
+		cp -f "$DEBSRC" "$WORK/config/includes.chroot_after_packages/opt/codebyr/"
+	else
+		echo "AVERTISSEMENT : paquet codebyr-tools introuvable, canal MAJ non embarqué." >&2
+	fi
+fi
+
 # — Bits exécutables (perdus/incertains via 9p) —
 chmod +x "$WORK/auto/config"
 chmod +x "$WORK"/config/hooks/normal/*.hook.chroot 2>/dev/null || true
@@ -85,7 +101,7 @@ if [ -z "$ISO" ]; then
 	echo "ERREUR : aucune ISO produite (voir la sortie ci-dessus)." >&2
 	exit 1
 fi
-OUT="$DIST/codebyr-os-1.0.1-$(date +%Y%m%d)-amd64.iso"
+OUT="$DIST/codebyr-os-1.0.2-$(date +%Y%m%d)-amd64.iso"
 cp -f "$ISO" "$OUT"
 sync
 echo "==> ISO prête : $OUT  ($(du -h "$OUT" | cut -f1))"

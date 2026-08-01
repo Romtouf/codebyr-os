@@ -1,0 +1,6 @@
+// Codebyr OS — autorise les mises à jour automatiques des outils Codebyr.
+// L'origine « Codebyr OS » est celle déclarée dans le Release du dépôt APT.
+// Sans cette ligne, unattended-upgrades ignorerait le dépôt Codebyr.
+Unattended-Upgrade::Origins-Pattern {
+    "origin=Codebyr OS";
+};

@@ -8,6 +8,7 @@ dist/
 cache/
 chroot/
 binary/
+site/
 
 # Dépôt APT généré (voir packaging/publish-apt.sh) et paquets construits
 apt-repo/

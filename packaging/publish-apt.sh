@@ -16,8 +16,9 @@
 set -euo pipefail
 
 HERE="$(cd "$(dirname "$0")" && pwd)"
-DIST="$HERE/dist"
-REPODIR="$HERE/apt-repo"
+REPO="${CODEBYR_REPO:-$(cd "$HERE/.." && pwd)}"
+DIST="$REPO/packaging/dist"
+REPODIR="$REPO/packaging/apt-repo"
 : "${GNUPGHOME:=/root/.gnupg-codebyr}"
 export GNUPGHOME
 KEYID="E6FB6616EC58E15F40DA876CB1E8C803CE596E68"

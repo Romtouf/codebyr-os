@@ -17,7 +17,7 @@ HERE="$(cd "$(dirname "$0")" && pwd)"
 REPO="${CODEBYR_REPO:-$(cd "$HERE/.." && pwd)}"
 SRC="$REPO/live-build/config/includes.chroot_after_packages"
 VERSION="${1:-$(tr -d ' \t\r\n' < "$REPO/VERSION")}"
-OUT="$HERE/dist"
+OUT="$REPO/packaging/dist"
 
 [ -d "$SRC" ] || { echo "ERREUR : arborescence source introuvable ($SRC)." >&2; exit 1; }
 

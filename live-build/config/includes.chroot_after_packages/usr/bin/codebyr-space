@@ -691,13 +691,18 @@ def cmd_add_app(esp_id, nom, fichier, extra):
         # Chemin tel que vu DANS le bac à sable (le home de l'Espace est monté sur ~).
         if cible.startswith(esp_home + os.sep):
             rel = os.path.relpath(cible, esp_home)
-            cmd = os.path.join(os.path.expanduser("~"), rel)
+            prog = os.path.join(os.path.expanduser("~"), rel)
         else:
-            cmd = cible  # hors home de l'Espace (ex. /usr, /opt en lecture seule)
+            prog = cible  # hors home de l'Espace (ex. /usr, /opt en lecture seule)
     else:
-        cmd = fichier  # commande du PATH (ex. « gimp »)
+        prog = fichier  # commande du PATH (ex. « gimp »)
+    # La commande stockée est réinterprétée comme une ligne shell au lancement :
+    # on protège le chemin (et les arguments) par des quotes, sans quoi un dossier
+    # contenant une espace (« Antigravity IDE ») casse le lancement.
+    import shlex
+    cmd = shlex.quote(prog)
     if extra:
-        cmd = cmd + " " + " ".join(extra)
+        cmd += " " + " ".join(shlex.quote(a) for a in extra)
     _enregistrer_app(esp_id, nom, cmd)
     print("« %s » ajoutée au menu de l'Espace %s." % (nom, esp["nom"]))
     print("  Commande : %s" % cmd)

@@ -542,7 +542,8 @@ class Fenetre(Adw.ApplicationWindow):
         grp.add(nom_row)
         sw = Adw.SwitchRow(
             title="Application Electron / Chromium",
-            subtitle="Ajoute « --no-sandbox » (VS Code, Antigravity, navigateurs…)")
+            subtitle="Ajoute les options Wayland + « --no-sandbox » "
+                     "(VS Code, Antigravity, navigateurs…)")
         grp.add(sw)
         page.add(grp)
 
@@ -570,7 +571,10 @@ class Fenetre(Adw.ApplicationWindow):
         nom = (nom or os.path.basename(chemin)).strip()
         args = ["codebyr-space", "add-app", esp.get("id"), nom, chemin]
         if nosandbox:
-            args.append("--no-sandbox")
+            # --no-sandbox : le bac à sable interne d'Electron entre en conflit
+            #   avec bubblewrap. --ozone-platform-hint=auto : Codebyr est
+            #   Wayland-only ; sans ce flag, l'app tente X11 et ne s'affiche pas.
+            args += ["--no-sandbox", "--ozone-platform-hint=auto"]
         ok = True
         try:
             subprocess.run(args, timeout=30, check=True)

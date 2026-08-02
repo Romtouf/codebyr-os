@@ -4,6 +4,7 @@
   "description": "Avertit quand un site imite une banque protégée par Codebyr OS.",
   "version": "1.0",
   "browser_specific_settings": { "gecko": { "id": "antiphishing@codebyr.io" } },
+  "permissions": ["storage"],
   "content_scripts": [
     {
       "matches": ["<all_urls>"],

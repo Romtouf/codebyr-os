@@ -65,10 +65,13 @@ surface applicative minimale (`--apt-recommends false`).
 
 ## Limites connues (transparence)
 
-- **Extensions Firefox non signées** : le bouclier anti-hameçonnage est chargé
-  via `xpinstall.signatures.required=false` dans les profils concernés, ce qui
-  abaisse la vérification des signatures d'extensions dans ces profils.
-  Objectif : faire signer le bouclier par Mozilla (AMO, distribution privée).
+- **Extensions Firefox non signées (transitoire)** : tant qu'aucun `.xpi` signé
+  n'est fourni, le bouclier anti-hameçonnage est chargé via
+  `xpinstall.signatures.required=false`, ce qui abaisse la vérification des
+  signatures dans les profils concernés. Le code de l'extension est désormais
+  **statique** (les domaines passent par le stockage managé, plus par injection),
+  donc **signable** : dès qu'un `.xpi` signé par Mozilla est déposé, `codebyr-space`
+  l'installe et **ne touche plus** à ce réglage. Suivi : issue #1.
 - **Filtre réseau bancaire** : appliqué au niveau du profil navigateur ; un code
   hostile déjà exécuté *dans* l'Espace pourrait le contourner. Il protège du web
   et de l'hameçonnage, pas d'un binaire malveillant lancé dans l'Espace.

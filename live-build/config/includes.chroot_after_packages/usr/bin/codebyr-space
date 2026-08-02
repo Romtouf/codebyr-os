@@ -246,9 +246,31 @@ def _domaines_proteges(espaces):
     return out
 
 
+def _ecrire_stockage_manage(home, doms):
+    """Écrit le manifeste de STOCKAGE MANAGÉ Firefox : les domaines protégés sont
+    fournis en DONNÉE (pas injectés dans le code), pour que l'extension reste
+    statique et signable. Firefox lit ce fichier par utilisateur sous Linux."""
+    msdir = os.path.join(home, ".mozilla", "managed-storage")
+    os.makedirs(msdir, exist_ok=True)
+    manifeste = {
+        "name": BOUCLIER_ID,
+        "description": "Domaines bancaires protégés par Codebyr.",
+        "type": "storage",
+        "data": {"domaines": doms},
+    }
+    with open(os.path.join(msdir, BOUCLIER_ID + ".json"), "w", encoding="utf-8") as f:
+        json.dump(manifeste, f, ensure_ascii=False)
+
+
 def _installer_bouclier(esp, home, espaces):
     """Installe le bouclier anti-hameçonnage dans le profil Firefox d'un Espace
-    de navigation : avertit si un site imite une banque protégée."""
+    de navigation : avertit si un site imite une banque protégée.
+
+    Les domaines passent par le stockage managé (extension statique). Si un .xpi
+    SIGNÉ par Mozilla est présent (BOUCLIER_DIR/signed/), on l'installe tel quel
+    et on NE désactive PAS la vérification des signatures ; sinon on construit un
+    .xpi non signé et on abaisse ce réglage (situation transitoire — voir #1)."""
+    import shutil as _sh
     import zipfile
     doms = _domaines_proteges(espaces)
     if not doms or not os.path.isdir(BOUCLIER_DIR):
@@ -262,27 +284,36 @@ def _installer_bouclier(esp, home, espaces):
         with open(ini, "w", encoding="utf-8") as f:
             f.write("[Profile0]\nName=codebyr\nIsRelative=1\nPath=codebyr.default\n"
                     "Default=1\n\n[General]\nStartWithLastProfile=1\nVersion=2\n")
+
+    # Domaines fournis en donnée (l'extension reste statique → signable).
+    _ecrire_stockage_manage(home, doms)
+
+    signe = os.path.join(BOUCLIER_DIR, "signed", BOUCLIER_ID + ".xpi")
+    a_signe = os.path.isfile(signe)
+
     prefs = [
-        'user_pref("xpinstall.signatures.required", false);',
         'user_pref("extensions.autoDisableScopes", 0);',
         'user_pref("extensions.enabledScopes", 15);',
     ]
+    if not a_signe:
+        # Extension non signée : nécessite d'abaisser la vérification (transitoire).
+        prefs.insert(0, 'user_pref("xpinstall.signatures.required", false);')
     with open(os.path.join(ffdir, "user.js"), "a", encoding="utf-8") as f:
         f.write("\n".join(prefs) + "\n")
-    try:
-        with open(os.path.join(BOUCLIER_DIR, "content.js"), encoding="utf-8") as f:
-            content = f.read()
-        with open(os.path.join(BOUCLIER_DIR, "manifest.json"), encoding="utf-8") as f:
-            manifest = f.read()
-    except OSError:
-        return
-    liste = ",".join('"%s"' % d.replace('"', "") for d in doms)
-    content = content.replace("/*__DOMAINES__*/", liste)
+
     xpi = os.path.join(extdir, BOUCLIER_ID + ".xpi")
-    with zipfile.ZipFile(xpi, "w", zipfile.ZIP_DEFLATED) as z:
-        z.writestr("manifest.json", manifest)
-        z.writestr("content.js", content)
-    print("Bouclier anti-hameçonnage actif (%d domaine(s) de banque protégé(s))." % len(doms))
+    if a_signe:
+        _sh.copy2(signe, xpi)
+    else:
+        # .xpi construit à partir des fichiers STATIQUES (aucune réécriture).
+        try:
+            with zipfile.ZipFile(xpi, "w", zipfile.ZIP_DEFLATED) as z:
+                for nom in ("manifest.json", "content.js"):
+                    z.write(os.path.join(BOUCLIER_DIR, nom), nom)
+        except OSError:
+            return
+    print("Bouclier anti-hameçonnage actif (%d domaine(s) de banque protégé(s))%s."
+          % (len(doms), " [signé]" if a_signe else ""))
 
 
 def _visionneuse_pour(nom):

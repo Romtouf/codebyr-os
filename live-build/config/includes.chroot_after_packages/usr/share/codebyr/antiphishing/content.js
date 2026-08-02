@@ -1,10 +1,28 @@
 /* Codebyr OS — Bouclier anti-hameçonnage (content script).
- * Compare le domaine visité aux domaines de banque protégés (injectés par
- * codebyr-space). Si le site RESSEMBLE à une banque sans être son domaine
- * officiel, il barre la page d'un avertissement. */
-(function () {
+ * Compare le domaine visité aux domaines de banque protégés. Si le site
+ * RESSEMBLE à une banque sans être son domaine officiel, il barre la page
+ * d'un avertissement.
+ *
+ * Les domaines protégés sont lus via le STOCKAGE MANAGÉ (storage.managed),
+ * écrit par codebyr-space par Espace. Le code de l'extension reste donc
+ * STATIQUE — condition nécessaire pour qu'il puisse être signé par Mozilla
+ * (une extension signée est scellée : on ne peut plus y injecter les domaines).
+ */
+(async function () {
     "use strict";
-    var PROTEGES = [/*__DOMAINES__*/];
+
+    // Récupère les domaines protégés depuis le stockage managé (repli : rien).
+    let PROTEGES = [];
+    try {
+        const api = (typeof browser !== "undefined") ? browser
+                  : (typeof chrome !== "undefined") ? chrome : null;
+        if (!api || !api.storage || !api.storage.managed)
+            return;
+        const res = await api.storage.managed.get("domaines");
+        PROTEGES = (res && Array.isArray(res.domaines)) ? res.domaines : [];
+    } catch (e) {
+        return;   // aucune configuration managée disponible
+    }
     if (!PROTEGES.length)
         return;
 
@@ -33,7 +51,7 @@
     var host = (location.hostname || "").toLowerCase();
     var banque = null;
     for (var k = 0; k < PROTEGES.length; k++) {
-        var p = PROTEGES[k].toLowerCase();
+        var p = String(PROTEGES[k]).toLowerCase().replace(/^\*\./, "");
         // Domaine officiel exact (ou sous-domaine) : ce n'est PAS un imposteur.
         if (host === p || host.endsWith("." + p)) { banque = null; break; }
         var cp = coeur(p), ch = coeur(host);
@@ -62,11 +80,11 @@
             '<p style="font-size:17px;line-height:1.6;">Ce site (<b>' + host + '</b>) ressemble ' +
             'au site de votre banque (<b>' + banque + '</b>) mais ce n\'en est <b>pas</b> ' +
             'le site officiel.<br><br>N\'entrez <b>jamais</b> vos identifiants ici. Pour votre ' +
-            'banque, utilisez l\'Espace <b>Banque</b> de Codebyr OS.</p>' +
+            'banque, utilisez l\'Espace <b>Banque</b> de Codebyr OS.</p>' +
             '<button id="codebyr-ap-close" style="margin-top:16px;padding:11px 22px;font-size:15px;' +
             'border:0;border-radius:10px;background:#fff;color:#7f1d1d;font-weight:700;cursor:pointer;">' +
             'Quitter ce site</button>' +
-            '<div style="margin-top:18px;opacity:.75;font-size:13px;">Protection Codebyr OS</div>' +
+            '<div style="margin-top:18px;opacity:.75;font-size:13px;">Protection Codebyr OS</div>' +
             '</div>';
         (document.body || document.documentElement).appendChild(o);
         var b = document.getElementById("codebyr-ap-close");

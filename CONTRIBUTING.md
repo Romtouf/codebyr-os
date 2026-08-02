@@ -72,4 +72,3 @@ L'expérience du projet en une règle : **ne jamais expédier un fichier qui n'a
 - Tests sur du matériel varié (UEFI/BIOS, GPU divers, Wi-Fi capricieux)
 - Traductions des outils Codebyr (l'infrastructure gettext reste à poser)
 - CI de build (GitHub Actions) et ISO reproductibles
-- Phase 6 : prototype micro-VM KVM pour les Espaces sensibles

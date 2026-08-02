@@ -30,8 +30,8 @@ Highlights:
   caps + private D-Bus per Space.
 
 **Honesty section**: it's namespaces, not VMs — this is *not* Qubes-grade
-isolation and the README/SECURITY.md say so explicitly. KVM micro-VMs are the
-planned next tier (hardware detection already ships). The promise is
+isolation and the README/SECURITY.md say so explicitly. A kernel 0-day escapes
+a namespace; that's an accepted limitation of the model. The promise is
 "drastically reduce everyday damage", not "unhackable".
 
 GPL-3.0, reproducible with live-build in 3 commands. Releases are GPG-signed

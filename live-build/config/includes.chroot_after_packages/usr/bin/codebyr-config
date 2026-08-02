@@ -59,12 +59,10 @@ def capacites_machine():
                 return f.read().strip() == "1"
         except OSError:
             return True
-    kvm = os.path.exists("/dev/kvm") and os.access("/dev/kvm", os.R_OK | os.W_OK)
     return [
         ("Bac à sable (bubblewrap)", bool(shutil.which("bwrap"))),
         ("Isolation utilisateur", user_ns()),
         ("Plafonds mémoire / processus", bool(shutil.which("systemd-run"))),
-        ("Accélération matérielle KVM", kvm),
     ]
 
 

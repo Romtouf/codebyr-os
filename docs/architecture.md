@@ -22,10 +22,10 @@
 ├─────────────────────────────────────────────────────┤
 │  codebyr-spaced — démon D-Bus (Python/systemd)      │
 │  Cycle de vie des Espaces · politique d'isolation   │
-├──────────────────────────┬──────────────────────────┤
-│  Conteneurs (Incus/LXC)  │  Micro-VM (KVM/libvirt)  │
-│  défaut, léger           │  Espaces sensibles       │
-├──────────────────────────┴──────────────────────────┤
+├─────────────────────────────────────────────────────┤
+│  Compartimentage bubblewrap (espaces de noms noyau) │
+│  dossier isolé · /tmp isolé · bus privé · Blindage  │
+├─────────────────────────────────────────────────────┤
 │  codebyr-core — Debian stable durcie                │
 │  AppArmor · nftables · Wayland · MAJ auto · LUKS    │
 └─────────────────────────────────────────────────────┘
@@ -55,13 +55,12 @@ Démon système exposé sur D-Bus. Responsabilités :
 - Créer / démarrer / arrêter / détruire les Espaces.
 - Choisir le **niveau d'isolation** de chaque Espace selon la politique :
 
-| Situation | Backend | Pourquoi |
+| Situation | Niveau | Pourquoi |
 |---|---|---|
-| Machine sans VT-x ou < 6 Go RAM | Conteneur Incus + bubblewrap | Seule option viable, reste une vraie isolation de fichiers/réseau/processus |
-| Machine avec VT-x et ≥ 8 Go | Conteneurs par défaut, **micro-VM KVM pour Banque et Jetable** | L'isolation forte là où le risque est maximal |
-| Machine confortable (≥ 16 Go) | Micro-VM pour tous les Espaces non-Personnel | Se rapproche du modèle Qubes, sans changer l'UX |
+| Tout Espace | Bac à sable bubblewrap (dossier isolé, `/tmp` isolé, bus D-Bus privé) | Isolation réelle des fichiers, du réseau et des processus |
+| Espaces sensibles (Banque, Jetable) | **Blindage** : espace de noms utilisateur, `--cap-drop ALL`, session neuve, plafonds mémoire/processus | L'isolation renforcée là où le risque est maximal |
 
-- Le backend est **invisible** : l'utilisateur voit « Banque », jamais « VM ».
+- Le backend est **invisible** : l'utilisateur voit « Banque », jamais un détail technique.
 - Réseau par Espace : Banque n'accède qu'à une liste d'autorisation (résolue
   localement), Jetable passe par un réseau isolé, Personnel a le réseau normal.
 - Presse-papiers inter-Espaces **explicite** (implémenté dans l'extension
@@ -115,5 +114,6 @@ aux données des autres Espaces ; pièce jointe piégée ; extension de navigate
 malveillante ; vol de l'ordinateur (chiffrement).
 
 **Non couvert** (et on ne prétendra jamais le contraire) : compromission du
-noyau partagé pour les Espaces en conteneur (d'où les micro-VM dès que
-possible) ; attaquant physique avec accès répété ; matériel compromis.
+noyau partagé (l'isolation repose sur ses espaces de noms, pas sur des VM
+matérielles — limite assumée) ; attaquant physique avec accès répété ;
+matériel compromis.

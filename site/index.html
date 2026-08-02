@@ -318,8 +318,8 @@
       protection <em>réelle</em>, qui réduit drastiquement les dégâts d'un piège — sur une machine
       que tout le monde possède déjà. La détection des capacités est transparente&nbsp;:
       <code>codebyr-space isolation</code> vous dit exactement ce que votre machine sait faire.
-      Le palier supérieur — l'isolation matérielle par micro-VM (KVM) — est le prochain jalon
-      de la <a href="#feuille-de-route">feuille de route</a>.
+      L'absence d'isolation matérielle (un exploit noyau peut théoriquement sortir d'un
+      compartiment) est une limite assumée du modèle.
     </p>
   </div>
 </section>
@@ -346,7 +346,7 @@
           <tr><th>Matériel</th><td>Liste de compatibilité stricte</td><td class="cmp__us">Un laptop ordinaire, même de 2015</td></tr>
           <tr><th>Expertise</th><td>Notion de VM, domaines, templates</td><td class="cmp__us">Une couleur par Espace, rien à configurer</td></tr>
           <tr><th>Langue</th><td>Anglais d'abord</td><td class="cmp__us">Français d'abord (~150 locales)</td></tr>
-          <tr><th>Isolation</th><td>Machines virtuelles matérielles (Xen)</td><td class="cmp__us">Espaces de noms noyau · micro-VM à venir</td></tr>
+          <tr><th>Isolation</th><td>Machines virtuelles matérielles (Xen)</td><td class="cmp__us">Espaces de noms noyau (bubblewrap)</td></tr>
           <tr><th>Prix</th><td>Gratuit, open source</td><td class="cmp__us">Gratuit, open source (GPL-3.0)</td></tr>
         </tbody>
       </table>
@@ -392,10 +392,6 @@
         <span class="road__mark">→</span>
         <div><span class="road__ph">Phase 5 — Diffusion</span><p>ISO signées, CI de build, site, premiers testeurs.</p></div>
       </li>
-      <li class="road__item">
-        <span class="road__mark"></span>
-        <div><span class="road__ph">Phase 6 — Micro-VM</span><p>Isolation matérielle KVM pour les Espaces sensibles — le palier au-dessus de bubblewrap.</p></div>
-      </li>
     </ol>
   </div>
 </section>
@@ -424,7 +420,7 @@
       </table>
       <ul class="specs__notes">
         <li><strong>x86-64 uniquement</strong> pour l'instant (pas d'ARM / Raspberry Pi / Apple Silicon).</li>
-        <li>La virtualisation matérielle (VT-x / AMD-V) n'est <strong>pas</strong> requise aujourd'hui — elle servira au futur socle micro-VM.</li>
+        <li>La virtualisation matérielle (VT-x / AMD-V) n'est <strong>pas</strong> requise — l'isolation repose sur le noyau.</li>
       </ul>
     </div>
   </div>

@@ -38,7 +38,7 @@ utilisateur non technique.
 **Hors périmètre (assumé) :**
 - Exploits noyau : l'isolation repose sur les namespaces Linux (bubblewrap),
   pas sur de la virtualisation matérielle. Un attaquant disposant d'un 0-day
-  noyau peut s'échapper. Le palier micro-VM (KVM) est prévu en Phase 6.
+  noyau peut s'échapper. C'est une limite assumée du modèle.
 - Attaquant physique, evil maid, matériel compromis.
 - Le compositeur Wayland et le serveur audio sont partagés entre Espaces
   (fenêtres et son doivent bien s'afficher quelque part) : un Espace ne peut pas
@@ -79,8 +79,7 @@ surface applicative minimale (`--apt-recommends false`).
   presse-papiers Wayland dépend du compositeur, il est techniquement commun à
   tous les Espaces : la protection Codebyr (vidage au changement d'Espace,
   transfert explicite) est **temporelle** — elle réduit la fenêtre de fuite,
-  elle n'apporte pas l'étanchéité d'une VM. L'isolation forte du presse-papiers
-  suppose des compositeurs imbriqués (piste micro-VM, Phase 6). Soupape :
+  elle n'apporte pas l'étanchéité d'une VM. Soupape :
   `~/.config/codebyr/presse-papiers-libre` désactive le vidage automatique.
 - **Applications Flatpak** : proviennent de Flathub — confiance déléguée à
   Flathub et à l'éditeur de chaque application.

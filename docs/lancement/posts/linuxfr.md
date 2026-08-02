@@ -38,9 +38,9 @@ mémoire/processus). Bus D-Bus privé par Espace, dossiers personnels séparés.
 
 ## L'honnêteté d'abord
 
-Ce n'est **pas** Qubes : pas de virtualisation matérielle (c'est prévu comme
-palier suivant pour les machines avec KVM — la détection est déjà là). Un 0-day
-noyau peut s'échapper d'un namespace. Le modèle de menace complet est dans le
+Ce n'est **pas** Qubes : pas de virtualisation matérielle, l'isolation repose
+sur le noyau — un 0-day noyau peut donc s'échapper d'un namespace. C'est une
+limite assumée. Le modèle de menace complet est dans le
 SECURITY.md du dépôt : Codebyr réduit drastiquement les dégâts des menaces du
 quotidien — hameçonnage, pièces jointes, sites frauduleux — il ne rend pas
 invulnérable, et je refuse de prétendre le contraire.

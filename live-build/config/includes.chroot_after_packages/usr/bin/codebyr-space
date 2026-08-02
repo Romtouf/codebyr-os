@@ -9,9 +9,8 @@ Chaque Espace a :
   - un marqueur de fenêtre « codebyr-<id> » pour que l'extension GNOME
     colore ses fenêtres.
 
-Isolation v1 : bubblewrap si disponible (isolation réelle du système de
-fichiers), sinon repli sur un dossier personnel séparé. L'isolation forte
-par micro-VM viendra en Phase 6 (voir la feuille de route).
+Isolation : bubblewrap si disponible (isolation réelle du système de
+fichiers), sinon repli sur un dossier personnel séparé.
 
 Usage :
   codebyr-space list
@@ -149,11 +148,6 @@ def _plafonner_ressources(run):
                 "-p", "MemoryMax=2G", "-p", "MemorySwapMax=0",
                 "-p", "TasksMax=800", "--"] + run
     return run
-
-
-def kvm_dispo():
-    """Accélération matérielle KVM présente ? (socle d'un futur vrai micro-VM)."""
-    return os.path.exists("/dev/kvm") and os.access("/dev/kvm", os.R_OK | os.W_OK)
 
 
 def user_ns_dispo():
@@ -823,16 +817,11 @@ def cmd_isolation():
     print("  Isolation utilisateur (user-ns) %s" % oui_non(user_ns_dispo()))
     print("  Coupure réseau par Espace .... %s" % oui_non(bwrap))
     print("  Plafonds mémoire / processus . %s" % oui_non(_systemd_scope_dispo()))
-    print("  Accélération matérielle KVM .. %s" % oui_non(kvm_dispo()))
     print()
     if bwrap:
         print("Niveau : Blindage disponible (bac à sable + coupure réseau).")
     else:
         print("Niveau : réduit (dossiers séparés seulement).")
-    if kvm_dispo():
-        print("KVM présent : socle prêt pour un futur micro-VM à isolation matérielle.")
-    else:
-        print("KVM absent (machine virtuelle imbriquée ?) : micro-VM indisponible ici.")
     return 0
 
 

@@ -114,11 +114,11 @@ Codebyr OS **réduit drastiquement les dégâts** d'un piège (fichier vérolé,
 frauduleux, téléchargement douteux) en l'enfermant dans un compartiment jetable ou
 blindé. C'est une protection réelle, mais **ce n'est pas Qubes** : l'isolation
 repose sur les espaces de noms du noyau Linux (bubblewrap), pas sur des machines
-virtuelles matérielles. Un exploit noyau peut théoriquement en sortir.
+virtuelles matérielles. Un exploit noyau peut théoriquement en sortir — c'est une
+limite assumée du modèle.
 
 La détection des capacités est transparente : `codebyr-space isolation` vous dit
-exactement ce que votre machine sait faire. Le support micro-VM (KVM) est le
-prochain palier de la feuille de route pour les machines qui le permettent.
+exactement ce que votre machine sait faire.
 
 Vulnérabilité à signaler ? Voir [SECURITY.md](SECURITY.md).
 
@@ -158,7 +158,7 @@ Notes :
 - **Architecture x86-64 uniquement** pour l'instant (pas d'ARM / Raspberry Pi /
   Apple Silicon).
 - La virtualisation matérielle (VT-x/AMD-V) n'est **pas** requise — l'isolation
-  repose sur le noyau. Elle servira au futur socle micro-VM.
+  repose sur le noyau.
 - Codebyr redonne vie à un portable modeste (un laptop de 2015 avec 8 Go tourne
   très bien), là où Qubes exige 16 Go et du matériel haut de gamme.
 
@@ -222,7 +222,6 @@ codebyros/
 - [x] **Phase 4 — Installeur** : Calamares Codebyr, installation vérifiée sur
       machine réelle
 - [ ] **Phase 5 — Diffusion** : ISO signées, CI de build, site, premiers testeurs
-- [ ] **Phase 6 — Micro-VM** : isolation matérielle KVM pour les Espaces sensibles
 
 ## Contribuer
 

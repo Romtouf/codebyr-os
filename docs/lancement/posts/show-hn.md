@@ -31,10 +31,10 @@ Isolation is bubblewrap (kernel namespaces) with a hardened mode: user
 namespace, cap-drop ALL, new session, memory/task cgroup limits, private
 D-Bus per Space.
 
-**What it is NOT**: this is not Qubes. No hardware virtualization (yet —
-KVM micro-VMs are the planned next tier, detection is already shipped).
-A kernel 0-day escapes a namespace. The threat model is spelled out in
-SECURITY.md — the promise is "drastically reduces damage from everyday
+**What it is NOT**: this is not Qubes. No hardware virtualization — isolation
+is kernel-based, so a kernel 0-day escapes a namespace. That's an accepted
+limitation, spelled out in SECURITY.md — the promise is "drastically reduces
+damage from everyday
 threats", never "unhackable".
 
 State: v1.0 live ISO, installable (Calamares, works fully offline),

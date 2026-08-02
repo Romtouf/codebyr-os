@@ -670,6 +670,9 @@ class Indicateur extends PanelMenu.Button {
         const apps = (Array.isArray(e.apps) && e.apps.length) ? e.apps : this._apps;
         for (const app of apps)
             sub.menu.addAction(app.nom, () => this._lancer(e.id, app.cmd));
+        // Toute application installée (par n'importe quel moyen : magasin, apt,
+        // Flatpak…) est lançable ici, sans passer par un enregistrement manuel.
+        sub.menu.addAction('➕  Autres applications…', () => this._dialogueApps(e));
         sub.menu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
         sub.menu.addAction('Fermer cet Espace', () => this._gerer('close', e.id, e.nom));
         if (!jetable) {
@@ -680,6 +683,82 @@ class Indicateur extends PanelMenu.Button {
                 sub.menu.addAction('Supprimer cet Espace', () => this._gerer('delete', e.id, e.nom));
         }
         this.menu.addMenuItem(sub);
+    }
+
+    // Toutes les applications installées (magasin, apt, Flatpak…), via leurs
+    // .desktop. Gio.AppInfo fait le parsing pour nous.
+    _appsInstallees() {
+        const out = [];
+        try {
+            for (const info of Gio.AppInfo.get_all()) {
+                if (!info.should_show())
+                    continue;
+                const nom = info.get_name();
+                let cmd = info.get_commandline() || '';
+                cmd = cmd.replace(/\s*%[a-zA-Z]/g, '').trim();   // retire %U, %f…
+                if (nom && cmd)
+                    out.push({nom, cmd});
+            }
+        } catch (e) {
+            logError(e, 'Codebyr: liste des applications');
+        }
+        out.sort((a, b) => a.nom.localeCompare(b.nom, 'fr'));
+        return out;
+    }
+
+    _dialogueApps(esp) {
+        const toutes = this._appsInstallees();
+        const dlg = new ModalDialog.ModalDialog({destroyOnClose: true});
+        const boite = new St.BoxLayout({vertical: true, style: 'spacing: 10px; min-width: 480px;'});
+        boite.add_child(new St.Label({
+            text: 'Ouvrir une application dans « ' + esp.nom + ' »',
+            style: 'font-weight: 700; font-size: 15px;',
+        }));
+        const recherche = new St.Entry({
+            hint_text: 'Rechercher une application…', can_focus: true, x_expand: true,
+        });
+        boite.add_child(recherche);
+
+        const scroll = new St.ScrollView({style: 'max-height: 360px;', x_expand: true});
+        const liste = new St.BoxLayout({vertical: true, style: 'spacing: 2px;'});
+        try { scroll.add_child(liste); } catch (e) { scroll.add_actor(liste); }
+        boite.add_child(scroll);
+        dlg.contentLayout.add_child(boite);
+
+        const remplir = (filtre) => {
+            liste.destroy_all_children();
+            const f = (filtre || '').trim().toLowerCase();
+            let n = 0;
+            for (const app of toutes) {
+                if (f && !app.nom.toLowerCase().includes(f))
+                    continue;
+                if (n >= 200)
+                    break;
+                n++;
+                const b = new St.Button({
+                    label: app.nom, can_focus: true, x_align: Clutter.ActorAlign.FILL,
+                    style: 'padding: 9px 12px; border-radius: 8px;'
+                        + 'background-color: rgba(67,199,223,0.08);',
+                });
+                b.connect('clicked', () => {
+                    dlg.close();
+                    this._lancer(esp.id, app.cmd);
+                });
+                liste.add_child(b);
+            }
+            if (n === 0)
+                liste.add_child(new St.Label({
+                    text: 'Aucune application trouvée.',
+                    style: 'color: #93A6B0; padding: 9px 12px;',
+                }));
+        };
+        remplir('');
+        recherche.clutter_text.connect('text-changed', () => remplir(recherche.get_text()));
+
+        dlg.setButtons([{label: 'Fermer', action: () => dlg.close(),
+            key: Clutter.KEY_Escape, default: true}]);
+        dlg.open();
+        global.stage.set_key_focus(recherche.clutter_text);
     }
 
     _lancer(id, cmd) {

@@ -288,8 +288,15 @@ def _installer_bouclier(esp, home, espaces):
     # Domaines fournis en donnée (l'extension reste statique → signable).
     _ecrire_stockage_manage(home, doms)
 
-    signe = os.path.join(BOUCLIER_DIR, "signed", BOUCLIER_ID + ".xpi")
-    a_signe = os.path.isfile(signe)
+    # .xpi signé par Mozilla, s'il y en a un (nom quelconque : AMO le génère).
+    signe = None
+    signed_dir = os.path.join(BOUCLIER_DIR, "signed")
+    if os.path.isdir(signed_dir):
+        for f in sorted(os.listdir(signed_dir)):
+            if f.endswith(".xpi"):
+                signe = os.path.join(signed_dir, f)
+                break
+    a_signe = signe is not None
 
     prefs = [
         'user_pref("extensions.autoDisableScopes", 0);',

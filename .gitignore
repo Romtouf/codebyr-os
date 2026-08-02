@@ -27,3 +27,6 @@ apt-repo/
 # Caches Python (tests de compilation)
 __pycache__/
 *.pyc
+
+# Sortie de web-ext (garder seulement le .xpi copié dans includes/.../signed/)
+build-signature/

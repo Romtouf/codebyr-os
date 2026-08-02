@@ -119,8 +119,11 @@ const Lisere = GObject.registerClass(
 class Lisere extends St.Widget {
     _init(espace) {
         super._init({reactive: false, can_focus: false, track_hover: false});
+        // Charte : les Espaces éphémères (Jetable) portent un trait POINTILLÉ,
+        // jamais plein — la couleur seule ne suffit pas (accessibilité daltonisme).
+        const trait = espace.ephemere ? 'dashed' : 'solid';
         this.set_style(
-            `border: ${EP}px solid ${espace.couleur};` +
+            `border: ${EP}px ${trait} ${espace.couleur};` +
             `border-radius: 12px;`);
         const etiq = new St.Label({
             text: espace.nom,

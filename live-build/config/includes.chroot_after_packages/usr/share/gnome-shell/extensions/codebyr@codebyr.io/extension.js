@@ -115,16 +115,36 @@ function espaceParProcessus(win, espaces, rundir) {
     return null;
 }
 
+// « #RRGGBB » → composantes 0..1 pour Cairo.
+function hexVersRGB(hex) {
+    let s = (hex || '#000000').replace('#', '');
+    if (s.length === 3)
+        s = s.split('').map(c => c + c).join('');
+    const n = parseInt(s, 16) || 0;
+    return {r: ((n >> 16) & 255) / 255, g: ((n >> 8) & 255) / 255, b: (n & 255) / 255};
+}
+
+// Chemin d'un rectangle à coins arrondis.
+function cheminArrondi(cr, x, y, w, h, r) {
+    const Q = Math.PI / 2;
+    cr.newSubPath();
+    cr.arc(x + w - r, y + r,     r, -Q, 0);
+    cr.arc(x + w - r, y + h - r, r,  0, Q);
+    cr.arc(x + r,     y + h - r, r,  Q, Math.PI);
+    cr.arc(x + r,     y + r,     r,  Math.PI, Math.PI + Q);
+    cr.closePath();
+}
+
 const Lisere = GObject.registerClass(
-class Lisere extends St.Widget {
+class Lisere extends St.DrawingArea {
     _init(espace) {
+        // St ne rend PAS les bordures CSS « dashed » (toujours pleines) : on
+        // dessine donc le liseré à la main avec Cairo. Les Espaces éphémères
+        // (Jetable) obtiennent un vrai trait pointillé — la couleur seule ne
+        // suffit pas (accessibilité daltonisme, cf. charte).
         super._init({reactive: false, can_focus: false, track_hover: false});
-        // Charte : les Espaces éphémères (Jetable) portent un trait POINTILLÉ,
-        // jamais plein — la couleur seule ne suffit pas (accessibilité daltonisme).
-        const trait = espace.ephemere ? 'dashed' : 'solid';
-        this.set_style(
-            `border: ${EP}px ${trait} ${espace.couleur};` +
-            `border-radius: 12px;`);
+        this._espace = espace;
+        this.connect('repaint', () => this._dessiner());
         const etiq = new St.Label({
             text: espace.nom,
             style: `background-color: ${espace.couleur}; color: #0A1318;` +
@@ -134,10 +154,32 @@ class Lisere extends St.Widget {
         etiq.set_position(12, -8);
         this.add_child(etiq);
     }
+    _dessiner() {
+        let cr = null;
+        try {
+            const [w, h] = this.get_surface_size();
+            if (w <= EP || h <= EP)
+                return;
+            cr = this.get_context();
+            const {r, g, b} = hexVersRGB(this._espace.couleur);
+            cr.setLineWidth(EP);
+            cr.setSourceRGBA(r, g, b, 1);
+            if (this._espace.ephemere)
+                cr.setDash([9, 6], 0);   // pointillé : Jetable
+            cheminArrondi(cr, EP / 2, EP / 2, w - EP, h - EP, 11);
+            cr.stroke();
+        } catch (e) {
+            logError(e, 'Codebyr: dessin du liseré');
+        } finally {
+            if (cr)
+                cr.$dispose();
+        }
+    }
     majGeometrie(rect) {
         // le liseré épouse le bord de la fenêtre (visible même maximisée)
         this.set_position(rect.x, rect.y);
         this.set_size(rect.width, rect.height);
+        this.queue_repaint();
     }
 });
 

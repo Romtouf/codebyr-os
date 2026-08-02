@@ -44,7 +44,11 @@ mkdir -p /etc/gdm3/PostSession
 cat > /etc/gdm3/PostSession/Default <<'EOF'
 #!/bin/sh
 # Codebyr — l'invité repart à neuf dès la fermeture de sa session.
-if [ "$USER" = "invite" ]; then
+# GDM ne garantit pas $USER dans PostSession selon les versions : on couvre
+# $USER, $USERNAME, puis le 1er argument (validé en test réel — sinon le reset
+# n'était jamais déclenché et les données de l'invité persistaient).
+u="${USER:-${USERNAME:-$1}}"
+if [ "$u" = "invite" ]; then
 	/usr/bin/codebyr-invite-reset
 fi
 exit 0

@@ -13,7 +13,6 @@ import St from 'gi://St';
 import Gio from 'gi://Gio';
 import GLib from 'gi://GLib';
 import Clutter from 'gi://Clutter';
-import Meta from 'gi://Meta';
 
 import {Extension} from 'resource:///org/gnome/shell/extensions/extension.js';
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
@@ -297,9 +296,8 @@ class PressePapiers {
     constructor(getEspaces, rundir) {
         this._getEspaces = getEspaces;
         this._rundir = rundir;
-        this._proprietaire = null;   // Espace ayant rempli le presse-papiers
+        this._dernier = null;        // id du dernier Espace focalisé (non nul)
         this._transfert = null;      // {dest} transfert explicite autorisé
-        this._selId = 0;
         this._focusId = 0;
         this._nettoyageId = 0;
         this._clip = St.Clipboard.get_default();
@@ -315,23 +313,19 @@ class PressePapiers {
     }
 
     activer() {
-        try {
-            const sel = global.display.get_selection();
-            this._selId = sel.connect('owner-changed', (_s, type) => {
-                if (type !== Meta.SelectionType.SELECTION_CLIPBOARD)
-                    return;
-                // Presse-papiers (re)rempli : on note l'Espace source, sauf si
-                // c'est nous qui venons de le vider (proprietaire déjà nul).
-                if (!this._transfert)
-                    this._proprietaire = this._espace();
-            });
-        } catch (e) {
-            logError(e, 'Codebyr: presse-papiers (sélection indisponible)');
-        }
+        // Approche robuste : on ne dépend PAS du signal de sélection Wayland
+        // (owner-changed ne capte pas fiablement les copies des clients comme
+        // Firefox). On surveille simplement le focus : dès qu'on ENTRE dans un
+        // Espace différent du précédent, on vide le presse-papiers. Ainsi un
+        // secret copié dans Banque n'est jamais collable dans Navigation.
+        const esp = this._espace();
+        this._dernier = esp ? esp.id : null;
         try {
             this._focusId = global.display.connect('notify::focus-window',
                 () => this._surFocus());
-        } catch (e) {}
+        } catch (e) {
+            logError(e, 'Codebyr: presse-papiers (focus)');
+        }
     }
 
     _surFocus() {
@@ -340,15 +334,20 @@ class PressePapiers {
         const esp = this._espace();
         if (!esp)
             return;   // bureau / app système : ne jamais casser le presse-papiers
-        if (this._transfert) {
-            // le contenu « en transit » atteint sa destination : on le laisse,
-            // puis nettoyage différé pour ne pas qu'il traîne.
-            if (esp.id === this._transfert.dest)
-                this._planifierNettoyage();
+
+        // Transfert explicite en cours vers CET Espace : on laisse le contenu
+        // arriver (une fois), puis nettoyage différé pour qu'il ne traîne pas.
+        if (this._transfert && esp.id === this._transfert.dest) {
+            this._dernier = esp.id;
+            this._planifierNettoyage();
             return;
         }
-        if (this._proprietaire && esp.id !== this._proprietaire.id)
+
+        // On entre dans un Espace différent du dernier → le presse-papiers ne
+        // franchit pas la frontière : on le vide.
+        if (this._dernier && esp.id !== this._dernier)
             this._vider();
+        this._dernier = esp.id;
     }
 
     _vider() {
@@ -356,7 +355,6 @@ class PressePapiers {
             this._clip.set_text(St.ClipboardType.CLIPBOARD, '');
             this._clip.set_text(St.ClipboardType.PRIMARY, '');
         } catch (e) {}
-        this._proprietaire = null;
     }
 
     _planifierNettoyage() {
@@ -387,9 +385,6 @@ class PressePapiers {
     detruire() {
         if (this._focusId) {
             try { global.display.disconnect(this._focusId); } catch (e) {}
-        }
-        if (this._selId) {
-            try { global.display.get_selection().disconnect(this._selId); } catch (e) {}
         }
         if (this._nettoyageId) {
             try { GLib.Source.remove(this._nettoyageId); } catch (e) {}

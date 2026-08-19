@@ -15,4 +15,10 @@ if grep -q '^AutomaticLogin=user$' /etc/gdm3/daemon.conf 2>/dev/null; then
            -e '/^AutomaticLogin=user$/d' /etc/gdm3/daemon.conf
 fi
 
+# Durcissements qui ne valent QUE sur le système installé : le dossier personnel
+# créé par Calamares doit être privé (0700), sans quoi le compte Invité lirait
+# tous les fichiers de l'utilisateur — exactement ce que le mode invité promet
+# d'empêcher. Le compte invité est verrouillé au passage.
+[ -f /usr/bin/codebyr-durcir-poste ] && sh /usr/bin/codebyr-durcir-poste || true
+
 exit 0

@@ -14,7 +14,7 @@ incrustés au montage (beaucoup regardent sans le son).
 | # | Durée | À l'écran | Sous-titre incrusté |
 |---|---|---|---|
 | 1 | 3 s | Bureau Codebyr, dossier avec `facture-urgente.pdf` | « Une pièce jointe douteuse ? » |
-| 2 | 4 s | Clic droit → Ouvrir avec… → **Ouvrir en Jetable** | « Ouvrez-la en Jetable. » |
+| 2 | 4 s | Menu du Sceau → **Ouvrir en Jetable** (ou `codebyr-jetable facture.pdf`) | « Ouvrez-la en Jetable. » |
 | 3 | 5 s | Le PDF s'ouvre, **liseré rouge** autour de la fenêtre | « Elle s'ouvre dans une bulle isolée… » |
 | 4 | 5 s | Terminal dans la bulle : `ping google.fr` → échec | « …coupée d'internet : rien ne peut fuiter. » |
 | 5 | 4 s | On ferme la fenêtre → terminal : `Espace jetable détruit.` | « On ferme : la bulle s'autodétruit. » |

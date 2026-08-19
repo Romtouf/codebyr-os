@@ -20,7 +20,7 @@ porte un liseré à la couleur de son Espace : on sait toujours « où » on est
 
 Concrètement :
 
-- **La pièce jointe douteuse** ? Clic droit → « Ouvrir en Jetable » : elle s'ouvre
+- **La pièce jointe douteuse** ? `codebyr-jetable facture.pdf` : elle s'ouvre
   dans une bulle **sans réseau** (namespace réseau isolé) qui **s'autodétruit** à
   la fermeture. Le piège explose dans le vide.
 - **La banque** ? Le navigateur de l'Espace Banque n'a le droit de joindre QUE

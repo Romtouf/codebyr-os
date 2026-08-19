@@ -1,0 +1,90 @@
+#!/bin/sh
+# codebyr-durcir-poste — durcissements qui doivent être VRAIS sur le système
+# installé, pas seulement dans l'image live.
+#
+# Appelé depuis trois endroits, volontairement :
+#   1. hook 0400 (construction de l'ISO)      → l'image live est déjà correcte ;
+#   2. codebyr-nettoyage-installation         → le système fraîchement installé ;
+#   3. postinst de codebyr-tools              → les machines DÉJÀ déployées,
+#                                               rattrapées par « apt ».
+# D'où l'exigence d'idempotence absolue : ce script doit pouvoir tourner cent
+# fois sans rien casser, et ne JAMAIS échouer (un postinst qui sort en erreur
+# bloque la mise à jour de tout le parc).
+#
+# Usage : codebyr-durcir-poste   (root requis)
+set -e
+
+[ "$(id -u)" = "0" ] || { echo "codebyr-durcir-poste : root requis." >&2; exit 0; }
+
+PAM_GDM="/etc/pam.d/gdm-password"
+MARQUEUR="Codebyr — Mode invité"
+
+# ── 1) Dossiers personnels privés ────────────────────────────────────────────
+# Sans ceci, le compte « Invité » (ou tout autre compte local) lit les fichiers
+# de l'utilisateur principal : le défaut Debian est 0755. L'image live posait
+# bien un 700 sur /home/user, mais ce compte est supprimé à l'installation et
+# celui créé par Calamares n'héritait de rien. C'était un écart entre la
+# promesse (« l'invité ne voit AUCUN de vos fichiers ») et la réalité.
+while IFS=: read -r nom _ uid _ _ home _; do
+	[ "$uid" -ge 1000 ] 2>/dev/null || continue
+	[ "$uid" -lt 65534 ] || continue
+	case "$home" in /home/*) ;; *) continue ;; esac
+	[ -d "$home" ] || continue
+	mode="$(stat -c '%a' "$home" 2>/dev/null || echo 700)"
+	[ "$mode" = "700" ] && continue
+	chmod 700 "$home" 2>/dev/null || true
+	echo "codebyr : dossier personnel de « $nom » rendu privé (0700, était $mode)."
+done < /etc/passwd
+
+# ── 2) Compte invité : plus aucun mot de passe utilisable ────────────────────
+# Avant : « invite » / « invite » — le même mot de passe, public, sur TOUTES les
+# machines Codebyr. Désormais :
+#   · le champ mot de passe vaut « * » → aucun mot de passe ne peut correspondre,
+#     donc ni SSH, ni su, ni sudo, ni polkit ne peuvent s'authentifier ;
+#   · une seule ligne PAM autorise la session GDM de « invite » sans mot de passe.
+# Le mode invité reste donc un clic, mais il n'ouvre plus rien d'autre.
+if id invite >/dev/null 2>&1; then
+	# a) La règle PAM D'ABORD : sans elle, verrouiller le mot de passe
+	#    empêcherait l'invité de se connecter du tout.
+	pam_ok=0
+	if [ -f "$PAM_GDM" ]; then
+		if grep -q "$MARQUEUR" "$PAM_GDM"; then
+			pam_ok=1
+		else
+			cp -a "$PAM_GDM" "$PAM_GDM.avant-codebyr" 2>/dev/null || true
+			# Insertion avant la première ligne « auth » qui n'est pas
+			# pam_nologin (on ne court-circuite pas l'interdiction de session).
+			# « sufficient » est sûr pour les autres comptes : l'ÉCHEC d'un
+			# module sufficient est ignoré, la pile normale se poursuit.
+			awk -v marq="# $MARQUEUR : session sans mot de passe (voir codebyr-durcir-poste)." '
+				BEGIN { pose = 0 }
+				{
+					if (!pose && $1 == "auth" && $0 !~ /pam_nologin/) {
+						print marq
+						print "auth\tsufficient\tpam_succeed_if.so user = invite quiet"
+						pose = 1
+					}
+					print
+				}
+				END { if (!pose) exit 3 }
+			' "$PAM_GDM" > "$PAM_GDM.codebyr-tmp" && mv "$PAM_GDM.codebyr-tmp" "$PAM_GDM" && pam_ok=1
+			rm -f "$PAM_GDM.codebyr-tmp"
+			[ "$pam_ok" = "1" ] && echo "codebyr : session invité sans mot de passe (règle PAM posée)."
+		fi
+	fi
+
+	# b) Le mot de passe public ne disparaît QUE si l'invité peut encore entrer.
+	if [ "$pam_ok" = "1" ]; then
+		if grep -q '^invite:\*:' /etc/shadow 2>/dev/null; then
+			:
+		else
+			usermod -p '*' invite 2>/dev/null \
+				&& echo "codebyr : mot de passe du compte invité neutralisé (« * »)."
+		fi
+	else
+		echo "codebyr : règle PAM invité non posée — mot de passe laissé tel quel" >&2
+		echo "          (mieux vaut un invité accessible qu'un invité inutilisable)." >&2
+	fi
+fi
+
+exit 0

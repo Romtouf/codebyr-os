@@ -12,9 +12,6 @@ if ! id invite >/dev/null 2>&1; then
 	useradd --create-home --shell /bin/bash --uid 1001 --user-group \
 		--groups audio,video,plugdev,netdev --comment "Invité" invite
 fi
-# Mot de passe simple, à donner à la personne (v1 ; le sans-mot-de-passe viendra).
-echo 'invite:invite' | chpasswd
-
 # — Isole le dossier de l'utilisateur principal : l'invité ne peut pas le lire —
 chmod 700 /home/user 2>/dev/null || true
 
@@ -72,4 +69,20 @@ mkdir -p /etc/systemd/system/multi-user.target.wants
 ln -sf /etc/systemd/system/codebyr-invite-reset.service \
        /etc/systemd/system/multi-user.target.wants/codebyr-invite-reset.service
 
-echo "P: Codebyr — mode invité prêt (utilisateur « invite »)"
+# — Mot de passe neutralisé + session GDM sans mot de passe —
+# Un mot de passe identique et public sur toutes les machines Codebyr était le
+# maillon faible du mode invité. Le durcissement est délégué au script partagé,
+# qui rejoue exactement la même chose à l'installation et par « apt » sur les
+# machines déjà déployées.
+# NB : on invoque par « sh <script> » et non directement. Ce hook s'exécute AVANT
+# 0700-permissions, et un checkout Windows/9p peut avoir perdu le bit +x — un
+# test « -x » échouerait alors silencieusement et livrerait une image avec le
+# compte invité non durci.
+if [ -f /usr/bin/codebyr-durcir-poste ]; then
+	sh /usr/bin/codebyr-durcir-poste || true
+else
+	echo "P: Codebyr — codebyr-durcir-poste ABSENT : le compte invité n'est pas durci !" >&2
+	exit 1
+fi
+
+echo "P: Codebyr — mode invité prêt (utilisateur « invite », sans mot de passe)"

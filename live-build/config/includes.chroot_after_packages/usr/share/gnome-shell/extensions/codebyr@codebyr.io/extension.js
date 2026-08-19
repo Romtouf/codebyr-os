@@ -559,7 +559,8 @@ class Indicateur extends PanelMenu.Button {
             SystemActions.getDefault().activateSwitchUser();
         } catch (e) {
             Main.notify('Codebyr — Mode invité',
-                'Ouvre le menu en haut à droite → Changer d\'utilisateur → Invité (mot de passe : invite).');
+                'Ouvre le menu en haut à droite → Changer d\'utilisateur → Invité '
+                + '(aucun mot de passe demandé).');
         }
     }
 

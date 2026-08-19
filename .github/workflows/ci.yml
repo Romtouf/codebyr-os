@@ -1,0 +1,141 @@
+name: CI
+
+# Ce dépôt pousse des mises à jour automatiques (apt) vers des machines
+# d'utilisateurs non techniques : rien ne doit partir sans passer ici.
+# La CI ne remplace PAS le test en machine réelle (voir CONTRIBUTING.md) —
+# elle attrape ce qu'un humain ne devrait pas avoir à vérifier à la main.
+#
+# Règle de conduite : une étape bloquante ne doit JAMAIS échouer pour des
+# raisons de style. Ce qui bloque, ce sont les erreurs réelles (syntaxe,
+# nom indéfini, test rouge). Le reste est signalé sans bloquer.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  qualite:
+    name: Syntaxe et tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Lister les sources
+        id: sources
+        run: |
+          set -e
+          py=$(grep -rl '^#!/usr/bin/env python3' \
+                live-build/config/includes.chroot_after_packages/usr/bin/ | tr '\n' ' ')
+          sh=$(find live-build packaging -type f \
+                \( -name '*.sh' -o -name '*.hook.chroot' -o -name '*.postinst' \) \
+                | tr '\n' ' ')
+          sh="$sh $(grep -rl '^#!/bin/sh' \
+                live-build/config/includes.chroot_after_packages/usr/bin/ \
+                | tr '\n' ' ')"
+          echo "python=$py" >> "$GITHUB_OUTPUT"
+          echo "shell=$sh"  >> "$GITHUB_OUTPUT"
+          echo "Python : $py"
+          echo "Shell  : $sh"
+
+      - name: Syntaxe Python
+        # « compile() » et non « py_compile » : ce dernier déposerait des
+        # __pycache__ DANS l'arborescence copiée telle quelle dans l'ISO.
+        run: |
+          python - ${{ steps.sources.outputs.python }} <<'EOF'
+          import sys
+          for f in sys.argv[1:]:
+              with open(f, encoding="utf-8") as fh:
+                  compile(fh.read(), f, "exec")
+              print("OK", f)
+          EOF
+
+      - name: Erreurs Python réelles (ruff)
+        # Volontairement restreint aux fautes qui cassent à l'exécution :
+        # nom indéfini, import inutilisé, redéfinition, erreur de syntaxe.
+        run: |
+          pip install --quiet ruff
+          ruff check --no-cache --select E9,F --output-format=github \
+            ${{ steps.sources.outputs.python }} tests/
+
+      - name: Syntaxe shell
+        run: |
+          set -e
+          for s in ${{ steps.sources.outputs.shell }}; do
+            echo "→ $s"
+            bash -n "$s"
+          done
+
+      - name: shellcheck (erreurs)
+        run: shellcheck --severity=error ${{ steps.sources.outputs.shell }}
+
+      - name: shellcheck (avertissements — informatif)
+        continue-on-error: true
+        run: shellcheck --severity=warning ${{ steps.sources.outputs.shell }}
+
+      - name: Tests
+        run: python -m unittest discover -s tests -v
+
+      - name: Fichiers de données valides
+        run: |
+          set -e
+          for f in $(find live-build packaging site -name '*.json'); do
+            python -c "import json,sys; json.load(open(sys.argv[1],encoding='utf-8'))" "$f"
+            echo "OK $f"
+          done
+
+      - name: Version cohérente
+        run: |
+          set -e
+          version=$(tr -d ' \t\r\n' < VERSION)
+          echo "VERSION = $version"
+          echo "$version" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$' \
+            || { echo "VERSION doit être du semver (x.y.z)." >&2; exit 1; }
+
+  paquet:
+    name: Construction du paquet codebyr-tools
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Construire le .deb
+        run: |
+          # dpkg-deb est DÉJÀ présent sur les runners Ubuntu. On n'appelle apt
+          # que s'il manque vraiment : un « apt-get update » sur runner peut
+          # rester bloqué sur un verrou tenu par une mise à jour d'arrière-plan
+          # (constaté : 9 minutes sur une étape qui en prend 10 secondes).
+          if ! command -v dpkg-deb >/dev/null 2>&1; then
+            sudo apt-get update -qq
+            sudo apt-get install -y --no-install-recommends dpkg-dev
+          fi
+          CODEBYR_REPO="$PWD" bash packaging/build-deb.sh
+
+      - name: Vérifier le contenu du paquet
+        run: |
+          set -e
+          deb=$(ls packaging/dist/codebyr-tools_*_all.deb)
+          dpkg-deb --info "$deb"
+          dpkg-deb --contents "$deb"
+          # Les outils doivent être exécutables : un codebyr-space en 644 rend
+          # le système inutilisable, et ça ne se voit qu'à l'usage.
+          for outil in codebyr-space codebyr-durcir-poste codebyr-net-proxy; do
+            dpkg-deb --contents "$deb" \
+              | grep -Eq "^-rwxr-xr-x .*usr/bin/$outil$" \
+              || { echo "$outil n'est pas exécutable dans le paquet !" >&2; exit 1; }
+          done
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: codebyr-tools-deb
+          path: packaging/dist/*.deb
+          retention-days: 14

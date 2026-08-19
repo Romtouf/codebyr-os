@@ -46,7 +46,7 @@ votre vie numérique en **Espaces** isolés, chacun avec sa couleur :
 Chaque fenêtre porte un liseré à la couleur de son Espace. Aucun jargon, aucune
 configuration : **la couleur dit tout**.
 
-Concrètement, une pièce jointe suspecte s'ouvre d'un clic droit dans une bulle
+Concrètement, une pièce jointe suspecte s'ouvre en une commande dans une bulle
 **sans aucun accès réseau**, qui s'efface entièrement à la fermeture. Le piège
 explose dans le vide : il ne peut rien voler, rien contacter, rien laisser
 derrière lui.

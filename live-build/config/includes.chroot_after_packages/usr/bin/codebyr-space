@@ -10,19 +10,26 @@ Chaque Espace a :
     colore ses fenêtres.
 
 Isolation : bubblewrap si disponible (isolation réelle du système de
-fichiers), sinon repli sur un dossier personnel séparé.
+fichiers), sinon repli sur un dossier personnel séparé. Le bus de session de
+l'hôte n'entre JAMAIS dans un Espace (voir wrap_bwrap).
 
-Usage :
-  codebyr-space list
-  codebyr-space launch <espace> [-- commande...]
-  codebyr-space purge <espace>        (efface les données d'un Espace)
+La liste des actions est produite à partir de la table ACTIONS : « --help » ne
+peut donc pas se désynchroniser de ce que le programme sait réellement faire.
 """
+import glob
 import json
 import os
+import re
+import shlex
 import shutil
+import signal
 import socket
+import subprocess
 import sys
+import tarfile
 import tempfile
+import time
+import unicodedata
 
 REGISTRY = "/etc/codebyr/espaces.json"
 USER_REGISTRY = os.path.expanduser("~/.config/codebyr/espaces.json")
@@ -48,7 +55,14 @@ def desktop_exec(desktop_id):
             with open(p, encoding="utf-8") as f:
                 for line in f:
                     if line.startswith("Exec="):
-                        parts = line[5:].strip().split()
+                        # shlex, pas split() : une ligne Exec peut contenir des
+                        # guillemets et des chemins avec espaces
+                        # (Exec="/opt/Mon App/bin" %U). Un split naïf coupait la
+                        # commande en morceaux et le lancement échouait.
+                        try:
+                            parts = shlex.split(line[5:].strip())
+                        except ValueError:
+                            parts = line[5:].strip().split()
                         return [a for a in parts if not a.startswith("%")]
     # Pas un .desktop : on suppose une commande brute
     return [desktop_id.replace(".desktop", "")]
@@ -76,17 +90,35 @@ def build_command(esp, home, app_cmd):
     return app_cmd
 
 
-def wrap_bwrap(home, cmd, env, renforce=False, hors_ligne=False):
+def wrap_bwrap(home, cmd, env, renforce=False, hors_ligne=False, audio=True):
     """Enveloppe avec bubblewrap : dossier personnel isolé, /tmp isolé,
-    sockets GUI/audio partagés. Repli géré par l'appelant si bwrap échoue.
+    affichage (et éventuellement son) partagés. Repli géré par l'appelant si
+    bwrap échoue.
 
     renforce   : Blindage — isolation utilisateur, abandon des privilèges,
                  nouvelle session (anti-injection terminal).
     hors_ligne : coupe tout accès réseau (namespace réseau isolé). Idéal pour
                  examiner une pièce jointe douteuse : le piège explose sans
                  jamais pouvoir téléphoner dehors.
+    audio      : donne accès au serveur de son PipeWire. À couper pour les
+                 Espaces sensibles : ce socket, c'est aussi le MICRO.
+
+    RÈGLE ABSOLUE — le bus de session de l'hôte n'entre JAMAIS ici.
+    Un « --ro-bind » ne protège pas un socket : le noyau ne refuse l'écriture
+    sur un montage en lecture seule que pour les fichiers, répertoires et liens
+    (sb_permission()), jamais pour les sockets. Exposer $XDG_RUNTIME_DIR/bus
+    revenait donc à offrir le bus de session complet à l'Espace — et avec lui
+    systemd --user, dont StartTransientUnit exécute n'importe quoi HORS du bac
+    à sable, sous l'identité de l'utilisateur. L'Espace lisait alors les
+    données de tous les autres. C'est pour cette même raison que Flatpak
+    n'expose jamais le bus en direct (il passe par xdg-dbus-proxy).
+
+    Les applications ne perdent rien : dbus-run-session (voir cmd_launch) leur
+    donne déjà un bus de session PRIVÉ, et c'est celui-là qu'elles utilisent.
     """
-    runtime = env.get("XDG_RUNTIME_DIR", "/run/user/%d" % os.getuid())
+    # « or » et non env.get(défaut) : le défaut ne doit être calculé que s'il
+    # sert (os.getuid n'existe pas partout où l'on teste ce code).
+    runtime = env.get("XDG_RUNTIME_DIR") or "/run/user/%d" % os.getuid()
     bwrap = [
         "bwrap",
         "--ro-bind", "/usr", "/usr",
@@ -101,14 +133,18 @@ def wrap_bwrap(home, cmd, env, renforce=False, hors_ligne=False):
         "--tmpfs", "/tmp",
         "--bind", home, os.path.expanduser("~"),
         "--ro-bind-try", runtime + "/wayland-0", runtime + "/wayland-0",
-        "--ro-bind-try", runtime + "/pipewire-0", runtime + "/pipewire-0",
-        "--ro-bind-try", runtime + "/bus", runtime + "/bus",
         "--ro-bind-try", "/sys/dev/char", "/sys/dev/char",
         "--ro-bind-try", "/sys/devices", "/sys/devices",
         "--unshare-pid", "--unshare-uts", "--unshare-ipc",
         "--die-with-parent",
         "--setenv", "HOME", os.path.expanduser("~"),
+        # Le chemin du bus de l'hôte hérité de l'environnement ne mène plus à
+        # rien dans le bac à sable : on le retire pour éviter toute confusion
+        # (dbus-run-session posera la bonne valeur juste après).
+        "--unsetenv", "DBUS_SESSION_BUS_ADDRESS",
     ]
+    if audio and not hors_ligne:
+        bwrap += ["--ro-bind-try", runtime + "/pipewire-0", runtime + "/pipewire-0"]
     if hors_ligne:
         # Aucune interface réseau : exfiltration impossible.
         bwrap += ["--unshare-net"]
@@ -129,7 +165,6 @@ def _systemd_scope_dispo():
     if _SCOPE_DISPO is None:
         _SCOPE_DISPO = False
         if shutil.which("systemd-run"):
-            import subprocess
             try:
                 r = subprocess.run(
                     ["systemd-run", "--user", "--scope", "--quiet", "--", "true"],
@@ -167,14 +202,6 @@ def cmd_list(espaces):
         print("  \033[1m%-12s\033[0m %s  %s%s" % (e["id"], e["couleur"], e["nom"], tag))
 
 
-def _port_libre():
-    s = socket.socket()
-    s.bind(("127.0.0.1", 0))
-    port = s.getsockname()[1]
-    s.close()
-    return port
-
-
 def _preparer_profil_firefox(home, port):
     """Pré-configure le profil Firefox de l'Espace pour passer par le filtre réseau."""
     ffbase = os.path.join(home, ".mozilla", "firefox")
@@ -195,32 +222,69 @@ def _preparer_profil_firefox(home, port):
         'user_pref("network.proxy.allow_hijacking_localhost", true);',
         'user_pref("network.trr.mode", 5);',
     ]
-    with open(os.path.join(ffdir, "user.js"), "w", encoding="utf-8") as f:
-        f.write("\n".join(prefs) + "\n")
+    _ajouter_prefs(os.path.join(ffdir, "user.js"), prefs)
+
+
+def journal_refus(esp_id):
+    """Fichier où le filtre note les domaines qu'il a refusés dans cet Espace.
+
+    « Configuration Codebyr » le relit pour proposer de les autoriser : c'est la
+    réponse au cas concret « ma banque ne s'affiche plus » (site bancaire qui
+    charge un CDN, un prestataire 3-D Secure ou un captcha sur un autre domaine).
+    Convention de chemin partagée avec codebyr-config — si elle change ici,
+    elle change là-bas."""
+    return os.path.join(DATA_ROOT, esp_id, "domaines-refuses.txt")
 
 
 def _demarrer_filtre_reseau(esp, home, app_cmd):
     """Si l'Espace a une liste blanche et lance Firefox : démarre le filtre
-    et configure le navigateur pour l'utiliser. Renvoie le processus proxy."""
-    import subprocess
+    et configure le navigateur pour l'utiliser. Renvoie le processus proxy.
+
+    Liste VIDE = tout est bloqué, jamais « tout est permis ». Un Espace déclaré
+    à liste blanche dont la liste n'est pas encore remplie doit échouer FERMÉ :
+    l'utilisateur voit une page de blocage qui lui dit d'ajouter sa banque,
+    au lieu de croire à tort qu'il est protégé."""
     reseau = esp.get("reseau") or {}
     if reseau.get("mode") != "liste-blanche":
         return None
     if "firefox" not in os.path.basename(app_cmd[0]):
         return None
     domaines = reseau.get("domaines") or []
-    if not domaines:
-        return None
+    srv = None
     try:
-        port = _port_libre()
-        proc = subprocess.Popen(["codebyr-net-proxy", str(port)] + domaines)
+        # On ouvre NOUS-MÊMES la socket d'écoute et on la transmet au filtre :
+        # plus de course entre « trouver un port libre » et « s'y installer »,
+        # et le port écoute déjà quand le navigateur démarre.
+        srv = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        srv.bind(("127.0.0.1", 0))
+        srv.listen(64)
+        port = srv.getsockname()[1]
+
+        # Le profil est configuré AVANT de lancer le filtre, volontairement : si
+        # le filtre ne démarre pas, le navigateur pointe vers un port muet et ne
+        # joint plus rien. L'ordre inverse laissait l'Espace Banque avec un accès
+        # Internet complet quand le filtre manquait à l'appel.
         _preparer_profil_firefox(home, port)
-        print("Réseau restreint : seuls %d domaine(s) autorisé(s) dans %s."
-              % (len(domaines), esp["nom"]))
+
+        proc = subprocess.Popen(["codebyr-net-proxy", "--fd", str(srv.fileno()),
+                                 "--journal", journal_refus(esp["id"])] + domaines,
+                                pass_fds=(srv.fileno(),))
+        if domaines:
+            print("Réseau restreint : seuls %d domaine(s) autorisé(s) dans %s."
+                  % (len(domaines), esp["nom"]))
+        else:
+            print("Réseau restreint : AUCUN site autorisé dans %s pour l'instant. "
+                  "Ajoutez celui de votre banque dans « Configuration Codebyr »."
+                  % esp["nom"])
         return proc
     except OSError as exc:
-        sys.stderr.write("codebyr-space : filtre réseau indisponible (%s)\n" % exc)
+        sys.stderr.write("codebyr-space : filtre réseau indisponible (%s) — "
+                         "le navigateur de cet Espace ne joindra aucun site.\n" % exc)
         return None
+    finally:
+        # Le filtre a sa propre copie de la socket : la nôtre n'a plus lieu d'être.
+        if srv is not None:
+            srv.close()
 
 
 BOUCLIER_DIR = "/usr/share/codebyr/antiphishing"
@@ -256,16 +320,37 @@ def _ecrire_stockage_manage(home, doms):
         json.dump(manifeste, f, ensure_ascii=False)
 
 
+def _ajouter_prefs(chemin, prefs):
+    """Ajoute des « user_pref » à un user.js SANS le faire grossir sans fin.
+
+    Ce fichier était réécrit en mode « ajout » à chaque lancement d'Espace : au
+    bout de quelques centaines d'ouvertures, Firefox relisait la même
+    préférence des centaines de fois. On dédoublonne, et on écrit une seule fois."""
+    existantes = []
+    try:
+        with open(chemin, encoding="utf-8") as f:
+            existantes = [l.rstrip("\n") for l in f if l.strip()]
+    except OSError:
+        pass
+    for p in prefs:
+        if p not in existantes:
+            existantes.append(p)
+    with open(chemin, "w", encoding="utf-8") as f:
+        f.write("\n".join(existantes) + "\n")
+
+
 def _installer_bouclier(esp, home, espaces):
     """Installe le bouclier anti-hameçonnage dans le profil Firefox d'un Espace
     de navigation : avertit si un site imite une banque protégée.
 
-    Les domaines passent par le stockage managé (extension statique). Si un .xpi
-    SIGNÉ par Mozilla est présent (BOUCLIER_DIR/signed/), on l'installe tel quel
-    et on NE désactive PAS la vérification des signatures ; sinon on construit un
-    .xpi non signé et on abaisse ce réglage (situation transitoire — voir #1)."""
-    import shutil as _sh
-    import zipfile
+    Les domaines passent par le stockage managé : le code de l'extension reste
+    STATIQUE, donc signable par Mozilla. Seul un .xpi SIGNÉ est installé.
+
+    Il n'existe volontairement PLUS de repli « .xpi non signé » : il obligeait à
+    poser xpinstall.signatures.required=false, c'est-à-dire à désactiver la
+    vérification des signatures d'extensions dans le profil — un affaiblissement
+    réel du navigateur pour installer une protection. Sans .xpi signé, on
+    n'installe rien, et on le dit."""
     doms = _domaines_proteges(espaces)
     if not doms or not os.path.isdir(BOUCLIER_DIR):
         return
@@ -290,31 +375,21 @@ def _installer_bouclier(esp, home, espaces):
             if f.endswith(".xpi"):
                 signe = os.path.join(signed_dir, f)
                 break
-    a_signe = signe is not None
+    if signe is None:
+        sys.stderr.write(
+            "codebyr-space : bouclier anti-hameçonnage indisponible (aucune "
+            "extension signée dans %s/signed). Aucune protection installée — et "
+            "aucun réglage de sécurité de Firefox abaissé.\n" % BOUCLIER_DIR)
+        return
 
-    prefs = [
+    _ajouter_prefs(os.path.join(ffdir, "user.js"), [
         'user_pref("extensions.autoDisableScopes", 0);',
         'user_pref("extensions.enabledScopes", 15);',
-    ]
-    if not a_signe:
-        # Extension non signée : nécessite d'abaisser la vérification (transitoire).
-        prefs.insert(0, 'user_pref("xpinstall.signatures.required", false);')
-    with open(os.path.join(ffdir, "user.js"), "a", encoding="utf-8") as f:
-        f.write("\n".join(prefs) + "\n")
+    ])
 
-    xpi = os.path.join(extdir, BOUCLIER_ID + ".xpi")
-    if a_signe:
-        _sh.copy2(signe, xpi)
-    else:
-        # .xpi construit à partir des fichiers STATIQUES (aucune réécriture).
-        try:
-            with zipfile.ZipFile(xpi, "w", zipfile.ZIP_DEFLATED) as z:
-                for nom in ("manifest.json", "content.js"):
-                    z.write(os.path.join(BOUCLIER_DIR, nom), nom)
-        except OSError:
-            return
-    print("Bouclier anti-hameçonnage actif (%d domaine(s) de banque protégé(s))%s."
-          % (len(doms), " [signé]" if a_signe else ""))
+    shutil.copy2(signe, os.path.join(extdir, BOUCLIER_ID + ".xpi"))
+    print("Bouclier anti-hameçonnage actif [signé] "
+          "(%d domaine(s) de banque protégé(s))." % len(doms))
 
 
 def _visionneuse_pour(nom):
@@ -359,6 +434,10 @@ def cmd_launch(espaces, esp_id, extra, fichier=None):
     # ou imposé automatiquement pour l'examen d'une pièce jointe.
     renforce = esp.get("blindage") == "renforce"
     hors_ligne = False
+    # Son : le socket PipeWire donne aussi accès au MICRO. Un Espace peut le
+    # refuser dans le registre ("audio": false) — c'est le cas de Banque, qui
+    # n'a aucun besoin de son et représente la cible la plus sensible.
+    audio = esp.get("audio", True) is not False
 
     # Fichier partagé dans l'Espace (ouverture jetable d'une pièce jointe) :
     # copié dans l'Espace pour être visible dans le bac à sable isolé.
@@ -387,8 +466,14 @@ def cmd_launch(espaces, esp_id, extra, fichier=None):
     # Bus de session privé par Espace : les apps « mono-instance » (Fichiers,
     # éditeur…) démarrent alors un vrai processus isolé au lieu de rouvrir une
     # fenêtre de la session partagée — ce qui rétablit l'isolation ET le liseré.
-    if not est_flatpak and shutil.which("dbus-run-session"):
-        cmd = ["dbus-run-session", "--"] + cmd
+    # Ce bus privé n'est pas un confort : c'est LUI qui remplace le bus de
+    # session de l'hôte, que le bac à sable n'expose plus (voir wrap_bwrap).
+    if not est_flatpak:
+        if shutil.which("dbus-run-session"):
+            cmd = ["dbus-run-session", "--"] + cmd
+        else:
+            sys.stderr.write("codebyr-space : dbus-run-session absent — l'application "
+                             "n'aura aucun bus de session (paquet « dbus » manquant ?).\n")
 
     env = dict(os.environ)
     env["CODEBYR_ESPACE"] = esp["id"]
@@ -420,11 +505,14 @@ def cmd_launch(espaces, esp_id, extra, fichier=None):
             print("Note : application Flatpak système — son propre bac à sable "
                   "Flatpak ; le liseré de l'Espace reste indicatif.")
     elif use_bwrap:
-        run = wrap_bwrap(home, cmd, env, renforce=renforce, hors_ligne=hors_ligne)
+        run = wrap_bwrap(home, cmd, env, renforce=renforce, hors_ligne=hors_ligne,
+                         audio=audio)
         if renforce:
             run = _plafonner_ressources(run)
             detail = "Blindage actif" + (" · hors-ligne (aucun réseau)" if hors_ligne else "")
             print("🛡  %s dans l'Espace %s." % (detail, esp["nom"]))
+        if not audio:
+            print("🎤 Son et micro coupés dans l'Espace %s." % esp["nom"])
     else:
         env["HOME"] = home
         run = cmd
@@ -432,7 +520,6 @@ def cmd_launch(espaces, esp_id, extra, fichier=None):
                          "(dossier personnel séparé).\n")
 
     print("Ouverture de « %s » dans l'Espace %s…" % (os.path.basename(cmd[0]), esp["nom"]))
-    import subprocess
     # Répertoire d'exécution partagé avec l'extension GNOME : on y note
     # « ce processus (et ses enfants) appartient à tel Espace », pour que
     # l'extension colore la fenêtre par filiation, même sans marqueur de classe.
@@ -486,7 +573,6 @@ def _rundir():
 
 def cmd_close(espaces, esp_id):
     """Ferme toutes les fenêtres/processus ouverts d'un Espace."""
-    import signal
     rundir = _rundir()
     ferme = 0
     try:
@@ -540,8 +626,6 @@ BACKUP_DIR = os.path.expanduser("~/Espaces-Codebyr")
 
 def cmd_export(espaces, esp_id, dest=None):
     """Sauvegarde un Espace dans une archive portable (copiable sur clé USB)."""
-    import tarfile
-    import time
     esp = espaces.get(esp_id)
     if not esp:
         sys.stderr.write("Espace inconnu : %s\n" % esp_id)
@@ -561,8 +645,6 @@ def cmd_export(espaces, esp_id, dest=None):
 
 def cmd_import(espaces, esp_id, source=None):
     """Restaure un Espace depuis une archive (portabilité entre machines)."""
-    import glob
-    import tarfile
     esp = espaces.get(esp_id)
     if not esp:
         sys.stderr.write("Espace inconnu : %s\n" % esp_id)
@@ -615,7 +697,6 @@ def _flatpak_app_dans_espace(esp_id, appid):
 
 def _assurer_flathub(env):
     """Ajoute le dépôt Flathub à l'installation de l'Espace (fichier local → hors-ligne OK)."""
-    import subprocess
     src = FLATHUB_REPO if os.path.exists(FLATHUB_REPO) else \
         "https://flathub.org/repo/flathub.flatpakrepo"
     subprocess.run(["flatpak", "--user", "remote-add", "--if-not-exists", "flathub", src],
@@ -623,7 +704,6 @@ def _assurer_flathub(env):
 
 
 def _flatpak_nom_lisible(env, appid):
-    import subprocess
     try:
         out = subprocess.check_output(
             ["flatpak", "--user", "list", "--app", "--columns=application,name"],
@@ -651,7 +731,6 @@ def _enregistrer_app(esp_id, nom, cmd):
 
 def cmd_install(esp_id, appid):
     """Installe une application Flatpak DANS un Espace (isolée : binaires + données)."""
-    import subprocess
     espaces = load_espaces()
     esp = espaces.get(esp_id)
     if not esp:
@@ -699,7 +778,6 @@ def cmd_add_app(esp_id, nom, fichier, extra):
     # La commande stockée est réinterprétée comme une ligne shell au lancement :
     # on protège le chemin (et les arguments) par des quotes, sans quoi un dossier
     # contenant une espace (« Antigravity IDE ») casse le lancement.
-    import shlex
     cmd = shlex.quote(prog)
     if extra:
         cmd += " " + " ".join(shlex.quote(a) for a in extra)
@@ -711,7 +789,6 @@ def cmd_add_app(esp_id, nom, fichier, extra):
 
 def cmd_apps(esp_id):
     """Liste les applications installées dans un Espace."""
-    import subprocess
     espaces = load_espaces()
     esp = espaces.get(esp_id)
     if not esp:
@@ -726,7 +803,6 @@ def cmd_apps(esp_id):
 
 def cmd_remove_app(esp_id, appid):
     """Désinstalle une application d'un Espace et la retire de son menu."""
-    import subprocess
     espaces = load_espaces()
     esp = espaces.get(esp_id)
     if not esp:
@@ -764,8 +840,6 @@ def _ecrire_registre_utilisateur(data):
 
 def cmd_create(nom, couleur):
     """Crée un Espace personnalisé (persistant), écrit dans le registre utilisateur."""
-    import re
-    import unicodedata
     nom = nom.strip()
     if not nom:
         sys.stderr.write("Nom d'Espace vide.\n")
@@ -822,6 +896,7 @@ def cmd_isolation():
     print("  Isolation utilisateur (user-ns) %s" % oui_non(user_ns_dispo()))
     print("  Coupure réseau par Espace .... %s" % oui_non(bwrap))
     print("  Plafonds mémoire / processus . %s" % oui_non(_systemd_scope_dispo()))
+    print("  Bus de session privé ......... %s" % oui_non(bool(shutil.which("dbus-run-session"))))
     print()
     if bwrap:
         print("Niveau : Blindage disponible (bac à sable + coupure réseau).")
@@ -830,88 +905,76 @@ def cmd_isolation():
     return 0
 
 
+def _action_launch(espaces, args):
+    """launch <espace> [--fichier <f>] [-- commande...]"""
+    esp_id, reste = args[0], args[1:]
+    fichier = None
+    extra = []
+    i = 0
+    while i < len(reste):
+        if reste[i] == "--fichier" and i + 1 < len(reste):
+            fichier = reste[i + 1]
+            i += 2
+        elif reste[i] == "--":
+            extra = reste[i + 1:]
+            break
+        else:
+            i += 1
+    return cmd_launch(espaces, esp_id, extra, fichier)
+
+
+# Table des actions : (nombre minimal d'arguments, usage, fonction).
+# Une seule source de vérité — l'ancienne cascade de « if » laissait le message
+# d'usage et le nombre d'arguments dériver l'un de l'autre à chaque ajout.
+ACTIONS = {
+    "list":       (0, "list", lambda espaces, a: cmd_list(espaces) or 0),
+    "isolation":  (0, "isolation", lambda espaces, a: cmd_isolation()),
+    "launch":     (1, "launch <espace> [--fichier <f>] [-- commande...]",
+                   _action_launch),
+    "close":      (1, "close <espace>",
+                   lambda espaces, a: cmd_close(espaces, a[0])),
+    "purge":      (1, "purge <espace>",
+                   lambda espaces, a: cmd_purge(espaces, a[0])),
+    "export":     (1, "export <espace> [fichier]",
+                   lambda espaces, a: cmd_export(espaces, a[0],
+                                                 a[1] if len(a) > 1 else None)),
+    "import":     (1, "import <espace> [fichier]",
+                   lambda espaces, a: cmd_import(espaces, a[0],
+                                                 a[1] if len(a) > 1 else None)),
+    "create":     (2, "create <nom> <couleur>",
+                   lambda espaces, a: cmd_create(a[0], a[1])),
+    "delete":     (1, "delete <espace>", lambda espaces, a: cmd_delete(a[0])),
+    "install":    (2, "install <espace> <app-id-flatpak>",
+                   lambda espaces, a: cmd_install(a[0], a[1])),
+    "apps":       (1, "apps <espace>", lambda espaces, a: cmd_apps(a[0])),
+    "add-app":    (3, "add-app <espace> <nom> <fichier|commande> [args...]",
+                   lambda espaces, a: cmd_add_app(a[0], a[1], a[2], a[3:])),
+    "remove-app": (2, "remove-app <espace> <app-id-flatpak>",
+                   lambda espaces, a: cmd_remove_app(a[0], a[1])),
+}
+
+
+def _aide():
+    lignes = [__doc__.strip(), "", "Actions :"]
+    for nom in sorted(ACTIONS):
+        lignes.append("  codebyr-space " + ACTIONS[nom][1])
+    return "\n".join(lignes)
+
+
 def main(argv):
-    espaces = load_espaces()
     if len(argv) < 2 or argv[1] in ("-h", "--help", "help"):
-        print(__doc__)
+        print(_aide())
         return 0
-    action = argv[1]
-    if action == "list":
-        cmd_list(espaces)
-        return 0
-    if action == "isolation":
-        return cmd_isolation()
-    if action == "launch":
-        if len(argv) < 3:
-            sys.stderr.write("Usage : codebyr-space launch <espace> [--fichier <f>] [-- commande...]\n")
-            return 2
-        esp_id = argv[2]
-        rest = argv[3:]
-        fichier = None
-        extra = []
-        i = 0
-        while i < len(rest):
-            if rest[i] == "--fichier" and i + 1 < len(rest):
-                fichier = rest[i + 1]
-                i += 2
-            elif rest[i] == "--":
-                extra = rest[i + 1:]
-                break
-            else:
-                i += 1
-        return cmd_launch(espaces, esp_id, extra, fichier)
-    if action == "close":
-        if len(argv) < 3:
-            sys.stderr.write("Usage : codebyr-space close <espace>\n")
-            return 2
-        return cmd_close(espaces, argv[2])
-    if action == "purge":
-        if len(argv) < 3:
-            sys.stderr.write("Usage : codebyr-space purge <espace>\n")
-            return 2
-        return cmd_purge(espaces, argv[2])
-    if action == "export":
-        if len(argv) < 3:
-            sys.stderr.write("Usage : codebyr-space export <espace> [fichier]\n")
-            return 2
-        return cmd_export(espaces, argv[2], argv[3] if len(argv) > 3 else None)
-    if action == "import":
-        if len(argv) < 3:
-            sys.stderr.write("Usage : codebyr-space import <espace> [fichier]\n")
-            return 2
-        return cmd_import(espaces, argv[2], argv[3] if len(argv) > 3 else None)
-    if action == "create":
-        if len(argv) < 4:
-            sys.stderr.write("Usage : codebyr-space create <nom> <couleur>\n")
-            return 2
-        return cmd_create(argv[2], argv[3])
-    if action == "delete":
-        if len(argv) < 3:
-            sys.stderr.write("Usage : codebyr-space delete <espace>\n")
-            return 2
-        return cmd_delete(argv[2])
-    if action == "install":
-        if len(argv) < 4:
-            sys.stderr.write("Usage : codebyr-space install <espace> <app-id-flatpak>\n")
-            return 2
-        return cmd_install(argv[2], argv[3])
-    if action == "apps":
-        if len(argv) < 3:
-            sys.stderr.write("Usage : codebyr-space apps <espace>\n")
-            return 2
-        return cmd_apps(argv[2])
-    if action == "add-app":
-        if len(argv) < 5:
-            sys.stderr.write("Usage : codebyr-space add-app <espace> <nom> <fichier|commande> [args...]\n")
-            return 2
-        return cmd_add_app(argv[2], argv[3], argv[4], argv[5:])
-    if action == "remove-app":
-        if len(argv) < 4:
-            sys.stderr.write("Usage : codebyr-space remove-app <espace> <app-id-flatpak>\n")
-            return 2
-        return cmd_remove_app(argv[2], argv[3])
-    sys.stderr.write("Action inconnue : %s\n" % action)
-    return 2
+    action, args = argv[1], argv[2:]
+    if action not in ACTIONS:
+        sys.stderr.write("Action inconnue : %s\n" % action)
+        sys.stderr.write("Actions : %s\n" % ", ".join(sorted(ACTIONS)))
+        return 2
+    minimum, usage, executer = ACTIONS[action]
+    if len(args) < minimum:
+        sys.stderr.write("Usage : codebyr-space %s\n" % usage)
+        return 2
+    return executer(load_espaces(), args)
 
 
 if __name__ == "__main__":

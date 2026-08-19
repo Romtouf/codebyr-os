@@ -157,9 +157,8 @@ class Fenetre(Adw.ApplicationWindow):
 
     # ---- Reconstruit toute la page (après modification) ----
     def _construire(self):
-        # vider la page
-        child = self._page.get_first_child()
-        # PreferencesPage n'expose pas remove aisément : on recrée les groupes.
+        # Vider la page : Adw.PreferencesPage n'offre pas de « tout retirer »,
+        # on enlève donc un à un les groupes qu'on a nous-mêmes ajoutés.
         for g in list(getattr(self, "_groupes", [])):
             self._page.remove(g)
         self._groupes = []

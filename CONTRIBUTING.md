@@ -149,6 +149,10 @@ franchement vaut mieux que de laisser chacun le découvrir :
 
 ## Où aider en priorité
 
+> La liste complète et priorisée des chantiers — sécurité, produit, dette
+> technique, et ce qui est volontairement hors périmètre — est dans
+> [docs/chantiers.md](docs/chantiers.md).
+
 - Tests sur du matériel varié (UEFI/BIOS, GPU divers, Wi-Fi capricieux)
 - Traductions des outils Codebyr (l'infrastructure gettext reste à poser)
 - **Un UID Unix par Espace** — la seule façon de rendre la séparation vraie même

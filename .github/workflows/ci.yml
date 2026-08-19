@@ -22,6 +22,7 @@ jobs:
   qualite:
     name: Syntaxe et tests
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
 
@@ -103,13 +104,20 @@ jobs:
   paquet:
     name: Construction du paquet codebyr-tools
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
 
       - name: Construire le .deb
         run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y --no-install-recommends dpkg-dev
+          # dpkg-deb est DÉJÀ présent sur les runners Ubuntu. On n'appelle apt
+          # que s'il manque vraiment : un « apt-get update » sur runner peut
+          # rester bloqué sur un verrou tenu par une mise à jour d'arrière-plan
+          # (constaté : 9 minutes sur une étape qui en prend 10 secondes).
+          if ! command -v dpkg-deb >/dev/null 2>&1; then
+            sudo apt-get update -qq
+            sudo apt-get install -y --no-install-recommends dpkg-dev
+          fi
           CODEBYR_REPO="$PWD" bash packaging/build-deb.sh
 
       - name: Vérifier le contenu du paquet

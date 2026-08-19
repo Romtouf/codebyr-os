@@ -45,13 +45,17 @@ depuis le menu du Sceau.
 
 ## Ce qui fonctionne aujourd'hui
 
-- **Espaces isolés** : bac à sable bubblewrap, dossier personnel séparé, bus D-Bus
-  privé, liserés colorés par fenêtre (extension GNOME Shell dédiée).
+- **Espaces isolés** : bac à sable bubblewrap, dossier personnel séparé, bus
+  D-Bus **privé** (celui de la session hôte n'entre jamais dans un Espace —
+  c'est ce qui empêche d'en sortir), liserés colorés par fenêtre (extension
+  GNOME Shell dédiée).
 - **Le Blindage** : niveau d'isolation renforcé par Espace — espace de noms
   utilisateur, zéro privilège (`--cap-drop ALL`), session neuve, plafonds
   mémoire/processus (anti fork-bomb). Actif par défaut sur Banque.
-- **Jetable automatique** : clic droit → « Ouvrir en Jetable ». Une pièce jointe
-  douteuse s'ouvre dans une bulle **blindée et sans réseau** (namespace réseau
+- **Jetable automatique** : menu du Sceau → « Ouvrir un lien en Jetable », ou
+  `codebyr-jetable <lien|fichier>` (l'entrée au clic droit dans le gestionnaire
+  de fichiers reste à faire). Une pièce jointe douteuse s'ouvre dans une bulle
+  **blindée et sans réseau** (namespace réseau
   isolé : le piège ne peut rien exfiltrer) ; un lien douteux s'ouvre dans une
   bulle **blindée** qui s'autodétruit — le réseau y reste ouvert, il est
   nécessaire pour charger la page.
@@ -59,14 +63,18 @@ depuis le menu du Sceau.
   vos domaines bancaires (proxy local à liste blanche — un garde-fou contre
   l'erreur humaine, pas une règle réseau système : voir SECURITY.md) ; dans les
   autres Espaces, une extension Firefox alerte si un site imite l'un de vos
-  sites protégés.
+  sites protégés. **À configurer au premier usage** : tant que vous n'avez pas
+  déclaré votre banque dans « Configuration Codebyr », l'Espace Banque n'ouvre
+  aucun site (il échoue fermé) et le bouclier n'a rien à surveiller.
 - **Réseau par Espace** : libre, liste blanche (appliquée au navigateur de
   l'Espace), ou coupure totale (namespace réseau isolé, comme le Jetable
   fichier).
 - **Retour dans le temps** : instantanés d'un Espace (export/import), restauration
   en un clic depuis le menu du Sceau.
 - **Espace portable** : exportez un Espace complet, réimportez-le ailleurs.
-- **Mode invité** : session vierge, nettoyée automatiquement à la déconnexion.
+- **Mode invité** : session vierge d'un compte séparé, sans mot de passe à
+  retenir, nettoyée automatiquement à la déconnexion — et votre dossier
+  personnel lui reste fermé (droits `0700`).
 - **Assistant de sécurité** : réponses claires, en français, aux questions de
   sécurité du quotidien — 100 % local, aucune donnée n'en sort.
 - **Configuration Codebyr** : vos vrais domaines bancaires, le blindage par

@@ -36,6 +36,7 @@ for chemin in \
 	usr/bin/codebyr-assistant \
 	usr/bin/codebyr-bienvenue \
 	usr/bin/codebyr-verifier \
+	usr/bin/codebyr-durcir-poste \
 	usr/share/gnome-shell/extensions/codebyr@codebyr.io \
 	usr/share/codebyr/antiphishing \
 	etc/codebyr/espaces.json

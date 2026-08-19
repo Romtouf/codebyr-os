@@ -14,6 +14,12 @@ sudo
 # Phase 2 — isolation des Espaces (bubblewrap)
 bubblewrap
 
+# Bus de session PRIVÉ par Espace (dbus-run-session). Load-bearing pour la
+# sécurité : le bus de session de l'hôte n'est plus exposé au bac à sable, ce
+# bus privé est donc le seul que voit l'application. Listé explicitement car
+# --apt-recommends false ne pardonne rien.
+dbus-user-session
+
 # Langues : support multilingue complet (comme une distro haut de gamme)
 # locales-all = TOUTES les langues disponibles ; français par défaut (hook 0600).
 locales

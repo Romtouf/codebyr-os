@@ -1,63 +1,84 @@
-# Signer le bouclier anti-hameçonnage (point de sécurité)
+# Signer le bouclier anti-hameçonnage
 
-## Le problème
+## Pourquoi il faut le faire, et quand
 
-Aujourd'hui, le bouclier est chargé dans les profils Firefox en **désactivant la
-vérification des signatures** (`xpinstall.signatures.required=false`). C'est le seul
-moyen d'installer une extension non signée — mais ça abaisse la sécurité de Firefox
-dans ces profils (n'importe quelle autre extension non signée pourrait s'y charger).
+Le bouclier est une extension Firefox. **Firefox refuse de charger une extension
+non signée** par Mozilla. Codebyr a longtemps contourné ce refus en posant
+`xpinstall.signatures.required=false` dans les profils concernés — autrement dit
+en désactivant la vérification des signatures d'extensions pour y installer une
+protection. Ce contournement a été **supprimé** : aujourd'hui, sans `.xpi` signé,
+`codebyr-space` n'installe rien et le dit.
 
-**Objectif :** un bouclier **signé par Mozilla**, installé sans jamais toucher à ce
-réglage.
+Conséquence à retenir : **un `.xpi` signé est scellé.** Modifier `content.js`
+dans le dépôt ne change strictement rien sur les machines tant que l'extension
+n'a pas été re-signée. C'est contre-intuitif, et c'est la raison d'être du test
+`tests/test_bouclier.py::XpiSigne` : il compare le code du dépôt à celui du
+`.xpi` livré et passe au rouge dès qu'ils divergent.
 
-## Pourquoi ce n'est pas qu'un `web-ext sign`
+**À faire donc à chaque modification de `content.js` ou de `manifest.json`.**
 
-Le bouclier a besoin de connaître **les domaines bancaires de l'utilisateur**.
-Aujourd'hui, `codebyr-space` les injecte dans le code de l'extension au moment de
-l'installation (placeholder `/*__DOMAINES__*/`). Or **une extension signée est
-scellée** : la modifier casse la signature.
+## Une seule fois : les identifiants
 
-Il faut donc découpler les données du code. La bonne méthode Firefox :
-**`storage.managed`** (stockage managé).
+1. Ouvrir <https://addons.mozilla.org/fr/developers/addon/api/key/>
+   La page demande d'abord une connexion à un **compte Firefox** (le même que
+   pour la synchronisation, si vous en avez un) : c'est normal, elle renvoie
+   ensuite sur le formulaire. Sans le préfixe de langue (`/fr/` ou `/en-US/`),
+   l'adresse ne répond pas.
+2. Cliquer sur **« Generate new credentials »**. Deux valeurs apparaissent :
+   - **JWT issuer** — de la forme `user:12345678:123`
+   - **JWT secret** — une longue chaîne, **affichée une seule fois**
+3. Les déposer dans un fichier **hors du dépôt**, `~/.codebyr-amo` :
 
-## Le plan (2 étapes)
+   ```sh
+   AMO_KEY='user:12345678:123'
+   AMO_SECRET='le-long-secret'
+   ```
 
-### Étape A — Refonte pour le stockage managé (à faire AVEC un test sur matériel)
+   Ce secret permet de publier des extensions sous votre identité : il ne va ni
+   dans le dépôt, ni dans un message, ni dans l'historique du shell.
+4. Vérifier que `web-ext` est là : `web-ext --version`. Sinon :
+   `npm install -g web-ext`.
 
-1. `manifest.json` : ajouter la permission `"storage"` et déclarer un
-   `browser_specific_settings.gecko.id` (déjà présent : `antiphishing@codebyr.io`).
-2. `content.js` : au lieu du placeholder, lire les domaines au démarrage via
-   `await browser.storage.managed.get("domaines")` (repli sur liste vide).
-3. `codebyr-space._installer_bouclier` : au lieu d'injecter dans le code, écrire
-   un manifeste natif de stockage managé par profil :
-   `~/.mozilla/managed-storage/antiphishing@codebyr.io.json`
-   contenant `{ "name": "antiphishing@codebyr.io", "type": "storage",
-   "data": { "domaines": [ ... ] } }`.
-4. Le code de l'extension devient **statique** → signable.
+## À chaque signature
 
-> ⚠️ Cette refonte touche un composant de sécurité qui **fonctionne aujourd'hui**.
-> Elle doit être testée sur Firefox réel (le comportement de `storage.managed`
-> ne se teste pas dans le chroot). Tant qu'elle n'est pas validée, on garde
-> l'approche actuelle (non signée) en repli.
+```sh
+sh live-build/scripts/sign-extension.sh
+```
 
-### Étape B — Signature Mozilla (nécessite TON compte)
+Le script fait tout : il vérifie que le numéro de version n'a pas déjà été
+signé (Mozilla refuse un doublon), n'envoie que `manifest.json` et `content.js`
+— surtout pas le sous-dossier `signed/`, qui embarquerait l'ancien `.xpi` dans
+le nouveau —, récupère le paquet signé, l'installe dans
+`…/antiphishing/signed/` en remplaçant le précédent, puis vérifie que le code
+du `.xpi` est bien celui du dépôt.
 
-1. Crée des identifiants API sur
-   https://addons.mozilla.org/developers/addon/api/key/
-2. `AMO_KEY=... AMO_SECRET=... live-build/scripts/sign-extension.sh`
-   → produit un `.xpi` signé (canal *unlisted*, non public).
-3. Place le `.xpi` signé dans
-   `.../usr/share/codebyr/antiphishing/signed/antiphishing@codebyr.io.xpi`.
-4. `codebyr-space` : si ce fichier existe, l'installer **tel quel** dans le
-   profil (sans écrire `xpinstall.signatures.required=false`) ; sinon, repli
-   sur l'approche actuelle.
+Puis, pour confirmer :
 
-## État
+```sh
+python -m unittest discover -s tests    # les 2 tests du bouclier passent au vert
+```
 
-- [x] Manifeste prêt (id + version)
-- [x] Script de signature (`sign-extension.sh`) + guide
-- [ ] Refonte `storage.managed` (à coder + **tester sur matériel**)
-- [ ] Signature Mozilla (nécessite le compte AMO de Romain)
+La signature se fait en canal **unlisted** (distribution privée) : pas de revue
+humaine, pas de publication sur le catalogue Mozilla, une signature automatique
+en une à deux minutes.
 
-Tant que ce n'est pas terminé, la limite est **documentée publiquement** dans
-[SECURITY.md](../SECURITY.md) — la transparence tient lieu de garde-fou.
+## Si Mozilla refuse
+
+| Message | Cause | Solution |
+|---|---|---|
+| `Version already exists` | Ce numéro a déjà été signé | Monter `"version"` dans `manifest.json` (1.1 → 1.2) |
+| `401 Unauthorized` | Identifiants invalides ou expirés | Régénérer les identifiants sur la page AMO |
+| `Upload failed` | Identifiants faux, ou AMO indisponible | Vérifier `~/.codebyr-amo`, puis réessayer |
+
+## Comment les domaines arrivent dans une extension scellée
+
+Le bouclier a besoin des domaines bancaires **de chaque utilisateur**, mais une
+extension signée ne peut pas être modifiée. Le découplage se fait par le
+**stockage managé** de Firefox : `codebyr-space` écrit
+`~/.mozilla/managed-storage/antiphishing@codebyr.io.json` dans le dossier
+personnel de l'Espace, et `content.js` lit les domaines au démarrage via
+`browser.storage.managed.get("domaines")`. Le code reste donc **statique**, donc
+signable, et les données restent propres à chaque utilisateur.
+
+C'est ce qui rend la signature possible ; ne revenez pas à une injection de
+domaines dans le code sans mesurer que cela rendrait l'extension insignable.

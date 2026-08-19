@@ -63,6 +63,9 @@ def capacites_machine():
         ("Bac à sable (bubblewrap)", bool(shutil.which("bwrap"))),
         ("Isolation utilisateur", user_ns()),
         ("Plafonds mémoire / processus", bool(shutil.which("systemd-run"))),
+        # Sans lui, une application d'un Espace n'a aucun bus de session : le bus
+        # de l'hôte n'est plus exposé au bac à sable (il permettait d'en sortir).
+        ("Bus de session privé par Espace", bool(shutil.which("dbus-run-session"))),
     ]
 
 
@@ -196,6 +199,8 @@ class Fenetre(Adw.ApplicationWindow):
         ajout.connect("entry-activated", lambda _r: self._ajouter_domaine(ajout.get_text()))
         grp.add(ajout)
 
+        self._groupe_domaines_bloques(banque)
+
         # Espaces + blindage
         gesp = Adw.PreferencesGroup(
             title="Vos Espaces et leur blindage",
@@ -235,6 +240,66 @@ class Fenetre(Adw.ApplicationWindow):
             gcap.add(r)
 
         self._groupe_applications()
+
+    # ---- Section « Sites bloqués » (mode apprentissage du filtre réseau) ----
+    def _journal_refus(self, esp_id):
+        """Journal des domaines refusés par le filtre, écrit par codebyr-net-proxy.
+        Convention de chemin partagée avec codebyr-space.journal_refus()."""
+        return os.path.expanduser(
+            "~/.local/share/codebyr/espaces/%s/domaines-refuses.txt" % esp_id)
+
+    def _lire_refus(self, esp_id):
+        try:
+            with open(self._journal_refus(esp_id), encoding="utf-8") as f:
+                vus = []
+                for ligne in f:
+                    d = ligne.strip().lower()
+                    if d and d not in vus:
+                        vus.append(d)
+                return vus
+        except OSError:
+            return []
+
+    def _groupe_domaines_bloques(self, banque):
+        """Un vrai site bancaire charge souvent des ressources ailleurs (CDN,
+        3-D Secure, captcha). Sans cette section, l'utilisateur voit seulement
+        « ma banque ne marche plus » sans jamais savoir quoi autoriser."""
+        if not banque:
+            return
+        autorises = set(banque.get("reseau", {}).get("domaines", []) or [])
+        refuses = [d for d in self._lire_refus(banque.get("id", ""))
+                   if d not in autorises and ("*." + d) not in autorises]
+        if not refuses:
+            return
+        grp = Adw.PreferencesGroup(
+            title="Sites bloqués dans « %s »" % banque.get("nom", "Banque"),
+            description="Codebyr a refusé ces adresses. Si votre banque ne "
+                        "s'affiche pas entièrement, l'une d'elles lui est "
+                        "peut-être nécessaire (paiement sécurisé, images…). "
+                        "N'autorisez que ce que vous reconnaissez.")
+        self._page.add(grp)
+        self._groupes.append(grp)
+        for d in refuses[:20]:
+            row = Adw.ActionRow(title=d)
+            btn = Gtk.Button(label="Autoriser", valign=Gtk.Align.CENTER)
+            btn.add_css_class("flat")
+            btn.connect("clicked", lambda _b, dom=d: self._ajouter_domaine(dom))
+            row.add_suffix(btn)
+            grp.add(row)
+        oublier = Adw.ActionRow(title="Effacer cette liste",
+                                subtitle="Elle se remplira à nouveau au besoin.")
+        boubli = Gtk.Button(icon_name="user-trash-symbolic", valign=Gtk.Align.CENTER)
+        boubli.add_css_class("flat")
+        boubli.connect("clicked", lambda _b: self._oublier_refus(banque.get("id", "")))
+        oublier.add_suffix(boubli)
+        grp.add(oublier)
+
+    def _oublier_refus(self, esp_id):
+        try:
+            os.remove(self._journal_refus(esp_id))
+        except OSError:
+            pass
+        self._construire()
 
     # ---- Section « Applications du menu » (par Espace ou commune) ----
     def _espaces_registre(self):

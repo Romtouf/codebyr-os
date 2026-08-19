@@ -18,9 +18,21 @@ Le tout est signé avec la **même clé de release** que les ISO
 (`E6FB6616EC58E15F40DA876CB1E8C803CE596E68`, trousseau `/root/.gnupg-codebyr`
 du WSL de build).
 
+> ⚠️ **Ce dépôt installe des paquets en root sur toutes les machines Codebyr.**
+> La clé qui le signe vaut donc le parc entier. `publish-apt.sh` refuse
+> désormais de signer avec une clé sans phrase de passe et n'en contient plus
+> en clair. La hiérarchie cible (clé maîtresse hors ligne + sous-clé dédiée au
+> dépôt), le renouvellement et la conduite à tenir en cas de fuite sont dans
+> [docs/chaine-de-signature.md](../docs/chaine-de-signature.md). À faire **avant**
+> toute diffusion large.
+
 ## Publier une nouvelle version
 
-1. **Incrémenter la version** dans [`../VERSION`](../VERSION) (ex. `1.0.2`).
+0. **Passer les tests** : `python -m unittest discover -s tests`.
+   Si le test du bouclier signale que `content.js` diffère du `.xpi` signé,
+   re-signez l'extension **avant** de publier (`live-build/scripts/sign-extension.sh`) :
+   sans cela, votre correctif du bouclier ne s'appliquera sur aucune machine.
+1. **Incrémenter la version** dans [`../VERSION`](../VERSION) (ex. `1.1.0`).
 2. **Construire le paquet** (dans le WSL de build) :
    ```bash
    CODEBYR_REPO=/mnt/c/Users/pcrom/codebyros bash packaging/build-deb.sh
@@ -28,7 +40,12 @@ du WSL de build).
 3. **Générer et signer le dépôt** :
    ```bash
    GNUPGHOME=/root/.gnupg-codebyr bash packaging/publish-apt.sh
+   # avec la sous-clé dédiée, une fois la migration faite :
+   # CODEBYR_APT_KEY='<empreinte-sous-cle>!' bash packaging/publish-apt.sh
    ```
+   La phrase de passe est demandée par `gpg-agent` ; pour un enchaînement non
+   interactif, `CODEBYR_PASSPHRASE_FILE=/chemin/hors/depot` (jamais dans le
+   dépôt, jamais dans l'historique du shell).
 4. **Déployer** `packaging/apt-repo/` vers le serveur (voir ci-dessous).
 
 Les machines installées récupèrent alors la mise à jour automatiquement

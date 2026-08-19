@@ -196,7 +196,7 @@
       <article class="card reveal">
         <div class="card__ico">◧</div>
         <h3>Espaces isolés</h3>
-        <p>Bac à sable bubblewrap, dossier personnel séparé, bus D-Bus privé, liserés colorés par fenêtre via une extension GNOME Shell dédiée.</p>
+        <p>Bac à sable bubblewrap, dossier personnel séparé, bus D-Bus <strong>privé</strong> — celui de votre session n'entre jamais dans un Espace, c'est ce qui empêche d'en sortir. Liserés colorés par fenêtre via une extension GNOME Shell dédiée.</p>
       </article>
       <article class="card reveal">
         <div class="card__ico">🛡</div>
@@ -206,12 +206,12 @@
       <article class="card reveal">
         <div class="card__ico">✷</div>
         <h3>Jetable automatique</h3>
-        <p>Une pièce jointe douteuse s'ouvre dans une bulle <strong>blindée et sans réseau</strong> ; un lien douteux, dans une bulle <strong>blindée</strong> qui s'autodétruit (le réseau reste ouvert : il faut bien charger la page). Clic droit → « Ouvrir en Jetable ».</p>
+        <p>Une pièce jointe douteuse s'ouvre dans une bulle <strong>blindée et sans réseau</strong> ; un lien douteux, dans une bulle <strong>blindée</strong> qui s'autodétruit (le réseau reste ouvert : il faut bien charger la page). Menu du Sceau → « Ouvrir un lien en Jetable ».</p>
       </article>
       <article class="card reveal">
         <div class="card__ico">⛨</div>
         <h3>Bouclier anti-hameçonnage</h3>
-        <p>Le navigateur de l'Espace Banque n'atteint QUE vos domaines bancaires (proxy local à liste blanche — un garde-fou contre l'erreur, pas une règle réseau système). Ailleurs, une extension alerte si un site imite l'un de vos sites protégés.</p>
+        <p>Le navigateur de l'Espace Banque n'atteint QUE vos domaines bancaires (proxy local à liste blanche — un garde-fou contre l'erreur, pas une règle réseau système). Ailleurs, une extension alerte si un site imite l'un de vos sites protégés. Tant que vous n'avez pas déclaré votre banque, cet Espace n'ouvre <em>aucun</em> site : il échoue fermé.</p>
       </article>
       <article class="card reveal">
         <div class="card__ico">⇄</div>
@@ -231,7 +231,7 @@
       <article class="card reveal">
         <div class="card__ico">◌</div>
         <h3>Mode invité</h3>
-        <p>Session vierge, nettoyée automatiquement à la déconnexion. Prêtez votre machine sans arrière-pensée.</p>
+        <p>Un compte séparé, sans mot de passe à retenir, effacé à la déconnexion — et votre dossier personnel lui reste fermé (droits <code>0700</code>). Prêtez votre machine sans arrière-pensée.</p>
       </article>
       <article class="card reveal">
         <div class="card__ico">✦</div>
@@ -309,6 +309,8 @@
           <li>Résister à une compromission du <strong>noyau partagé</strong>&nbsp;: l'isolation repose sur les espaces de noms Linux (bubblewrap), pas sur des machines virtuelles matérielles. Un exploit noyau peut théoriquement en sortir.</li>
           <li>Protéger contre un attaquant physique avec accès répété à la machine.</li>
           <li>Protéger contre du matériel déjà compromis.</li>
+          <li>Empêcher un Espace d'atteindre le <strong>micro</strong> : le serveur de son est partagé (Banque, elle, l'a coupé par défaut).</li>
+          <li>Séparer les Espaces par <strong>compte Unix</strong> : ils tournent tous sous le vôtre. Le bac à sable les cloisonne, mais un programme lancé hors Espace voit tout.</li>
         </ul>
       </div>
     </div>
@@ -443,7 +445,7 @@
       aucune installation forcée. Essayez avant d'installer.
     </p>
     <div class="cta__buttons">
-      <a class="btn btn--primary btn--lg" href="https://github.com/Romtouf/codebyr-os/releases/latest" target="_blank" rel="noopener">Télécharger l'ISO — v1.0 (1,5 Go)</a>
+      <a class="btn btn--primary btn--lg" href="https://github.com/Romtouf/codebyr-os/releases/latest" target="_blank" rel="noopener">Télécharger l'ISO — la plus récente (~1,5 Go)</a>
       <a class="btn btn--ghost btn--lg" href="https://github.com/Romtouf/codebyr-os#construire-liso" target="_blank" rel="noopener">Construire l'ISO soi-même</a>
     </div>
     <p class="cta__fine">

@@ -4,16 +4,50 @@
 codebyr-net-proxy — filtre réseau à liste blanche pour un Espace.
 
 N'autorise QUE les domaines passés en argument ; tout le reste est bloqué.
+Sans aucun domaine, TOUT est bloqué (échec fermé — jamais l'inverse).
 Gère HTTPS (méthode CONNECT) et HTTP simple. Écoute sur 127.0.0.1.
 
-Usage : codebyr-net-proxy <port> <domaine> [<domaine> ...]
+Un domaine refusé est noté dans le JOURNAL (option --journal) : c'est ce qui
+permet à « Configuration Codebyr » de proposer ensuite « ce site a été bloqué,
+voulez-vous l'autoriser ? ». Sans cela, un site bancaire qui charge une
+ressource sur un domaine tiers (CDN, 3-D Secure, captcha) semble simplement
+cassé, et l'utilisateur n'a aucun moyen de comprendre pourquoi.
+
+Usage : codebyr-net-proxy <port> [--journal <fichier>] [<domaine> ...]
+        codebyr-net-proxy --fd <n> [--journal <fichier>] [<domaine> ...]
+
+La forme « --fd » reçoit du parent une socket DÉJÀ en écoute. Elle supprime
+deux défauts de la forme « --port » : la course entre le choix du port libre et
+sa prise effective (un autre programme pouvait s'y glisser), et le cas où le
+navigateur démarrait plus vite que le filtre et tombait sur un port muet.
 """
+import os
 import select
 import socket
 import sys
 import threading
 
 TAILLE = 65536
+
+JOURNAL = None
+_VUS = set()
+_VERROU = None
+
+
+def journaliser(host):
+    """Note un domaine refusé, une seule fois, pour « Configuration Codebyr »."""
+    if not JOURNAL or not host:
+        return
+    with _VERROU:
+        if host in _VUS:
+            return
+        _VUS.add(host)
+    try:
+        os.makedirs(os.path.dirname(JOURNAL), exist_ok=True)
+        with open(JOURNAL, "a", encoding="utf-8") as f:
+            f.write(host + "\n")
+    except OSError:
+        pass
 
 
 def autorise(host, patterns):
@@ -44,9 +78,14 @@ def tunnel(a, b):
         pass
 
 
-def bloque(client, host):
-    corps = (u"Codebyr — Espace à réseau restreint.\n"
-             u"Le domaine « %s » n'est pas autorisé dans cet Espace." % host).encode("utf-8")
+def bloque(client, host, patterns=()):
+    if patterns:
+        detail = (u"Le domaine « %s » n'est pas autorisé dans cet Espace." % host)
+    else:
+        detail = (u"Aucun site n'est encore autorisé dans cet Espace.\n"
+                  u"Ouvrez « Configuration Codebyr » et ajoutez l'adresse de "
+                  u"votre banque : elle sera alors la seule joignable ici.")
+    corps = (u"Codebyr — Espace à réseau restreint.\n" + detail).encode("utf-8")
     entete = (b"HTTP/1.1 403 Forbidden\r\n"
               b"Content-Type: text/plain; charset=utf-8\r\n"
               b"Content-Length: " + str(len(corps)).encode() + b"\r\n"
@@ -75,7 +114,8 @@ def gerer(client, patterns):
             host = cible.rsplit(":", 1)[0]
             port = int(cible.rsplit(":", 1)[1]) if ":" in cible else 443
             if not autorise(host, patterns):
-                bloque(client, host)
+                journaliser(host)
+                bloque(client, host, patterns)
                 client.close()
                 return
             amont = socket.create_connection((host, port), timeout=15)
@@ -91,7 +131,8 @@ def gerer(client, patterns):
                     host = l.split(b":", 1)[1].strip().decode("latin-1").rsplit(":", 1)[0]
                     break
             if not autorise(host, patterns):
-                bloque(client, host)
+                journaliser(host)
+                bloque(client, host, patterns)
                 client.close()
                 return
             amont = socket.create_connection((host, 80), timeout=15)
@@ -109,15 +150,33 @@ def gerer(client, patterns):
 
 
 def main(argv):
-    if len(argv) < 3:
+    global JOURNAL, _VERROU
+    args = argv[1:]
+    if not args:
         sys.stderr.write(__doc__)
         return 2
-    port = int(argv[1])
-    patterns = argv[2:]
-    srv = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    srv.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-    srv.bind(("127.0.0.1", port))
-    srv.listen(64)
+
+    srv = None
+    if args[0] == "--fd" and len(args) >= 2:
+        # Socket héritée du parent : elle écoute déjà, rien à ouvrir.
+        srv = socket.socket(fileno=int(args[1]))
+        args = args[2:]
+    else:
+        port = int(args[0])
+        args = args[1:]
+
+    if len(args) >= 2 and args[0] == "--journal":
+        JOURNAL = args[1]
+        args = args[2:]
+    _VERROU = threading.Lock()
+    patterns = args
+
+    if srv is None:
+        srv = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        srv.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        srv.bind(("127.0.0.1", port))
+        srv.listen(64)
+    port = srv.getsockname()[1]
     sys.stderr.write("codebyr-net-proxy : filtre actif sur 127.0.0.1:%d (%d domaine(s))\n"
                      % (port, len(patterns)))
     while True:

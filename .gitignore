@@ -8,17 +8,26 @@ dist/
 cache/
 chroot/
 binary/
-site/
+# ATTENTION : ne PAS mettre « site/ » ici. Le site vitrine est suivi par git
+# (site/index.html, site/styles.css…) ; un motif « site/ » n'aurait pas retiré
+# les fichiers déjà suivis, mais aurait fait ignorer en silence tout nouveau
+# fichier du site — un piège à retardement. Le répertoire généré par
+# live-build, lui, est sous l'arbre de build, jamais ici.
 
 # Dépôt APT généré (voir packaging/publish-apt.sh) et paquets construits
 apt-repo/
 *.deb
 
-# Clés PRIVÉES et trousseaux binaires — ne JAMAIS committer.
-# (La clé PUBLIQUE codebyr-signing-key.asc, elle, est suivie : voir plus bas.)
+# Clés PRIVÉES, certificats de révocation et trousseaux binaires — ne JAMAIS
+# committer. (La clé PUBLIQUE codebyr-signing-key.asc, elle, est suivie.)
+# Ces motifs sont un filet, pas une politique : ces fichiers n'ont rien à faire
+# dans l'arborescence du dépôt, même ignorés (voir docs/chaine-de-signature.md).
 *-SECRETE.asc
 *secret*.asc
 *.gpg
+revocation*.asc
+sous-cles.asc
+maitresse*.asc
 
 # Divers
 *.log

@@ -15,6 +15,15 @@ case "$1" in
 		if command -v update-desktop-database >/dev/null 2>&1; then
 			update-desktop-database -q /usr/share/applications 2>/dev/null || true
 		fi
+		# Rattrapage des machines DÉJÀ installées : dossiers personnels privés
+		# (0700) et neutralisation du mot de passe public du compte invité.
+		# Ces deux correctifs vivaient dans l'image live ou dans le script
+		# d'installation — ils n'atteignaient donc jamais un poste existant.
+		# « || true » : un durcissement qui échoue ne doit pas bloquer la mise à
+		# jour de sécurité du reste du parc.
+		if [ -f /usr/bin/codebyr-durcir-poste ]; then
+			sh /usr/bin/codebyr-durcir-poste || true
+		fi
 		;;
 esac
 

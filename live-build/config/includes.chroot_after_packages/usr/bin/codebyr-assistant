@@ -11,25 +11,35 @@ import os
 import gi
 gi.require_version("Gtk", "4.0")
 gi.require_version("Adw", "1")
-from gi.repository import Adw, Gtk, Gio, GLib  # noqa: E402
+from gi.repository import Adw, Gtk, Gio  # noqa: E402
 
 REGISTRY = "/etc/codebyr/espaces.json"
+USER_REGISTRY = os.path.expanduser("~/.config/codebyr/espaces.json")
 
 CONNAITRE = [
     ("Qu'est-ce qu'un Espace ?",
-     "Un Espace est une bulle étanche. Ce que vous faites dans « Banque » ne peut "
-     "pas être vu par « Navigation », et inversement. Chaque Espace a sa couleur : "
-     "le liseré autour d'une fenêtre vous dit d'un coup d'œil à quelle bulle elle "
-     "appartient. Si un Espace est un jour compromis, les autres restent intacts."),
+     "Un Espace est un compartiment séparé. Les applications de « Banque » et celles "
+     "de « Navigation » ne partagent ni dossier personnel, ni fichiers temporaires, "
+     "ni bus de communication : ce que vous téléchargez dans l'un n'existe pas dans "
+     "l'autre. Chaque Espace a sa couleur : le liseré autour d'une fenêtre vous dit "
+     "d'un coup d'œil à quel compartiment elle appartient. Si un Espace attrape "
+     "quelque chose, le dégât reste confiné à ce compartiment."),
     ("Pourquoi certains sites sont bloqués dans Banque ?",
-     "L'Espace Banque n'a le droit de contacter QUE les sites de votre banque. Tout "
-     "le reste est bloqué. Ainsi, même si une page piégée s'ouvrait dans Banque, elle "
-     "ne pourrait rien envoyer à un pirate. Un site bloqué dans Banque, c'est la "
-     "protection qui marche — pas une panne."),
+     "Le navigateur de l'Espace Banque ne peut ouvrir QUE les sites que vous avez "
+     "déclarés comme étant ceux de votre banque. Tout le reste est refusé — y compris "
+     "un lien d'hameçonnage reçu par courriel et ouvert par mégarde dans cet Espace. "
+     "Un site bloqué dans Banque, c'est la protection qui marche, pas une panne."),
     ("À quoi sert l'Espace Jetable ?",
      "Il s'autodétruit dès que vous le fermez. Idéal pour ouvrir un lien ou un "
-     "fichier douteux : s'il est piégé, le piège disparaît avec l'Espace, sans "
-     "laisser la moindre trace sur votre ordinateur."),
+     "fichier douteux : s'il est piégé, le piège disparaît avec l'Espace. Une pièce "
+     "jointe y est même ouverte SANS réseau : elle ne peut rien envoyer dehors."),
+    ("Est-ce que Codebyr OS me rend invulnérable ?",
+     "Non, et personne ne devrait vous le promettre. Codebyr réduit fortement les "
+     "dégâts d'un piège en l'enfermant dans un compartiment. Mais les Espaces "
+     "reposent sur les protections du noyau Linux, pas sur des machines virtuelles "
+     "séparées : une faille grave du noyau permettrait d'en sortir. Continuez donc à "
+     "vous méfier des pièces jointes et à vérifier l'adresse des sites — Codebyr est "
+     "un filet de sécurité, pas une raison de sauter sans regarder."),
 ]
 
 REAGIR = [
@@ -53,14 +63,19 @@ REAGIR = [
      "ne sont pas touchés."),
     ("Je prête mon ordinateur — comment protéger mes données ?",
      "Menu du Sceau → « Mode invité (prêter le PC) ». La personne arrive dans une "
-     "session séparée qui ne voit AUCUN de vos fichiers et qui repart à zéro. Vos "
-     "données restent privées."),
+     "session séparée, sous un autre compte : votre dossier personnel lui est fermé "
+     "(droits 0700), et sa session est effacée dès qu'elle se déconnecte. Elle n'a "
+     "pas besoin de mot de passe, et ne peut pas devenir administrateur."),
 ]
 
 
 def _domaines_banque():
+    # La copie UTILISATEUR fait foi si elle existe : c'est elle que « Configuration
+    # Codebyr » écrit. Lire /etc seul faisait afficher « aucune banque » à un
+    # utilisateur qui venait pourtant d'enregistrer la sienne.
+    path = USER_REGISTRY if os.path.exists(USER_REGISTRY) else REGISTRY
     try:
-        with open(REGISTRY, encoding="utf-8") as f:
+        with open(path, encoding="utf-8") as f:
             data = json.load(f)
         for e in data.get("espaces", []):
             r = e.get("reseau") or {}
@@ -99,13 +114,29 @@ class Fenetre(Adw.ApplicationWindow):
         page.add(intro)
 
         etat = Adw.PreferencesGroup(title="En ce moment")
-        etat.add(self._info("Bouclier anti-hameçonnage", "Actif — il veille sur vos "
-                            "Espaces de navigation.", "security-high-symbolic"))
+        # État RÉEL, jamais rassurant par défaut : le bouclier ne surveille que les
+        # domaines déclarés. Sans banque enregistrée, il n'a rien à comparer — le
+        # dire est plus utile qu'un « Actif » de façade.
         doms = _domaines_banque()
         if doms:
             etat.add(self._info(
-                "Espace Banque", "Réseau restreint à %d site(s) de confiance : %s."
-                % (len(doms), ", ".join(doms)), "network-wireless-symbolic"))
+                "Bouclier anti-hameçonnage",
+                "Actif : il vous alerte si un site imite l'un de vos %d site(s) "
+                "protégé(s), dans vos Espaces de navigation." % len(doms),
+                "security-high-symbolic"))
+            etat.add(self._info(
+                "Espace Banque", "Navigateur restreint à : %s. Tout autre site y est "
+                "refusé." % ", ".join(doms), "network-wireless-symbolic"))
+        else:
+            etat.add(self._info(
+                "Bouclier anti-hameçonnage",
+                "En attente : aucun site de banque n'est encore enregistré. Ouvrez "
+                "« Configuration Codebyr » pour ajouter le vôtre — sans lui, le "
+                "bouclier n'a rien à surveiller.", "dialog-warning-symbolic"))
+            etat.add(self._info(
+                "Espace Banque", "Aucun site autorisé pour l'instant : le navigateur "
+                "de cet Espace n'ouvrira rien tant que vous n'aurez pas déclaré votre "
+                "banque.", "dialog-warning-symbolic"))
         ouverts = _espaces_ouverts()
         etat.add(self._info(
             "Espaces ouverts",

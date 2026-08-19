@@ -86,9 +86,21 @@ faille qui revient. Ne les neutralisez jamais pour faire passer la CI.
    - se déconnecter de la session invité, s'y reconnecter : elle doit être vierge.
 5. **Après toute modification du bac à sable**, vérifier depuis un terminal
    ouvert DANS un Espace (menu du Sceau → Espace → Terminal) :
-   `ls "$XDG_RUNTIME_DIR"` ne doit montrer **aucun** socket `bus`, et
-   `busctl --user` doit échouer. S'il réussit, l'Espace peut sortir de son bac
-   à sable : c'est bloquant.
+
+   ```sh
+   ls $XDG_RUNTIME_DIR                     # aucun fichier « bus »
+   systemctl --user status                 # doit ÉCHOUER
+   busctl --user list | grep -c org.gnome.Shell   # doit afficher 0
+   ```
+
+   > ⚠️ Ne testez **pas** avec « `busctl --user` doit échouer » : c'est faux.
+   > `busctl --user` se connecte au bus indiqué par l'environnement, donc au
+   > bus **privé** de l'Espace — il RÉPOND, et c'est normal. Il liste même des
+   > services « activatable », qui viennent des fichiers de
+   > `/usr/share/dbus-1/` visibles en lecture seule. Ce qu'on veut prouver,
+   > c'est que le bus de la **session hôte** est hors d'atteinte : d'où
+   > `systemctl --user` (la porte de sortie historique) et l'absence de
+   > `org.gnome.Shell`.
 
 ## Proposer un changement
 

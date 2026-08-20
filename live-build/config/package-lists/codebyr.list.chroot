@@ -11,6 +11,11 @@ librsvg2-bin
 # Administration (compte user de la session live)
 sudo
 
+# notify-send : le seul moyen, pour un script shell, de dire quelque chose à
+# l'utilisateur d'un bureau. Sans lui, un refus poli (« ce système est déjà
+# installé ») se perd dans un fichier de journal que personne n'ouvrira.
+libnotify-bin
+
 # Phase 2 — isolation des Espaces (bubblewrap)
 bubblewrap
 

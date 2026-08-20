@@ -1,0 +1,86 @@
+# Journal des versions — Codebyr OS
+
+Ce que chaque version apporte, en clair. Les correctifs de **sécurité** sont
+détaillés dans [SECURITY.md](SECURITY.md), qui indique aussi ce qui était
+vulnérable et comment.
+
+Les mises à jour arrivent toutes seules par `apt` sur les machines installées.
+Après une mise à jour, **déconnectez-vous et reconnectez-vous** : l'extension
+GNOME (menu du Sceau, liserés colorés) ne se recharge pas à chaud.
+
+---
+
+## 1.2.0 — en préparation
+
+**Vos réglages ne bloquent plus les mises à jour de sécurité.** Jusqu'ici, dès
+que vous touchiez un réglage, votre copie de la configuration devenait un
+instantané figé : aucune valeur par défaut livrée ensuite ne pouvait plus vous
+atteindre. Autrement dit, plus vous configuriez votre système, moins les
+durcissements vous parvenaient. Les deux configurations se superposent
+désormais : vos choix gagnent, les nouveautés arrivent quand même.
+
+**Son et micro réglables par Espace.** Le serveur de son donne aussi accès au
+microphone. Vous pouvez le couper Espace par Espace dans « Configuration
+Codebyr » — c'est déjà le cas pour Banque.
+
+**Une commande pour vérifier l'isolation.** `codebyr-space verifier-isolation`
+lance une sonde dans un vrai bac à sable et vous dit, preuve à l'appui, ce
+qu'un Espace peut réellement atteindre. Utile après chaque mise à jour, et
+indispensable pour qui veut vérifier plutôt que croire.
+
+**Quand une application ne démarre pas, vous le savez.** Avant, il ne se
+passait rien à l'écran. Le menu du Sceau vous prévient désormais, et
+`journalctl -t codebyr` donne le détail.
+
+Corrections : adresses IPv6 dans le filtre réseau, marqueurs de processus
+laissés par une application tuée brutalement (ils pouvaient faire afficher le
+mauvais liseré), aide de `codebyr-space --help` qui ne documentait que 3 actions
+sur 13.
+
+## 1.1.0 — 19 août 2026
+
+**Correctif de sécurité important.** Une application malveillante lancée dans
+un Espace pouvait, par le bus de communication du bureau, s'exécuter **hors**
+de son compartiment et lire les données de tous les autres Espaces. Le chemin
+est fermé. Détails complets dans [SECURITY.md](SECURITY.md).
+
+**Le compte Invité n'a plus de mot de passe public.** Il était `invite` sur
+toutes les machines Codebyr. Désormais aucun mot de passe ne fonctionne pour ce
+compte (ni SSH, ni `su`, ni `sudo`) : seule sa session graphique locale
+s'ouvre, d'un clic et sans rien saisir.
+
+**Votre dossier personnel est privé sur le système installé.** La protection
+n'existait que sur la version « live ». Un compte Invité pouvait donc lire vos
+fichiers sur une machine installée.
+
+**L'Espace Banque échoue fermé.** Sans site déclaré, il n'ouvrait plus rien du
+tout — auparavant il avait un accès complet à Internet alors que l'interface
+annonçait une restriction. Déclarez votre banque dans « Configuration Codebyr »
+au premier usage.
+
+**Le bouclier anti-hameçonnage crie moins fort et plus juste.** Il ne se
+déclenche plus sur un simple bout de nom présent n'importe où dans l'adresse
+(`revolut.zendesk.com` était signalé comme frauduleux), et vous pouvez déclarer
+un site légitime une fois pour toutes.
+
+## 1.0.7 — 2 août 2026
+
+Bouclier anti-hameçonnage signé par Mozilla.
+
+## 1.0.5 — 2 août 2026
+
+Presse-papiers cloisonné entre Espaces, mode invité, liseré pointillé pour le
+Jetable.
+
+## 1.0.2 — 1er août 2026
+
+Canal de mise à jour `apt` et corrections de sécurité.
+
+## 1.0.1 — 1er août 2026
+
+Correctifs issus d'une revue de sécurité externe.
+
+## 1.0 — 9 juillet 2026
+
+Première version installable : Espaces isolés, liserés colorés, Jetable,
+installeur graphique.

@@ -229,7 +229,15 @@ codebyros/
       Portable, Retour dans le temps, Assistant, Mode invité — plus le Blindage
 - [x] **Phase 4 — Installeur** : Calamares Codebyr, installation vérifiée sur
       machine réelle
-- [ ] **Phase 5 — Diffusion** : ISO signées, CI de build, site, premiers testeurs
+- [x] **Phase 5 — Diffusion** : ISO signées, canal de mise à jour `apt`,
+      intégration continue, site en ligne — **il ne manque que des testeurs**
+- [ ] **Phase 6 — Isolation par compte** : un UID Unix par Espace, pour que la
+      séparation reste vraie même si le bac à sable cède
+
+Le détail de tout ce qui reste — sécurité, produit, dette technique, et ce qui
+est volontairement hors périmètre — est dans
+[docs/chantiers.md](docs/chantiers.md). Ce que chaque version apporte est dans
+[CHANGELOG.md](CHANGELOG.md).
 
 ## Contribuer
 

@@ -21,6 +21,14 @@ BIN = os.path.join(RACINE, "live-build", "config",
                    "includes.chroot_after_packages", "usr", "bin")
 ETC = os.path.join(RACINE, "live-build", "config",
                    "includes.chroot_after_packages", "etc")
+LIB = os.path.join(RACINE, "live-build", "config",
+                   "includes.chroot_after_packages", "usr", "share", "codebyr")
+
+# Les outils chargent leur module partagé depuis CODEBYR_LIB : on les fait
+# pointer sur la copie du dépôt, pas sur celle installée sur la machine.
+os.environ["CODEBYR_LIB"] = LIB
+if LIB not in sys.path:
+    sys.path.insert(0, LIB)
 
 
 def charger(nom):

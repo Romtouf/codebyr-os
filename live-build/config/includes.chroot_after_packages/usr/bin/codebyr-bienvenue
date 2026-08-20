@@ -12,7 +12,21 @@ gi.require_version("Gtk", "4.0")
 gi.require_version("Adw", "1")
 from gi.repository import Adw, Gtk, Gio, GLib  # noqa: E402
 
+sys.path.insert(0, os.environ.get("CODEBYR_LIB", "/usr/share/codebyr"))
+import systeme  # noqa: E402
+
 MARQUEUR = os.path.expanduser("~/.config/codebyr/bienvenue-vu")
+
+
+def marquer_vu():
+    """Note que le tour a été vu. Écrit DÈS L'OUVERTURE, pas à la fermeture :
+    si la fenêtre est tuée ou la session coupée, le tour ne doit pas revenir
+    à chaque connexion."""
+    try:
+        os.makedirs(os.path.dirname(MARQUEUR), exist_ok=True)
+        open(MARQUEUR, "w").close()
+    except OSError:
+        pass
 
 ESPACES = [
     ("Personnel", "#4E8FEF"), ("Travail", "#8F6CF0"), ("Banque", "#2FA36B"),
@@ -86,29 +100,35 @@ class Fenetre(Adw.ApplicationWindow):
             sceau(96)))
         self._carousel.append(page(
             "Vos Espaces",
-            ["Votre vie numérique, rangée en bulles étanches et colorées.",
-             "Si l'une est un jour piégée, les autres restent intactes."],
+            ["Votre vie numérique, rangée en compartiments colorés.",
+             "Si l'un est un jour piégé, le dégât reste confiné à celui-là."],
             legende_espaces()))
         self._carousel.append(page(
             "Comment ça marche",
             ["L'icône du Sceau, en haut à droite, ouvre vos Espaces.",
              "Le liseré coloré autour d'une fenêtre dit à quel Espace elle appartient.",
              "L'Assistant de sécurité répond à toutes vos questions, en clair."]))
-        # Bouton d'installation, seulement en session live (Calamares présent).
+        # Bouton d'installation : SEULEMENT depuis le support live.
+        # On ne se fie plus à la présence de Calamares — son retrait à la fin
+        # de l'installation passe par apt, hors ligne, et peut échouer en
+        # silence. Le bouton « Installer sur ce disque » réapparaissait alors
+        # à chaque session sur une machine déjà installée.
         bouton_install = None
-        if shutil.which("calamares") and shutil.which("codebyr-installer"):
+        if systeme.session_live() and shutil.which("codebyr-installer"):
             bouton_install = Gtk.Button(label="Installer Codebyr OS sur ce disque")
             bouton_install.add_css_class("suggested-action")
             bouton_install.add_css_class("pill")
             bouton_install.set_halign(Gtk.Align.CENTER)
             bouton_install.set_margin_top(10)
             bouton_install.connect("clicked", self._installer)
-        self._carousel.append(page(
-            "Vous êtes prêt !",
-            ["Un lien ou un fichier douteux ? Ouvrez-le « en Jetable ».",
-             "Votre banque ? L'Espace Banque veille sur elle.",
-             "Cliquez sur le Sceau pour commencer votre exploration."],
-            bouton_install))
+        derniere = ["Un lien ou un fichier douteux ? Ouvrez-le « en Jetable ».",
+                    "Votre banque ? Déclarez-la d'abord dans « Configuration "
+                    "Codebyr » : l'Espace Banque n'ouvrira qu'elle.",
+                    "Cliquez sur le Sceau pour commencer votre exploration."]
+        if bouton_install is not None:
+            derniere.append("Vous utilisez la version d'essai : rien n'est "
+                            "écrit sur votre disque tant que vous n'installez pas.")
+        self._carousel.append(page("Vous êtes prêt !", derniere, bouton_install))
 
         dots = Adw.CarouselIndicatorDots(carousel=self._carousel)
 
@@ -160,15 +180,8 @@ class Bienvenue(Adw.Application):
                          flags=Gio.ApplicationFlags.FLAGS_NONE)
 
     def do_activate(self):
+        marquer_vu()
         (self.props.active_window or Fenetre(self)).present()
-
-    def do_shutdown(self):
-        try:
-            os.makedirs(os.path.dirname(MARQUEUR), exist_ok=True)
-            open(MARQUEUR, "w").close()
-        except OSError:
-            pass
-        Adw.Application.do_shutdown(self)
 
 
 if __name__ == "__main__":

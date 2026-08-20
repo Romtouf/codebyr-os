@@ -24,9 +24,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         with:
           python-version: '3.11'
 
@@ -78,9 +78,35 @@ jobs:
       - name: shellcheck (erreurs)
         run: shellcheck --severity=error ${{ steps.sources.outputs.shell }}
 
+      - name: Bashismes dans les scripts « #!/bin/sh »
+        # Les hooks de construction tournent sous dash, pas bash. Un bashisme
+        # (« read -d », « [[ ]] »…) est syntaxiquement valide : ni « bash -n »
+        # ni « dash -n » ne le voient. Il ne casse qu'à l'exécution, pendant la
+        # construction de l'ISO. shellcheck le signale par un code SC3xxx.
+        run: |
+          set -e
+          rapport=$(shellcheck --severity=warning -f gcc \
+            ${{ steps.sources.outputs.shell }} || true)
+          if echo "$rapport" | grep -E 'SC3[0-9]{3}'; then
+            echo "::error::Bashisme dans un script #!/bin/sh (voir ci-dessus)."
+            exit 1
+          fi
+          echo "Aucun bashisme."
+
       - name: shellcheck (avertissements — informatif)
         continue-on-error: true
         run: shellcheck --severity=warning ${{ steps.sources.outputs.shell }}
+
+      - name: Syntaxe JavaScript (extension GNOME et bouclier)
+        # Rien ne vérifiait ces fichiers. Or une erreur de syntaxe dans
+        # extension.js, c'est le menu du Sceau ET les liserés qui disparaissent
+        # — sans message, sans trace visible pour l'utilisateur.
+        run: |
+          set -e
+          for js in $(find live-build -name '*.js'); do
+            echo "→ $js"
+            node --check "$js"
+          done
 
       - name: Tests
         run: python -m unittest discover -s tests -v
@@ -106,7 +132,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Construire le .deb
         run: |
@@ -134,7 +160,7 @@ jobs:
               || { echo "$outil n'est pas exécutable dans le paquet !" >&2; exit 1; }
           done
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: codebyr-tools-deb
           path: packaging/dist/*.deb

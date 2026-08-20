@@ -50,8 +50,20 @@ def journaliser(host):
         pass
 
 
+def hote_propre(brut):
+    """Normalise un nom d'hôte : minuscules, sans point final, sans crochets.
+
+    Les crochets viennent des adresses IPv6 littérales : « CONNECT [::1]:443 »
+    donne « [::1] », que getaddrinfo refuse. Sans ce nettoyage, un Espace à
+    liste blanche ne pouvait joindre aucune adresse IPv6 écrite en clair."""
+    h = (brut or "").strip().lower().strip(".")
+    if h.startswith("[") and h.endswith("]"):
+        h = h[1:-1]
+    return h
+
+
 def autorise(host, patterns):
-    host = (host or "").lower().strip(".")
+    host = hote_propre(host)
     for p in patterns:
         p = p.lower().strip()
         if p.startswith("*."):
@@ -111,8 +123,15 @@ def gerer(client, patterns):
         methode, cible = parts[0], parts[1]
 
         if methode.upper() == "CONNECT":
-            host = cible.rsplit(":", 1)[0]
-            port = int(cible.rsplit(":", 1)[1]) if ":" in cible else 443
+            # « [2001:db8::1]:443 » : on coupe APRÈS le crochet fermant, sinon
+            # le découpage tombe au milieu de l'adresse IPv6.
+            if cible.startswith("[") and "]" in cible:
+                hote_brut, _, reste = cible.partition("]")
+                host = hote_propre(hote_brut + "]")
+                port = int(reste.lstrip(":")) if reste.lstrip(":") else 443
+            else:
+                host = hote_propre(cible.rsplit(":", 1)[0])
+                port = int(cible.rsplit(":", 1)[1]) if ":" in cible else 443
             if not autorise(host, patterns):
                 journaliser(host)
                 bloque(client, host, patterns)
@@ -128,7 +147,12 @@ def gerer(client, patterns):
             host = ""
             for l in premier.split(b"\r\n"):
                 if l.lower().startswith(b"host:"):
-                    host = l.split(b":", 1)[1].strip().decode("latin-1").rsplit(":", 1)[0]
+                    brut = l.split(b":", 1)[1].strip().decode("latin-1")
+                    if brut.startswith("[") and "]" in brut:
+                        brut = brut.partition("]")[0] + "]"
+                    elif ":" in brut:
+                        brut = brut.rsplit(":", 1)[0]
+                    host = hote_propre(brut)
                     break
             if not autorise(host, patterns):
                 journaliser(host)

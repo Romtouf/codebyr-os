@@ -7,6 +7,24 @@
 # de sudo sans mot de passe, d'où l'absence d'invite.
 set -e
 
+# ── Refus net hors du support live ──────────────────────────────────────────
+# Ce contrôle passe AVANT la redirection vers le journal : sinon le message
+# tomberait dans un fichier et l'utilisateur ne verrait, une fois de plus,
+# strictement rien.
+#
+# Pourquoi ne pas se fier à l'absence de Calamares ? Parce que son retrait en
+# fin d'installation passe par apt, que l'installation de Codebyr se fait hors
+# ligne, et qu'il échoue parfois sans bruit. L'installeur reste alors joignable
+# sur une machine déjà installée, où le lancer ne peut que faire des dégâts.
+if [ ! -d /run/live ] && [ ! -d /lib/live/mount/medium ] \
+   && ! grep -qw "boot=live" /proc/cmdline 2>/dev/null; then
+    message="Codebyr OS est déjà installé sur cette machine : rien à installer."
+    echo "$message" >&2
+    notify-send --icon=dialog-information "Codebyr OS" "$message" 2>/dev/null \
+        || zenity --info --text="$message" 2>/dev/null || true
+    exit 1
+fi
+
 # Journal : si « rien ne se passe », la cause est ici.
 LOG="${XDG_CACHE_HOME:-$HOME/.cache}/codebyr-installer.log"
 mkdir -p "$(dirname "$LOG")" 2>/dev/null || true
@@ -17,6 +35,7 @@ if ! command -v calamares >/dev/null 2>&1; then
     echo "Calamares n'est pas installé (système déjà installé ?)." >&2
     exit 1
 fi
+
 
 # Autorise root sur l'affichage X/XWayland le temps de l'installation.
 xhost +SI:localuser:root >/dev/null 2>&1 || true

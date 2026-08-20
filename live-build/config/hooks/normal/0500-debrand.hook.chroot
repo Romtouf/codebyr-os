@@ -41,19 +41,18 @@ EOF
 # — Remplace l'emblème/logo Debian par le Sceau Codebyr (là où il s'afficherait) —
 LOGO=/usr/share/icons/hicolor/scalable/apps/codebyr-logo.svg
 if [ -f "$LOGO" ]; then
-	for f in $(find /usr/share/icons -iname "emblem-debian*.svg" 2>/dev/null); do
-		cp -f "$LOGO" "$f"
-	done
+	find /usr/share/icons -iname "emblem-debian*.svg" -exec cp -f "$LOGO" {} \; 2>/dev/null || true
 	# distributor-logo éventuel
-	for f in $(find /usr/share/icons -iname "*distributor-logo*.svg" 2>/dev/null); do
-		cp -f "$LOGO" "$f"
-	done
+	find /usr/share/icons -iname "*distributor-logo*.svg" -exec cp -f "$LOGO" {} \; 2>/dev/null || true
 	if command -v rsvg-convert >/dev/null 2>&1; then
-		for f in $(find /usr/share/icons -iname "emblem-debian*.png" 2>/dev/null); do
-			sz=$(basename "$(dirname "$(dirname "$f")")" | cut -dx -f1)
-			[ -n "$sz" ] && [ "$sz" -eq "$sz" ] 2>/dev/null && \
-				rsvg-convert -w "$sz" -h "$sz" "$LOGO" -o "$f" 2>/dev/null || true
-		done
+		# « find -exec sh -c » : POSIX (ces hooks tournent sous dash) et sûr
+		# même si un chemin contient une espace. $0 porte le logo.
+		find /usr/share/icons -iname "emblem-debian*.png" -exec sh -c '
+			for f do
+				sz=$(basename "$(dirname "$(dirname "$f")")" | cut -dx -f1)
+				[ -n "$sz" ] && [ "$sz" -eq "$sz" ] 2>/dev/null && \
+					rsvg-convert -w "$sz" -h "$sz" "$0" -o "$f" 2>/dev/null || true
+			done' "$LOGO" {} + 2>/dev/null || true
 	fi
 fi
 
@@ -68,25 +67,24 @@ if [ -f "$GL" ] && command -v rsvg-convert >/dev/null 2>&1; then
 	[ -e "$DL/logo-text-version.svg" ] && cp -f "$GL" "$DL/logo-text-version.svg" || true
 	# Autres logos Debian carrés (image simple) -> le Sceau
 	# (on exclut logo-text-version* déjà traité en logo textuel juste au-dessus)
-	for f in $(find "$DL" -iname "logo-*.png" ! -iname "logo-text-version*" 2>/dev/null); do
-		sz=$(basename "$f" .png | sed 's/[^0-9]//g')
-		[ -n "$sz" ] && rsvg-convert -w "$sz" -h "$sz" "$LOGO" -o "$f" 2>/dev/null || true
-	done
+	find "$DL" -iname "logo-*.png" ! -iname "logo-text-version*" -exec sh -c '
+		for f do
+			sz=$(basename "$f" .png | sed "s/[^0-9]//g")
+			[ -n "$sz" ] && rsvg-convert -w "$sz" -h "$sz" "$0" -o "$f" 2>/dev/null || true
+		done' "$LOGO" {} + 2>/dev/null || true
 fi
 # Autres logos Debian visibles (pixmaps, emblème « vendor »)
 [ -f /usr/share/pixmaps/debian-logo.png ] && command -v rsvg-convert >/dev/null 2>&1 && \
 	rsvg-convert -w 96 -h 96 "$LOGO" -o /usr/share/pixmaps/debian-logo.png 2>/dev/null || true
-for f in $(find /usr/share/icons/vendor -iname "emblem-vendor*.svg" 2>/dev/null); do
-	cp -f "$LOGO" "$f"
-done
+find /usr/share/icons/vendor -iname "emblem-vendor*.svg" \
+	-exec cp -f "$LOGO" {} \; 2>/dev/null || true
 
 # — Remplace les fonds Debian (connexion / verrouillage) par le fond Codebyr —
 BG=/usr/share/backgrounds/codebyr/codebyr-sombre.svg
 if [ -f "$BG" ]; then
-	for f in $(find /usr/share/desktop-base -path "*login*" -name "*.svg" -o \
-	                -path "*lockscreen*" -name "*.svg" 2>/dev/null); do
-		cp -f "$BG" "$f"
-	done
+	find /usr/share/desktop-base \
+		\( -path "*login*" -name "*.svg" -o -path "*lockscreen*" -name "*.svg" \) \
+		-exec cp -f "$BG" {} \; 2>/dev/null || true
 fi
 
 # — Rafraîchit le cache d'icônes —

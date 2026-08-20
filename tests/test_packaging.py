@@ -59,6 +59,16 @@ class Paquet(unittest.TestCase):
                           "%s n'est pas embarqué dans codebyr-tools : les machines "
                           "déjà installées ne le recevront jamais." % nom)
 
+    def test_le_module_partage_est_embarque(self):
+        # Sans /usr/share/codebyr/registre.py, TOUS les outils Codebyr échouent
+        # dès l'import : le paquet doit l'emporter, pas seulement les scripts.
+        couvert = any(c in ("usr/share/codebyr", "usr/share/codebyr/registre.py")
+                      for c in self.chemins)
+        self.assertTrue(couvert,
+                        "le module partagé registre.py n'est pas dans le paquet : "
+                        "les outils planteraient à l'import sur les machines "
+                        "mises à jour. Chemins listés : %s" % self.chemins)
+
     def test_le_postinst_rattrape_les_machines_existantes(self):
         with open(os.path.join(RACINE, "packaging", "codebyr-tools.postinst"),
                   encoding="utf-8") as f:

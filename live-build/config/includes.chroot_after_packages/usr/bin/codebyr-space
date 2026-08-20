@@ -31,19 +31,34 @@ import tempfile
 import time
 import unicodedata
 
-REGISTRY = "/etc/codebyr/espaces.json"
-USER_REGISTRY = os.path.expanduser("~/.config/codebyr/espaces.json")
+# Module partagé de lecture/écriture du registre (voir /usr/share/codebyr/).
+# CODEBYR_LIB permet de le charger ailleurs — tests, développement.
+sys.path.insert(0, os.environ.get("CODEBYR_LIB", "/usr/share/codebyr"))
+import registre  # noqa: E402
+
 DATA_ROOT = os.path.expanduser("~/.local/share/codebyr/espaces")
 
 
-def load_espaces():
-    path = USER_REGISTRY if os.path.exists(USER_REGISTRY) else REGISTRY
+def journal(message):
+    """Trace une action dans le journal système (« journalctl -t codebyr »).
+
+    Sans trace, un utilisateur qui signale « ça n'a pas marché » ne peut être
+    aidé par personne. On note l'Espace et l'action — jamais le nom du fichier
+    ouvert ni l'adresse visitée : ce serait consigner sur disque exactement ce
+    que les Espaces servent à cloisonner."""
     try:
-        with open(path, encoding="utf-8") as f:
-            return {e["id"]: e for e in json.load(f).get("espaces", [])}
-    except (OSError, ValueError) as exc:
-        sys.stderr.write("codebyr-space : registre illisible (%s) : %s\n" % (path, exc))
-        return {}
+        import syslog
+        syslog.openlog("codebyr", syslog.LOG_PID, syslog.LOG_USER)
+        syslog.syslog(syslog.LOG_INFO, message)
+        syslog.closelog()
+    except Exception:
+        pass    # un journal absent ne doit jamais empêcher un lancement
+
+
+def load_espaces():
+    """Les Espaces, valeurs par défaut du système recouvertes par les choix
+    de l'utilisateur (voir registre.charger)."""
+    return registre.espaces()
 
 
 def desktop_exec(desktop_id):
@@ -520,15 +535,20 @@ def cmd_launch(espaces, esp_id, extra, fichier=None):
                          "(dossier personnel séparé).\n")
 
     print("Ouverture de « %s » dans l'Espace %s…" % (os.path.basename(cmd[0]), esp["nom"]))
+    journal("Espace %s : ouverture de %s%s%s%s"
+            % (esp["id"], os.path.basename(app_cmd[0]),
+               " [blindage]" if renforce else "",
+               " [hors-ligne]" if hors_ligne else "",
+               "" if use_bwrap or est_flatpak else " [SANS bac à sable]"))
     # Répertoire d'exécution partagé avec l'extension GNOME : on y note
     # « ce processus (et ses enfants) appartient à tel Espace », pour que
     # l'extension colore la fenêtre par filiation, même sans marqueur de classe.
-    rundir = os.path.join(
-        os.environ.get("XDG_RUNTIME_DIR", "/run/user/%d" % os.getuid()), "codebyr")
+    rundir = _rundir()
     try:
         os.makedirs(rundir, exist_ok=True)
     except OSError:
         pass
+    _nettoyer_marqueurs()
 
     proxy = _demarrer_filtre_reseau(esp, home, app_cmd)
     # Bouclier anti-hameçonnage dans les navigateurs des Espaces NON bancaires
@@ -568,7 +588,34 @@ def cmd_launch(espaces, esp_id, extra, fichier=None):
 
 def _rundir():
     return os.path.join(
-        os.environ.get("XDG_RUNTIME_DIR", "/run/user/%d" % os.getuid()), "codebyr")
+        os.environ.get("XDG_RUNTIME_DIR") or "/run/user/%d" % os.getuid(), "codebyr")
+
+
+def _nettoyer_marqueurs():
+    """Retire les marqueurs « pid-N » dont le processus n'existe plus.
+
+    Un processus tué brutalement laissait le sien derrière lui, et l'extension
+    GNOME pouvait alors attribuer la fenêtre d'un NOUVEAU processus au même
+    numéro à l'Espace du défunt — donc afficher le mauvais liseré."""
+    if not os.path.isdir("/proc"):
+        return
+    rundir = _rundir()
+    try:
+        noms = os.listdir(rundir)
+    except OSError:
+        return
+    for nom in noms:
+        if not nom.startswith("pid-"):
+            continue
+        try:
+            pid = int(nom[4:])
+        except ValueError:
+            continue
+        if not os.path.isdir("/proc/%d" % pid):
+            try:
+                os.remove(os.path.join(rundir, nom))
+            except OSError:
+                pass
 
 
 def cmd_close(espaces, esp_id):
@@ -602,7 +649,9 @@ def cmd_close(espaces, esp_id):
                 os.remove(path)
             except OSError:
                 pass
+    _nettoyer_marqueurs()
     print("Espace %s : %d fenêtre(s) fermée(s)." % (esp_id, ferme))
+    journal("Espace %s : fermeture (%d fenêtre(s))" % (esp_id, ferme))
     return 0
 
 
@@ -616,6 +665,7 @@ def cmd_purge(espaces, esp_id):
     if os.path.isdir(d):
         shutil.rmtree(d, ignore_errors=True)
         print("Données de l'Espace %s effacées." % esp["nom"])
+        journal("Espace %s : données effacées" % esp_id)
     else:
         print("Rien à effacer pour %s." % esp["nom"])
     return 0
@@ -671,8 +721,6 @@ def cmd_import(espaces, esp_id, source=None):
     return 0
 
 
-BUILTIN_IDS = ("personnel", "travail", "banque", "navigation", "jetable")
-
 FLATHUB_REPO = "/etc/flatpak/remotes.d/flathub.flatpakrepo"
 
 
@@ -718,15 +766,12 @@ def _flatpak_nom_lisible(env, appid):
 
 
 def _enregistrer_app(esp_id, nom, cmd):
-    """Ajoute l'application au menu de CET Espace (registre utilisateur)."""
-    data = _registre_complet()
-    for e in data.get("espaces", []):
-        if e.get("id") == esp_id:
-            apps = e.setdefault("apps", [])
-            if not any(a.get("cmd") == cmd for a in apps):
-                apps.append({"nom": nom, "cmd": cmd})
-            break
-    _ecrire_registre_utilisateur(data)
+    """Ajoute l'application au menu de CET Espace (personnalisation utilisateur)."""
+    esp = registre.espaces().get(esp_id) or {}
+    apps = list(esp.get("apps") or [])
+    if not any(a.get("cmd") == cmd for a in apps):
+        apps.append({"nom": nom, "cmd": cmd})
+    registre.modifier_espace(esp_id, {"apps": apps})
 
 
 def cmd_install(esp_id, appid):
@@ -810,32 +855,11 @@ def cmd_remove_app(esp_id, appid):
         return 2
     env, _ = _flatpak_env(esp_id)
     rc = subprocess.call(["flatpak", "--user", "uninstall", "-y", appid], env=env)
-    data = _registre_complet()
-    for e in data.get("espaces", []):
-        if e.get("id") == esp_id:
-            e["apps"] = [a for a in e.get("apps", [])
-                         if a.get("cmd") != "flatpak run " + appid]
-            break
-    _ecrire_registre_utilisateur(data)
+    apps = [a for a in (esp.get("apps") or [])
+            if a.get("cmd") != "flatpak run " + appid]
+    registre.modifier_espace(esp_id, {"apps": apps})
     print("« %s » retirée de l'Espace %s." % (appid, esp["nom"]))
     return rc
-
-
-def _registre_complet():
-    """Charge le registre complet (espaces + apps), depuis la copie utilisateur
-    si elle existe, sinon depuis la copie système."""
-    path = USER_REGISTRY if os.path.exists(USER_REGISTRY) else REGISTRY
-    try:
-        with open(path, encoding="utf-8") as f:
-            return json.load(f)
-    except (OSError, ValueError):
-        return {"espaces": [], "apps": []}
-
-
-def _ecrire_registre_utilisateur(data):
-    os.makedirs(os.path.dirname(USER_REGISTRY), exist_ok=True)
-    with open(USER_REGISTRY, "w", encoding="utf-8") as f:
-        json.dump(data, f, ensure_ascii=False, indent=2)
 
 
 def cmd_create(nom, couleur):
@@ -846,38 +870,29 @@ def cmd_create(nom, couleur):
         return 2
     if not couleur.startswith("#"):
         couleur = "#" + couleur
-    data = _registre_complet()
     base = unicodedata.normalize("NFKD", nom).encode("ascii", "ignore").decode().lower()
     base = re.sub(r"[^a-z0-9]+", "-", base).strip("-") or "espace"
-    ids = {e.get("id") for e in data.get("espaces", [])}
-    esp_id = base
-    n = 2
-    while esp_id in ids:
-        esp_id = "%s-%d" % (base, n)
-        n += 1
-    data.setdefault("espaces", []).append({
+    esp_id = registre.identifiant_libre(base)
+    registre.ajouter_espace({
         "id": esp_id, "nom": nom, "couleur": couleur,
         "app": "org.gnome.Nautilus.desktop", "ephemere": False,
     })
-    _ecrire_registre_utilisateur(data)
     print("Espace « %s » créé (%s)." % (nom, couleur))
     return 0
 
 
 def cmd_delete(esp_id):
-    """Supprime un Espace personnalisé (les Espaces intégrés ne sont pas supprimables)."""
-    if esp_id in BUILTIN_IDS:
+    """Supprime un Espace personnalisé. Les Espaces livrés par le système ne
+    sont pas supprimables — on interroge le registre système plutôt qu'une
+    liste codée en dur, qui aurait fini par diverger de son contenu."""
+    if registre.est_systeme(esp_id):
         sys.stderr.write("L'Espace intégré « %s » ne peut pas être supprimé.\n" % esp_id)
         return 2
     espaces = load_espaces()
     cmd_close(espaces, esp_id)
-    data = _registre_complet()
-    avant = len(data.get("espaces", []))
-    data["espaces"] = [e for e in data.get("espaces", []) if e.get("id") != esp_id]
-    if len(data["espaces"]) == avant:
+    if not registre.supprimer_espace(esp_id):
         print("Espace introuvable : %s" % esp_id)
         return 1
-    _ecrire_registre_utilisateur(data)
     d = os.path.join(DATA_ROOT, esp_id)
     if os.path.isdir(d):
         shutil.rmtree(d, ignore_errors=True)
@@ -905,6 +920,171 @@ def cmd_isolation():
     return 0
 
 
+# ── Vérification de l'isolation, sur pièces ────────────────────────────────
+# « codebyr-space isolation » dit ce que la MACHINE sait faire. La commande
+# ci-dessous dit ce qu'un Espace peut réellement ATTEINDRE : elle lance une
+# sonde à l'intérieur d'un vrai bac à sable et rapporte ce qu'elle y trouve.
+# C'est la version reproductible des vérifications qu'il fallait sinon faire à
+# la main dans une machine virtuelle, et que personne ne refait jamais.
+
+SONDE = r"""
+import os, socket, sys
+
+def joignable(chemin):
+    # Un socket peut exister sans être joignable : on tente la connexion.
+    if not chemin or not os.path.exists(chemin):
+        return False
+    s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+    try:
+        s.connect(chemin)
+        return True
+    except OSError:
+        return False
+    finally:
+        s.close()
+
+runtime = os.environ.get("XDG_RUNTIME_DIR", "")
+mesures = {
+    "bus_hote": joignable(os.path.join(runtime, "bus")) if runtime else False,
+    "systemd_user": joignable(os.path.join(runtime, "systemd", "private")) if runtime else False,
+    "bus_systeme": joignable("/run/dbus/system_bus_socket"),
+    "x11": os.path.isdir("/tmp/.X11-unix"),
+    "son": os.path.exists(os.path.join(runtime, "pipewire-0")) if runtime else False,
+}
+try:
+    with open("/proc/net/dev", encoding="utf-8") as f:
+        interfaces = [l.split(":")[0].strip() for l in f if ":" in l]
+    mesures["reseau"] = any(i and i != "lo" for i in interfaces)
+except OSError:
+    mesures["reseau"] = False
+try:
+    with open(os.path.expanduser("~/.codebyr-sonde"), encoding="utf-8") as f:
+        mesures["home_isole"] = f.read().strip() == sys.argv[1]
+except OSError:
+    mesures["home_isole"] = False
+for cle, valeur in mesures.items():
+    print("%s=%s" % (cle, "oui" if valeur else "non"))
+"""
+
+CONTROLES = (
+    ("bus_hote", "Bus de session de l'hôte joignable"),
+    ("systemd_user", "systemd --user joignable"),
+    ("bus_systeme", "Bus système joignable"),
+    ("x11", "Socket X11 de l'hôte visible"),
+    ("son", "Son et micro (PipeWire)"),
+    ("reseau", "Accès au réseau"),
+    ("home_isole", "Dossier personnel bien isolé"),
+)
+
+# Ce qu'on attend selon la situation. Les trois premières lignes doivent être
+# fausses PARTOUT : ce sont les portes de sortie du bac à sable.
+SITUATIONS = (
+    ("Espace ordinaire", {},
+     {"bus_hote": False, "systemd_user": False, "bus_systeme": False, "x11": False,
+      "son": True, "reseau": True, "home_isole": True}),
+    ("Espace blindé, sans micro (Banque)", {"renforce": True, "audio": False},
+     {"bus_hote": False, "systemd_user": False, "bus_systeme": False, "x11": False,
+      "son": False, "reseau": True, "home_isole": True}),
+    ("Pièce jointe en Jetable", {"renforce": True, "hors_ligne": True},
+     {"bus_hote": False, "systemd_user": False, "bus_systeme": False, "x11": False,
+      "son": False, "reseau": False, "home_isole": True}),
+)
+
+
+def analyser_sonde(sortie):
+    """Transforme la sortie brute de la sonde en mesures booléennes."""
+    mesures = {}
+    for ligne in (sortie or "").splitlines():
+        if "=" in ligne:
+            cle, valeur = ligne.split("=", 1)
+            mesures[cle.strip()] = valeur.strip() == "oui"
+    return mesures
+
+
+def evaluer(mesures, attendu):
+    """Confronte les mesures aux attentes. Renvoie [(libellé, mesure, ok)]."""
+    resultat = []
+    for cle, libelle in CONTROLES:
+        if cle not in mesures:
+            resultat.append((libelle, None, False))
+            continue
+        resultat.append((libelle, mesures[cle], mesures[cle] == attendu[cle]))
+    return resultat
+
+
+def _sonder(options):
+    """Lance la sonde dans un vrai bac à sable et renvoie ses mesures."""
+    home = tempfile.mkdtemp(prefix="codebyr-sonde-")
+    jeton = os.urandom(8).hex()
+    try:
+        with open(os.path.join(home, ".codebyr-sonde"), "w", encoding="utf-8") as f:
+            f.write(jeton)
+        env = dict(os.environ)
+        cmd = [sys.executable or "python3", "-c", SONDE, jeton]
+        try:
+            r = subprocess.run(wrap_bwrap(home, cmd, env, **options),
+                               capture_output=True, text=True, timeout=30)
+        except (OSError, subprocess.SubprocessError) as exc:
+            sys.stderr.write("codebyr-space : sonde impossible (%s)\n" % exc)
+            return {}
+        return analyser_sonde(r.stdout)
+    finally:
+        shutil.rmtree(home, ignore_errors=True)
+
+
+def cmd_verifier_isolation():
+    """Vérifie sur pièces ce qu'un Espace peut réellement atteindre."""
+    if not shutil.which("bwrap"):
+        sys.stderr.write("bubblewrap absent : aucun bac à sable à vérifier.\n")
+        return 2
+    print("Vérification de l'isolation — une sonde est lancée dans un vrai "
+          "bac à sable.\n")
+    tout_va_bien = True
+    for titre, options, attendu in SITUATIONS:
+        mesures = _sonder(options)
+        print("\033[1m%s\033[0m" % titre)
+        if not mesures:
+            print("  \033[31mLa sonde n'a rien renvoyé.\033[0m\n")
+            tout_va_bien = False
+            continue
+        for libelle, mesure, ok in evaluer(mesures, attendu):
+            etat = "\033[32m✔\033[0m" if ok else "\033[31m✘\033[0m"
+            valeur = "?" if mesure is None else ("oui" if mesure else "non")
+            print("  %s %-36s %s" % (etat, libelle, valeur))
+            tout_va_bien = tout_va_bien and ok
+        print()
+    if tout_va_bien:
+        print("\033[32mTout est conforme.\033[0m Aucune sortie de bac à sable "
+              "détectée.")
+        return 0
+    print("\033[31mAu moins un contrôle a échoué.\033[0m Ne publiez pas cette "
+          "version : signalez-le (voir SECURITY.md).")
+    return 1
+
+
+def cmd_nettoyer_registre():
+    """Réduit vos réglages personnels à ce qui diffère vraiment des défauts.
+
+    Les versions antérieures à la 1.2.0 enregistraient une COPIE INTÉGRALE de
+    la configuration. Une valeur recopiée reste une valeur qui gagne : elle
+    continue donc de masquer les durcissements livrés ensuite, même après la
+    mise à jour. Cette commande fait le ménage une fois pour toutes."""
+    avant = registre.couche()
+    n_avant = sum(len(e) for e in avant.get("espaces", []) if isinstance(e, dict))
+    apres = registre.reduire_couche(dict(avant))
+    n_apres = sum(len(e) for e in apres.get("espaces", []) if isinstance(e, dict))
+    if n_apres == n_avant:
+        print("Vos réglages ne contiennent déjà que des différences. Rien à faire.")
+        return 0
+    registre.ecrire_couche(avant)
+    print("Réglages nettoyés : %d valeur(s) recopiée(s) du système retirée(s)."
+          % (n_avant - n_apres))
+    print("Vos choix personnels sont intacts ; les valeurs par défaut vous "
+          "atteindront de nouveau.")
+    journal("Registre utilisateur réduit (%d valeurs retirées)" % (n_avant - n_apres))
+    return 0
+
+
 def _action_launch(espaces, args):
     """launch <espace> [--fichier <f>] [-- commande...]"""
     esp_id, reste = args[0], args[1:]
@@ -929,6 +1109,10 @@ def _action_launch(espaces, args):
 ACTIONS = {
     "list":       (0, "list", lambda espaces, a: cmd_list(espaces) or 0),
     "isolation":  (0, "isolation", lambda espaces, a: cmd_isolation()),
+    "verifier-isolation": (0, "verifier-isolation",
+                           lambda espaces, a: cmd_verifier_isolation()),
+    "nettoyer-registre": (0, "nettoyer-registre",
+                          lambda espaces, a: cmd_nettoyer_registre()),
     "launch":     (1, "launch <espace> [--fichier <f>] [-- commande...]",
                    _action_launch),
     "close":      (1, "close <espace>",

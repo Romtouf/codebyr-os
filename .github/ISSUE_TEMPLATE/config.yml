@@ -1,0 +1,12 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Faille de sécurité
+    url: https://github.com/Romtouf/codebyr-os/security/advisories/new
+    about: >-
+      Ne l'écrivez pas dans une issue publique. Ce formulaire privé n'est
+      visible que du mainteneur (voir SECURITY.md).
+  - name: Retour de testeur
+    url: https://github.com/Romtouf/codebyr-os/blob/main/docs/lancement/protocole-testeurs.md
+    about: >-
+      Vous avez installé Codebyr OS sur votre matériel ? Le protocole de test
+      dit quoi vérifier et quoi rapporter. C'est le besoin numéro un du projet.

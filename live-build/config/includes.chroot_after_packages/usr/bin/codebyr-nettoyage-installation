@@ -15,6 +15,19 @@ if grep -q '^AutomaticLogin=user$' /etc/gdm3/daemon.conf 2>/dev/null; then
            -e '/^AutomaticLogin=user$/d' /etc/gdm3/daemon.conf
 fi
 
+# Calamares aurait dû être retiré par le module « packages » de l'installeur.
+# Ce retrait passe par apt, l'installation se fait hors ligne, et il échoue
+# parfois sans bruit : le lanceur « Installer Codebyr OS » reste alors dans le
+# menu d'un système déjà installé, et le tour de bienvenue continue de proposer
+# l'installation. On repasse derrière.
+if command -v calamares >/dev/null 2>&1; then
+    DEBIAN_FRONTEND=noninteractive apt-get -y purge \
+        calamares calamares-settings-debian >/dev/null 2>&1 || true
+    if command -v update-desktop-database >/dev/null 2>&1; then
+        update-desktop-database -q /usr/share/applications 2>/dev/null || true
+    fi
+fi
+
 # Durcissements qui ne valent QUE sur le système installé : le dossier personnel
 # créé par Calamares doit être privé (0700), sans quoi le compte Invité lirait
 # tous les fichiers de l'utilisateur — exactement ce que le mode invité promet

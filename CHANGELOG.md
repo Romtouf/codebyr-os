@@ -10,7 +10,7 @@ GNOME (menu du Sceau, liserés colorés) ne se recharge pas à chaud.
 
 ---
 
-## 1.4.1 — en préparation
+## 1.4.1 — 20 août 2026
 
 **Le clic droit « Ouvrir en Jetable » manquait vraiment à l'appel.** La 1.4.0
 livrait bien l'extension, mais le greffon qui la charge (`python3-nautilus`)
@@ -21,7 +21,7 @@ n'était qu'une *recommandation* : sur un poste où le paquet avait été instal
 Une fonctionnalité qui repose sur une recommandation n'est pas livrée, elle est
 espérée. Rien à faire de votre côté : la mise à jour installe ce qui manque.
 
-## 1.4.0 — en préparation
+## 1.4.0 — 20 août 2026
 
 **« Ouvrir en Jetable » arrive dans le clic droit.** Le geste naturel — clic
 droit sur une pièce jointe douteuse — était promis depuis le début sans jamais
@@ -30,7 +30,7 @@ c'est-à-dire ne jamais s'en servir au moment où l'on en a besoin. Le fichier
 s'ouvre dans un Espace éphémère, **blindé et sans réseau** : le piège
 s'exécute dans le vide et disparaît à la fermeture.
 
-## 1.3.1 — en préparation
+## 1.3.1 — 20 août 2026
 
 **Correctif de mise à jour, important.** L'ajout d'une sous-clé de signature a
 rendu le dépôt invérifiable par les machines déjà installées : leur trousseau,
@@ -45,7 +45,7 @@ refusait la signature — proprement, mais totalement. Trois corrections :
 - pendant la transition, le dépôt est signé par **deux** clés à la fois : les
   machines anciennes valident par l'ancienne, les neuves par la nouvelle.
 
-## 1.3.0 — en préparation
+## 1.3.0 — 20 août 2026
 
 **Le presse-papiers ne se contourne plus par le bureau.** Il était vidé quand
 on passait d'un Espace à un autre — mais pas quand on passait par le bureau.

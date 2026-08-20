@@ -35,6 +35,26 @@ class ListeBlanche(unittest.TestCase):
         self.assertFalse(proxy.autorise("mabanque.fr", []))
 
 
+class AdressesIPv6(unittest.TestCase):
+    """Les adresses IPv6 littérales arrivent entre crochets.
+
+    « CONNECT [2001:db8::1]:443 » donnait l'hôte « [2001:db8::1] », que
+    getaddrinfo refuse : aucune adresse IPv6 écrite en clair n'était joignable
+    depuis un Espace à liste blanche, même autorisée.
+    """
+
+    def test_les_crochets_sont_retires(self):
+        self.assertEqual(proxy.hote_propre("[2001:db8::1]"), "2001:db8::1")
+        self.assertEqual(proxy.hote_propre("[::1]"), "::1")
+
+    def test_un_nom_ordinaire_est_intact(self):
+        self.assertEqual(proxy.hote_propre("MaBanque.FR."), "mabanque.fr")
+
+    def test_une_adresse_ipv6_peut_etre_autorisee(self):
+        self.assertTrue(proxy.autorise("[2001:db8::1]", ["2001:db8::1"]))
+        self.assertFalse(proxy.autorise("[2001:db8::2]", ["2001:db8::1"]))
+
+
 class EchecFerme(unittest.TestCase):
     """Un Espace à réseau restreint sans domaine déclaré doit tout bloquer.
 

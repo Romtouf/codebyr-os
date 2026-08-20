@@ -516,20 +516,12 @@ class Indicateur extends PanelMenu.Button {
         this.menu.addAction('📋  Transférer le presse-papiers vers…',
             () => this._dialogueTransfert(espaces));
         this.menu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
-        this.menu.addAction('🛡  Assistant de sécurité', () => {
-            try {
-                GLib.spawn_command_line_async('/usr/bin/codebyr-assistant');
-            } catch (e) {
-                Main.notify('Codebyr', 'Assistant indisponible');
-            }
-        });
-        this.menu.addAction('⚙  Configuration Codebyr', () => {
-            try {
-                GLib.spawn_command_line_async('/usr/bin/codebyr-config');
-            } catch (e) {
-                Main.notify('Codebyr', 'Configuration indisponible');
-            }
-        });
+        this.menu.addAction('🛡  Assistant de sécurité',
+            () => this._executer('/usr/bin/codebyr-assistant',
+                'Assistant de sécurité indisponible'));
+        this.menu.addAction('⚙  Configuration Codebyr',
+            () => this._executer('/usr/bin/codebyr-config',
+                'Configuration Codebyr indisponible'));
     }
 
     _styleSwatch(couleur, choisie) {
@@ -573,8 +565,9 @@ class Indicateur extends PanelMenu.Button {
             const nom = entry.get_text().trim();
             dlg.close();
             if (nom) {
-                GLib.spawn_command_line_async('/usr/bin/codebyr-space create '
-                    + GLib.shell_quote(nom) + ' ' + GLib.shell_quote(etat.couleur));
+                this._executer('/usr/bin/codebyr-space create '
+                    + GLib.shell_quote(nom) + ' ' + GLib.shell_quote(etat.couleur),
+                    'Création de l\'Espace « ' + nom + ' » impossible');
                 Main.notify('Codebyr', 'Espace créé : ' + nom);
             }
         };
@@ -619,7 +612,8 @@ class Indicateur extends PanelMenu.Button {
             const u = entry.get_text().trim();
             dlg.close();
             if (u)
-                GLib.spawn_command_line_async('/usr/bin/codebyr-jetable ' + GLib.shell_quote(u));
+                this._executer('/usr/bin/codebyr-jetable ' + GLib.shell_quote(u),
+                    'Ouverture en Jetable impossible');
         };
         dlg.setButtons([
             {label: 'Annuler', action: () => dlg.close(), key: Clutter.KEY_Escape},
@@ -795,20 +789,59 @@ class Indicateur extends PanelMenu.Button {
         global.stage.set_key_focus(recherche.clutter_text);
     }
 
-    _lancer(id, cmd) {
+    // Lance une commande et SURVEILLE son sort. Avant, on lançait sans jamais
+    // regarder : quand une application ne démarrait pas, il ne se passait
+    // simplement rien à l'écran, et l'utilisateur n'avait aucun moyen de
+    // savoir pourquoi.
+    _executer(ligne, echec) {
+        let argv;
         try {
-            let commande = '/usr/bin/codebyr-space launch ' + id;
-            if (cmd)
-                commande += ' -- ' + cmd;
-            GLib.spawn_command_line_async(commande);
+            const [ok, parse] = GLib.shell_parse_argv(ligne);
+            if (!ok)
+                throw new Error('ligne de commande illisible');
+            argv = parse;
         } catch (e) {
-            Main.notify('Codebyr', 'Impossible d\'ouvrir l\'Espace ' + id);
+            Main.notify('Codebyr', echec);
+            return;
         }
+        let proc;
+        try {
+            // Aucun tuyau sur la sortie : une application bavarde (un
+            // navigateur, par exemple) remplirait la mémoire de GNOME Shell.
+            // Le détail va déjà dans le journal — « journalctl -t codebyr ».
+            proc = Gio.Subprocess.new(argv, Gio.SubprocessFlags.NONE);
+        } catch (e) {
+            Main.notify('Codebyr', echec);
+            return;
+        }
+        const debut = GLib.get_monotonic_time();
+        proc.wait_check_async(null, (p, res) => {
+            try {
+                p.wait_check_finish(res);
+            } catch (e) {
+                // Un échec RAPIDE, c'est un lancement qui n'a pas abouti. Un
+                // code de sortie non nul après plusieurs secondes, c'est
+                // l'application qui a fini ainsi : ça ne nous regarde pas.
+                const secondes = (GLib.get_monotonic_time() - debut) / 1000000;
+                if (secondes < 3) {
+                    Main.notify('Codebyr — ' + echec,
+                        'Détail : ouvrez un terminal et tapez  journalctl -t codebyr -n 20');
+                }
+            }
+        });
+    }
+
+    _lancer(id, cmd) {
+        let commande = '/usr/bin/codebyr-space launch ' + id;
+        if (cmd)
+            commande += ' -- ' + cmd;
+        this._executer(commande, 'Impossible d\'ouvrir l\'Espace ' + id);
     }
 
     _gerer(action, id, nom) {
         try {
-            GLib.spawn_command_line_async('/usr/bin/codebyr-space ' + action + ' ' + id);
+            this._executer('/usr/bin/codebyr-space ' + action + ' ' + id,
+                'Action « ' + action + ' » impossible sur ' + nom);
             const msgs = {
                 close: 'Espace fermé : ',
                 purge: 'Données effacées : ',
@@ -867,8 +900,9 @@ class Indicateur extends PanelMenu.Button {
             });
             b.connect('clicked', () => {
                 dlg.close();
-                GLib.spawn_command_line_async(
-                    '/usr/bin/codebyr-space import ' + id + ' ' + GLib.shell_quote(dir + '/' + f));
+                this._executer(
+                    '/usr/bin/codebyr-space import ' + id + ' ' + GLib.shell_quote(dir + '/' + f),
+                    'Restauration de ' + nom + ' impossible');
                 Main.notify('Codebyr', nom + ' restauré à l\'instantané du ' + label);
             });
             boite.add_child(b);

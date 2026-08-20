@@ -82,6 +82,17 @@ jobs:
         continue-on-error: true
         run: shellcheck --severity=warning ${{ steps.sources.outputs.shell }}
 
+      - name: Syntaxe JavaScript (extension GNOME et bouclier)
+        # Rien ne vérifiait ces fichiers. Or une erreur de syntaxe dans
+        # extension.js, c'est le menu du Sceau ET les liserés qui disparaissent
+        # — sans message, sans trace visible pour l'utilisateur.
+        run: |
+          set -e
+          for js in $(find live-build -name '*.js'); do
+            echo "→ $js"
+            node --check "$js"
+          done
+
       - name: Tests
         run: python -m unittest discover -s tests -v
 

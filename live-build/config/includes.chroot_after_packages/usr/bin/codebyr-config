@@ -217,6 +217,27 @@ class Fenetre(Adw.ApplicationWindow):
             row.connect("notify::active", self._basculer_blindage, e.get("id"))
             gesp.add(row)
 
+        # Son et micro : le même socket sert aux deux. Couper le son d'un Espace,
+        # c'est surtout lui retirer le microphone — d'où un réglage visible, et
+        # pas seulement une clé dans un fichier.
+        gson = Adw.PreferencesGroup(
+            title="Son et micro, par Espace",
+            description="Le serveur de son donne aussi accès au microphone. "
+                        "Coupez-le pour les Espaces qui n'en ont aucun besoin — "
+                        "Banque, par exemple : une page piégée ne pourra pas "
+                        "vous écouter.")
+        self._page.add(gson)
+        self._groupes.append(gson)
+        for e in self._data.get("espaces", []):
+            actif = e.get("audio", True) is not False
+            row = Adw.SwitchRow(
+                title=e.get("nom", e.get("id")),
+                subtitle="Son et micro autorisés" if actif
+                         else "Aucun son, aucun micro")
+            row.set_active(actif)
+            row.connect("notify::active", self._basculer_audio, e.get("id"))
+            gson.add(row)
+
         # Capacités réelles de la machine (transparence)
         gcap = Adw.PreferencesGroup(
             title="Isolation disponible sur cette machine",
@@ -687,6 +708,17 @@ class Fenetre(Adw.ApplicationWindow):
                 e["blindage"] = valeur
                 break
         registre.modifier_espace(esp_id, {"blindage": valeur})
+
+    def _basculer_audio(self, row, _pspec, esp_id):
+        # « True » s'écrit explicitement, comme « False » : sans cela, un
+        # utilisateur qui réactive le son verrait revenir le défaut du système.
+        valeur = bool(row.get_active())
+        for e in self._data.get("espaces", []):
+            if e.get("id") == esp_id:
+                e["audio"] = valeur
+                break
+        registre.modifier_espace(esp_id, {"audio": valeur})
+        self._construire()
 
     def _supprimer_domaine(self, _btn, d):
         banque = espace_banque(self._data)

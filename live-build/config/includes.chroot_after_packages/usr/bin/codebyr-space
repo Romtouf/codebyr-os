@@ -39,6 +39,22 @@ import registre  # noqa: E402
 DATA_ROOT = os.path.expanduser("~/.local/share/codebyr/espaces")
 
 
+def journal(message):
+    """Trace une action dans le journal système (« journalctl -t codebyr »).
+
+    Sans trace, un utilisateur qui signale « ça n'a pas marché » ne peut être
+    aidé par personne. On note l'Espace et l'action — jamais le nom du fichier
+    ouvert ni l'adresse visitée : ce serait consigner sur disque exactement ce
+    que les Espaces servent à cloisonner."""
+    try:
+        import syslog
+        syslog.openlog("codebyr", syslog.LOG_PID, syslog.LOG_USER)
+        syslog.syslog(syslog.LOG_INFO, message)
+        syslog.closelog()
+    except Exception:
+        pass    # un journal absent ne doit jamais empêcher un lancement
+
+
 def load_espaces():
     """Les Espaces, valeurs par défaut du système recouvertes par les choix
     de l'utilisateur (voir registre.charger)."""
@@ -519,15 +535,20 @@ def cmd_launch(espaces, esp_id, extra, fichier=None):
                          "(dossier personnel séparé).\n")
 
     print("Ouverture de « %s » dans l'Espace %s…" % (os.path.basename(cmd[0]), esp["nom"]))
+    journal("Espace %s : ouverture de %s%s%s%s"
+            % (esp["id"], os.path.basename(app_cmd[0]),
+               " [blindage]" if renforce else "",
+               " [hors-ligne]" if hors_ligne else "",
+               "" if use_bwrap or est_flatpak else " [SANS bac à sable]"))
     # Répertoire d'exécution partagé avec l'extension GNOME : on y note
     # « ce processus (et ses enfants) appartient à tel Espace », pour que
     # l'extension colore la fenêtre par filiation, même sans marqueur de classe.
-    rundir = os.path.join(
-        os.environ.get("XDG_RUNTIME_DIR", "/run/user/%d" % os.getuid()), "codebyr")
+    rundir = _rundir()
     try:
         os.makedirs(rundir, exist_ok=True)
     except OSError:
         pass
+    _nettoyer_marqueurs()
 
     proxy = _demarrer_filtre_reseau(esp, home, app_cmd)
     # Bouclier anti-hameçonnage dans les navigateurs des Espaces NON bancaires
@@ -567,7 +588,34 @@ def cmd_launch(espaces, esp_id, extra, fichier=None):
 
 def _rundir():
     return os.path.join(
-        os.environ.get("XDG_RUNTIME_DIR", "/run/user/%d" % os.getuid()), "codebyr")
+        os.environ.get("XDG_RUNTIME_DIR") or "/run/user/%d" % os.getuid(), "codebyr")
+
+
+def _nettoyer_marqueurs():
+    """Retire les marqueurs « pid-N » dont le processus n'existe plus.
+
+    Un processus tué brutalement laissait le sien derrière lui, et l'extension
+    GNOME pouvait alors attribuer la fenêtre d'un NOUVEAU processus au même
+    numéro à l'Espace du défunt — donc afficher le mauvais liseré."""
+    if not os.path.isdir("/proc"):
+        return
+    rundir = _rundir()
+    try:
+        noms = os.listdir(rundir)
+    except OSError:
+        return
+    for nom in noms:
+        if not nom.startswith("pid-"):
+            continue
+        try:
+            pid = int(nom[4:])
+        except ValueError:
+            continue
+        if not os.path.isdir("/proc/%d" % pid):
+            try:
+                os.remove(os.path.join(rundir, nom))
+            except OSError:
+                pass
 
 
 def cmd_close(espaces, esp_id):
@@ -601,7 +649,9 @@ def cmd_close(espaces, esp_id):
                 os.remove(path)
             except OSError:
                 pass
+    _nettoyer_marqueurs()
     print("Espace %s : %d fenêtre(s) fermée(s)." % (esp_id, ferme))
+    journal("Espace %s : fermeture (%d fenêtre(s))" % (esp_id, ferme))
     return 0
 
 
@@ -615,6 +665,7 @@ def cmd_purge(espaces, esp_id):
     if os.path.isdir(d):
         shutil.rmtree(d, ignore_errors=True)
         print("Données de l'Espace %s effacées." % esp["nom"])
+        journal("Espace %s : données effacées" % esp_id)
     else:
         print("Rien à effacer pour %s." % esp["nom"])
     return 0

@@ -1,0 +1,105 @@
+name: Signer le bouclier
+
+# Le bouclier anti-hameçonnage est une extension Firefox. Un .xpi signé par
+# Mozilla est SCELLÉ : modifier content.js dans le dépôt ne change rien sur les
+# machines tant que l'extension n'a pas été re-signée. Le test
+# tests/test_bouclier.py le détecte, mais quelqu'un doit encore agir.
+#
+# Ce workflow fait ce geste : il monte le numéro de version, envoie l'extension
+# à Mozilla, récupère le .xpi signé et le commite. Plus besoin de web-ext sur
+# son poste, ni de se souvenir de la manœuvre six mois plus tard.
+#
+# DÉCLENCHEMENT MANUEL, volontairement. Signer automatiquement à chaque commit
+# consommerait un numéro de version AMO par retouche, et ferait repartir le
+# workflow sur son propre commit. On signe quand on a fini, pas pendant.
+#
+# PRÉREQUIS — deux secrets à créer une fois dans les réglages du dépôt
+# (Settings → Secrets and variables → Actions) :
+#   AMO_KEY     le « JWT issuer » de https://addons.mozilla.org/fr/developers/addon/api/key/
+#   AMO_SECRET  le « JWT secret » de la même page
+
+on:
+  workflow_dispatch:
+    inputs:
+      raison:
+        description: "Ce qui a changé dans le bouclier (apparaîtra dans le commit)"
+        required: true
+        default: "correctif du bouclier anti-hameçonnage"
+
+permissions:
+  contents: write
+
+jobs:
+  signer:
+    name: Signature Mozilla et dépôt du .xpi
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Vérifier que les secrets existent
+        run: |
+          if [ -z "${{ secrets.AMO_KEY }}" ] || [ -z "${{ secrets.AMO_SECRET }}" ]; then
+            echo "::error::AMO_KEY et AMO_SECRET ne sont pas configurés dans les"
+            echo "::error::secrets du dépôt. Voir docs/signer-le-bouclier.md."
+            exit 1
+          fi
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+
+      - name: Installer web-ext
+        run: npm install -g web-ext
+
+      - name: Monter le numéro de version
+        # Mozilla refuse de signer deux fois le même numéro. On incrémente la
+        # dernière composante : 1.1 → 1.2.
+        id: version
+        run: |
+          set -e
+          src=live-build/config/includes.chroot_after_packages/usr/share/codebyr/antiphishing
+          ancienne=$(python3 -c "import json;print(json.load(open('$src/manifest.json'))['version'])")
+          nouvelle=$(python3 - "$ancienne" <<'EOF'
+          import sys
+          bouts = sys.argv[1].split(".")
+          bouts[-1] = str(int(bouts[-1]) + 1)
+          print(".".join(bouts))
+          EOF
+          )
+          python3 - "$src/manifest.json" "$nouvelle" <<'EOF'
+          import json, sys
+          chemin, version = sys.argv[1], sys.argv[2]
+          with open(chemin, encoding="utf-8") as f:
+              data = json.load(f)
+          data["version"] = version
+          with open(chemin, "w", encoding="utf-8") as f:
+              json.dump(data, f, ensure_ascii=False, indent=2)
+              f.write("\n")
+          EOF
+          echo "ancienne=$ancienne" >> "$GITHUB_OUTPUT"
+          echo "nouvelle=$nouvelle" >> "$GITHUB_OUTPUT"
+          echo "$ancienne → $nouvelle"
+
+      - name: Signer chez Mozilla
+        env:
+          AMO_KEY: ${{ secrets.AMO_KEY }}
+          AMO_SECRET: ${{ secrets.AMO_SECRET }}
+        run: sh live-build/scripts/sign-extension.sh
+
+      - name: Vérifier que le .xpi correspond bien aux sources
+        run: python3 -m unittest discover -s tests -k Xpi -v
+
+      - name: Déposer le résultat
+        run: |
+          set -e
+          git config user.name  "codebyr-signature"
+          git config user.email "noreply@codebyr.dev"
+          git add live-build/config/includes.chroot_after_packages/usr/share/codebyr/antiphishing
+          git commit -m "Bouclier : re-signé par Mozilla en ${{ steps.version.outputs.nouvelle }}
+
+          ${{ inputs.raison }}
+
+          Un .xpi signé est scellé : sans cette signature, la modification
+          n'aurait eu aucun effet sur les machines des utilisateurs."
+          git push

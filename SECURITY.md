@@ -41,9 +41,13 @@ utilisateur non technique.
 - Le Blindage ajoute : espace de noms utilisateur, abandon de toutes les
   capabilities, session neuve (anti-injection TIOCSTI), plafonds
   mémoire/processus.
-- Le presse-papiers ne « suit » pas passivement d'un Espace à l'autre : dès que
-  le focus passe à un Espace différent de celui qui l'a rempli, il est vidé.
-  Un transfert reste possible mais **explicite** (menu « Transférer vers… »).
+- Le presse-papiers ne « suit » pas passivement d'un Espace à l'autre : il est
+  vidé dès que le focus passe à un Espace différent de celui qui l'a rempli —
+  **et aussi dès qu'on quitte un Espace sensible** (Blindage ou réseau
+  restreint) vers le bureau ou une application ordinaire. Sans cette seconde
+  règle, la frontière ne se franchissait pas, elle se contournait : copier dans
+  Banque, cliquer sur le bureau, et le secret restait collable partout. Un
+  transfert délibéré reste possible (menu « Transférer vers… »).
 
 **Hors périmètre (assumé) :**
 - Exploits noyau : l'isolation repose sur les namespaces Linux (bubblewrap),
@@ -98,6 +102,12 @@ surface applicative minimale (`--apt-recommends false`).
   Mozilla, `codebyr-space` n'installe rien et le dit. Corollaire à connaître :
   **modifier `content.js` n'a aucun effet tant que l'extension n'a pas été
   re-signée** (le `.xpi` signé est scellé) — un test de la CI le vérifie.
+- **« Ce site est légitime » ne vaut que pour un Espace.** Lever une alerte du
+  bouclier dans Navigation ne la lève pas dans Personnel : chaque Espace a son
+  propre profil Firefox, donc sa propre liste de sites approuvés. C'est
+  cohérent avec le cloisonnement — une décision prise dans un compartiment n'en
+  sort pas — mais cela surprend : le même site peut déclencher l'avertissement
+  une seconde fois ailleurs.
 - **Détection d'imitation, pas de vérité absolue** : le bouclier compare des
   noms de domaine (même nom sous une autre extension, faute de frappe,
   homoglyphe, nom utilisé comme étiquette). Il peut se tromper dans les deux

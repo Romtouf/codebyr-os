@@ -4,7 +4,7 @@
 Ce qui a été fermé est listé en fin de document — un suivi qui ne reflète pas
 l'état réel ne sert à rien.
 
-**33 chantiers ouverts.** Ce document liste **tout** ce qui est identifié : les chantiers de fond, les
+**27 chantiers ouverts.** Ce document liste **tout** ce qui est identifié : les chantiers de fond, les
 correctifs de confort, la dette technique, et ce qui est volontairement écarté.
 Il vaut mieux une liste longue et honnête qu'une liste courte et rassurante —
 et un chantier écrit ici n'est pas un engagement, c'est une décision à prendre.
@@ -31,7 +31,6 @@ et un chantier écrit ici n'est pas un engagement, c'est une décision à prendr
 | 🔴 | **`xdg-dbus-proxy` pour les portails et les notifications** | Depuis la 1.1.0, un Espace n'a plus qu'un bus privé vide : plus de notifications, plus de portails XDG. Un proxy filtrant les rendrait **sans** rouvrir l'accès au bus de session. **Point dur identifié** (voir l'encadré ci-dessous) : le proxy remplace le bus privé, or c'est ce bus privé qui empêche aujourd'hui une application mono-instance de rejoindre celle de l'hôte. À traiter sur machine, pas à l'aveugle | M |
 | 🔴 | **Filtre réseau au niveau de l'Espace, pas du navigateur** | La liste blanche de Banque s'applique au profil Firefox : un binaire hostile lancé dans l'Espace la contourne. Un vrai cloisonnement demande un namespace réseau par Espace (veth + nftables, ou slirp), appliqué à **tous** les processus | L |
 | 🔴 | **Filtre seccomp dans le bac à sable** (`bwrap --seccomp`) | Aucun filtre d'appels système aujourd'hui : toute la surface du noyau est exposée depuis un Espace. C'est précisément la surface par laquelle une évasion passerait | M |
-| 🔴 | **Presse-papiers** | La protection est **temporelle** (vidage au changement d'Espace), pas étanche : le compositeur Wayland est partagé. Une vraie séparation demande un mécanisme au niveau du compositeur | L |
 | 🔴 | **Applications Flatpak système** | Une application Flatpak installée pour toute la machine est partagée entre Espaces et garde son propre bac à sable ; le liseré n'y est qu'indicatif. Soit on force l'installation par Espace, soit on le signale clairement dans l'interface (aujourd'hui c'est écrit… dans le terminal) | M |
 | 🔴 | **Profils AppArmor pour les composants Codebyr** | Seuls les profils Debian de série sont actifs. `codebyr-space`, `codebyr-net-proxy` et l'extension n'ont pas de profil dédié | M |
 | 🔴 | **Durcissement noyau au démarrage** | `GRUB_CMDLINE_LINUX` ne contient rien (`lockdown`, `init_on_alloc`, `slab_nomerge`…). `lockdown` n'a de sens qu'avec Secure Boot : à traiter ensemble | M |
@@ -76,7 +75,6 @@ démarre plus », sur la fonction centrale du système.
 | | Chantier | Pourquoi | Effort |
 |---|---|---|---|
 | 🔵 | **ISO reproductibles** | Deux constructions de la même version donnent aujourd'hui deux images différentes (horodatage, état du miroir Debian). Personne ne peut vérifier indépendamment que l'ISO publiée correspond au code publié | L |
-| 🔵 | **Automatiser la re-signature de l'extension en CI** | La signature AMO est manuelle. Un correctif du bouclier peut rester lettre morte — le test l'attrape désormais, mais il faut encore agir à la main | M |
 
 ---
 
@@ -86,7 +84,6 @@ démarre plus », sur la fonction centrale du système.
 |---|---|---|---|
 | 🔴 | **Migration Manifest V2 → V3** | Firefox accepte encore MV2, mais AMO pousse vers MV3 et finira par refuser MV2 à la signature. Le bouclier étant un simple *content script* sans page d'arrière-plan, la conversion devrait rester mécanique — mais elle doit être faite **avant** le refus, pas après | M |
 | 🟠 | **Homographes internationaux (punycode)** | La détection gère quelques substitutions (`0`→`o`, `rn`→`m`…), pas les caractères Unicode ressemblants (cyrillique, grec). C'est une technique d'hameçonnage courante | M |
-| ⚪ | **La liste « sites approuvés » est par Espace** | Approuver un site dans Navigation ne l'approuve pas dans Personnel : chaque Espace a son profil Firefox. Cohérent avec le modèle, mais à expliquer aux utilisateurs | — |
 
 ---
 
@@ -108,7 +105,6 @@ démarre plus », sur la fonction centrale du système.
 
 | | Chantier | Pourquoi | Effort |
 |---|---|---|---|
-| 🔵 | **Tests pour `codebyr-config` et `codebyr-assistant`** | Ils dépendent de GTK. La saisie des domaines bancaires est désormais extraite et testée ; restent la détection des applications installées et le journal des refus | S |
 | 🔵 | **Construction de l'ISO en CI** | Longue et exigeante (root, périphériques *loop*) : plutôt un déclenchement manuel ou nocturne qu'à chaque commit | L |
 
 ---
@@ -129,10 +125,8 @@ démarre plus », sur la fonction centrale du système.
 
 | | Point | Détail | Effort |
 |---|---|---|---|
-| ⚪ | **`codebyr-space` fait ~1 000 lignes** | Découpage souhaitable, contraint par le choix « ce sont des commandes, pas une bibliothèque » | M |
+| ⚪ | **`codebyr-space` fait ~1 100 lignes** | Le registre, la détection d'applications et la résolution des `.desktop` en sont sortis vers `/usr/share/codebyr/`. Ce qui reste est le cycle de vie des Espaces — cohérent, mais long | M |
 | ⚪ | **Proxy : pas de SOCKS** | HTTP et CONNECT uniquement. Suffisant pour un navigateur, insuffisant pour d'autres applications | M |
-| ⚪ | **Espace jetable en mémoire vive** | Le dossier éphémère vit dans `/tmp`, donc en RAM : rien de ce qu'on ouvre en Jetable n'atteint jamais le disque, ce qui est exactement la promesse. Le revers est qu'un téléchargement volumineux peut saturer la mémoire. **Arbitrage assumé** : le déplacer sur disque protégerait la RAM au prix de la propriété qui fait l'intérêt du Jetable. À revoir seulement si des testeurs rencontrent le problème | — |
-| ⚪ | **`desktop_exec` ignore les *Actions* des fichiers `.desktop`** | Seule la ligne `Exec` principale est lue | S |
 
 ---
 
@@ -162,6 +156,10 @@ démarre plus », sur la fonction centrale du système.
 | 🟠 | **Retour d'erreur au lancement** : le menu du Sceau prévient quand une application ne démarre pas |
 | 🟠 | **Journal système** (`journalctl -t codebyr`) — sans jamais consigner le fichier ouvert ni l'adresse visitée |
 | 🔵 | CHANGELOG public, modèles d'issues, Dependabot, actions GitHub à jour |
+| 🔴 | **Le presse-papiers ne se contourne plus par le bureau.** On ne vidait qu'en passant d'un Espace à un autre : copier dans Banque, cliquer sur le bureau, ouvrir n'importe quelle application — le secret était encore là. On vide désormais aussi en SORTANT d'un Espace sensible |
+| 🔵 | **La re-signature du bouclier est automatisable en CI** (déclenchement manuel, montée de version, signature Mozilla, dépôt du .xpi) |
+| 🔵 | **Détection des applications et résolution des `.desktop` extraites et testées.** Un `.desktop` peut contenir plusieurs `Exec` — ceux de ses « actions » — et la première ligne venue n'est pas forcément l'application |
+| ⚪ | **Jetable : avertissement quand la mémoire manque**, plutôt qu'une saturation en cours de route |
 | 🔴 | **La saisie d'un domaine bancaire est analysée et testée.** C'est la seule porte d'entrée de la liste blanche, et elle n'avait aucun test. Refuse désormais les adresses IP, l'Unicode non converti, les caractères interdits, et lit `mabanque.fr@piege.fr` comme le navigateur le lira : `piege.fr` |
 | 🔴 | **Le bouclier veille aussi dans l'Espace Banque.** Il en était exclu au motif que la liste blanche suffit — mais cette liste est saisie à la main, et l'erreur humaine est justement la menace couverte |
 | 🔴 | **L'empreinte de la clé est publiée sur deux hébergements indépendants** (dépôt et site). Une seule source, et sa compromission passe inaperçue |
@@ -186,7 +184,7 @@ tests. Détail dans [SECURITY.md](../SECURITY.md).
 
 1. **Des testeurs.** C'était le numéro deux, c'est devenu le numéro un : la
    chaîne de signature est durcie, la 1.2.0 est publiée et vérifiable. Les
-   32 autres chantiers relèvent de la supposition tant que cinq personnes
+   26 autres chantiers relèvent de la supposition tant que cinq personnes
    n'ont pas installé le système sur leur propre matériel.
 2. **`xdg-dbus-proxy`** — pour rendre aux Espaces les notifications et les
    portails perdus en 1.1.0, sans rouvrir la faille. Le point dur est analysé

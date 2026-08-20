@@ -436,12 +436,38 @@ class PressePapiers {
         }
     }
 
+    // Un Espace « sensible » est celui dont on ne veut rien laisser filtrer :
+    // Blindage actif, ou réseau restreint (donc Banque).
+    _sensible(id) {
+        const esp = this._getEspaces().find(e => e.id === id);
+        if (!esp)
+            return false;
+        return esp.blindage === 'renforce'
+            || (esp.reseau && esp.reseau.mode === 'liste-blanche');
+    }
+
     _surFocus() {
         if (!this._actif())
             return;
         const esp = this._espace();
-        if (!esp)
-            return;   // bureau / app système : ne jamais casser le presse-papiers
+
+        if (!esp) {
+            // Bureau, Réglages, une application lancée hors Espace… On ne
+            // cassait rien ici, pour ne pas gêner. Mais c'était un passage :
+            // copier dans Banque, cliquer sur le bureau, puis ouvrir n'importe
+            // quelle application — le secret était encore là, intact. La
+            // frontière ne se franchissait pas d'Espace à Espace, elle se
+            // contournait par le bureau.
+            //
+            // On vide donc aussi en SORTANT d'un Espace sensible. Pour les
+            // Espaces ordinaires, on ne touche à rien : coller une adresse
+            // depuis Navigation dans une note doit rester possible.
+            if (this._dernier && this._sensible(this._dernier)) {
+                this._vider();
+                this._dernier = null;
+            }
+            return;
+        }
 
         // Transfert explicite en cours vers CET Espace : on laisse le contenu
         // arriver (une fois), puis nettoyage différé pour qu'il ne traîne pas.

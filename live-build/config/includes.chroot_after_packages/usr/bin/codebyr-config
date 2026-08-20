@@ -5,10 +5,7 @@ codebyr-config — Configuration de Codebyr OS.
 Permet à chacun de définir SES vrais sites bancaires (protégés + surveillés par
 le bouclier anti-hameçonnage) et de voir ses Espaces. 100% local.
 """
-import configparser
-import glob
 import os
-import re
 import shutil
 import subprocess
 import sys
@@ -21,6 +18,7 @@ from gi.repository import Adw, Gtk, Gio, GLib  # noqa: E402
 # Registre partagé : la vue est la FUSION des défauts du système et des choix
 # de l'utilisateur ; on n'enregistre jamais que les différences (voir le module).
 sys.path.insert(0, os.environ.get("CODEBYR_LIB", "/usr/share/codebyr"))
+import applications  # noqa: E402
 import registre  # noqa: E402
 
 
@@ -58,52 +56,6 @@ def capacites_machine():
         # de l'hôte n'est plus exposé au bac à sable (il permettait d'en sortir).
         ("Bus de session privé par Espace", bool(shutil.which("dbus-run-session"))),
     ]
-
-
-def apps_installees():
-    """Détecte les applications installées via leurs fichiers .desktop
-    (système, utilisateur, Flatpak). Renvoie une liste triée de (nom, commande),
-    codes de champ (%U, %f…) retirés, sans doublons ni entrées cachées."""
-    dossiers = [
-        "/usr/share/applications",
-        "/var/lib/flatpak/exports/share/applications",
-        os.path.expanduser("~/.local/share/applications"),
-        os.path.expanduser("~/.local/share/flatpak/exports/share/applications"),
-    ]
-    vus = {}
-    for d in dossiers:
-        est_flatpak = "flatpak" in d
-        for f in sorted(glob.glob(os.path.join(d, "*.desktop"))):
-            cp = configparser.RawConfigParser(interpolation=None, strict=False)
-            try:
-                cp.read(f, encoding="utf-8")
-            except (OSError, configparser.Error):
-                continue
-            if not cp.has_section("Desktop Entry"):
-                continue
-            de = cp["Desktop Entry"]
-            if (de.get("Type") != "Application"
-                    or de.get("NoDisplay", "false").lower() == "true"
-                    or de.get("Hidden", "false").lower() == "true"):
-                continue
-            base = os.path.basename(f)
-            if base.lower().startswith(("io.codebyr.", "codebyr")):
-                continue  # nos propres lanceurs internes
-            nom = de.get("Name[fr]") or de.get("Name")
-            exe = de.get("Exec", "")
-            if not nom or not exe:
-                continue
-            if est_flatpak:
-                # Commande propre et fiable pour un Flatpak : « flatpak run <ID> »
-                # (l'ID = nom du .desktop). Évite les jetons @@ de la ligne Exec.
-                app_id = base[:-len(".desktop")]
-                cmd = "flatpak run " + app_id
-            else:
-                cmd = re.sub(r"%[fFuUdDnNickvm]", "", exe)
-                cmd = re.sub(r"\s+", " ", cmd).strip()
-            if cmd and nom not in vus:
-                vus[nom] = cmd
-    return sorted(vus.items(), key=lambda x: x[0].lower())
 
 
 class Fenetre(Adw.ApplicationWindow):
@@ -479,7 +431,7 @@ class Fenetre(Adw.ApplicationWindow):
         tv.set_content(boite)
         dlg.set_content(tv)
 
-        toutes = apps_installees()
+        toutes = applications.installees()
 
         def peupler(filtre=""):
             child = liste.get_first_child()

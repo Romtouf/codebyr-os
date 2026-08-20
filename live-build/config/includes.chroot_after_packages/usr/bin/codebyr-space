@@ -34,6 +34,7 @@ import unicodedata
 # Module partagé de lecture/écriture du registre (voir /usr/share/codebyr/).
 # CODEBYR_LIB permet de le charger ailleurs — tests, développement.
 sys.path.insert(0, os.environ.get("CODEBYR_LIB", "/usr/share/codebyr"))
+import applications  # noqa: E402
 import registre  # noqa: E402
 
 DATA_ROOT = os.path.expanduser("~/.local/share/codebyr/espaces")
@@ -61,30 +62,28 @@ def load_espaces():
     return registre.espaces()
 
 
-def desktop_exec(desktop_id):
-    """Résout un fichier .desktop vers sa commande (Exec), nettoyée des %-codes."""
-    for base in ("/usr/share/applications", "/var/lib/flatpak/exports/share/applications",
-                 os.path.expanduser("~/.local/share/applications")):
-        p = os.path.join(base, desktop_id)
-        if os.path.exists(p):
-            with open(p, encoding="utf-8") as f:
-                for line in f:
-                    if line.startswith("Exec="):
-                        # shlex, pas split() : une ligne Exec peut contenir des
-                        # guillemets et des chemins avec espaces
-                        # (Exec="/opt/Mon App/bin" %U). Un split naïf coupait la
-                        # commande en morceaux et le lancement échouait.
-                        try:
-                            parts = shlex.split(line[5:].strip())
-                        except ValueError:
-                            parts = line[5:].strip().split()
-                        return [a for a in parts if not a.startswith("%")]
-    # Pas un .desktop : on suppose une commande brute
-    return [desktop_id.replace(".desktop", "")]
+# En dessous de ce seuil, un Jetable risque de saturer la mémoire avant que
+# l'utilisateur ne comprenne ce qui se passe.
+JETABLE_MINIMUM = 512 * 1024 * 1024
 
 
 def espace_home(esp):
     if esp.get("ephemere"):
+        # Le dossier d'un Espace jetable vit dans /tmp, donc en mémoire vive :
+        # rien de ce qu'on y ouvre n'atteint jamais le disque. C'est exactement
+        # la promesse du Jetable, et cela vaut mieux qu'un fichier récupérable
+        # sur un disque non chiffré. Le revers est qu'un téléchargement
+        # volumineux se paie en RAM — autant le dire avant, pas pendant.
+        try:
+            libre = shutil.disk_usage(tempfile.gettempdir()).free
+            if libre < JETABLE_MINIMUM:
+                message = ("Il reste %d Mo de mémoire pour l'Espace jetable. "
+                           "Évitez d'y télécharger de gros fichiers."
+                           % (libre // (1024 * 1024)))
+                sys.stderr.write("codebyr-space : %s\n" % message)
+                _prevenir("Espace jetable : mémoire limitée", message)
+        except OSError:
+            pass
         return tempfile.mkdtemp(prefix="codebyr-jetable-%s-" % esp["id"])
     home = os.path.join(DATA_ROOT, esp["id"], "home")
     os.makedirs(home, exist_ok=True)
@@ -496,7 +495,7 @@ def cmd_launch(espaces, esp_id, extra, fichier=None):
         renforce = True
         hors_ligne = True
 
-    app_cmd = extra if extra else desktop_exec(esp.get("app", "org.gnome.Nautilus.desktop"))
+    app_cmd = extra if extra else applications.resoudre(esp.get("app", "org.gnome.Nautilus.desktop"))
     # Une application Flatpak s'isole DÉJÀ dans son propre bac à sable : on ne
     # peut ni l'enfermer dans le nôtre (sandbox imbriqué = échec), ni lui donner
     # un bus de session privé (elle a besoin du vrai bus pour ses portails).

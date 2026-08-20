@@ -116,10 +116,20 @@ fi
 echo "==> lb config"
 lb config
 echo "==> lb build  (téléchargement + assemblage — peut durer 20–40 min)"
-# Repère temporel : sert à prouver que l'ISO trouvée ensuite est bien CELLE
-# de cette construction, et pas un reliquat oublié dans l'arbre.
-DEBUT="$WORK/.codebyr-debut"
-: > "$DEBUT"
+# Preuve qu'on ne signera pas un reliquat : on EFFACE toute ISO présente avant
+# de construire. Ce qui se trouvera là ensuite ne peut venir que d'ici.
+#
+# La version précédente comparait les dates — et se trompait toujours. live-build
+# fait des constructions REPRODUCTIBLES : il fixe SOURCE_DATE_EPOCH au démarrage
+# de « lb build » et xorriso en estampille l'image. La date de l'ISO est donc,
+# par construction, celle du début — jamais postérieure à un repère pris au même
+# instant. Le test ne pouvait pas être vrai une seule fois.
+#
+# Le 20/08/2026, il a rejeté une ISO parfaitement valide en annonçant « rien n'a
+# été reconstruit », et fait relancer une construction d'une heure pour rien. Un
+# garde-fou qui crie au loup à chaque passage finit par être contourné, ce qui
+# est pire que son absence : on le désactive le jour où il a raison.
+rm -f "$WORK"/*.iso
 
 # live-build renvoie parfois un code non-zéro sur une étape finale de nettoyage
 # alors que l'ISO est bien produite : on ne s'y fie pas, on vérifie l'ISO.
@@ -128,16 +138,6 @@ lb build || echo "==> lb build a renvoyé un code non-zéro — vérification de
 # — Rapatriement de l'ISO —
 mkdir -p "$DIST"
 ISO="$(ls -1 "$WORK"/*.iso 2>/dev/null | head -n1 || true)"
-if [ -n "$ISO" ] && [ ! "$ISO" -nt "$DEBUT" ]; then
-	echo "ERREUR : l'ISO trouvée est ANTÉRIEURE au début de cette construction." >&2
-	echo "         C'est un reliquat, pas votre version : rien n'a été reconstruit." >&2
-	# Les deux dates, sans quoi le diagnostic se fait à l'aveugle : c'est ce qui
-	# a coûté une demi-heure d'enquête le 20/08/2026.
-	echo "         ISO   : $(date -r "$ISO" '+%F %T')  ($ISO)" >&2
-	echo "         Début : $(date -r "$DEBUT" '+%F %T')" >&2
-	echo "         Relancez avec « $0 clean » pour repartir d'un arbre propre." >&2
-	exit 1
-fi
 if [ -z "$ISO" ]; then
 	echo "ERREUR : aucune ISO produite (voir la sortie ci-dessus)." >&2
 	exit 1

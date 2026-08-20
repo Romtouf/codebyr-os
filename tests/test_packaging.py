@@ -86,8 +86,20 @@ class Paquet(unittest.TestCase):
         completed successfully » en 90 secondes sans rien reconstruire. Ce
         jour-là, l'arbre contenait encore le userland de la 1.0.7.
 
-        Deux garde-fous doivent rester en place : le nettoyage automatique, et
-        le refus d'une ISO antérieure au début de la construction.
+        Deux garde-fous doivent rester en place : le nettoyage automatique des
+        jalons, et la preuve que l'ISO récupérée sort bien de CETTE
+        construction.
+
+        Cette preuve ne peut PAS être une comparaison de dates. live-build
+        construit de façon reproductible : il fixe SOURCE_DATE_EPOCH au
+        démarrage de « lb build » et xorriso en estampille l'image. La date de
+        l'ISO est donc celle du début, jamais postérieure à un repère pris au
+        même instant — le test « l'ISO est-elle plus récente ? » était faux à
+        tous les coups. Le 20/08/2026 il a rejeté une image parfaitement
+        valide et fait relancer une construction d'une heure pour rien.
+
+        La preuve tient désormais à l'existence : on efface toute ISO avant de
+        construire, donc ce qui se trouve là ensuite ne peut venir que d'ici.
         """
         with open(os.path.join(RACINE, "live-build", "scripts", "build.sh"),
                   encoding="utf-8") as f:
@@ -96,9 +108,12 @@ class Paquet(unittest.TestCase):
         self.assertIn('$WORK/.build', source,
                       "le script doit détecter les jalons d'une construction "
                       "précédente")
-        self.assertIn("-nt", source,
-                      "le script doit vérifier que l'ISO est postérieure au "
-                      "début de la construction")
+        self.assertIn('rm -f "$WORK"/*.iso', source,
+                      "l'ISO doit être effacée AVANT la construction : c'est "
+                      "ce qui prouve que celle trouvée après en provient")
+        self.assertNotIn("-nt", source,
+                         "comparer les dates est faux : live-build estampille "
+                         "l'ISO à l'instant du début (SOURCE_DATE_EPOCH)")
 
     def test_le_controle_de_phrase_de_passe_lit_la_bonne_colonne(self):
         """Un garde-fou qui ne peut pas se déclencher est pire qu'aucun.
@@ -117,6 +132,31 @@ class Paquet(unittest.TestCase):
         self.assertIn("{print $8}", source,
                       "la protection de la clé est en colonne 8, pas 7")
         self.assertNotIn("{print $7}", source)
+
+    def test_les_dependances_arrivent_sans_intervention(self):
+        """Une dépendance nouvelle doit pouvoir s'installer TOUTE SEULE.
+
+        Promesse du projet : personne ne tape de commande pour recevoir une
+        mise à jour. Or unattended-upgrades vérifie l'origine de CHAQUE paquet
+        du lot, y compris les dépendances qu'il tire lui-même (sanity_problem :
+        « pkg %s is not in an allowed origin »). Si l'archive Debian n'est pas
+        autorisée, ajouter une dépendance Debian à codebyr-tools ne casse pas
+        l'installation : elle fait abandonner la mise à jour ENTIÈRE, en
+        silence, sur tout le parc.
+
+        Ce qui sauve Codebyr, c'est que le fichier 51 AJOUTE son origine à
+        celles de Debian. Un « #clear » suffirait à tout rompre sans qu'aucun
+        autre test ne s'en aperçoive : d'où celui-ci.
+        """
+        conf = os.path.join(self.src, "etc", "apt", "apt.conf.d",
+                            "51codebyr-unattended")
+        with open(conf, encoding="utf-8") as f:
+            source = f.read()
+        self.assertIn("origin=Codebyr OS", source)
+        self.assertNotIn("#clear", source,
+                         "purger la liste retirerait l'archive Debian des "
+                         "origines autorisées : plus aucune dépendance "
+                         "nouvelle ne pourrait s'installer seule")
 
     def test_pas_de_cache_python_dans_l_image(self):
         # Un __pycache__ traîné depuis un poste de développement finirait copié

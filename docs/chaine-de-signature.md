@@ -45,6 +45,26 @@ qu'on ne peut pas faire aujourd'hui.
 
 ### Mise en place
 
+Un script guide l'opération et **vérifie la sauvegarde avant tout** :
+
+```sh
+export GPG_TTY=$(tty)
+export GNUPGHOME=/root/.gnupg-codebyr
+sh live-build/scripts/durcir-cle.sh /mnt/e/codebyr-cles   # chemin de VOTRE clé USB
+```
+
+Il crée la sous-clé, exporte la sauvegarde et le certificat de révocation sur
+le support indiqué, puis **réimporte cette sauvegarde dans un trousseau
+jetable** pour prouver qu'elle est exploitable. Il s'arrête là : la suppression
+de la clé maîtresse est le seul geste irréversible de la chaîne, il reste
+manuel et n'intervient qu'une fois le support rangé ailleurs.
+
+Une seule sous-clé, et non deux : séparer « releases » et « apt » n'a de sens
+que si elles vivent sur des machines différentes. Ici les deux seraient sur le
+poste de construction — ce serait de la cérémonie, pas de la sécurité.
+
+<details><summary>Les mêmes étapes à la main</summary>
+
 ```bash
 export GNUPGHOME=/root/.gnupg-codebyr
 
@@ -71,6 +91,8 @@ gpg --import sous-cles.asc          # le poste de build ne garde QUE les sous-cl
 # 4) Phrase de passe (indispensable).
 gpg --edit-key E6FB6616EC58E15F40DA876CB1E8C803CE596E68 passwd
 ```
+
+</details>
 
 > `.gitignore` exclut `*-SECRETE.asc`, `*secret*.asc` et `*.gpg` — mais ne
 > comptez pas dessus : ces fichiers n'ont rien à faire dans l'arborescence du

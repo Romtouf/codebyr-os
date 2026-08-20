@@ -38,7 +38,7 @@ et un chantier écrit ici n'est pas un engagement, c'est une décision à prendr
 | | Chantier | Pourquoi | Effort |
 |---|---|---|---|
 | 🔴 | **Un UID Unix par Espace** | Le chantier structurant. Aujourd'hui tous les Espaces tournent sous votre compte et leurs données vivent dans `~/.local/share/codebyr/espaces/`. Le bac à sable les sépare, mais toute évasion — ou toute application lancée hors Espace — lit l'ensemble. C'est la seule façon de rendre la séparation vraie au niveau du système. **Point dur** : faire accepter par le compositeur Wayland des applications tournant sous d'autres UID (piste : portails XDG + `systemd-run --uid`). À dimensionner avant de s'y engager | XL |
-| 🔴 | **`xdg-dbus-proxy` pour les portails et les notifications** | Depuis la 1.1.0, un Espace n'a plus qu'un bus privé vide : plus de notifications, plus de portails XDG (sélecteur de fichiers, capture d'écran). Un proxy filtrant rend ces services **sans** rouvrir l'accès au bus de session. C'est exactement ce que fait Flatpak. Gain de sécurité *et* de confort — le meilleur rapport des deux | M |
+| 🔴 | **`xdg-dbus-proxy` pour les portails et les notifications** | Depuis la 1.1.0, un Espace n'a plus qu'un bus privé vide : plus de notifications, plus de portails XDG. Un proxy filtrant les rendrait **sans** rouvrir l'accès au bus de session. **Point dur identifié** (voir l'encadré ci-dessous) : le proxy remplace le bus privé, or c'est ce bus privé qui empêche aujourd'hui une application mono-instance de rejoindre celle de l'hôte. À traiter sur machine, pas à l'aveugle | M |
 | 🔴 | **Filtre réseau au niveau de l'Espace, pas du navigateur** | La liste blanche de Banque s'applique au profil Firefox : un binaire hostile lancé dans l'Espace la contourne. Un vrai cloisonnement demande un namespace réseau par Espace (veth + nftables, ou slirp), appliqué à **tous** les processus | L |
 | 🔴 | **Filtre seccomp dans le bac à sable** (`bwrap --seccomp`) | Aucun filtre d'appels système aujourd'hui : toute la surface du noyau est exposée depuis un Espace. C'est précisément la surface par laquelle une évasion passerait | M |
 | 🔴 | **Presse-papiers** | La protection est **temporelle** (vidage au changement d'Espace), pas étanche : le compositeur Wayland est partagé. Une vraie séparation demande un mécanisme au niveau du compositeur | L |
@@ -47,6 +47,37 @@ et un chantier écrit ici n'est pas un engagement, c'est une décision à prendr
 | 🔴 | **Durcissement noyau au démarrage** | `GRUB_CMDLINE_LINUX` ne contient rien (`lockdown`, `init_on_alloc`, `slab_nomerge`…). `lockdown` n'a de sens qu'avec Secure Boot : à traiter ensemble | M |
 | 🔴 | **Secure Boot de bout en bout** | `shim-signed` et `grub-efi-amd64-signed` sont dans l'image, mais le parcours complet n'a jamais été vérifié sur une machine avec Secure Boot **activé** | M |
 | 🟠 | **LUKS pré-coché par défaut** | L'architecture annonce une case pré-cochée avec une formulation grand public ; en réalité c'est le parcours Calamares standard. Soit on le fait, soit on corrige la promesse (marqué `[visé]` aujourd'hui) | M |
+
+### Le point dur de `xdg-dbus-proxy`
+
+Le sujet paraît mécanique — « faire comme Flatpak » — et il ne l'est pas. Trois
+faits qui se contredisent :
+
+1. Une application ne parle qu'à **un seul** bus de session. Donner le proxy
+   revient donc à retirer le bus privé (`dbus-run-session`).
+2. Or c'est précisément ce bus privé qui empêche Fichiers ou l'Éditeur de texte
+   — applications *mono-instance* — de repérer l'instance déjà lancée par
+   l'hôte et d'y ouvrir simplement une fenêtre. Sans lui, l'isolation ET le
+   liseré retombent.
+3. En mode `--filter`, `xdg-dbus-proxy` refuse `RequestName` sauf `--own=NOM`.
+   Une application GTK dont l'enregistrement échoue ne démarre pas du tout.
+
+Flatpak s'en sort parce qu'il **connaît** le nom de bus de l'application : il
+vaut son identifiant. Codebyr lance des commandes quelconques
+(`firefox-esr`, un binaire téléchargé) : la correspondance n'existe pas
+toujours.
+
+Deux pistes, à départager **sur une machine réelle** :
+
+- déduire le nom de bus du fichier `.desktop` quand il y en a un
+  (`org.gnome.Nautilus.desktop` → `--own=org.gnome.Nautilus`), et se rabattre
+  sur le bus privé sinon ;
+- ou n'accorder le proxy qu'aux Espaces qui le demandent, pour les seules
+  applications où le besoin est réel (envoi de fichiers, notifications).
+
+Ce qu'il ne faut pas faire : livrer une implémentation non essayée. Le mode
+d'échec n'est pas « les notifications manquent » — c'est « l'application ne
+démarre plus », sur la fonction centrale du système.
 
 ---
 
@@ -77,7 +108,7 @@ et un chantier écrit ici n'est pas un engagement, c'est une décision à prendr
 
 | | Chantier | Pourquoi | Effort |
 |---|---|---|---|
-| 🟠 | **Assistant de première configuration pour Banque** | Depuis la 1.1.0, un Espace Banque non configuré **n'ouvre aucun site** (échec fermé, correct mais brutal). Un écran « quelle est votre banque ? » avec une liste des banques françaises transformerait la fonctionnalité phare en quelque chose d'utilisable. ⚠️ La liste doit être construite à partir de données **vérifiées**, jamais devinées : un domaine faux dans une liste blanche casse l'authentification forte | M |
+| 🟠 | **Liste de banques préremplie** | L'utilisateur doit aujourd'hui saisir le domaine de sa banque à la main. Une liste « quelle est votre banque ? » rendrait le premier contact évident. ⚠️ Elle doit être construite à partir de données **vérifiées**, jamais devinées : un domaine faux dans une liste blanche casse l'authentification forte. *(Le reste est fait : notification au lancement + page de blocage explicite.)* | M |
 | 🟠 | **« Ouvrir en Jetable » au clic droit dans Fichiers** | C'est le geste naturel, il était promis dans la documentation, il n'existe pas. Aujourd'hui il faut passer par le menu du Sceau ou la ligne de commande | M |
 | 🟠 | **« Envoyer vers l'Espace… » dans Fichiers** | Annoncé dans l'architecture (marqué `[visé]`). Le transfert passe aujourd'hui par l'export/import d'instantané ou le presse-papiers explicite | M |
 | 🟠 | **Notifications depuis les Espaces** | Perdues depuis la 1.1.0 (bus privé). Dépend du chantier `xdg-dbus-proxy` | — |
@@ -146,6 +177,8 @@ et un chantier écrit ici n'est pas un engagement, c'est une décision à prendr
 | 🟠 | **Retour d'erreur au lancement** : le menu du Sceau prévient quand une application ne démarre pas |
 | 🟠 | **Journal système** (`journalctl -t codebyr`) — sans jamais consigner le fichier ouvert ni l'adresse visitée |
 | 🔵 | CHANGELOG public, modèles d'issues, Dependabot, actions GitHub à jour |
+| 🔵 | **`build.sh` ne peut plus « réussir » sans rien reconstruire.** live-build note ses étapes dans `.build/`, que le `rsync` du script préservait : une reconstruction sautait tout, annonçait « Build completed successfully » en 90 secondes et ne produisait aucune ISO — ou pire, en aurait produit une contenant l'ancien chroot. Nettoyage automatique, et refus d'une ISO antérieure au début de la construction |
+| 🟠 | **Espace Banque non configuré : l'utilisateur comprend enfin.** Notification au lancement, et vraie page d'explication au lieu d'un texte brut — le nom d'hôte y est échappé, il vient du site visité |
 | ⚪ | Adresses IPv6 dans le filtre réseau ; marqueurs de processus orphelins (ils faisaient afficher le mauvais liseré) ; boucles `for` sur `find` qui cassaient sur un chemin contenant une espace |
 
 ### 1.1.0 (19 août 2026)

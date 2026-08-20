@@ -77,6 +77,29 @@ class Paquet(unittest.TestCase):
                       "sans cet appel, les correctifs de durcissement ne "
                       "toucheraient que les nouvelles installations")
 
+    def test_la_construction_refuse_de_reutiliser_un_arbre_deja_bati(self):
+        """Le piège à ISO périmée, constaté en vrai le 20/08/2026.
+
+        live-build note chaque étape terminée dans `.build/`, et le `rsync` de
+        `build.sh` exclut ce dossier. Relancer une construction sur un arbre
+        déjà bâti fait donc sauter toutes les étapes : lb annonce « Build
+        completed successfully » en 90 secondes sans rien reconstruire. Ce
+        jour-là, l'arbre contenait encore le userland de la 1.0.7.
+
+        Deux garde-fous doivent rester en place : le nettoyage automatique, et
+        le refus d'une ISO antérieure au début de la construction.
+        """
+        with open(os.path.join(RACINE, "live-build", "scripts", "build.sh"),
+                  encoding="utf-8") as f:
+            source = f.read()
+        self.assertIn("lb clean", source)
+        self.assertIn('$WORK/.build', source,
+                      "le script doit détecter les jalons d'une construction "
+                      "précédente")
+        self.assertIn("-nt", source,
+                      "le script doit vérifier que l'ISO est postérieure au "
+                      "début de la construction")
+
     def test_pas_de_cache_python_dans_l_image(self):
         # Un __pycache__ traîné depuis un poste de développement finirait copié
         # tel quel dans l'ISO.

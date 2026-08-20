@@ -86,10 +86,38 @@ if [ "${1:-build}" = "clean" ]; then
 	exit 0
 fi
 
+# — Jalons d'une construction précédente : le piège à ISO périmée —
+#
+# live-build note chaque étape terminée dans .build/, et « rsync --delete »
+# n'y touche pas (le dossier est exclu). Relancer une construction sur un arbre
+# déjà bâti fait donc SAUTER toutes les étapes : lb annonce fièrement « Build
+# completed successfully »… sans avoir rien reconstruit, et sans produire la
+# moindre ISO. Pire, s'il en produisait une, elle contiendrait l'ancien chroot.
+#
+# Constaté en vrai : une reconstruction de la 1.2.0 a « réussi » en 90 secondes
+# sur un arbre du 2 août, contenant encore le userland de la 1.0.7.
+#
+# On nettoie donc systématiquement dès qu'un jalon traîne. « lb clean » garde le
+# cache des paquets téléchargés : on perd le chroot, pas le téléchargement.
+if [ -d "$WORK/.build" ] && [ -n "$(ls -A "$WORK/.build" 2>/dev/null)" ]; then
+	if [ "${CODEBYR_INCREMENTAL:-0}" = "1" ]; then
+		echo "==> Jalons conservés (CODEBYR_INCREMENTAL=1) — l'ISO produite" >&2
+		echo "    peut ne pas refléter vos modifications." >&2
+	else
+		echo "==> Construction précédente détectée : nettoyage (le cache est gardé)"
+		lb clean
+	fi
+fi
+
 # — Construction —
 echo "==> lb config"
 lb config
 echo "==> lb build  (téléchargement + assemblage — peut durer 20–40 min)"
+# Repère temporel : sert à prouver que l'ISO trouvée ensuite est bien CELLE
+# de cette construction, et pas un reliquat oublié dans l'arbre.
+DEBUT="$WORK/.codebyr-debut"
+: > "$DEBUT"
+
 # live-build renvoie parfois un code non-zéro sur une étape finale de nettoyage
 # alors que l'ISO est bien produite : on ne s'y fie pas, on vérifie l'ISO.
 lb build || echo "==> lb build a renvoyé un code non-zéro — vérification de l'ISO…"
@@ -97,6 +125,12 @@ lb build || echo "==> lb build a renvoyé un code non-zéro — vérification de
 # — Rapatriement de l'ISO —
 mkdir -p "$DIST"
 ISO="$(ls -1 "$WORK"/*.iso 2>/dev/null | head -n1 || true)"
+if [ -n "$ISO" ] && [ ! "$ISO" -nt "$DEBUT" ]; then
+	echo "ERREUR : l'ISO trouvée est ANTÉRIEURE au début de cette construction." >&2
+	echo "         C'est un reliquat, pas votre version : rien n'a été reconstruit." >&2
+	echo "         Relancez avec « $0 clean » pour repartir d'un arbre propre." >&2
+	exit 1
+fi
 if [ -z "$ISO" ]; then
 	echo "ERREUR : aucune ISO produite (voir la sortie ci-dessus)." >&2
 	exit 1

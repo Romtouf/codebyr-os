@@ -10,7 +10,19 @@ GNOME (menu du Sceau, liserés colorés) ne se recharge pas à chaud.
 
 ---
 
-## 1.2.0 — en préparation
+## 1.2.1 — en préparation
+
+**L'Espace Banque non configuré s'explique enfin.** Il n'ouvrait aucun site —
+ce qui est voulu — mais sans rien dire de compréhensible : en HTTPS, le
+navigateur affiche sa propre page d'erreur et notre explication n'arrivait
+jamais à l'écran. Une notification apparaît maintenant au lancement, et la page
+de blocage est une vraie page qui dit quoi faire.
+
+Pour les développeurs : `build.sh` ne peut plus annoncer une construction
+réussie sans avoir rien reconstruit (les jalons d'une construction précédente
+faisaient tout sauter, au risque de publier une ISO périmée).
+
+## 1.2.0 — 20 août 2026
 
 **Vos réglages ne bloquent plus les mises à jour de sécurité.** Jusqu'ici, dès
 que vous touchiez un réglage, votre copie de la configuration devenait un

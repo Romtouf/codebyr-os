@@ -90,16 +90,50 @@ def tunnel(a, b):
         pass
 
 
+def echapper(texte):
+    """Le nom d'hôte vient du site visité : il n'entre jamais tel quel dans du
+    HTML. Ce sont trois lignes, et c'est la différence entre une page
+    d'information et une page qu'on peut détourner."""
+    return (str(texte or "")
+            .replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+            .replace('"', "&quot;"))
+
+
+PAGE = u"""<!doctype html><html lang="fr"><meta charset="utf-8">
+<title>Site bloqué — Codebyr</title>
+<style>
+ body{margin:0;min-height:100vh;display:flex;align-items:center;
+      justify-content:center;background:#0A1318;color:#E7EEF1;
+      font-family:system-ui,sans-serif;padding:24px}
+ .c{max-width:34rem;text-align:center}
+ h1{font-size:1.6rem;margin:.6rem 0}
+ p{line-height:1.6;color:#B9C7CE}
+ code{background:#16242c;padding:.15rem .4rem;border-radius:5px;color:#E7EEF1}
+ .t{display:inline-block;margin-bottom:.4rem;padding:.2rem .7rem;border-radius:99px;
+    background:#2FA36B22;color:#2FA36B;font-size:.8rem;font-weight:700}
+</style>
+<div class="c"><span class="t">Espace à réseau restreint</span>
+<h1>%s</h1><p>%s</p></div>"""
+
+
 def bloque(client, host, patterns=()):
     if patterns:
-        detail = (u"Le domaine « %s » n'est pas autorisé dans cet Espace." % host)
+        titre = u"Ce site n'est pas celui de votre banque"
+        detail = (u"L'Espace Banque ne peut joindre que les adresses que vous "
+                  u"avez déclarées. <code>%s</code> n'en fait pas partie.<br><br>"
+                  u"Si votre banque a réellement besoin de ce site pour "
+                  u"fonctionner, ouvrez <b>Configuration Codebyr</b> : il vous "
+                  u"sera proposé dans la liste des sites bloqués."
+                  % echapper(host))
     else:
-        detail = (u"Aucun site n'est encore autorisé dans cet Espace.\n"
-                  u"Ouvrez « Configuration Codebyr » et ajoutez l'adresse de "
-                  u"votre banque : elle sera alors la seule joignable ici.")
-    corps = (u"Codebyr — Espace à réseau restreint.\n" + detail).encode("utf-8")
+        titre = u"Aucun site n'est encore autorisé ici"
+        detail = (u"Ouvrez <b>Configuration Codebyr</b> et ajoutez l'adresse de "
+                  u"votre banque. Elle sera alors la seule joignable dans cet "
+                  u"Espace — c'est ce qui rend un lien d'hameçonnage inoffensif "
+                  u"quand il s'ouvre ici par mégarde.")
+    corps = (PAGE % (titre, detail)).encode("utf-8")
     entete = (b"HTTP/1.1 403 Forbidden\r\n"
-              b"Content-Type: text/plain; charset=utf-8\r\n"
+              b"Content-Type: text/html; charset=utf-8\r\n"
               b"Content-Length: " + str(len(corps)).encode() + b"\r\n"
               b"Connection: close\r\n\r\n")
     try:

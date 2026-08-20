@@ -240,6 +240,21 @@ def _preparer_profil_firefox(home, port):
     _ajouter_prefs(os.path.join(ffdir, "user.js"), prefs)
 
 
+def _prevenir(titre, message):
+    """Dit quelque chose à l'utilisateur du bureau, sans dépendance dure.
+
+    Un message sur la sortie standard d'un programme lancé depuis un menu ne
+    sera jamais lu par personne."""
+    if not shutil.which("notify-send"):
+        return
+    try:
+        subprocess.Popen(["notify-send", "--icon=dialog-information",
+                          titre, message],
+                         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    except OSError:
+        pass
+
+
 def journal_refus(esp_id):
     """Fichier où le filtre note les domaines qu'il a refusés dans cet Espace.
 
@@ -291,6 +306,16 @@ def _demarrer_filtre_reseau(esp, home, app_cmd):
             print("Réseau restreint : AUCUN site autorisé dans %s pour l'instant. "
                   "Ajoutez celui de votre banque dans « Configuration Codebyr »."
                   % esp["nom"])
+            # En HTTPS, le navigateur affiche SA propre page d'erreur : notre
+            # explication n'arrive jamais à l'écran. Or c'est le premier
+            # contact d'un nouvel utilisateur avec la fonctionnalité phare —
+            # il clique sur Banque, rien ne s'affiche, et il n'a aucune idée
+            # de pourquoi. Une notification, elle, passe quel que soit le
+            # protocole.
+            _prevenir("Espace %s : aucun site autorisé" % esp["nom"],
+                      "Ouvrez « Configuration Codebyr » pour déclarer votre "
+                      "banque. Tant qu'elle n'est pas déclarée, cet Espace "
+                      "n'ouvre aucun site — c'est voulu.")
         return proc
     except OSError as exc:
         sys.stderr.write("codebyr-space : filtre réseau indisponible (%s) — "

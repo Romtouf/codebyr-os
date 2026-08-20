@@ -88,6 +88,21 @@ class EchecFerme(unittest.TestCase):
         self.assertIn("403", reponse.splitlines()[0])
         self.assertIn("Configuration Codebyr", reponse)
 
+    def test_la_page_de_blocage_est_une_vraie_page(self):
+        port = self._proxy_sans_domaine()
+        c = socket.create_connection(("127.0.0.1", port), timeout=5)
+        c.sendall(b"GET / HTTP/1.1\r\nHost: exemple.test\r\n\r\n")
+        reponse = c.recv(8192).decode("utf-8", "replace")
+        c.close()
+        self.assertIn("text/html", reponse)
+        self.assertIn("Configuration Codebyr", reponse)
+
+    def test_le_nom_d_hote_n_entre_pas_tel_quel_dans_la_page(self):
+        # Le nom d'hôte vient du site visité : c'est une donnée hostile.
+        self.assertEqual(proxy.echapper('<script>x</script>'),
+                         "&lt;script&gt;x&lt;/script&gt;")
+        self.assertEqual(proxy.echapper('a"b&c'), "a&quot;b&amp;c")
+
     def test_https_est_refuse_aussi(self):
         port = self._proxy_sans_domaine()
         c = socket.create_connection(("127.0.0.1", port), timeout=5)

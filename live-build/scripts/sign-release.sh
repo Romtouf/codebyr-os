@@ -36,7 +36,22 @@ echo "==> Empreinte de $(basename "$ISO")"
 sha256sum "$(basename "$ISO")" > SHA256SUMS
 
 echo "==> Signature GPG (clé : $SIGNER)"
-gpg --armor --detach-sign --local-user "$SIGNER" --output SHA256SUMS.asc --yes SHA256SUMS
+# On ne refuse pas d'emblée faute de terminal : gpg-agent garde la phrase de
+# passe en cache un moment, et une signature qui vient de suivre une
+# publication n'a rien à demander. En revanche, si gpg échoue, on traduit son
+# message — « Inappropriate ioctl for device » ne dit rien à personne, alors
+# que la cause est presque toujours l'absence de terminal.
+if ! gpg --armor --detach-sign --local-user "$SIGNER" \
+         --output SHA256SUMS.asc --yes SHA256SUMS; then
+	if [ -z "${GPG_TTY:-}" ] || [ ! -c "${GPG_TTY}" ]; then
+		echo >&2
+		echo "ERREUR : pas de terminal pour saisir la phrase de passe." >&2
+		echo "         Relancez depuis un vrai terminal WSL, après :" >&2
+		echo "             export GPG_TTY=\$(tty)" >&2
+	fi
+	rm -f SHA256SUMS.asc
+	exit 1
+fi
 
 # — Ancre de confiance : on ne la change pas sans le dire —
 NOUVELLE="$(mktemp)"

@@ -144,6 +144,86 @@ class SocketHeritee(unittest.TestCase):
         self.assertIn("403", reponse.splitlines()[0])
 
 
+class Socks5(unittest.TestCase):
+    """Le filtre n'était joignable que par un navigateur configuré en proxy HTTP.
+
+    Tout le reste — client de messagerie, outil en ligne de commande,
+    application quelconque lancée dans l'Espace — passait à côté sans que rien
+    ne le signale. SOCKS5 est le protocole que ces programmes savent parler, et
+    il cohabite avec HTTP sur le même port : le premier octet les distingue.
+    """
+
+    def _filtre(self, *domaines):
+        s = socket.socket()
+        s.bind(("127.0.0.1", 0))
+        port = s.getsockname()[1]
+        s.close()
+        threading.Thread(target=proxy.main,
+                         args=(["codebyr-net-proxy", str(port)] + list(domaines),),
+                         daemon=True).start()
+        for _ in range(50):
+            try:
+                socket.create_connection(("127.0.0.1", port), timeout=0.2).close()
+                return port
+            except OSError:
+                time.sleep(0.05)
+        self.fail("le filtre n'a pas démarré")
+
+    def _demander(self, port, hote, port_cible=443):
+        """Client SOCKS5 minimal : poignée de main puis CONNECT."""
+        c = socket.create_connection(("127.0.0.1", port), timeout=5)
+        c.sendall(bytes([5, 1, 0]))                 # v5, 1 méthode, sans auth
+        salut = c.recv(2)
+        nom = hote.encode()
+        c.sendall(bytes([5, 1, 0, 3, len(nom)]) + nom
+                  + port_cible.to_bytes(2, "big"))
+        reponse = c.recv(10)
+        c.close()
+        return salut, reponse
+
+    def test_la_poignee_de_main_annonce_sans_authentification(self):
+        salut, _ = self._demander(self._filtre("mabanque.fr"), "mabanque.fr")
+        self.assertEqual(salut, bytes([5, 0]))
+
+    def test_un_domaine_hors_liste_est_refuse(self):
+        _, reponse = self._demander(self._filtre("mabanque.fr"), "piege.fr")
+        self.assertEqual(reponse[0], 5)
+        self.assertEqual(reponse[1], proxy.SOCKS_REFUS,
+                         "un domaine non autorisé doit être refusé, pas ouvert")
+
+    def test_liste_vide_refuse_aussi_en_socks(self):
+        _, reponse = self._demander(self._filtre(), "exemple.test")
+        self.assertEqual(reponse[1], proxy.SOCKS_REFUS)
+
+    def test_les_commandes_autres_que_connect_sont_refusees(self):
+        # BIND et UDP ASSOCIATE ouvriraient des chemins que ce filtre ne sait
+        # pas contrôler : on les refuse plutôt que de les ignorer.
+        port = self._filtre("mabanque.fr")
+        c = socket.create_connection(("127.0.0.1", port), timeout=5)
+        c.sendall(bytes([5, 1, 0]))
+        c.recv(2)
+        nom = b"mabanque.fr"
+        c.sendall(bytes([5, 2, 0, 3, len(nom)]) + nom + (443).to_bytes(2, "big"))
+        reponse = c.recv(10)
+        c.close()
+        self.assertEqual(reponse[1], proxy.SOCKS_CMD_REFUSEE)
+
+    def test_lecture_exacte_resiste_au_fractionnement(self):
+        # TCP peut couper n'importe où. Se contenter d'un recv est un bogue qui
+        # n'apparaît qu'en charge — donc jamais pendant les essais.
+        a, b = socket.socketpair()
+        try:
+            def envoyer_en_morceaux():
+                for octet in b"abcdef":
+                    a.sendall(bytes([octet]))
+                    time.sleep(0.005)
+            threading.Thread(target=envoyer_en_morceaux, daemon=True).start()
+            self.assertEqual(proxy.lire_exactement(b, 6), b"abcdef")
+        finally:
+            a.close()
+            b.close()
+
+
 class ModeApprentissage(unittest.TestCase):
     """Les domaines refusés sont notés, pour pouvoir être autorisés ensuite.
 

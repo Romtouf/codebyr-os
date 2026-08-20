@@ -142,6 +142,89 @@ def bloque(client, host, patterns=()):
         pass
 
 
+# ── SOCKS5 (RFC 1928) — strictement ce qui sert ici ────────────────────────
+# Le filtre n'était joignable que par un navigateur configuré en proxy HTTP.
+# Tout le reste — un client de messagerie, un outil en ligne de commande, une
+# application quelconque lancée dans l'Espace — passait à côté. SOCKS5 est le
+# protocole que ces programmes savent presque tous parler.
+SOCKS_V5 = 0x05
+SOCKS_SANS_AUTH = 0x00
+SOCKS_CONNECT = 0x01
+SOCKS_IPV4, SOCKS_DOMAINE, SOCKS_IPV6 = 0x01, 0x03, 0x04
+SOCKS_OK, SOCKS_REFUS, SOCKS_CMD_REFUSEE = 0x00, 0x02, 0x07
+
+
+def lire_exactement(sock, taille):
+    """Lit exactement `taille` octets. TCP peut couper n'importe où : se
+    contenter d'un `recv` est un bogue qui n'apparaît qu'en charge."""
+    morceaux = b""
+    while len(morceaux) < taille:
+        bout = sock.recv(taille - len(morceaux))
+        if not bout:
+            raise OSError("connexion fermée en cours de lecture")
+        morceaux += bout
+    return morceaux
+
+
+def reponse_socks(code):
+    """Réponse SOCKS5. L'adresse de liaison renvoyée n'intéresse personne pour
+    un CONNECT : on renvoie 0.0.0.0:0, ce que font tous les serveurs."""
+    return bytes([SOCKS_V5, code, 0x00, SOCKS_IPV4, 0, 0, 0, 0, 0, 0])
+
+
+def gerer_socks(client, patterns, debut):
+    """Poignée de main SOCKS5, puis EXACTEMENT le même filtrage que pour HTTP."""
+    # debut = b"\x05" + nombre de méthodes + méthodes (souvent tout est là).
+    if len(debut) < 2:
+        debut += lire_exactement(client, 2 - len(debut))
+    nb_methodes = debut[1]
+    manquantes = nb_methodes - len(debut[2:])
+    if manquantes > 0:
+        lire_exactement(client, manquantes)
+    # On n'annonce que « sans authentification » : ce filtre est local à la
+    # machine, une authentification n'y ajouterait rien.
+    client.sendall(bytes([SOCKS_V5, SOCKS_SANS_AUTH]))
+
+    entete = lire_exactement(client, 4)
+    if entete[0] != SOCKS_V5:
+        return
+
+    # On lit la requête ENTIÈRE avant de décider, même pour la refuser. Fermer
+    # une connexion sur laquelle il reste des octets non lus fait envoyer un
+    # RST par la pile TCP : le refus qu'on vient d'écrire est alors jeté, et le
+    # client ne voit qu'une connexion coupée sans savoir pourquoi.
+    genre = entete[3]
+    if genre == SOCKS_DOMAINE:
+        longueur = lire_exactement(client, 1)[0]
+        host = lire_exactement(client, longueur).decode("latin-1")
+    elif genre == SOCKS_IPV4:
+        host = socket.inet_ntop(socket.AF_INET, lire_exactement(client, 4))
+    elif genre == SOCKS_IPV6:
+        host = socket.inet_ntop(socket.AF_INET6, lire_exactement(client, 16))
+    else:
+        client.sendall(reponse_socks(SOCKS_CMD_REFUSEE))
+        return
+    port = int.from_bytes(lire_exactement(client, 2), "big")
+
+    if entete[1] != SOCKS_CONNECT:
+        # Ni BIND ni UDP ASSOCIATE : ils ouvriraient des chemins que ce filtre
+        # ne sait pas contrôler. Les refuser vaut mieux que les ignorer.
+        client.sendall(reponse_socks(SOCKS_CMD_REFUSEE))
+        return
+
+    host = hote_propre(host)
+    if not autorise(host, patterns):
+        journaliser(host)
+        client.sendall(reponse_socks(SOCKS_REFUS))
+        return
+
+    amont = socket.create_connection((host, port), timeout=15)
+    client.sendall(reponse_socks(SOCKS_OK))
+    client.settimeout(None)
+    tunnel(client, amont)
+    amont.close()
+
+
 def gerer(client, patterns):
     try:
         client.settimeout(30)
@@ -149,6 +232,14 @@ def gerer(client, patterns):
         if not premier:
             client.close()
             return
+
+        # Le premier octet suffit à trancher : 0x05 pour SOCKS5, une lettre
+        # d'une méthode HTTP sinon. Les deux protocoles cohabitent donc sur le
+        # même port, sans réglage supplémentaire pour l'utilisateur.
+        if premier[0] == SOCKS_V5:
+            gerer_socks(client, patterns, premier)
+            return
+
         ligne = premier.split(b"\r\n", 1)[0].decode("latin-1", "replace")
         parts = ligne.split()
         if len(parts) < 2:

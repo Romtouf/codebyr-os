@@ -1,0 +1,101 @@
+name: Construire l'ISO
+
+# Construire Codebyr OS ne doit pas dépendre d'un seul poste. Aujourd'hui
+# l'image ne sort que du WSL du mainteneur : si cette machine disparaît, plus
+# personne ne sait produire une ISO — et personne ne peut vérifier que celle
+# qui est publiée correspond au dépôt.
+#
+# Ce workflow construit l'image depuis un checkout propre, sur une machine
+# neutre. C'est autant un filet de sécurité (facteur bus) qu'une preuve : si
+# elle sort ici, elle sort de ce qui est publié dans le dépôt, et de rien
+# d'autre.
+#
+# DÉCLENCHEMENT MANUEL : une construction dure 30 à 60 minutes et télécharge
+# ~1,5 Go. La lancer à chaque commit gaspillerait sans rien apprendre de plus.
+#
+# L'ISO produite reste un ARTEFACT de vérification. Celle qu'on publie est
+# signée, et la signature exige la clé — qui n'est pas ici, et n'a rien à y
+# faire.
+
+on:
+  workflow_dispatch:
+    inputs:
+      conserver:
+        description: "Jours de conservation de l'ISO produite"
+        required: false
+        default: "3"
+
+permissions:
+  contents: read
+
+jobs:
+  iso:
+    name: Image live depuis un checkout propre
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Faire de la place
+        # Le runner arrive avec une vingtaine de gigaoctets d'outils dont on
+        # n'a aucun usage, et la construction en demande une dizaine
+        # (chroot ~4 Go, cache ~1,5 Go, squashfs, ISO). Sans ce ménage, elle
+        # meurt à mi-parcours sur un disque plein.
+        run: |
+          echo "Avant :"; df -h / | tail -1
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc \
+                      /usr/local/share/boost "$AGENT_TOOLSDIRECTORY" || true
+          echo "Après :"; df -h / | tail -1
+
+      - name: Installer live-build
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends \
+            live-build rsync librsvg2-bin dpkg-dev xorriso squashfs-tools
+
+      - name: Construire
+        run: |
+          set -e
+          sudo -E env CODEBYR_REPO="$PWD" CODEBYR_WORK=/mnt/codebyr-build \
+            bash live-build/scripts/build.sh
+
+      - name: Vérifier ce qui est sorti
+        run: |
+          set -e
+          iso=$(ls -1 dist/*.iso | head -n1)
+          ls -lh "$iso"
+          sha256sum "$iso" | tee dist/SHA256SUMS-ci
+
+          # Une ISO qui se construit ne prouve rien : il faut vérifier qu'elle
+          # contient bien CE dépôt. On la monte une fois, on regarde, on
+          # démonte.
+          sudo mkdir -p /mnt/iso
+          sudo mount -o loop,ro "$iso" /mnt/iso
+          cp /mnt/iso/live/filesystem.packages /tmp/paquets.txt
+          sudo unsquashfs -l /mnt/iso/live/filesystem.squashfs > /tmp/contenu.txt
+          sudo umount /mnt/iso
+
+          echo "--- version de codebyr-tools embarquée ---"
+          grep -E '^codebyr-tools' /tmp/paquets.txt
+
+          attendue=$(tr -d ' \t\r\n' < VERSION)
+          grep -qE "^codebyr-tools[[:space:]]+${attendue}$" /tmp/paquets.txt || {
+            echo "::error::l'ISO ne porte pas la version $attendue"; exit 1; }
+
+          echo "--- modules partagés (sans eux, tous les outils plantent) ---"
+          for module in registre systeme applications; do
+            grep -q "share/codebyr/${module}.py" /tmp/contenu.txt || {
+              echo "::error::${module}.py absent de l'image"; exit 1; }
+            echo "  ${module}.py"
+          done
+
+          echo "ISO conforme à la version $attendue."
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: codebyr-os-iso
+          path: |
+            dist/*.iso
+            dist/SHA256SUMS-ci
+          retention-days: ${{ inputs.conserver }}
+          compression-level: 0

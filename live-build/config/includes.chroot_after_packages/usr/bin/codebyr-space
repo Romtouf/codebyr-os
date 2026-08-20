@@ -538,11 +538,27 @@ def cmd_launch(espaces, esp_id, extra, fichier=None):
             run = cmd
             print("Application Flatpak propre à l'Espace %s (isolée)." % esp["nom"])
         else:
-            # App Flatpak système : déjà isolée par Flatpak, mais partagée
-            # entre Espaces. Marquée pour le liseré (meilleur effort).
+            # App Flatpak SYSTÈME : installée pour toute la machine. Elle a son
+            # propre bac à sable Flatpak, mais ses données sont communes à tous
+            # les Espaces — ce qu'elle enregistre depuis Travail, elle le
+            # retrouve depuis Personnel.
+            #
+            # L'avertissement existait, dans le terminal : c'est-à-dire nulle
+            # part, pour quelqu'un qui a cliqué dans un menu. L'utilisateur
+            # croyait son application cloisonnée alors qu'elle ne l'est pas, et
+            # le liseré coloré le lui confirmait à tort.
             run = cmd
+            nom_app = os.path.basename(app_cmd[-1] if len(app_cmd) >= 2
+                                       else app_cmd[0])
             print("Note : application Flatpak système — son propre bac à sable "
                   "Flatpak ; le liseré de l'Espace reste indicatif.")
+            _prevenir(
+                "%s n'est pas cloisonnée dans %s" % (nom_app, esp["nom"]),
+                "Cette application est installée pour toute la machine : ses "
+                "données sont les mêmes dans tous les Espaces. Pour l'isoler, "
+                "installez-la DANS l'Espace depuis « Configuration Codebyr ».")
+            journal("Espace %s : application Flatpak système %s (non cloisonnée)"
+                    % (esp["id"], nom_app))
     elif use_bwrap:
         run = wrap_bwrap(home, cmd, env, renforce=renforce, hors_ligne=hors_ligne,
                          audio=audio)

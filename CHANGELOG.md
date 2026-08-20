@@ -10,7 +10,35 @@ GNOME (menu du Sceau, liserés colorés) ne se recharge pas à chaud.
 
 ---
 
-## 1.2.1 — en préparation
+## 1.3.0 — en préparation
+
+**Le presse-papiers ne se contourne plus par le bureau.** Il était vidé quand
+on passait d'un Espace à un autre — mais pas quand on passait par le bureau.
+Copier dans Banque, cliquer sur le bureau, ouvrir n'importe quelle
+application : le secret était encore là. La frontière ne se franchissait pas,
+elle se contournait. Elle se ferme désormais aussi à la sortie d'un Espace
+sensible ; les Espaces ordinaires gardent leur souplesse.
+
+**Le bouclier anti-hameçonnage veille aussi dans l'Espace Banque.** Il en était
+exclu au motif que la liste blanche y suffit — mais cette liste, c'est vous qui
+la saisissez. Le jour où un site imitateur y entre par erreur, plus rien ne
+criait.
+
+**L'adresse que vous saisissez est vérifiée.** Ajouter le site de sa banque
+passe par un contrôle sérieux : les adresses IP sont refusées, les caractères
+interdits aussi, et `mabanque.fr@piege.fr` est lu comme votre navigateur le
+lira — `piege.fr`. L'interface vous prévient quand une saisie est refusée, au
+lieu de ne rien faire.
+
+**Le filtre réseau accepte SOCKS5.** Jusqu'ici il ne protégeait que le
+navigateur ; les autres applications d'un Espace passaient à côté.
+
+**Quand une application n'est pas vraiment cloisonnée, on vous le dit.** Une
+application Flatpak installée pour toute la machine partage ses données entre
+tous les Espaces — le liseré coloré laissait croire l'inverse.
+
+**L'empreinte de la clé de signature est publiée sur le site**, en plus du
+dépôt : deux sources indépendantes à comparer.
 
 **L'Espace Banque non configuré s'explique enfin.** Il n'ouvrait aucun site —
 ce qui est voulu — mais sans rien dire de compréhensible : en HTTPS, le

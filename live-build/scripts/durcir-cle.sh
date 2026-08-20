@@ -9,8 +9,9 @@
 #
 # Ce que ce script ne fait PAS, volontairement : supprimer la clé maîtresse du
 # poste. C'est le seul geste irréversible de toute la chaîne — un défaut ici et
-# la clé du projet est perdue. Le script affiche les deux commandes à taper
-# vous-même, une fois la clé USB rangée ailleurs.
+# la clé du projet est perdue. Il affiche la commande exacte, à taper soi-même,
+# une fois la sauvegarde vérifiée (support encore branché : la suppression a
+# besoin d'y relire les sous-clés en cas de fausse manœuvre).
 #
 # POURQUOI UNE SOUS-CLÉ ?
 # Aujourd'hui, une seule clé signe tout. Si elle fuite, il faut la révoquer et
@@ -132,34 +133,57 @@ SOUS="$(gpg --list-keys --with-colons --with-subkey-fingerprints "$CLE" | awk -F
 	END      { print empreinte }')"
 [ -n "$SOUS" ] || SOUS="<aucune sous-clé de signature>"
 
+# Keygrips : c'est par eux que se nomment les fichiers de clés privées.
+GRIP_MAITRESSE="$(gpg --list-secret-keys --with-keygrip --with-colons "$CLE" | awk -F: '
+	/^sec:/ { dans_maitresse = 1; next }
+	/^ssb:/ { dans_maitresse = 0 }
+	/^grp:/ { if (dans_maitresse) { print $10; exit } }')"
+GRIP_SOUS="$(gpg --list-secret-keys --with-keygrip --with-colons "$CLE" | awk -F: '
+	/^ssb:/ { dans_sous = 1; next }
+	/^grp:/ { if (dans_sous) { print $10; exit } }')"
+
 cat <<FIN
 
 ════════════════════════════════════════════════════════════════════════
   Sauvegarde faite et VÉRIFIÉE. Trois choses maintenant, dans cet ordre.
 ════════════════════════════════════════════════════════════════════════
 
-1. RETIREZ LA CLÉ MAÎTRESSE DE CE POSTE — support TOUJOURS BRANCHÉ, puisque
-   la seconde commande y lit le fichier des sous-clés :
+1. RETIREZ LA CLÉ MAÎTRESSE DE CE POSTE.
 
-     gpg --delete-secret-keys $CLE
-     gpg --import "$SORTIE/codebyr-sous-cles-SECRETE.asc"
+   GnuPG range chaque clé privée dans un fichier nommé d'après son empreinte
+   interne (« keygrip »). Retirer ce fichier fait exactement ce que
+   « gpg --delete-secret-keys » ferait — sans la fenêtre de confirmation de
+   l'agent, qui expire régulièrement sous WSL (« deleting secret key failed:
+   Timeout ») en laissant le trousseau à moitié défait.
 
-   Contrôle : « gpg -K » doit afficher « sec# » (le dièse dit que la clé
-   maîtresse n'est plus là — seules les sous-clés restent, c'est le but).
+   Le keygrip de la MAÎTRESSE, à retirer :
+
+     $GRIP_MAITRESSE
+
+   Celui de la sous-clé, à GARDER : $GRIP_SOUS
+
+     rm $GNUPGHOME/private-keys-v1.d/$GRIP_MAITRESSE.key
+
+   Contrôle : « gpg -K » doit afficher « sec# » et « ssb » SANS dièse. Le
+   dièse sur « sec » dit que la clé maîtresse n'est plus là — c'est le but.
 
 2. ALORS SEULEMENT, RANGEZ LE SUPPORT.
    Débranchez la clé USB et mettez-la ailleurs que près de cet ordinateur.
    Elle contient de quoi signer au nom du projet, et de quoi le révoquer :
    c'est le double du trousseau, pas une copie de confort.
 
-3. SIGNEZ AVEC LA SOUS-CLÉ. Le « ! » impose CETTE clé et non une autre :
+3. RIEN À CHANGER DANS VOS SCRIPTS.
+   Continuez à désigner la clé par l'empreinte de la MAÎTRESSE :
 
-     export CODEBYR_APT_KEY='$SOUS!'
-     export CODEBYR_SIGNER='$SOUS!'
+     $CLE
 
-   À noter dans vos scripts de publication, ou dans le .bashrc du WSL.
+   GnuPG y trouve tout seul la sous-clé de signature en cours
+   ($SOUS). Épingler la sous-clé avec un « ! » serait
+   plus précis mais moins robuste : il faudrait y repasser à chaque rotation.
+   Le « ! » ne sert que pour forcer une sous-clé précise parmi plusieurs.
 
 Dans un an, la sous-clé expire : ressortez la clé maîtresse du support, faites
 « gpg --edit-key $CLE » puis « expire », et réexportez les sous-clés.
-Rien à republier côté utilisateur — l'empreinte publiée ne change pas.
+Rien à republier côté utilisateur — l'empreinte publiée ne change pas, et vos
+scripts n'ont pas à être touchés.
 FIN

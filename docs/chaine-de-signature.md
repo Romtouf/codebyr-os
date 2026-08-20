@@ -15,15 +15,16 @@ Le serveur, lui, est secondaire : `apt` refuse un dépôt dont la signature ne
 correspond pas au trousseau embarqué. Un serveur piraté sans la clé ne peut rien
 livrer. **La clé est l'actif à protéger, pas la machine qui la sert.**
 
-## État actuel (à corriger)
+## État au 20 août 2026
 
 | | Situation | Risque |
 |---|---|---|
-| Nombre de clés | **Une seule**, `E6FB6616EC58E15F40DA876CB1E8C803CE596E68` | Elle signe les ISO *et* le dépôt APT : une fuite compromet tout d'un coup |
-| Emplacement | `/root/.gnupg-codebyr` du WSL de build, sur un poste Windows de développement | Poste de travail quotidien, exposé au web et au courriel |
+| Clé maîtresse | `E6FB6616EC58E15F40DA876CB1E8C803CE596E68` — **hors ligne** depuis le 20/08/2026 | Un vol du poste de construction ne donne plus l'identité du projet |
+| Sous-clé de signature | `49DF7B8855830CCD347663345884F50B88581C19`, expire le 20/08/2027 | Révocable et remplaçable **sans** que personne ne réimporte l'empreinte publiée |
+| Emplacement | Sous-clé seule dans `/root/.gnupg-codebyr` ; maîtresse et révocation sur support amovible | Le poste ne détient plus que de quoi signer, pas de quoi se faire passer pour le projet |
 | Phrase de passe | ~~Aucune~~ → **posée le 20/08/2026** | Un vol de fichiers ne suffit plus à signer à la place du projet |
-| Expiration | Aucune | Une clé volée reste valable indéfiniment |
-| Révocation | Pas de certificat prégénéré | Sans lui, impossible de révoquer une clé dont on a perdu l'accès |
+| Expiration | Maîtresse : 07/07/2028. Sous-clé : 20/08/2027 | Une sous-clé volée cesse d'elle-même de valoir quelque chose |
+| Révocation | Certificat prégénéré, **sorti de la machine** le 20/08/2026 | Révocable même si ce poste est perdu ou chiffré par un rançongiciel |
 
 `publish-apt.sh` refuse désormais de signer avec une clé sans phrase de passe et
 ne contient plus de phrase de passe en clair. La suite ci-dessous est la
@@ -144,6 +145,30 @@ Attention à la colonne : `$7` est le **cache**, `$8` la **protection**. Tester
 en signant ne prouve rien si l'agent a la phrase en mémoire — il ne la
 redemandera pas.
 
+## Deux pièges de la mise hors ligne (constatés)
+
+**« deleting secret key failed: Timeout ».** `gpg --delete-secret-keys` demande
+confirmation par une fenêtre de l'agent, qui n'arrive pas toujours à s'afficher
+sous WSL. Pire, l'opération n'est pas atomique : elle supprime d'abord les
+**sous-clés** puis expire sur la maîtresse — on se retrouve avec exactement
+l'inverse de ce qu'on voulait, la maîtresse encore là et la sous-clé perdue.
+(Récupérable en réimportant `codebyr-sous-cles-SECRETE.asc`.)
+
+La méthode fiable retire directement le fichier de la clé privée. GnuPG les
+nomme d'après leur *keygrip* :
+
+```sh
+gpg --list-secret-keys --with-keygrip     # relever celui de la MAÎTRESSE
+rm $GNUPGHOME/private-keys-v1.d/<KEYGRIP-MAITRESSE>.key
+gpg -K                                    # doit afficher « sec# » et « ssb »
+```
+
+**Pas besoin d'épingler la sous-clé.** Continuez à désigner l'empreinte de la
+**maîtresse** dans les scripts : GnuPG y trouve seul la sous-clé de signature
+en cours. Vérifié — `--default-key E6FB…6E68` produit bien une signature de
+`49DF…1C19`. Épingler avec `!` serait plus précis mais casserait à chaque
+rotation, pour aucun gain.
+
 ## Renouvellement annuel
 
 Les sous-clés expirent au bout d'un an — volontairement, pour forcer le geste.
@@ -176,9 +201,9 @@ Rien à republier côté utilisateur : l'ancre de confiance est inchangée.
 
 ## Ce qui reste à faire
 
-- [ ] Sous-clés dédiées `releases` et `apt`, clé maîtresse hors ligne
+- [x] Sous-clé de signature dédiée, clé maîtresse hors ligne *(20/08/2026 — une seule sous-clé : en séparer deux n'aurait de sens que sur deux machines)*
 - [x] Phrase de passe sur la clé de signature *(posée le 20/08/2026 ; `publish-apt.sh` le confirme au démarrage)*
-- [ ] Certificat de révocation généré et stocké hors ligne
-- [ ] Expiration à 1 an sur les sous-clés
+- [x] Certificat de révocation stocké hors ligne *(20/08/2026)*
+- [x] Expiration à 1 an sur la sous-clé *(20/08/2027)*
 - [ ] Empreinte publiée en plusieurs endroits indépendants (dépôt, site, réseaux)
       pour qu'une substitution soit détectable

@@ -28,7 +28,6 @@ et un chantier écrit ici n'est pas un engagement, c'est une décision à prendr
 | | Chantier | Pourquoi | Effort |
 |---|---|---|---|
 | 🔵 | **Signer et publier l'ISO 1.1.0** — `sign-release.sh`, puis `gh release create v1.1.0` avec l'ISO, `SHA256SUMS` et `SHA256SUMS.asc` | La dernière release publique est la 1.0.7. Une installation neuve repart aujourd'hui d'une image qui contient la faille corrigée ce matin (elle la recevrait ensuite par apt, mais elle démarre vulnérable) | S |
-| 🔵 | **Sortir le certificat de révocation de la machine** — il existe (`/root/.gnupg-codebyr/openpgp-revocs.d/`) mais il est sur le même disque que la clé qu'il sert à révoquer | Si le poste est perdu ou chiffré par un rançongiciel, vous perdez la clé **et** le moyen de la révoquer | S |
 
 ---
 
@@ -84,8 +83,6 @@ démarre plus », sur la fonction centrale du système.
 
 | | Chantier | Pourquoi | Effort |
 |---|---|---|---|
-| 🔴 | **Clé maîtresse hors ligne + sous-clés dédiées** (`releases`, `apt`) | Une sous-clé volée se révoque et se remplace **sans changer l'empreinte publiée**, donc sans faire réimporter une clé à tous les utilisateurs. Impossible aujourd'hui : une seule clé fait tout | M |
-| 🔴 | **Expiration à 1 an sur les sous-clés** | La clé actuelle expire le 07/07/2028 (688 jours). Une clé volée reste valable jusque-là | S |
 | 🔴 | **Publier l'empreinte à plusieurs endroits indépendants** (dépôt, site, réseaux sociaux, éventuellement un keyserver) | Aujourd'hui elle n'est que dans le dépôt : quiconque contrôle le dépôt contrôle l'ancre de confiance | S |
 | 🔵 | **ISO reproductibles** | Deux constructions de la même version donnent aujourd'hui deux images différentes (horodatage, état du miroir Debian). Personne ne peut vérifier indépendamment que l'ISO publiée correspond au code publié | L |
 | 🔵 | **Automatiser la re-signature de l'extension en CI** | La signature AMO est manuelle. Un correctif du bouclier peut rester lettre morte — le test l'attrape désormais, mais il faut encore agir à la main | M |
@@ -176,6 +173,7 @@ démarre plus », sur la fonction centrale du système.
 | 🟠 | **Retour d'erreur au lancement** : le menu du Sceau prévient quand une application ne démarre pas |
 | 🟠 | **Journal système** (`journalctl -t codebyr`) — sans jamais consigner le fichier ouvert ni l'adresse visitée |
 | 🔵 | CHANGELOG public, modèles d'issues, Dependabot, actions GitHub à jour |
+| 🔴 | **La chaîne de signature est durcie.** Phrase de passe posée, sous-clé de signature dédiée (expire dans un an), clé maîtresse et certificat de révocation sortis de la machine sur support amovible. Un vol du poste de construction ne donne plus que de quoi signer — révocable sans que personne ne réimporte l'empreinte publiée |
 | 🔴 | **Phrase de passe sur la clé de signature** — posée le 20/08/2026. Au passage, le contrôle qui devait refuser de signer avec une clé nue lisait la mauvaise colonne de `keyinfo` : il ne pouvait pas se déclencher |
 | 🔵 | **`build.sh` ne peut plus « réussir » sans rien reconstruire.** live-build note ses étapes dans `.build/`, que le `rsync` du script préservait : une reconstruction sautait tout, annonçait « Build completed successfully » en 90 secondes et ne produisait aucune ISO — ou pire, en aurait produit une contenant l'ancien chroot. Nettoyage automatique, et refus d'une ISO antérieure au début de la construction |
 | 🟠 | **Espace Banque non configuré : l'utilisateur comprend enfin.** Notification au lancement, et vraie page d'explication au lieu d'un texte brut — le nom d'hôte y est échappé, il vient du site visité |
@@ -193,17 +191,13 @@ tests. Détail dans [SECURITY.md](../SECURITY.md).
 
 ## Si je ne devais garder que trois choses
 
-1. **La clé de signature — la moitié du chemin est faite.** La phrase de passe
-   est posée (20/08/2026). Restent : une sous-clé dédiée au dépôt APT, la clé
-   maîtresse hors ligne, et surtout **le certificat de révocation sorti de la
-   machine** — il dort aujourd'hui à côté de la clé qu'il sert à révoquer, ce
-   qui le rend inutile le jour où ce poste est perdu ou chiffré par un
-   rançongiciel. Une demi-journée.
-2. **Des testeurs.** Les 44 autres chantiers relèvent de la supposition tant
-   que cinq personnes n'ont pas installé le système sur leur propre matériel.
-   Et `codebyr-space verifier-isolation` leur donne désormais de quoi vérifier
-   au lieu de croire.
-3. **`xdg-dbus-proxy`**, puis **un UID par Espace.** Le premier rend aux
-   Espaces les notifications et les portails que la 1.1.0 leur a retirés, sans
-   rouvrir la faille ; le second est le seul qui rende la promesse d'isolation
-   vraie même quand le bac à sable cède.
+1. **Des testeurs.** C'était le numéro deux, c'est devenu le numéro un : la
+   chaîne de signature est durcie, la 1.2.0 est publiée et vérifiable. Les
+   44 autres chantiers relèvent de la supposition tant que cinq personnes
+   n'ont pas installé le système sur leur propre matériel.
+2. **`xdg-dbus-proxy`** — pour rendre aux Espaces les notifications et les
+   portails perdus en 1.1.0, sans rouvrir la faille. Le point dur est analysé
+   plus haut : cela se tranche sur une machine.
+3. **Un UID par Espace.** Le seul chantier qui rende la promesse d'isolation
+   vraie même quand le bac à sable cède. Gros morceau, à dimensionner avant de
+   s'y engager.

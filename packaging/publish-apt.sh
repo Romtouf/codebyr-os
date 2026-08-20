@@ -190,8 +190,23 @@ gpg --batch --yes "${GPG_PASS[@]+"${GPG_PASS[@]}"}" \
 gpg --batch --yes "${GPG_PASS[@]+"${GPG_PASS[@]}"}" \
 	"${SIGNATAIRES[@]}" -abs -o Release.gpg Release
 
+# On COMPTE les signatures au lieu d'en montrer un extrait. La version
+# précédente tronquait la sortie à trois lignes : elle affichait donc une seule
+# signature, la même, que le dépôt en porte une ou deux. Impossible de voir à
+# l'œil que la double signature avait bien eu lieu — alors que c'est
+# exactement ce qui décide qu'un parc entier reste joignable ou non.
+attendues=$(( ${#SIGNATAIRES[@]} / 2 ))
 echo "==> Dépôt signé. Vérification :"
-gpg --verify Release.gpg Release 2>&1 | sed -n '1,3p'
+for fichier in "Release.gpg Release" "InRelease"; do
+	# shellcheck disable=SC2086  # découpage voulu : « Release.gpg Release »
+	obtenues="$(gpg --verify $fichier 2>&1 | grep -c 'Good signature' || true)"
+	echo "    ${fichier%% *} : $obtenues signature(s) valide(s) sur $attendues attendue(s)"
+	if [ "$obtenues" -lt "$attendues" ]; then
+		echo "ERREUR : signature manquante — ne déployez pas ce dépôt." >&2
+		exit 1
+	fi
+done
+gpg --verify Release.gpg Release 2>&1 | grep -E 'using|Good signature' || true
 echo
 echo "Déployer : rsync -a --delete \"$REPODIR/\" user@serveur:/chemin/apt-repo/"
 echo "ou copier apt-repo/ dans le volume du conteneur apt.codebyr.dev."

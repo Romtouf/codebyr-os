@@ -118,8 +118,42 @@ def est_systeme(esp_id):
 
 # ── Écriture : toujours sur la couche utilisateur ───────────────────────────
 
+def reduire_couche(data=None):
+    """Retire de la couche utilisateur tout ce qui est IDENTIQUE au système.
+
+    Indispensable pour les fichiers écrits par les versions précédentes : ils
+    contiennent une copie intégrale de la configuration, figée au jour où elle
+    a été créée. Superposer ne suffit pas à les guérir — une valeur recopiée
+    reste une valeur qui gagne, et continue donc de masquer les défauts livrés
+    ensuite. Ce qui n'est pas une différence n'a rien à faire ici.
+
+    Une valeur volontairement réglée sur le défaut disparaît elle aussi : c'est
+    le sens du modèle. Si le système change d'avis plus tard, elle suivra.
+    """
+    base = {e.get("id"): e for e in systeme().get("espaces", [])
+            if isinstance(e, dict) and e.get("id")}
+    data = couche() if data is None else data
+    retenus = []
+    for e in data.get("espaces", []):
+        if not isinstance(e, dict) or not e.get("id"):
+            continue
+        defaut = base.get(e["id"])
+        if defaut is None:
+            retenus.append(e)        # Espace créé par l'utilisateur : tout compte
+            continue
+        difference = {k: v for k, v in e.items()
+                      if k == "id" or k not in defaut or defaut[k] != v}
+        if len(difference) > 1:      # au-delà du seul identifiant
+            retenus.append(difference)
+    data["espaces"] = retenus
+    if data.get("apps") and data["apps"] == systeme().get("apps"):
+        data.pop("apps")
+    return data
+
+
 def ecrire_couche(data):
-    """Écrit la couche utilisateur, en retirant les clés calculées."""
+    """Écrit la couche utilisateur, réduite aux différences et sans clés calculées."""
+    data = reduire_couche(data)
     propre = {
         "_commentaire": "Personnalisations Codebyr. Les valeurs absentes d'ici "
                         "viennent de /etc/codebyr/espaces.json et suivent les "

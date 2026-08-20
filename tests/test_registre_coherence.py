@@ -166,6 +166,75 @@ class EcritureEnCouche(unittest.TestCase):
         self.assertEqual(registre.identifiant_libre("neuf"), "neuf")
 
 
+class ReduireUnAncienInstantane(unittest.TestCase):
+    """Guérir les fichiers écrits par les versions précédentes.
+
+    Superposer ne suffit pas : les anciennes versions enregistraient une COPIE
+    INTÉGRALE de la configuration, et une valeur recopiée reste une valeur qui
+    gagne. Sans réduction, tous les utilisateurs déjà installés resteraient
+    gelés sur les défauts du jour où ils ont touché leur premier réglage.
+    """
+
+    def setUp(self):
+        self._dossier = tempfile.TemporaryDirectory()
+        d = self._dossier.name
+        self._sys, self._usr = registre.SYSTEME, registre.UTILISATEUR
+        registre.SYSTEME = os.path.join(d, "systeme.json")
+        registre.UTILISATEUR = os.path.join(d, "utilisateur.json")
+        with open(registre.SYSTEME, "w", encoding="utf-8") as f:
+            json.dump({"espaces": [
+                {"id": "banque", "nom": "Banque", "couleur": "#2FA36B",
+                 "audio": False, "blindage": "renforce",
+                 "reseau": {"mode": "liste-blanche", "domaines": []}},
+                {"id": "travail", "nom": "Travail", "couleur": "#8F6CF0"},
+            ], "apps": [{"nom": "Navigateur", "cmd": "firefox-esr"}]}, f)
+        # Un instantané complet, tel que l'écrivaient les versions ≤ 1.1.0.
+        with open(registre.UTILISATEUR, "w", encoding="utf-8") as f:
+            json.dump({"espaces": [
+                {"id": "banque", "nom": "Banque", "couleur": "#2FA36B",
+                 "blindage": "renforce",
+                 "reseau": {"mode": "liste-blanche",
+                            "domaines": ["mabanque.fr"]}},
+                {"id": "travail", "nom": "Travail", "couleur": "#8F6CF0"},
+                {"id": "assoc", "nom": "Association", "couleur": "#43C7DF"},
+            ], "apps": [{"nom": "Navigateur", "cmd": "firefox-esr"}]}, f)
+
+    def tearDown(self):
+        registre.SYSTEME, registre.UTILISATEUR = self._sys, self._usr
+        self._dossier.cleanup()
+
+    def test_les_valeurs_recopiees_disparaissent(self):
+        reduit = registre.reduire_couche()
+        par_id = {e["id"]: e for e in reduit["espaces"]}
+        # « travail » n'était qu'une copie : il n'a plus rien à dire.
+        self.assertNotIn("travail", par_id)
+        # « banque » ne garde que sa vraie différence : la liste de domaines.
+        self.assertEqual(set(par_id["banque"]), {"id", "reseau"})
+        # La liste d'applications commune était identique au système.
+        self.assertNotIn("apps", reduit)
+
+    def test_un_espace_cree_par_l_utilisateur_est_intact(self):
+        par_id = {e["id"]: e for e in registre.reduire_couche()["espaces"]}
+        self.assertEqual(par_id["assoc"]["nom"], "Association")
+        self.assertEqual(par_id["assoc"]["couleur"], "#43C7DF")
+
+    def test_apres_reduction_les_defauts_atteignent_enfin_l_utilisateur(self):
+        """Le test qui compte : avant, « audio » restait hors d'atteinte."""
+        registre.ecrire_couche(registre.couche())
+        banque = registre.espaces()["banque"]
+        self.assertIs(banque["audio"], False)                       # le défaut arrive
+        self.assertEqual(banque["reseau"]["domaines"], ["mabanque.fr"])  # son choix tient
+        self.assertEqual(banque["nom"], "Banque")
+
+    def test_l_ecriture_reduit_automatiquement(self):
+        registre.modifier_espace("banque", {"audio": True})
+        with open(registre.UTILISATEUR, encoding="utf-8") as f:
+            couche = json.load(f)
+        par_id = {e["id"]: e for e in couche["espaces"]}
+        self.assertNotIn("travail", par_id, "l'écriture doit nettoyer au passage")
+        self.assertIs(par_id["banque"]["audio"], True)
+
+
 class LecteursCoherents(unittest.TestCase):
     """Les quatre lecteurs du registre doivent appliquer la même règle."""
 

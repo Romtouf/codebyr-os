@@ -1062,6 +1062,29 @@ def cmd_verifier_isolation():
     return 1
 
 
+def cmd_nettoyer_registre():
+    """Réduit vos réglages personnels à ce qui diffère vraiment des défauts.
+
+    Les versions antérieures à la 1.2.0 enregistraient une COPIE INTÉGRALE de
+    la configuration. Une valeur recopiée reste une valeur qui gagne : elle
+    continue donc de masquer les durcissements livrés ensuite, même après la
+    mise à jour. Cette commande fait le ménage une fois pour toutes."""
+    avant = registre.couche()
+    n_avant = sum(len(e) for e in avant.get("espaces", []) if isinstance(e, dict))
+    apres = registre.reduire_couche(dict(avant))
+    n_apres = sum(len(e) for e in apres.get("espaces", []) if isinstance(e, dict))
+    if n_apres == n_avant:
+        print("Vos réglages ne contiennent déjà que des différences. Rien à faire.")
+        return 0
+    registre.ecrire_couche(avant)
+    print("Réglages nettoyés : %d valeur(s) recopiée(s) du système retirée(s)."
+          % (n_avant - n_apres))
+    print("Vos choix personnels sont intacts ; les valeurs par défaut vous "
+          "atteindront de nouveau.")
+    journal("Registre utilisateur réduit (%d valeurs retirées)" % (n_avant - n_apres))
+    return 0
+
+
 def _action_launch(espaces, args):
     """launch <espace> [--fichier <f>] [-- commande...]"""
     esp_id, reste = args[0], args[1:]
@@ -1088,6 +1111,8 @@ ACTIONS = {
     "isolation":  (0, "isolation", lambda espaces, a: cmd_isolation()),
     "verifier-isolation": (0, "verifier-isolation",
                            lambda espaces, a: cmd_verifier_isolation()),
+    "nettoyer-registre": (0, "nettoyer-registre",
+                          lambda espaces, a: cmd_nettoyer_registre()),
     "launch":     (1, "launch <espace> [--fichier <f>] [-- commande...]",
                    _action_launch),
     "close":      (1, "close <espace>",

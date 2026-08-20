@@ -62,10 +62,15 @@ else
 	[ "$restant" -gt 30 ] || echo "AVERTISSEMENT : expiration proche — renouvelez AVANT." >&2
 fi
 
-# Phrase de passe : on interroge gpg-agent (champ « protection » de keyinfo).
-# En cas de doute, on ne bloque pas — on le dit.
+# Phrase de passe : on interroge gpg-agent. La ligne a cette forme —
+#   S KEYINFO <keygrip> D - - <cache> <protection> <fpr> <ttl> <flags>
+# soit, pour awk : $3 le keygrip, $7 le CACHE (0/1/-), $8 la PROTECTION (P/C/-).
+#
+# Ce contrôle lisait $7. Il cherchait donc un « C » dans une colonne qui n'en
+# contient jamais : le garde-fou ne pouvait PAS se déclencher. Une sécurité
+# décorative, qui rassure sans rien vérifier — le pire des deux mondes.
 protection="$(gpg-connect-agent 'keyinfo --list' /bye 2>/dev/null \
-	| awk '/^S KEYINFO/ {print $7}' | sort -u | tr '\n' ' ' || true)"
+	| awk '/^S KEYINFO/ {print $8}' | sort -u | tr '\n' ' ' || true)"
 case " $protection " in
 	*" C "*)
 		echo "ERREUR : au moins une clé privée de ce trousseau est SANS phrase de passe." >&2

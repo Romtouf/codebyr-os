@@ -100,6 +100,24 @@ class Paquet(unittest.TestCase):
                       "le script doit vérifier que l'ISO est postérieure au "
                       "début de la construction")
 
+    def test_le_controle_de_phrase_de_passe_lit_la_bonne_colonne(self):
+        """Un garde-fou qui ne peut pas se déclencher est pire qu'aucun.
+
+        `gpg-connect-agent keyinfo --list` renvoie :
+            S KEYINFO <keygrip> D - - <cache> <protection> <fpr> <ttl> <flags>
+        soit $7 = cache (0/1/-) et $8 = protection (P/C/-).
+
+        Le script lisait $7 : il cherchait un « C » dans une colonne qui n'en
+        contient jamais. Il annonçait donc « protection indéterminée » sur une
+        clé nue, et n'aurait jamais refusé de signer.
+        """
+        with open(os.path.join(RACINE, "packaging", "publish-apt.sh"),
+                  encoding="utf-8") as f:
+            source = f.read()
+        self.assertIn("{print $8}", source,
+                      "la protection de la clé est en colonne 8, pas 7")
+        self.assertNotIn("{print $7}", source)
+
     def test_pas_de_cache_python_dans_l_image(self):
         # Un __pycache__ traîné depuis un poste de développement finirait copié
         # tel quel dans l'ISO.

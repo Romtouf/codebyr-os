@@ -28,7 +28,6 @@ et un chantier écrit ici n'est pas un engagement, c'est une décision à prendr
 | | Chantier | Pourquoi | Effort |
 |---|---|---|---|
 | 🔵 | **Signer et publier l'ISO 1.1.0** — `sign-release.sh`, puis `gh release create v1.1.0` avec l'ISO, `SHA256SUMS` et `SHA256SUMS.asc` | La dernière release publique est la 1.0.7. Une installation neuve repart aujourd'hui d'une image qui contient la faille corrigée ce matin (elle la recevrait ensuite par apt, mais elle démarre vulnérable) | S |
-| 🔴 | **Phrase de passe sur la clé de signature** — procédure dans [chaine-de-signature.md](chaine-de-signature.md) | Devenu le premier risque du projet : le canal apt est vivant et atteint root sur toutes les machines ; la clé dort en clair sur un poste Windows de développement | S |
 | 🔵 | **Sortir le certificat de révocation de la machine** — il existe (`/root/.gnupg-codebyr/openpgp-revocs.d/`) mais il est sur le même disque que la clé qu'il sert à révoquer | Si le poste est perdu ou chiffré par un rançongiciel, vous perdez la clé **et** le moyen de la révoquer | S |
 
 ---
@@ -177,6 +176,7 @@ démarre plus », sur la fonction centrale du système.
 | 🟠 | **Retour d'erreur au lancement** : le menu du Sceau prévient quand une application ne démarre pas |
 | 🟠 | **Journal système** (`journalctl -t codebyr`) — sans jamais consigner le fichier ouvert ni l'adresse visitée |
 | 🔵 | CHANGELOG public, modèles d'issues, Dependabot, actions GitHub à jour |
+| 🔴 | **Phrase de passe sur la clé de signature** — posée le 20/08/2026. Au passage, le contrôle qui devait refuser de signer avec une clé nue lisait la mauvaise colonne de `keyinfo` : il ne pouvait pas se déclencher |
 | 🔵 | **`build.sh` ne peut plus « réussir » sans rien reconstruire.** live-build note ses étapes dans `.build/`, que le `rsync` du script préservait : une reconstruction sautait tout, annonçait « Build completed successfully » en 90 secondes et ne produisait aucune ISO — ou pire, en aurait produit une contenant l'ancien chroot. Nettoyage automatique, et refus d'une ISO antérieure au début de la construction |
 | 🟠 | **Espace Banque non configuré : l'utilisateur comprend enfin.** Notification au lancement, et vraie page d'explication au lieu d'un texte brut — le nom d'hôte y est échappé, il vient du site visité |
 | ⚪ | Adresses IPv6 dans le filtre réseau ; marqueurs de processus orphelins (ils faisaient afficher le mauvais liseré) ; boucles `for` sur `find` qui cassaient sur un chemin contenant une espace |
@@ -193,11 +193,12 @@ tests. Détail dans [SECURITY.md](../SECURITY.md).
 
 ## Si je ne devais garder que trois choses
 
-1. **La clé de signature.** Une phrase de passe, une sous-clé dédiée au dépôt
-   APT, la clé maîtresse hors ligne, le certificat de révocation ailleurs que
-   sur la machine qu'il protège. C'est devenu le premier risque du projet :
-   cette clé installe du code en root sur toutes les machines Codebyr, et elle
-   dort en clair sur un poste de développement. Une demi-journée.
+1. **La clé de signature — la moitié du chemin est faite.** La phrase de passe
+   est posée (20/08/2026). Restent : une sous-clé dédiée au dépôt APT, la clé
+   maîtresse hors ligne, et surtout **le certificat de révocation sorti de la
+   machine** — il dort aujourd'hui à côté de la clé qu'il sert à révoquer, ce
+   qui le rend inutile le jour où ce poste est perdu ou chiffré par un
+   rançongiciel. Une demi-journée.
 2. **Des testeurs.** Les 44 autres chantiers relèvent de la supposition tant
    que cinq personnes n'ont pas installé le système sur leur propre matériel.
    Et `codebyr-space verifier-isolation` leur donne désormais de quoi vérifier

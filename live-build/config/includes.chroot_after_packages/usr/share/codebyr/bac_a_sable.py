@@ -281,28 +281,3 @@ def cmd_verifier_isolation():
     print("\033[31mAu moins un contrôle a échoué.\033[0m Ne publiez pas cette "
           "version : signalez-le (voir SECURITY.md).")
     return 1
-
-
-def cmd_nettoyer_registre():
-    """Réduit vos réglages personnels à ce qui diffère vraiment des défauts.
-
-    Les versions antérieures à la 1.2.0 enregistraient une COPIE INTÉGRALE de
-    la configuration. Une valeur recopiée reste une valeur qui gagne : elle
-    continue donc de masquer les durcissements livrés ensuite, même après la
-    mise à jour. Cette commande fait le ménage une fois pour toutes."""
-    avant = registre.couche()
-    n_avant = sum(len(e) for e in avant.get("espaces", []) if isinstance(e, dict))
-    apres = registre.reduire_couche(dict(avant))
-    n_apres = sum(len(e) for e in apres.get("espaces", []) if isinstance(e, dict))
-    if n_apres == n_avant:
-        print("Vos réglages ne contiennent déjà que des différences. Rien à faire.")
-        return 0
-    registre.ecrire_couche(avant)
-    print("Réglages nettoyés : %d valeur(s) recopiée(s) du système retirée(s)."
-          % (n_avant - n_apres))
-    print("Vos choix personnels sont intacts ; les valeurs par défaut vous "
-          "atteindront de nouveau.")
-    journal("Registre utilisateur réduit (%d valeurs retirées)" % (n_avant - n_apres))
-    return 0
-
-

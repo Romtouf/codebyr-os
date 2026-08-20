@@ -1,6 +1,8 @@
 # Chantiers — Codebyr OS
 
-État au **19 août 2026**, juste après la publication de la 1.1.0.
+État au **20 août 2026**, pendant la préparation de la 1.2.0.
+Ce qui a été fermé est listé en fin de document — un suivi qui ne reflète pas
+l'état réel ne sert à rien.
 
 Ce document liste **tout** ce qui est identifié : les chantiers de fond, les
 correctifs de confort, la dette technique, et ce qui est volontairement écarté.
@@ -27,8 +29,6 @@ et un chantier écrit ici n'est pas un engagement, c'est une décision à prendr
 |---|---|---|---|
 | 🔵 | **Signer et publier l'ISO 1.1.0** — `sign-release.sh`, puis `gh release create v1.1.0` avec l'ISO, `SHA256SUMS` et `SHA256SUMS.asc` | La dernière release publique est la 1.0.7. Une installation neuve repart aujourd'hui d'une image qui contient la faille corrigée ce matin (elle la recevrait ensuite par apt, mais elle démarre vulnérable) | S |
 | 🔴 | **Phrase de passe sur la clé de signature** — procédure dans [chaine-de-signature.md](chaine-de-signature.md) | Devenu le premier risque du projet : le canal apt est vivant et atteint root sur toutes les machines ; la clé dort en clair sur un poste Windows de développement | S |
-| 🔴 | **Activer le signalement privé de vulnérabilité** sur GitHub : `gh api -X PUT repos/Romtouf/codebyr-os/private-vulnerability-reporting` | SECURITY.md demande d'utiliser l'onglet « Security → Report a vulnerability »… qui est désactivé. Le canal de signalement documenté **n'existe pas** : un chercheur bien intentionné n'a aujourd'hui aucun moyen privé de vous joindre | S |
-| 🔵 | **Cocher la Phase 5** dans le README (ISO signées ✅, CI ✅, site ✅ — restent les testeurs) | Le README annonce encore la diffusion comme non commencée | S |
 | 🔵 | **Sortir le certificat de révocation de la machine** — il existe (`/root/.gnupg-codebyr/openpgp-revocs.d/`) mais il est sur le même disque que la clé qu'il sert à révoquer | Si le poste est perdu ou chiffré par un rançongiciel, vous perdez la clé **et** le moyen de la révoquer | S |
 
 ---
@@ -41,7 +41,6 @@ et un chantier écrit ici n'est pas un engagement, c'est une décision à prendr
 | 🔴 | **`xdg-dbus-proxy` pour les portails et les notifications** | Depuis la 1.1.0, un Espace n'a plus qu'un bus privé vide : plus de notifications, plus de portails XDG (sélecteur de fichiers, capture d'écran). Un proxy filtrant rend ces services **sans** rouvrir l'accès au bus de session. C'est exactement ce que fait Flatpak. Gain de sécurité *et* de confort — le meilleur rapport des deux | M |
 | 🔴 | **Filtre réseau au niveau de l'Espace, pas du navigateur** | La liste blanche de Banque s'applique au profil Firefox : un binaire hostile lancé dans l'Espace la contourne. Un vrai cloisonnement demande un namespace réseau par Espace (veth + nftables, ou slirp), appliqué à **tous** les processus | L |
 | 🔴 | **Filtre seccomp dans le bac à sable** (`bwrap --seccomp`) | Aucun filtre d'appels système aujourd'hui : toute la surface du noyau est exposée depuis un Espace. C'est précisément la surface par laquelle une évasion passerait | M |
-| 🔴 | **Micro et son** | Le socket PipeWire vaut accès au microphone. Seul Banque le refuse (`"audio": false`), et uniquement via le registre système — un utilisateur ayant une copie personnelle du registre ne l'a pas. Il faut un réglage visible dans « Configuration Codebyr », par Espace | S |
 | 🔴 | **Presse-papiers** | La protection est **temporelle** (vidage au changement d'Espace), pas étanche : le compositeur Wayland est partagé. Une vraie séparation demande un mécanisme au niveau du compositeur | L |
 | 🔴 | **Applications Flatpak système** | Une application Flatpak installée pour toute la machine est partagée entre Espaces et garde son propre bac à sable ; le liseré n'y est qu'indicatif. Soit on force l'installation par Espace, soit on le signale clairement dans l'interface (aujourd'hui c'est écrit… dans le terminal) | M |
 | 🔴 | **Profils AppArmor pour les composants Codebyr** | Seuls les profils Debian de série sont actifs. `codebyr-space`, `codebyr-net-proxy` et l'extension n'ont pas de profil dédié | M |
@@ -82,11 +81,9 @@ et un chantier écrit ici n'est pas un engagement, c'est une décision à prendr
 | 🟠 | **« Ouvrir en Jetable » au clic droit dans Fichiers** | C'est le geste naturel, il était promis dans la documentation, il n'existe pas. Aujourd'hui il faut passer par le menu du Sceau ou la ligne de commande | M |
 | 🟠 | **« Envoyer vers l'Espace… » dans Fichiers** | Annoncé dans l'architecture (marqué `[visé]`). Le transfert passe aujourd'hui par l'export/import d'instantané ou le presse-papiers explicite | M |
 | 🟠 | **Notifications depuis les Espaces** | Perdues depuis la 1.1.0 (bus privé). Dépend du chantier `xdg-dbus-proxy` | — |
-| 🟠 | **Retour d'erreur quand une application ne démarre pas** | L'extension lance `codebyr-space` sans lire sa sortie : si le lancement échoue, l'utilisateur ne voit **rien** | S |
 | 🟠 | **Thème GTK/libadwaita Codebyr** clair et sombre | Annoncé dans l'architecture (`[visé]`). Aujourd'hui : accent GNOME « teal », fonds d'écran et réglages par défaut | M |
 | 🟠 | **Internationalisation (gettext)** | Toutes les chaînes des outils Codebyr sont en français, en dur. Le système propose ~150 locales, mais Codebyr lui-même reste monolingue — un frein direct à l'adoption hors francophonie | L |
 | 🟠 | **Mode invité : point d'entrée plus clair** | Le menu du Sceau ouvre le sélecteur d'utilisateur GNOME ; l'utilisateur doit encore comprendre qu'il faut choisir « Invité » | S |
-| 🟠 | **Journal des actions Codebyr** | Aucune trace exploitable quand un utilisateur signale « ça n'a pas marché ». Un journal (`journalctl`, identifiant `codebyr`) rendrait le support possible | S |
 
 ---
 
@@ -94,13 +91,8 @@ et un chantier écrit ici n'est pas un engagement, c'est une décision à prendr
 
 | | Chantier | Pourquoi | Effort |
 |---|---|---|---|
-| 🔵 | **`codebyr-space verifier-isolation`** : une commande qui lance une sonde **dans** un bac à sable et rapporte ce qui est joignable (bus de session, systemd, micro, réseau) | Les trois vérifications qu'on a faites à la main en VM deviendraient une commande, reproductible par n'importe quel testeur, et exécutable après chaque mise à jour | M |
 | 🔵 | **Tests pour `codebyr-config` et `codebyr-assistant`** | Ils dépendent de GTK, donc ne sont pas testés. Extraire la logique pure (registre, domaines, journal des refus) la rendrait testable | M |
 | 🔵 | **Construction de l'ISO en CI** | Longue et exigeante (root, périphériques *loop*) : plutôt un déclenchement manuel ou nocturne qu'à chaque commit | L |
-| 🔵 | **Nettoyer les 6 avertissements `shellcheck`** (`SC2044`, boucles `for` sur `find`, dans `0500-debrand.hook.chroot`) | Signalés sans bloquer. Sans conséquence sur ces chemins, mais autant ne pas laisser de bruit | S |
-| 🔵 | **Actions GitHub sur Node 20 déprécié** (`actions/checkout@v4`, `setup-python@v5`) | Avertissement à chaque run ; il faudra passer aux versions suivantes | S |
-| 🔵 | **Dependabot** pour les actions GitHub (actuellement désactivé) | Sinon les versions d'actions vieillissent en silence | S |
-| 🔵 | **CHANGELOG.md public** | L'historique vit dans les messages de commit et le tableau de SECURITY.md. Un utilisateur qui veut savoir ce qu'apporte une version n'a pas d'endroit évident | S |
 
 ---
 
@@ -112,7 +104,6 @@ et un chantier écrit ici n'est pas un engagement, c'est une décision à prendr
 | 🔵 | **Un second mainteneur** | Facteur bus = 1, sur un projet qui pousse du code en root chez ses utilisateurs. C'est écrit dans CONTRIBUTING ; ça ne se règle pas en l'écrivant | — |
 | 🟠 | **Publier les posts de lancement** | LinkedIn est prêt ; LinuxFr, Show HN, Reddit et Mastodon sont rédigés | S |
 | 🟠 | **La vidéo de démonstration** | Le storyboard existe, la vidéo non. À refaire avec les gestes **réels** (le storyboard montrait un clic droit qui n'existe pas — corrigé dans le texte) | M |
-| 🔵 | **Modèles d'issues et tri** | Aucun modèle aujourd'hui ; les premiers rapports arriveront en vrac | S |
 | 🔵 | **Liste de compatibilité matérielle** | À construire à partir des retours de testeurs (UEFI/BIOS, GPU, Wi-Fi) | — |
 
 ---
@@ -121,15 +112,11 @@ et un chantier écrit ici n'est pas un engagement, c'est une décision à prendr
 
 | | Point | Détail | Effort |
 |---|---|---|---|
-| ⚪ | **Registre des Espaces lu par 4 programmes** | Trois en Python, un en GJS. Impossible de partager du code entre les deux langages ; la cohérence est garantie par un test (`tests/test_registre_coherence.py`) plutôt que par le langage. Un démon `codebyr-spaced` serait la vraie réponse — mais il ajouterait un service privilégié à sécuriser | L |
 | ⚪ | **`codebyr-space` fait ~1 000 lignes** | Découpage souhaitable, contraint par le choix « ce sont des commandes, pas une bibliothèque » | M |
-| ⚪ | **Proxy : adresses IPv6 littérales** | `CONNECT [2001:db8::1]:443` conserve les crochets et la connexion échoue. Impact quasi nul (les navigateurs utilisent des noms), mais c'est faux | S |
 | ⚪ | **Proxy : pas de SOCKS** | HTTP et CONNECT uniquement. Suffisant pour un navigateur, insuffisant pour d'autres applications | M |
-| ⚪ | **Espace jetable dans `/tmp`** | Le dossier personnel éphémère vit dans `/tmp`, souvent en RAM. Un téléchargement volumineux dans un Jetable peut saturer la mémoire | S |
+| ⚪ | **Espace jetable en mémoire vive** | Le dossier éphémère vit dans `/tmp`, donc en RAM : rien de ce qu'on ouvre en Jetable n'atteint jamais le disque, ce qui est exactement la promesse. Le revers est qu'un téléchargement volumineux peut saturer la mémoire. **Arbitrage assumé** : le déplacer sur disque protégerait la RAM au prix de la propriété qui fait l'intérêt du Jetable. À revoir seulement si des testeurs rencontrent le problème | — |
 | ⚪ | **`desktop_exec` ignore les *Actions* des fichiers `.desktop`** | Seule la ligne `Exec` principale est lue | S |
-| ⚪ | **Fichiers `pid-*` orphelins** | Si un processus meurt anormalement, son marqueur reste dans le répertoire d'exécution jusqu'à la prochaine fermeture d'Espace | S |
 | ⚪ | **L'extension relit le registre à chaque fenêtre créée** | Sans conséquence perceptible, mais inutile | S |
-| ⚪ | **Réglages système masqués par la copie utilisateur** | Dès qu'un utilisateur a un `~/.config/codebyr/espaces.json`, les nouveaux réglages livrés dans `/etc` (comme `"audio": false` sur Banque) ne s'appliquent plus à lui. Il faudrait fusionner les deux registres au lieu de choisir l'un ou l'autre | M |
 
 ---
 
@@ -144,8 +131,45 @@ et un chantier écrit ici n'est pas un engagement, c'est une décision à prendr
 
 ---
 
+## Fait
+
+### 1.2.0 (en préparation)
+
+| | Chantier |
+|---|---|
+| 🔴 | **Les réglages du système atteignent enfin les utilisateurs qui personnalisent.** Le fichier utilisateur remplaçait celui du système : dès qu'on touchait un réglage, plus aucun défaut livré par apt ne pouvait plus l'atteindre — plus on configurait, moins on était protégé. Les deux se superposent désormais clé par clé, et l'écriture ne consigne que les différences |
+| 🔴 | **Son et micro réglables par Espace**, dans « Configuration Codebyr » |
+| 🔴 | **Signalement privé de vulnérabilité activé** — le canal que SECURITY.md documentait n'existait pas |
+| 🔵 | **`codebyr-space verifier-isolation`** : une sonde s'exécute dans un vrai bac à sable et rapporte ce qu'un Espace atteint réellement, pour trois situations |
+| 🔵 | **Le registre tient dans un module partagé** (`/usr/share/codebyr/registre.py`) au lieu de quatre implémentations — c'est ainsi qu'elles avaient divergé. L'extension GJS applique la même règle, vérifiée par les tests |
+| 🔵 | **La CI vérifie la syntaxe JavaScript** (une erreur dans `extension.js` supprimait le menu et les liserés, sans message) **et refuse les bashismes** dans les scripts `#!/bin/sh` (invisibles pour `bash -n` comme pour `dash -n`, ils ne cassent qu'à la construction de l'ISO) |
+| 🟠 | **Retour d'erreur au lancement** : le menu du Sceau prévient quand une application ne démarre pas |
+| 🟠 | **Journal système** (`journalctl -t codebyr`) — sans jamais consigner le fichier ouvert ni l'adresse visitée |
+| 🔵 | CHANGELOG public, modèles d'issues, Dependabot, actions GitHub à jour |
+| ⚪ | Adresses IPv6 dans le filtre réseau ; marqueurs de processus orphelins (ils faisaient afficher le mauvais liseré) ; boucles `for` sur `find` qui cassaient sur un chemin contenant une espace |
+
+### 1.1.0 (19 août 2026)
+
+Sortie de bac à sable par le bus de session, dossier personnel lisible par le
+compte invité sur le système installé, mot de passe invité public, Espace à
+liste blanche vide qui laissait tout passer, faux positifs du bouclier, repli
+« extension non signée », discours aligné sur le code, première CI et premiers
+tests. Détail dans [SECURITY.md](../SECURITY.md).
+
+---
+
 ## Si je ne devais garder que trois choses
 
-1. **Terminer la 1.1.0** — signer l'ISO, publier la release, poser une phrase de passe sur la clé, activer le signalement de vulnérabilité. Quelques heures, et le projet est propre.
-2. **Des testeurs.** Tout le reste est supposition sans eux.
-3. **`xdg-dbus-proxy`**, puis **un UID par Espace.** Le premier rend aux Espaces ce que la 1.1.0 leur a retiré ; le second est le seul qui rende la promesse d'isolation vraie même quand le bac à sable cède.
+1. **La clé de signature.** Une phrase de passe, une sous-clé dédiée au dépôt
+   APT, la clé maîtresse hors ligne, le certificat de révocation ailleurs que
+   sur la machine qu'il protège. C'est devenu le premier risque du projet :
+   cette clé installe du code en root sur toutes les machines Codebyr, et elle
+   dort en clair sur un poste de développement. Une demi-journée.
+2. **Des testeurs.** Les 44 autres chantiers relèvent de la supposition tant
+   que cinq personnes n'ont pas installé le système sur leur propre matériel.
+   Et `codebyr-space verifier-isolation` leur donne désormais de quoi vérifier
+   au lieu de croire.
+3. **`xdg-dbus-proxy`**, puis **un UID par Espace.** Le premier rend aux
+   Espaces les notifications et les portails que la 1.1.0 leur a retirés, sans
+   rouvrir la faille ; le second est le seul qui rende la promesse d'isolation
+   vraie même quand le bac à sable cède.

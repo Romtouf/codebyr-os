@@ -133,6 +133,32 @@ class Paquet(unittest.TestCase):
                       "la protection de la clé est en colonne 8, pas 7")
         self.assertNotIn("{print $7}", source)
 
+    def test_la_publication_refuse_une_signature_unique(self):
+        """Signer sans la clé maîtresse bloque définitivement des machines.
+
+        Une machine installée avec une ISO antérieure à la sous-clé a un
+        trousseau qui l'ignore. Pour le réparer il lui faut codebyr-tools ≥
+        1.3, dont le postinst rafraîchit le trousseau — mais pour recevoir ce
+        paquet, apt doit vérifier une signature qu'il ne sait pas vérifier.
+        Elle ne se répare qu'à la main, sur place.
+
+        Le script se contentait d'avertir. Le 20/08/2026 l'avertissement a
+        défilé vingt lignes au-dessus d'un « Bonne signature » final, et le
+        dépôt à signature unique a été produit sans que personne ne le
+        remarque. Il doit donc REFUSER, et non prévenir.
+        """
+        with open(os.path.join(RACINE, "packaging", "publish-apt.sh"),
+                  encoding="utf-8") as f:
+            source = f.read()
+        self.assertIn("CODEBYR_TRANSITION_TERMINEE", source,
+                      "la signature par la sous-clé seule doit exiger une "
+                      "autorisation explicite")
+        debut = source.index('if [ "$etat_maitresse" = "#" ]')
+        fin = source.index("else", debut)
+        self.assertIn("exit 1", source[debut:fin],
+                      "sans la clé maîtresse, le script doit s'arrêter avant "
+                      "de générer quoi que ce soit")
+
     def test_les_dependances_arrivent_sans_intervention(self):
         """Une dépendance nouvelle doit pouvoir s'installer TOUTE SEULE.
 

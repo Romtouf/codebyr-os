@@ -118,20 +118,32 @@ SIGNATAIRES=(-u "$KEYID")
 etat_maitresse="$(gpg --list-secret-keys --with-colons "$KEYID" 2>/dev/null \
 	| awk -F: '/^sec:/ {print $15; exit}')"
 if [ "$etat_maitresse" = "#" ]; then
+	# On REFUSE, on n'avertit pas. Le 20/08/2026, cet avertissement a défilé
+	# vingt lignes au-dessus d'un « Bonne signature » final : le dépôt à
+	# signature unique a été produit sans que personne ne le remarque. Un
+	# garde-fou qu'on franchit sans s'en apercevoir n'en est pas un.
 	cat >&2 <<'TRANSITION'
-    ATTENTION : la clé maîtresse n'est pas sur ce poste (elle est hors ligne,
-    c'est voulu). Le dépôt ne sera donc signé QUE par la sous-clé.
+    ARRÊT : la clé maîtresse n'est pas sur ce poste (elle est hors ligne,
+    c'est voulu). Le dépôt ne serait donc signé QUE par la sous-clé.
 
-    Les machines dont le trousseau date d'avant la création de cette sous-clé
-    refuseront la signature et cesseront de recevoir les mises à jour — sans
-    intervention manuelle sur chacune.
+    Ce que cela casserait, précisément : une machine installée avec une ISO
+    antérieure à la sous-clé a un trousseau qui l'ignore. Pour le réparer il
+    lui faut codebyr-tools ≥ 1.3, dont le postinst rafraîchit le trousseau —
+    mais pour recevoir ce paquet, apt doit d'abord vérifier une signature
+    qu'il ne sait pas vérifier. La machine est bloquée pour de bon, et ne se
+    répare qu'à la main, sur place.
 
-    Pour une transition sans douleur : rebranchez le support, importez la
-    maîtresse le temps de publier, puis retirez-la.
+    Rebranchez le support, importez la maîtresse le temps de publier, retirez-la :
+        mount -t drvfs D: /mnt/d          # WSL ne monte pas ce qu'on branche après lui
         gpg --import /mnt/d/codebyr-cles/codebyr-maitresse-SECRETE.asc
         …publier…
         rm $GNUPGHOME/private-keys-v1.d/<keygrip-maitresse>.key
+
+    Le jour où plus aucune machine n'a de trousseau d'avant la sous-clé, cette
+    transition n'a plus lieu d'être : CODEBYR_TRANSITION_TERMINEE=1.
 TRANSITION
+	[ "${CODEBYR_TRANSITION_TERMINEE:-0}" = "1" ] || exit 1
+	echo "    → signature par la sous-clé seule (transition déclarée terminée)." >&2
 else
 	# Le « ! » impose la clé MAÎTRESSE elle-même — sans lui, gpg choisirait
 	# encore la sous-clé et l'on signerait deux fois avec la même.

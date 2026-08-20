@@ -38,7 +38,7 @@ for chemin in \
 	usr/bin/codebyr-verifier \
 	usr/bin/codebyr-durcir-poste \
 	usr/share/gnome-shell/extensions/codebyr@codebyr.io \
-	usr/share/codebyr/antiphishing \
+	usr/share/codebyr \
 	etc/codebyr/espaces.json
 do
 	if [ -e "$SRC/$chemin" ]; then

@@ -31,19 +31,18 @@ import tempfile
 import time
 import unicodedata
 
-REGISTRY = "/etc/codebyr/espaces.json"
-USER_REGISTRY = os.path.expanduser("~/.config/codebyr/espaces.json")
+# Module partagé de lecture/écriture du registre (voir /usr/share/codebyr/).
+# CODEBYR_LIB permet de le charger ailleurs — tests, développement.
+sys.path.insert(0, os.environ.get("CODEBYR_LIB", "/usr/share/codebyr"))
+import registre  # noqa: E402
+
 DATA_ROOT = os.path.expanduser("~/.local/share/codebyr/espaces")
 
 
 def load_espaces():
-    path = USER_REGISTRY if os.path.exists(USER_REGISTRY) else REGISTRY
-    try:
-        with open(path, encoding="utf-8") as f:
-            return {e["id"]: e for e in json.load(f).get("espaces", [])}
-    except (OSError, ValueError) as exc:
-        sys.stderr.write("codebyr-space : registre illisible (%s) : %s\n" % (path, exc))
-        return {}
+    """Les Espaces, valeurs par défaut du système recouvertes par les choix
+    de l'utilisateur (voir registre.charger)."""
+    return registre.espaces()
 
 
 def desktop_exec(desktop_id):
@@ -671,8 +670,6 @@ def cmd_import(espaces, esp_id, source=None):
     return 0
 
 
-BUILTIN_IDS = ("personnel", "travail", "banque", "navigation", "jetable")
-
 FLATHUB_REPO = "/etc/flatpak/remotes.d/flathub.flatpakrepo"
 
 
@@ -718,15 +715,12 @@ def _flatpak_nom_lisible(env, appid):
 
 
 def _enregistrer_app(esp_id, nom, cmd):
-    """Ajoute l'application au menu de CET Espace (registre utilisateur)."""
-    data = _registre_complet()
-    for e in data.get("espaces", []):
-        if e.get("id") == esp_id:
-            apps = e.setdefault("apps", [])
-            if not any(a.get("cmd") == cmd for a in apps):
-                apps.append({"nom": nom, "cmd": cmd})
-            break
-    _ecrire_registre_utilisateur(data)
+    """Ajoute l'application au menu de CET Espace (personnalisation utilisateur)."""
+    esp = registre.espaces().get(esp_id) or {}
+    apps = list(esp.get("apps") or [])
+    if not any(a.get("cmd") == cmd for a in apps):
+        apps.append({"nom": nom, "cmd": cmd})
+    registre.modifier_espace(esp_id, {"apps": apps})
 
 
 def cmd_install(esp_id, appid):
@@ -810,32 +804,11 @@ def cmd_remove_app(esp_id, appid):
         return 2
     env, _ = _flatpak_env(esp_id)
     rc = subprocess.call(["flatpak", "--user", "uninstall", "-y", appid], env=env)
-    data = _registre_complet()
-    for e in data.get("espaces", []):
-        if e.get("id") == esp_id:
-            e["apps"] = [a for a in e.get("apps", [])
-                         if a.get("cmd") != "flatpak run " + appid]
-            break
-    _ecrire_registre_utilisateur(data)
+    apps = [a for a in (esp.get("apps") or [])
+            if a.get("cmd") != "flatpak run " + appid]
+    registre.modifier_espace(esp_id, {"apps": apps})
     print("« %s » retirée de l'Espace %s." % (appid, esp["nom"]))
     return rc
-
-
-def _registre_complet():
-    """Charge le registre complet (espaces + apps), depuis la copie utilisateur
-    si elle existe, sinon depuis la copie système."""
-    path = USER_REGISTRY if os.path.exists(USER_REGISTRY) else REGISTRY
-    try:
-        with open(path, encoding="utf-8") as f:
-            return json.load(f)
-    except (OSError, ValueError):
-        return {"espaces": [], "apps": []}
-
-
-def _ecrire_registre_utilisateur(data):
-    os.makedirs(os.path.dirname(USER_REGISTRY), exist_ok=True)
-    with open(USER_REGISTRY, "w", encoding="utf-8") as f:
-        json.dump(data, f, ensure_ascii=False, indent=2)
 
 
 def cmd_create(nom, couleur):
@@ -846,38 +819,29 @@ def cmd_create(nom, couleur):
         return 2
     if not couleur.startswith("#"):
         couleur = "#" + couleur
-    data = _registre_complet()
     base = unicodedata.normalize("NFKD", nom).encode("ascii", "ignore").decode().lower()
     base = re.sub(r"[^a-z0-9]+", "-", base).strip("-") or "espace"
-    ids = {e.get("id") for e in data.get("espaces", [])}
-    esp_id = base
-    n = 2
-    while esp_id in ids:
-        esp_id = "%s-%d" % (base, n)
-        n += 1
-    data.setdefault("espaces", []).append({
+    esp_id = registre.identifiant_libre(base)
+    registre.ajouter_espace({
         "id": esp_id, "nom": nom, "couleur": couleur,
         "app": "org.gnome.Nautilus.desktop", "ephemere": False,
     })
-    _ecrire_registre_utilisateur(data)
     print("Espace « %s » créé (%s)." % (nom, couleur))
     return 0
 
 
 def cmd_delete(esp_id):
-    """Supprime un Espace personnalisé (les Espaces intégrés ne sont pas supprimables)."""
-    if esp_id in BUILTIN_IDS:
+    """Supprime un Espace personnalisé. Les Espaces livrés par le système ne
+    sont pas supprimables — on interroge le registre système plutôt qu'une
+    liste codée en dur, qui aurait fini par diverger de son contenu."""
+    if registre.est_systeme(esp_id):
         sys.stderr.write("L'Espace intégré « %s » ne peut pas être supprimé.\n" % esp_id)
         return 2
     espaces = load_espaces()
     cmd_close(espaces, esp_id)
-    data = _registre_complet()
-    avant = len(data.get("espaces", []))
-    data["espaces"] = [e for e in data.get("espaces", []) if e.get("id") != esp_id]
-    if len(data["espaces"]) == avant:
+    if not registre.supprimer_espace(esp_id):
         print("Espace introuvable : %s" % esp_id)
         return 1
-    _ecrire_registre_utilisateur(data)
     d = os.path.join(DATA_ROOT, esp_id)
     if os.path.isdir(d):
         shutil.rmtree(d, ignore_errors=True)

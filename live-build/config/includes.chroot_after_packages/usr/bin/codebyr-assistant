@@ -5,16 +5,17 @@ codebyr-assistant — l'assistant de sécurité de Codebyr OS.
 Explique en clair les situations de sécurité du quotidien. 100% local, privé.
 """
 import glob
-import json
 import os
+import sys
 
 import gi
 gi.require_version("Gtk", "4.0")
 gi.require_version("Adw", "1")
 from gi.repository import Adw, Gtk, Gio  # noqa: E402
 
-REGISTRY = "/etc/codebyr/espaces.json"
-USER_REGISTRY = os.path.expanduser("~/.config/codebyr/espaces.json")
+# Registre partagé : vue fusionnée (défauts du système + choix de l'utilisateur).
+sys.path.insert(0, os.environ.get("CODEBYR_LIB", "/usr/share/codebyr"))
+import registre  # noqa: E402
 
 CONNAITRE = [
     ("Qu'est-ce qu'un Espace ?",
@@ -70,19 +71,14 @@ REAGIR = [
 
 
 def _domaines_banque():
-    # La copie UTILISATEUR fait foi si elle existe : c'est elle que « Configuration
-    # Codebyr » écrit. Lire /etc seul faisait afficher « aucune banque » à un
-    # utilisateur qui venait pourtant d'enregistrer la sienne.
-    path = USER_REGISTRY if os.path.exists(USER_REGISTRY) else REGISTRY
-    try:
-        with open(path, encoding="utf-8") as f:
-            data = json.load(f)
-        for e in data.get("espaces", []):
-            r = e.get("reseau") or {}
-            if r.get("mode") == "liste-blanche":
-                return [d.removeprefix("*.") for d in (r.get("domaines") or [])]
-    except (OSError, ValueError):
-        pass
+    """Les domaines protégés, vus depuis la FUSION des deux registres : les
+    défauts du système recouverts par ce que « Configuration Codebyr » a
+    enregistré. Lire /etc seul faisait afficher « aucune banque » à quelqu'un
+    qui venait pourtant d'enregistrer la sienne."""
+    for e in registre.charger().get("espaces", []):
+        r = e.get("reseau") or {}
+        if r.get("mode") == "liste-blanche":
+            return [d.removeprefix("*.") for d in (r.get("domaines") or [])]
     return []
 
 

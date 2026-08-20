@@ -7,34 +7,25 @@ le bouclier anti-hameçonnage) et de voir ses Espaces. 100% local.
 """
 import configparser
 import glob
-import json
 import os
 import re
 import shutil
 import subprocess
+import sys
 
 import gi
 gi.require_version("Gtk", "4.0")
 gi.require_version("Adw", "1")
 from gi.repository import Adw, Gtk, Gio, GLib  # noqa: E402
 
-SYSTEM = "/etc/codebyr/espaces.json"
-USER = os.path.expanduser("~/.config/codebyr/espaces.json")
+# Registre partagé : la vue est la FUSION des défauts du système et des choix
+# de l'utilisateur ; on n'enregistre jamais que les différences (voir le module).
+sys.path.insert(0, os.environ.get("CODEBYR_LIB", "/usr/share/codebyr"))
+import registre  # noqa: E402
 
 
 def load_registry():
-    path = USER if os.path.exists(USER) else SYSTEM
-    try:
-        with open(path, encoding="utf-8") as f:
-            return json.load(f)
-    except (OSError, ValueError):
-        return {"espaces": [], "apps": []}
-
-
-def save_registry(data):
-    os.makedirs(os.path.dirname(USER), exist_ok=True)
-    with open(USER, "w", encoding="utf-8") as f:
-        json.dump(data, f, ensure_ascii=False, indent=2)
+    return registre.charger()
 
 
 def espace_banque(data):
@@ -141,10 +132,13 @@ class Fenetre(Adw.ApplicationWindow):
         self.connect("notify::is-active", self._peut_etre_recharger)
 
     def _mtime_registre(self):
-        try:
-            return os.path.getmtime(USER if os.path.exists(USER) else SYSTEM)
-        except OSError:
-            return 0
+        dernier = 0
+        for chemin in (registre.SYSTEME, registre.UTILISATEUR):
+            try:
+                dernier = max(dernier, os.path.getmtime(chemin))
+            except OSError:
+                pass
+        return dernier
 
     def _peut_etre_recharger(self, *_a):
         if not self.is_active():
@@ -427,15 +421,23 @@ class Fenetre(Adw.ApplicationWindow):
                 return  # le rechargement au focus rafraîchira la liste
         lst = self._liste_modifiable()
         lst[:] = [a for a in lst if a.get("cmd") != cmd]
-        save_registry(self._data)
+        self._enregistrer_apps()
         self._construire()
 
     def _ajouter_app(self, nom, cmd):
         lst = self._liste_modifiable()
         if not any(a.get("cmd") == cmd for a in lst):
             lst.append({"nom": nom, "cmd": cmd})
-            save_registry(self._data)
+            self._enregistrer_apps()
         self._construire()
+
+    def _enregistrer_apps(self):
+        """Enregistre la liste d'applications de la portée courante."""
+        esp = self._espace_scope()
+        if esp is None:
+            registre.ecrire_apps_communes(self._data.get("apps", []))
+        else:
+            registre.modifier_espace(esp["id"], {"apps": esp.get("apps", [])})
 
     def _ouvrir_selecteur_app(self):
         dlg = Adw.Window(transient_for=self, modal=True,
@@ -672,18 +674,19 @@ class Fenetre(Adw.ApplicationWindow):
         for cible in (d, "*." + d):
             if cible not in doms:
                 doms.append(cible)
-        save_registry(self._data)
+        registre.modifier_espace(banque["id"], {"reseau": banque["reseau"]})
         self._construire()
 
     def _basculer_blindage(self, row, _pspec, esp_id):
+        # On écrit explicitement « None » pour désactiver : retirer la clé
+        # laisserait simplement revenir la valeur par défaut du système, et le
+        # bouton semblerait ne servir à rien.
+        valeur = "renforce" if row.get_active() else None
         for e in self._data.get("espaces", []):
             if e.get("id") == esp_id:
-                if row.get_active():
-                    e["blindage"] = "renforce"
-                else:
-                    e.pop("blindage", None)
+                e["blindage"] = valeur
                 break
-        save_registry(self._data)
+        registre.modifier_espace(esp_id, {"blindage": valeur})
 
     def _supprimer_domaine(self, _btn, d):
         banque = espace_banque(self._data)
@@ -691,7 +694,7 @@ class Fenetre(Adw.ApplicationWindow):
             return
         doms = banque.get("reseau", {}).get("domaines", [])
         banque["reseau"]["domaines"] = [x for x in doms if x != d]
-        save_registry(self._data)
+        registre.modifier_espace(banque["id"], {"reseau": banque["reseau"]})
         self._construire()
 
 

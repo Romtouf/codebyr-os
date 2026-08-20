@@ -21,26 +21,66 @@ import * as PopupMenu from 'resource:///org/gnome/shell/ui/popupMenu.js';
 import * as ModalDialog from 'resource:///org/gnome/shell/ui/modalDialog.js';
 import * as SystemActions from 'resource:///org/gnome/shell/misc/systemActions.js';
 
-const REGISTRY = '/etc/codebyr/espaces.json';
+const REGISTRE_SYSTEME = '/etc/codebyr/espaces.json';
 const DIAG = false;  // notifications de diagnostic
 const EP = 3;        // épaisseur du liseré
-const BUILTIN = ['personnel', 'travail', 'banque', 'navigation', 'jetable'];
 
-function registrePath() {
-    const u = GLib.get_home_dir() + '/.config/codebyr/espaces.json';
-    return GLib.file_test(u, GLib.FileTest.EXISTS) ? u : REGISTRY;
+function registreUtilisateur() {
+    return GLib.get_home_dir() + '/.config/codebyr/espaces.json';
+}
+
+function lireRegistre(chemin) {
+    try {
+        if (!GLib.file_test(chemin, GLib.FileTest.EXISTS))
+            return {espaces: [], apps: []};
+        const [ok, bytes] = GLib.file_get_contents(chemin);
+        if (!ok)
+            return {espaces: [], apps: []};
+        const data = JSON.parse(new TextDecoder().decode(bytes));
+        return {espaces: data.espaces || [], apps: data.apps || []};
+    } catch (e) {
+        logError(e, 'Codebyr: registre illisible (' + chemin + ')');
+        return {espaces: [], apps: []};
+    }
+}
+
+// Les deux registres se SUPERPOSENT, clé par clé : les valeurs par défaut du
+// système d'abord, recouvertes par les personnalisations de l'utilisateur.
+// Choisir « l'un OU l'autre », comme avant, figeait les défauts au jour où
+// l'utilisateur touchait son premier réglage : plus aucune valeur livrée par
+// une mise à jour ne pouvait plus l'atteindre. Même règle que le module Python
+// /usr/share/codebyr/registre.py — les deux sont vérifiés par les tests.
+function fusionner() {
+    const sys = lireRegistre(REGISTRE_SYSTEME);
+    const usr = lireRegistre(registreUtilisateur());
+    const perso = new Map();
+    for (const e of usr.espaces) {
+        if (e && e.id)
+            perso.set(e.id, e);
+    }
+    const espaces = [];
+    const vus = new Set();
+    for (const base of sys.espaces) {
+        if (!base || !base.id)
+            continue;
+        const espace = Object.assign({}, base, perso.get(base.id) || {});
+        espace._systeme = true;
+        espaces.push(espace);
+        vus.add(base.id);
+    }
+    for (const e of usr.espaces) {
+        if (!e || !e.id || vus.has(e.id))
+            continue;
+        const espace = Object.assign({}, e);
+        espace._systeme = false;
+        espaces.push(espace);
+        vus.add(e.id);
+    }
+    return {espaces, apps: (usr.apps.length ? usr.apps : sys.apps)};
 }
 
 function chargerEspaces() {
-    try {
-        const [ok, bytes] = GLib.file_get_contents(registrePath());
-        if (!ok)
-            return [];
-        return JSON.parse(new TextDecoder().decode(bytes)).espaces || [];
-    } catch (e) {
-        logError(e, 'Codebyr: registre illisible');
-        return [];
-    }
+    return fusionner().espaces;
 }
 
 const APPS_DEFAUT = [
@@ -51,15 +91,8 @@ const APPS_DEFAUT = [
 ];
 
 function chargerApps() {
-    try {
-        const [ok, bytes] = GLib.file_get_contents(registrePath());
-        if (ok) {
-            const apps = JSON.parse(new TextDecoder().decode(bytes)).apps;
-            if (apps && apps.length)
-                return apps;
-        }
-    } catch (e) {}
-    return APPS_DEFAUT;
+    const apps = fusionner().apps;
+    return (apps && apps.length) ? apps : APPS_DEFAUT;
 }
 
 function classeDe(win) {
@@ -680,7 +713,7 @@ class Indicateur extends PanelMenu.Button {
             sub.menu.addAction('Vider ses données', () => this._gerer('purge', e.id, e.nom));
             sub.menu.addAction('Créer un instantané (sauvegarde)', () => this._gerer('export', e.id, e.nom));
             sub.menu.addAction('Revenir à un instantané…', () => this._dialogueInstantanes(e.id, e.nom));
-            if (!BUILTIN.includes(e.id))
+            if (!e._systeme)
                 sub.menu.addAction('Supprimer cet Espace', () => this._gerer('delete', e.id, e.nom));
         }
         this.menu.addMenuItem(sub);

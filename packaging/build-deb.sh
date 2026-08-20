@@ -64,6 +64,15 @@ find "$STAGE/usr/share/gnome-shell" -type f -exec chmod 644 {} + 2>/dev/null || 
 TAILLE="$(du -sk "$STAGE" | cut -f1)"
 
 # 4) Métadonnées du paquet.
+#
+# python3-nautilus est une dépendance FERME, et non une simple recommandation.
+# Sans lui, le clic droit « Ouvrir en Jetable » n'est pas chargé — en silence,
+# sans le moindre message : le menu contextuel a l'air parfaitement normal.
+# Constaté le 20/08/2026 sur un poste où le paquet avait été installé par
+# « dpkg -i », qui n'installe jamais les recommandations.
+#
+# La leçon vaut au-delà de ce cas : une fonctionnalité qui repose sur un
+# Recommends n'est pas livrée, elle est espérée.
 mkdir -p "$STAGE/DEBIAN"
 cat > "$STAGE/DEBIAN/control" <<EOF
 Package: codebyr-tools
@@ -71,8 +80,8 @@ Version: $VERSION
 Architecture: all
 Maintainer: Codebyr OS <romain.formationoc@gmail.com>
 Installed-Size: $TAILLE
-Depends: python3, python3-gi, gir1.2-gtk-4.0, gir1.2-adw-1, bubblewrap, dbus-user-session, firefox-esr | firefox
-Recommends: flatpak, gnome-shell, python3-nautilus, libnotify-bin
+Depends: python3, python3-gi, gir1.2-gtk-4.0, gir1.2-adw-1, bubblewrap, dbus-user-session, firefox-esr | firefox, python3-nautilus
+Recommends: flatpak, gnome-shell, libnotify-bin
 Section: admin
 Priority: optional
 Homepage: https://os.codebyr.dev

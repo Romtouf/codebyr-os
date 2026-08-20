@@ -61,11 +61,14 @@ fi
 # — Paquet codebyr-tools embarqué : le hook 1000 l'installera via dpkg pour que
 #   codebyr-tools soit un VRAI paquet (donc suivi par apt/unattended-upgrades).
 #   Construit ici pour être toujours cohérent avec la version courante du dépôt.
+# Version relevée UNE FOIS, avant toute construction : c'est elle qui sera
+# embarquée dans l'image, et c'est donc elle qui doit la nommer à la fin.
+VER_EMBARQUEE="$(tr -d ' \t\r\n' < "$REPO/VERSION")"
+
 if [ -f "$REPO/packaging/build-deb.sh" ]; then
-	echo "==> Construction du paquet codebyr-tools (embarqué pour les MAJ)"
+	echo "==> Construction du paquet codebyr-tools $VER_EMBARQUEE (embarqué pour les MAJ)"
 	CODEBYR_REPO="$REPO" bash "$REPO/packaging/build-deb.sh" >/dev/null
-	VER="$(tr -d ' \t\r\n' < "$REPO/VERSION")"
-	DEBSRC="$REPO/packaging/dist/codebyr-tools_${VER}_all.deb"
+	DEBSRC="$REPO/packaging/dist/codebyr-tools_${VER_EMBARQUEE}_all.deb"
 	if [ -f "$DEBSRC" ]; then
 		mkdir -p "$WORK/config/includes.chroot_after_packages/opt/codebyr"
 		cp -f "$DEBSRC" "$WORK/config/includes.chroot_after_packages/opt/codebyr/"
@@ -128,6 +131,10 @@ ISO="$(ls -1 "$WORK"/*.iso 2>/dev/null | head -n1 || true)"
 if [ -n "$ISO" ] && [ ! "$ISO" -nt "$DEBUT" ]; then
 	echo "ERREUR : l'ISO trouvée est ANTÉRIEURE au début de cette construction." >&2
 	echo "         C'est un reliquat, pas votre version : rien n'a été reconstruit." >&2
+	# Les deux dates, sans quoi le diagnostic se fait à l'aveugle : c'est ce qui
+	# a coûté une demi-heure d'enquête le 20/08/2026.
+	echo "         ISO   : $(date -r "$ISO" '+%F %T')  ($ISO)" >&2
+	echo "         Début : $(date -r "$DEBUT" '+%F %T')" >&2
 	echo "         Relancez avec « $0 clean » pour repartir d'un arbre propre." >&2
 	exit 1
 fi
@@ -135,7 +142,12 @@ if [ -z "$ISO" ]; then
 	echo "ERREUR : aucune ISO produite (voir la sortie ci-dessus)." >&2
 	exit 1
 fi
-OUT="$DIST/codebyr-os-$(tr -d ' \t\r\n' < "$REPO/VERSION")-$(date +%Y%m%d)-amd64.iso"
+# Le nom porte la version EMBARQUÉE, relevée au début de la construction — pas
+# celle lue maintenant. Une construction dure une heure : si VERSION change
+# entre-temps (correctif publié pendant ce temps), relire le fichier ici
+# baptiserait l'image d'une version qu'elle ne contient pas. Une étiquette qui
+# ment sur son contenu est pire que pas d'étiquette du tout.
+OUT="$DIST/codebyr-os-${VER_EMBARQUEE}-$(date +%Y%m%d)-amd64.iso"
 cp -f "$ISO" "$OUT"
 sync
 echo "==> ISO prête : $OUT  ($(du -h "$OUT" | cut -f1))"

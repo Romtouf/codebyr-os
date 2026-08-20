@@ -10,6 +10,17 @@ GNOME (menu du Sceau, liserés colorés) ne se recharge pas à chaud.
 
 ---
 
+## 1.4.1 — en préparation
+
+**Le clic droit « Ouvrir en Jetable » manquait vraiment à l'appel.** La 1.4.0
+livrait bien l'extension, mais le greffon qui la charge (`python3-nautilus`)
+n'était qu'une *recommandation* : sur un poste où le paquet avait été installé
+à la main, il n'était pas là, et le menu contextuel restait parfaitement normal
+— sans le moindre message d'erreur. C'est désormais une dépendance ferme.
+
+Une fonctionnalité qui repose sur une recommandation n'est pas livrée, elle est
+espérée. Rien à faire de votre côté : la mise à jour installe ce qui manque.
+
 ## 1.4.0 — en préparation
 
 **« Ouvrir en Jetable » arrive dans le clic droit.** Le geste naturel — clic

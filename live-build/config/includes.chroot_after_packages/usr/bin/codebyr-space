@@ -576,10 +576,14 @@ def cmd_launch(espaces, esp_id, extra, fichier=None):
     _nettoyer_marqueurs()
 
     proxy = _demarrer_filtre_reseau(esp, home, app_cmd)
-    # Bouclier anti-hameçonnage dans les navigateurs des Espaces NON bancaires
-    # (Banque est déjà protégé par sa liste blanche réseau).
-    reseau = esp.get("reseau") or {}
-    if reseau.get("mode") != "liste-blanche" and "firefox" in os.path.basename(app_cmd[0]):
+    # Bouclier anti-hameçonnage dans TOUS les navigateurs, y compris celui de
+    # l'Espace Banque. On l'en excluait au motif que sa liste blanche suffit —
+    # mais cette liste est saisie à la main par l'utilisateur. Le jour où un
+    # domaine imitateur y entre par erreur, plus rien ne le signale : la liste
+    # blanche le laisse passer, et le bouclier n'était pas là pour crier.
+    # Or l'erreur humaine est précisément la menace que cette fonctionnalité
+    # existe pour couvrir.
+    if "firefox" in os.path.basename(app_cmd[0]):
         try:
             _installer_bouclier(esp, home, espaces)
         except OSError as exc:

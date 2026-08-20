@@ -422,3 +422,13 @@ thead .cmp__us { color: var(--accent) !important; border-radius: 10px 10px 0 0; 
 
 /* ── Focus visibility ────────────────────────────────────────── */
 :focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 6px; }
+
+/* Empreinte de la clé de signature : elle doit se lire et se comparer
+   caractère par caractère, d'où la police fixe et l'espacement généreux. */
+.empreinte{display:inline-block;margin-top:.35rem;padding:.45rem .7rem;
+  border-radius:8px;background:rgba(67,199,223,.10);
+  border:1px solid rgba(67,199,223,.25);
+  font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  font-size:.82rem;letter-spacing:.02em;line-height:1.6;word-break:break-all}
+.cta__note{display:inline-block;margin-top:.5rem;opacity:.72;font-size:.82rem;
+  max-width:42rem}

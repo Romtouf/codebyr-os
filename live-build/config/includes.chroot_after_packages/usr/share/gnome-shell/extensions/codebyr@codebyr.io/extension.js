@@ -50,7 +50,34 @@ function lireRegistre(chemin) {
 // l'utilisateur touchait son premier réglage : plus aucune valeur livrée par
 // une mise à jour ne pouvait plus l'atteindre. Même règle que le module Python
 // /usr/share/codebyr/registre.py — les deux sont vérifiés par les tests.
+// Le registre est relu à chaque fenêtre créée. Deux fichiers ouverts, décodés
+// et analysés en JSON pour chaque fenêtre qui s'ouvre — inutile, et c'est le
+// compositeur qui paie. On garde donc le résultat, invalidé dès que l'un des
+// deux fichiers change : une signature (date de modification + taille) coûte
+// deux appels système, contre deux lectures et deux analyses.
+let _fusionCache = null;
+let _fusionSignature = '';
+
+function signatureRegistres() {
+    let signature = '';
+    for (const chemin of [REGISTRE_SYSTEME, registreUtilisateur()]) {
+        try {
+            const info = Gio.File.new_for_path(chemin).query_info(
+                'time::modified,standard::size', Gio.FileQueryInfoFlags.NONE, null);
+            signature += chemin + ':' + info.get_attribute_uint64('time::modified')
+                + ':' + info.get_size() + ';';
+        } catch (e) {
+            signature += chemin + ':absent;';
+        }
+    }
+    return signature;
+}
+
 function fusionner() {
+    const signature = signatureRegistres();
+    if (_fusionCache && signature === _fusionSignature)
+        return _fusionCache;
+
     const sys = lireRegistre(REGISTRE_SYSTEME);
     const usr = lireRegistre(registreUtilisateur());
     const perso = new Map();
@@ -76,7 +103,9 @@ function fusionner() {
         espaces.push(espace);
         vus.add(e.id);
     }
-    return {espaces, apps: (usr.apps.length ? usr.apps : sys.apps)};
+    _fusionCache = {espaces, apps: (usr.apps.length ? usr.apps : sys.apps)};
+    _fusionSignature = signature;
+    return _fusionCache;
 }
 
 function chargerEspaces() {
@@ -249,7 +278,8 @@ class Coloriage {
     _suivre(win, diag) {
         if (!win || this._suivis.has(win))
             return;
-        // Recharge le registre pour reconnaître aussi les Espaces personnalisés.
+        // Relecture des Espaces (Espaces personnalisés compris) : passe par le
+        // cache ci-dessus, donc sans coût quand rien n'a changé.
         this._espaces = chargerEspaces();
         const rec = {lisere: null, signals: []};
         this._suivis.set(win, rec);

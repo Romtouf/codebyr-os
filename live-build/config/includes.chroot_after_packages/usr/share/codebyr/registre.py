@@ -212,6 +212,47 @@ def ecrire_apps_communes(apps):
     ecrire_couche(data)
 
 
+def normaliser_domaine(saisi):
+    """Transforme ce que l'utilisateur a tapé en nom de domaine, ou None.
+
+    C'est la seule porte d'entrée de la liste blanche bancaire : ce qui sort
+    d'ici devient une adresse que l'Espace Banque aura le droit de joindre. Une
+    analyse trop permissive y ferait entrer autre chose que ce que la personne
+    croit avoir saisi — d'où le refus par défaut plutôt que le « à peu près ».
+
+    Refusé : ce qui n'a pas de point, ce qui contient un caractère hors
+    [a-z0-9.-], une étiquette vide (« ..fr »), un tiret en début ou fin
+    d'étiquette, et les adresses IP (une banque a un nom, et une IP dans une
+    liste blanche ne protège de rien).
+    """
+    d = (saisi or "").strip().lower()
+    for prefixe in ("http://", "https://"):
+        if d.startswith(prefixe):
+            d = d[len(prefixe):]
+            break
+    # On coupe ce qui suit l'hôte : chemin, port, identifiants, ancre.
+    for separateur in ("/", "?", "#"):
+        d = d.split(separateur, 1)[0]
+    if "@" in d:                       # « https://user@piege.fr/ »
+        d = d.split("@", 1)[1]
+    d = d.split(":", 1)[0]             # port
+    d = d.strip(".")
+    d = d.removeprefix("www.")         # PAS lstrip : « wise.com » y perdrait son w
+
+    if not d or "." not in d:
+        return None
+    if any(c not in "abcdefghijklmnopqrstuvwxyz0123456789.-" for c in d):
+        return None
+    etiquettes = d.split(".")
+    if any(not e or e.startswith("-") or e.endswith("-") for e in etiquettes):
+        return None
+    if len(etiquettes[-1]) < 2:        # une extension d'un seul caractère
+        return None
+    if all(e.isdigit() for e in etiquettes):   # adresse IP
+        return None
+    return d
+
+
 def identifiant_libre(base):
     """Un identifiant d'Espace non utilisé, dérivé de « base »."""
     pris = set(espaces())

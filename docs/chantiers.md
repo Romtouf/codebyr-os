@@ -4,7 +4,7 @@
 Ce qui a été fermé est listé en fin de document — un suivi qui ne reflète pas
 l'état réel ne sert à rien.
 
-**36 chantiers ouverts.** Ce document liste **tout** ce qui est identifié : les chantiers de fond, les
+**33 chantiers ouverts.** Ce document liste **tout** ce qui est identifié : les chantiers de fond, les
 correctifs de confort, la dette technique, et ce qui est volontairement écarté.
 Il vaut mieux une liste longue et honnête qu'une liste courte et rassurante —
 et un chantier écrit ici n'est pas un engagement, c'est une décision à prendre.
@@ -75,7 +75,6 @@ démarre plus », sur la fonction centrale du système.
 
 | | Chantier | Pourquoi | Effort |
 |---|---|---|---|
-| 🔴 | **Publier l'empreinte à plusieurs endroits indépendants** (dépôt, site, réseaux sociaux, éventuellement un keyserver) | Aujourd'hui elle n'est que dans le dépôt : quiconque contrôle le dépôt contrôle l'ancre de confiance | S |
 | 🔵 | **ISO reproductibles** | Deux constructions de la même version donnent aujourd'hui deux images différentes (horodatage, état du miroir Debian). Personne ne peut vérifier indépendamment que l'ISO publiée correspond au code publié | L |
 | 🔵 | **Automatiser la re-signature de l'extension en CI** | La signature AMO est manuelle. Un correctif du bouclier peut rester lettre morte — le test l'attrape désormais, mais il faut encore agir à la main | M |
 
@@ -87,7 +86,6 @@ démarre plus », sur la fonction centrale du système.
 |---|---|---|---|
 | 🔴 | **Migration Manifest V2 → V3** | Firefox accepte encore MV2, mais AMO pousse vers MV3 et finira par refuser MV2 à la signature. Le bouclier étant un simple *content script* sans page d'arrière-plan, la conversion devrait rester mécanique — mais elle doit être faite **avant** le refus, pas après | M |
 | 🟠 | **Homographes internationaux (punycode)** | La détection gère quelques substitutions (`0`→`o`, `rn`→`m`…), pas les caractères Unicode ressemblants (cyrillique, grec). C'est une technique d'hameçonnage courante | M |
-| 🟠 | **Aucun bouclier dans l'Espace Banque** | Par conception (la liste blanche y suffit), mais si un domaine imitateur était ajouté à la liste blanche par erreur, rien ne le signalerait | S |
 | ⚪ | **La liste « sites approuvés » est par Espace** | Approuver un site dans Navigation ne l'approuve pas dans Personnel : chaque Espace a son profil Firefox. Cohérent avec le modèle, mais à expliquer aux utilisateurs | — |
 
 ---
@@ -110,7 +108,7 @@ démarre plus », sur la fonction centrale du système.
 
 | | Chantier | Pourquoi | Effort |
 |---|---|---|---|
-| 🔵 | **Tests pour `codebyr-config` et `codebyr-assistant`** | Ils dépendent de GTK, donc ne sont pas testés. Extraire la logique pure (registre, domaines, journal des refus) la rendrait testable | M |
+| 🔵 | **Tests pour `codebyr-config` et `codebyr-assistant`** | Ils dépendent de GTK. La saisie des domaines bancaires est désormais extraite et testée ; restent la détection des applications installées et le journal des refus | S |
 | 🔵 | **Construction de l'ISO en CI** | Longue et exigeante (root, périphériques *loop*) : plutôt un déclenchement manuel ou nocturne qu'à chaque commit | L |
 
 ---
@@ -135,7 +133,6 @@ démarre plus », sur la fonction centrale du système.
 | ⚪ | **Proxy : pas de SOCKS** | HTTP et CONNECT uniquement. Suffisant pour un navigateur, insuffisant pour d'autres applications | M |
 | ⚪ | **Espace jetable en mémoire vive** | Le dossier éphémère vit dans `/tmp`, donc en RAM : rien de ce qu'on ouvre en Jetable n'atteint jamais le disque, ce qui est exactement la promesse. Le revers est qu'un téléchargement volumineux peut saturer la mémoire. **Arbitrage assumé** : le déplacer sur disque protégerait la RAM au prix de la propriété qui fait l'intérêt du Jetable. À revoir seulement si des testeurs rencontrent le problème | — |
 | ⚪ | **`desktop_exec` ignore les *Actions* des fichiers `.desktop`** | Seule la ligne `Exec` principale est lue | S |
-| ⚪ | **L'extension relit le registre à chaque fenêtre créée** | Sans conséquence perceptible, mais inutile | S |
 
 ---
 
@@ -165,6 +162,10 @@ démarre plus », sur la fonction centrale du système.
 | 🟠 | **Retour d'erreur au lancement** : le menu du Sceau prévient quand une application ne démarre pas |
 | 🟠 | **Journal système** (`journalctl -t codebyr`) — sans jamais consigner le fichier ouvert ni l'adresse visitée |
 | 🔵 | CHANGELOG public, modèles d'issues, Dependabot, actions GitHub à jour |
+| 🔴 | **La saisie d'un domaine bancaire est analysée et testée.** C'est la seule porte d'entrée de la liste blanche, et elle n'avait aucun test. Refuse désormais les adresses IP, l'Unicode non converti, les caractères interdits, et lit `mabanque.fr@piege.fr` comme le navigateur le lira : `piege.fr` |
+| 🔴 | **Le bouclier veille aussi dans l'Espace Banque.** Il en était exclu au motif que la liste blanche suffit — mais cette liste est saisie à la main, et l'erreur humaine est justement la menace couverte |
+| 🔴 | **L'empreinte de la clé est publiée sur deux hébergements indépendants** (dépôt et site). Une seule source, et sa compromission passe inaperçue |
+| ⚪ | **L'extension ne relit plus les registres à chaque fenêtre** : cache invalidé par date de modification |
 | 🔴 | **La chaîne de signature est durcie.** Phrase de passe posée, sous-clé de signature dédiée (expire dans un an), clé maîtresse et certificat de révocation sortis de la machine sur support amovible. Un vol du poste de construction ne donne plus que de quoi signer — révocable sans que personne ne réimporte l'empreinte publiée |
 | 🔴 | **Phrase de passe sur la clé de signature** — posée le 20/08/2026. Au passage, le contrôle qui devait refuser de signer avec une clé nue lisait la mauvaise colonne de `keyinfo` : il ne pouvait pas se déclencher |
 | 🔵 | **`build.sh` ne peut plus « réussir » sans rien reconstruire.** live-build note ses étapes dans `.build/`, que le `rsync` du script préservait : une reconstruction sautait tout, annonçait « Build completed successfully » en 90 secondes et ne produisait aucune ISO — ou pire, en aurait produit une contenant l'ancien chroot. Nettoyage automatique, et refus d'une ISO antérieure au début de la construction |
@@ -185,7 +186,7 @@ tests. Détail dans [SECURITY.md](../SECURITY.md).
 
 1. **Des testeurs.** C'était le numéro deux, c'est devenu le numéro un : la
    chaîne de signature est durcie, la 1.2.0 est publiée et vérifiable. Les
-   35 autres chantiers relèvent de la supposition tant que cinq personnes
+   32 autres chantiers relèvent de la supposition tant que cinq personnes
    n'ont pas installé le système sur leur propre matériel.
 2. **`xdg-dbus-proxy`** — pour rendre aux Espaces les notifications et les
    portails perdus en 1.1.0, sans rouvrir la faille. Le point dur est analysé

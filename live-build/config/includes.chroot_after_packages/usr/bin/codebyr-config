@@ -676,15 +676,13 @@ class Fenetre(Adw.ApplicationWindow):
                 if ok else "Impossible d'ajouter ce programme."))
 
     def _ajouter_domaine(self, texte):
-        # removeprefix, PAS lstrip("www.") : lstrip retire tout caractère de
-        # tête de l'ensemble {w, .}, donc « wise.com » deviendrait « ise.com ».
-        d = (texte or "").strip().lower()
-        if d.startswith("http://"):
-            d = d[7:]
-        elif d.startswith("https://"):
-            d = d[8:]
-        d = d.split("/", 1)[0].removeprefix("www.")
-        if not d or "." not in d:
+        # L'analyse vit dans le module partagé : c'est la seule porte d'entrée
+        # de la liste blanche, elle mérite d'être testée plutôt que réécrite ici.
+        d = registre.normaliser_domaine(texte)
+        if d is None:
+            self._toaster.add_toast(Adw.Toast(
+                title="« %s » n'est pas une adresse de site valable."
+                      % (texte or "").strip()[:40]))
             return
         banque = espace_banque(self._data)
         if banque is None:

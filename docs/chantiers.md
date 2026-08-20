@@ -4,7 +4,7 @@
 Ce qui a été fermé est listé en fin de document — un suivi qui ne reflète pas
 l'état réel ne sert à rien.
 
-Ce document liste **tout** ce qui est identifié : les chantiers de fond, les
+**36 chantiers ouverts.** Ce document liste **tout** ce qui est identifié : les chantiers de fond, les
 correctifs de confort, la dette technique, et ce qui est volontairement écarté.
 Il vaut mieux une liste longue et honnête qu'une liste courte et rassurante —
 et un chantier écrit ici n'est pas un engagement, c'est une décision à prendre.
@@ -23,15 +23,7 @@ et un chantier écrit ici n'est pas un engagement, c'est une décision à prendr
 
 ---
 
-## 1. Maintenant — terminer la 1.1.0
-
-| | Chantier | Pourquoi | Effort |
-|---|---|---|---|
-| 🔵 | **Signer et publier l'ISO 1.1.0** — `sign-release.sh`, puis `gh release create v1.1.0` avec l'ISO, `SHA256SUMS` et `SHA256SUMS.asc` | La dernière release publique est la 1.0.7. Une installation neuve repart aujourd'hui d'une image qui contient la faille corrigée ce matin (elle la recevrait ensuite par apt, mais elle démarre vulnérable) | S |
-
----
-
-## 2. Sécurité — architecture
+## 1. Sécurité — architecture
 
 | | Chantier | Pourquoi | Effort |
 |---|---|---|---|
@@ -79,7 +71,7 @@ démarre plus », sur la fonction centrale du système.
 
 ---
 
-## 3. Chaîne d'approvisionnement et clés
+## 2. Chaîne d'approvisionnement et clés
 
 | | Chantier | Pourquoi | Effort |
 |---|---|---|---|
@@ -89,7 +81,7 @@ démarre plus », sur la fonction centrale du système.
 
 ---
 
-## 4. Extension navigateur (bouclier anti-hameçonnage)
+## 3. Extension navigateur (bouclier anti-hameçonnage)
 
 | | Chantier | Pourquoi | Effort |
 |---|---|---|---|
@@ -100,7 +92,7 @@ démarre plus », sur la fonction centrale du système.
 
 ---
 
-## 5. Produit et expérience
+## 4. Produit et expérience
 
 | | Chantier | Pourquoi | Effort |
 |---|---|---|---|
@@ -114,7 +106,7 @@ démarre plus », sur la fonction centrale du système.
 
 ---
 
-## 6. Qualité, tests, CI
+## 5. Qualité, tests, CI
 
 | | Chantier | Pourquoi | Effort |
 |---|---|---|---|
@@ -123,11 +115,11 @@ démarre plus », sur la fonction centrale du système.
 
 ---
 
-## 7. Projet et diffusion
+## 6. Projet et diffusion
 
 | | Chantier | Pourquoi | Effort |
 |---|---|---|---|
-| 🟠 | **Des testeurs — priorité n°1 après la 1.1.0** | Le protocole est écrit, personne ne l'a déroulé. Tout le reste de cette liste relève de la supposition tant que cinq personnes n'ont pas installé le système sur leur propre matériel. Et la 1.1.0 est le premier état où une exposition publique ne peut pas se retourner contre vous | M |
+| 🟠 | **Des testeurs — la priorité, désormais seule sur sa ligne** | Le protocole est écrit, personne ne l'a déroulé. Tout le reste de cette liste relève de la supposition tant que cinq personnes n'ont pas installé le système sur leur propre matériel. Et la 1.1.0 est le premier état où une exposition publique ne peut pas se retourner contre vous | M |
 | 🔵 | **Un second mainteneur** | Facteur bus = 1, sur un projet qui pousse du code en root chez ses utilisateurs. C'est écrit dans CONTRIBUTING ; ça ne se règle pas en l'écrivant | — |
 | 🟠 | **Publier les posts de lancement** | LinkedIn est prêt ; LinuxFr, Show HN, Reddit et Mastodon sont rédigés | S |
 | 🟠 | **La vidéo de démonstration** | Le storyboard existe, la vidéo non. À refaire avec les gestes **réels** (le storyboard montrait un clic droit qui n'existe pas — corrigé dans le texte) | M |
@@ -135,7 +127,7 @@ démarre plus », sur la fonction centrale du système.
 
 ---
 
-## 8. Dette technique et limites connues
+## 7. Dette technique et limites connues
 
 | | Point | Détail | Effort |
 |---|---|---|---|
@@ -147,7 +139,7 @@ démarre plus », sur la fonction centrale du système.
 
 ---
 
-## 9. Explicitement hors périmètre
+## 8. Explicitement hors périmètre
 
 À dire clairement, pour ne pas y revenir tous les six mois :
 
@@ -193,7 +185,7 @@ tests. Détail dans [SECURITY.md](../SECURITY.md).
 
 1. **Des testeurs.** C'était le numéro deux, c'est devenu le numéro un : la
    chaîne de signature est durcie, la 1.2.0 est publiée et vérifiable. Les
-   44 autres chantiers relèvent de la supposition tant que cinq personnes
+   35 autres chantiers relèvent de la supposition tant que cinq personnes
    n'ont pas installé le système sur leur propre matériel.
 2. **`xdg-dbus-proxy`** — pour rendre aux Espaces les notifications et les
    portails perdus en 1.1.0, sans rouvrir la faille. Le point dur est analysé

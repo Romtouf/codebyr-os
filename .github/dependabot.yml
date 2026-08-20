@@ -1,0 +1,14 @@
+version: 2
+
+# Les versions d'actions GitHub vieillissent en silence : elles finissent par
+# tourner sur un Node déprécié, puis par ne plus tourner du tout. Une fois par
+# mois suffit — ce dépôt n'a pas de dépendances applicatives, seulement la CI.
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+    commit-message:
+      prefix: "CI"
+    labels:
+      - outillage

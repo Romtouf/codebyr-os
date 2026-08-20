@@ -87,5 +87,55 @@ class Cloisonnement(unittest.TestCase):
         self.assertEqual(inscriptibles, ["/tmp/espace-home"])
 
 
+class SondeIsolation(unittest.TestCase):
+    """« codebyr-space verifier-isolation » — le contrôle rejouable.
+
+    La sonde s'exécute DANS un bac à sable et rapporte ce qu'elle atteint.
+    Ici on ne teste pas le bac à sable (il faut Linux pour ça, c'est le rôle de
+    la commande elle-même sur la machine) mais la lecture des mesures et les
+    attentes : une sortie de bac à sable ne doit jamais pouvoir passer pour un
+    succès.
+    """
+
+    CONFORME = {"bus_hote": False, "systemd_user": False, "bus_systeme": False,
+                "x11": False, "son": True, "reseau": True, "home_isole": True}
+
+    def test_lecture_des_mesures(self):
+        mesures = espace.analyser_sonde("bus_hote=non\nson=oui\nbruit\n")
+        self.assertEqual(mesures, {"bus_hote": False, "son": True})
+
+    def test_une_situation_conforme_passe(self):
+        resultats = espace.evaluer(self.CONFORME, self.CONFORME)
+        self.assertTrue(all(ok for _l, _m, ok in resultats))
+
+    def test_un_bus_hote_joignable_est_un_echec(self):
+        fuite = dict(self.CONFORME, bus_hote=True)
+        resultats = espace.evaluer(fuite, self.CONFORME)
+        echecs = [libelle for libelle, _m, ok in resultats if not ok]
+        self.assertEqual(echecs, ["Bus de session de l'hôte joignable"])
+
+    def test_une_mesure_manquante_est_un_echec(self):
+        resultats = espace.evaluer({"son": True}, self.CONFORME)
+        self.assertFalse(all(ok for _l, _m, ok in resultats))
+
+    def test_les_portes_de_sortie_sont_refusees_dans_TOUTES_les_situations(self):
+        for titre, _options, attendu in espace.SITUATIONS:
+            for cle in ("bus_hote", "systemd_user", "bus_systeme", "x11"):
+                self.assertFalse(attendu[cle],
+                                 "« %s » tolère %s : ce sont les portes de "
+                                 "sortie du bac à sable" % (titre, cle))
+
+    def test_la_piece_jointe_est_sans_reseau_ni_micro(self):
+        attendus = {t: a for t, _o, a in espace.SITUATIONS}
+        piece = attendus["Pièce jointe en Jetable"]
+        self.assertFalse(piece["reseau"])
+        self.assertFalse(piece["son"])
+
+    def test_la_sonde_tente_vraiment_la_connexion(self):
+        # Un socket peut exister sans être joignable — et inversement, tester la
+        # seule présence du fichier donnerait un faux sentiment de sécurité.
+        self.assertIn("s.connect(chemin)", espace.SONDE)
+
+
 if __name__ == "__main__":
     unittest.main()

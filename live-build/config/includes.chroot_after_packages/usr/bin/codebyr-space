@@ -869,6 +869,148 @@ def cmd_isolation():
     return 0
 
 
+# ── Vérification de l'isolation, sur pièces ────────────────────────────────
+# « codebyr-space isolation » dit ce que la MACHINE sait faire. La commande
+# ci-dessous dit ce qu'un Espace peut réellement ATTEINDRE : elle lance une
+# sonde à l'intérieur d'un vrai bac à sable et rapporte ce qu'elle y trouve.
+# C'est la version reproductible des vérifications qu'il fallait sinon faire à
+# la main dans une machine virtuelle, et que personne ne refait jamais.
+
+SONDE = r"""
+import os, socket, sys
+
+def joignable(chemin):
+    # Un socket peut exister sans être joignable : on tente la connexion.
+    if not chemin or not os.path.exists(chemin):
+        return False
+    s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+    try:
+        s.connect(chemin)
+        return True
+    except OSError:
+        return False
+    finally:
+        s.close()
+
+runtime = os.environ.get("XDG_RUNTIME_DIR", "")
+mesures = {
+    "bus_hote": joignable(os.path.join(runtime, "bus")) if runtime else False,
+    "systemd_user": joignable(os.path.join(runtime, "systemd", "private")) if runtime else False,
+    "bus_systeme": joignable("/run/dbus/system_bus_socket"),
+    "x11": os.path.isdir("/tmp/.X11-unix"),
+    "son": os.path.exists(os.path.join(runtime, "pipewire-0")) if runtime else False,
+}
+try:
+    with open("/proc/net/dev", encoding="utf-8") as f:
+        interfaces = [l.split(":")[0].strip() for l in f if ":" in l]
+    mesures["reseau"] = any(i and i != "lo" for i in interfaces)
+except OSError:
+    mesures["reseau"] = False
+try:
+    with open(os.path.expanduser("~/.codebyr-sonde"), encoding="utf-8") as f:
+        mesures["home_isole"] = f.read().strip() == sys.argv[1]
+except OSError:
+    mesures["home_isole"] = False
+for cle, valeur in mesures.items():
+    print("%s=%s" % (cle, "oui" if valeur else "non"))
+"""
+
+CONTROLES = (
+    ("bus_hote", "Bus de session de l'hôte joignable"),
+    ("systemd_user", "systemd --user joignable"),
+    ("bus_systeme", "Bus système joignable"),
+    ("x11", "Socket X11 de l'hôte visible"),
+    ("son", "Son et micro (PipeWire)"),
+    ("reseau", "Accès au réseau"),
+    ("home_isole", "Dossier personnel bien isolé"),
+)
+
+# Ce qu'on attend selon la situation. Les trois premières lignes doivent être
+# fausses PARTOUT : ce sont les portes de sortie du bac à sable.
+SITUATIONS = (
+    ("Espace ordinaire", {},
+     {"bus_hote": False, "systemd_user": False, "bus_systeme": False, "x11": False,
+      "son": True, "reseau": True, "home_isole": True}),
+    ("Espace blindé, sans micro (Banque)", {"renforce": True, "audio": False},
+     {"bus_hote": False, "systemd_user": False, "bus_systeme": False, "x11": False,
+      "son": False, "reseau": True, "home_isole": True}),
+    ("Pièce jointe en Jetable", {"renforce": True, "hors_ligne": True},
+     {"bus_hote": False, "systemd_user": False, "bus_systeme": False, "x11": False,
+      "son": False, "reseau": False, "home_isole": True}),
+)
+
+
+def analyser_sonde(sortie):
+    """Transforme la sortie brute de la sonde en mesures booléennes."""
+    mesures = {}
+    for ligne in (sortie or "").splitlines():
+        if "=" in ligne:
+            cle, valeur = ligne.split("=", 1)
+            mesures[cle.strip()] = valeur.strip() == "oui"
+    return mesures
+
+
+def evaluer(mesures, attendu):
+    """Confronte les mesures aux attentes. Renvoie [(libellé, mesure, ok)]."""
+    resultat = []
+    for cle, libelle in CONTROLES:
+        if cle not in mesures:
+            resultat.append((libelle, None, False))
+            continue
+        resultat.append((libelle, mesures[cle], mesures[cle] == attendu[cle]))
+    return resultat
+
+
+def _sonder(options):
+    """Lance la sonde dans un vrai bac à sable et renvoie ses mesures."""
+    home = tempfile.mkdtemp(prefix="codebyr-sonde-")
+    jeton = os.urandom(8).hex()
+    try:
+        with open(os.path.join(home, ".codebyr-sonde"), "w", encoding="utf-8") as f:
+            f.write(jeton)
+        env = dict(os.environ)
+        cmd = [sys.executable or "python3", "-c", SONDE, jeton]
+        try:
+            r = subprocess.run(wrap_bwrap(home, cmd, env, **options),
+                               capture_output=True, text=True, timeout=30)
+        except (OSError, subprocess.SubprocessError) as exc:
+            sys.stderr.write("codebyr-space : sonde impossible (%s)\n" % exc)
+            return {}
+        return analyser_sonde(r.stdout)
+    finally:
+        shutil.rmtree(home, ignore_errors=True)
+
+
+def cmd_verifier_isolation():
+    """Vérifie sur pièces ce qu'un Espace peut réellement atteindre."""
+    if not shutil.which("bwrap"):
+        sys.stderr.write("bubblewrap absent : aucun bac à sable à vérifier.\n")
+        return 2
+    print("Vérification de l'isolation — une sonde est lancée dans un vrai "
+          "bac à sable.\n")
+    tout_va_bien = True
+    for titre, options, attendu in SITUATIONS:
+        mesures = _sonder(options)
+        print("\033[1m%s\033[0m" % titre)
+        if not mesures:
+            print("  \033[31mLa sonde n'a rien renvoyé.\033[0m\n")
+            tout_va_bien = False
+            continue
+        for libelle, mesure, ok in evaluer(mesures, attendu):
+            etat = "\033[32m✔\033[0m" if ok else "\033[31m✘\033[0m"
+            valeur = "?" if mesure is None else ("oui" if mesure else "non")
+            print("  %s %-36s %s" % (etat, libelle, valeur))
+            tout_va_bien = tout_va_bien and ok
+        print()
+    if tout_va_bien:
+        print("\033[32mTout est conforme.\033[0m Aucune sortie de bac à sable "
+              "détectée.")
+        return 0
+    print("\033[31mAu moins un contrôle a échoué.\033[0m Ne publiez pas cette "
+          "version : signalez-le (voir SECURITY.md).")
+    return 1
+
+
 def _action_launch(espaces, args):
     """launch <espace> [--fichier <f>] [-- commande...]"""
     esp_id, reste = args[0], args[1:]
@@ -893,6 +1035,8 @@ def _action_launch(espaces, args):
 ACTIONS = {
     "list":       (0, "list", lambda espaces, a: cmd_list(espaces) or 0),
     "isolation":  (0, "isolation", lambda espaces, a: cmd_isolation()),
+    "verifier-isolation": (0, "verifier-isolation",
+                           lambda espaces, a: cmd_verifier_isolation()),
     "launch":     (1, "launch <espace> [--fichier <f>] [-- commande...]",
                    _action_launch),
     "close":      (1, "close <espace>",

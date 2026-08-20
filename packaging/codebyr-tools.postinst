@@ -15,6 +15,27 @@ case "$1" in
 		if command -v update-desktop-database >/dev/null 2>&1; then
 			update-desktop-database -q /usr/share/applications 2>/dev/null || true
 		fi
+		# Trousseau apt : la clé publique du projet évolue (ajout d'une
+		# sous-clé de signature, rotation). Le trousseau, lui, a été figé à
+		# l'installation — et apt refuse alors une signature parfaitement
+		# légitime : « Missing key …, which is needed to verify signature ».
+		# Le paquet embarque donc la clé à jour et rafraîchit le trousseau.
+		#
+		# Ce n'est pas une porte ouverte : ce paquet est déjà signé par cette
+		# même clé. Qui peut le remplacer contrôle déjà la machine.
+		CLE=/usr/share/codebyr/codebyr-signing-key.asc
+		TROUSSEAU=/usr/share/keyrings/codebyr-archive-keyring.gpg
+		if [ -f "$CLE" ] && command -v gpg >/dev/null 2>&1; then
+			# On écrit à côté puis on déplace : un trousseau à moitié écrit
+			# rendrait le dépôt invérifiable, donc la machine non maintenable.
+			if gpg --dearmor < "$CLE" > "$TROUSSEAU.neuf" 2>/dev/null; then
+				chmod 0644 "$TROUSSEAU.neuf"
+				mv "$TROUSSEAU.neuf" "$TROUSSEAU"
+			else
+				rm -f "$TROUSSEAU.neuf"
+			fi
+		fi
+
 		# Rattrapage des machines DÉJÀ installées : dossiers personnels privés
 		# (0700) et neutralisation du mot de passe public du compte invité.
 		# Ces deux correctifs vivaient dans l'image live ou dans le script

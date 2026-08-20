@@ -10,6 +10,15 @@ GNOME (menu du Sceau, liserés colorés) ne se recharge pas à chaud.
 
 ---
 
+## 1.4.0 — en préparation
+
+**« Ouvrir en Jetable » arrive dans le clic droit.** Le geste naturel — clic
+droit sur une pièce jointe douteuse — était promis depuis le début sans jamais
+exister : il fallait passer par le menu du Sceau ou la ligne de commande,
+c'est-à-dire ne jamais s'en servir au moment où l'on en a besoin. Le fichier
+s'ouvre dans un Espace éphémère, **blindé et sans réseau** : le piège
+s'exécute dans le vide et disparaît à la fermeture.
+
 ## 1.3.1 — en préparation
 
 **Correctif de mise à jour, important.** L'ajout d'une sous-clé de signature a

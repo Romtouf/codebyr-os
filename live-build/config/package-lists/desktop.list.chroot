@@ -14,6 +14,11 @@ gnome-software
 gnome-software-plugin-flatpak
 flatpak
 
+# Extensions Python pour le gestionnaire de fichiers : c'est par là que passe
+# « Ouvrir en Jetable » au clic droit. Sans ce paquet, l'entrée n'apparaît
+# simplement pas — en silence.
+python3-nautilus
+
 # Réglages avancés + navigateur par défaut
 gnome-tweaks
 firefox-esr

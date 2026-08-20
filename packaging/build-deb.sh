@@ -39,6 +39,7 @@ for chemin in \
 	usr/bin/codebyr-durcir-poste \
 	usr/share/gnome-shell/extensions/codebyr@codebyr.io \
 	usr/share/codebyr \
+	usr/share/nautilus-python \
 	etc/codebyr/espaces.json
 do
 	if [ -e "$SRC/$chemin" ]; then
@@ -54,7 +55,8 @@ done
 #    tous = faille. On normalise : dossiers 755, scripts 755, données 644.
 find "$STAGE/usr" "$STAGE/etc" -type d -exec chmod 755 {} + 2>/dev/null || true
 find "$STAGE/usr/bin" -type f -exec chmod 755 {} + 2>/dev/null || true
-find "$STAGE/usr/share/codebyr" -type f -exec chmod 644 {} + 2>/dev/null || true
+find "$STAGE/usr/share/codebyr" "$STAGE/usr/share/nautilus-python" \
+	-type f -exec chmod 644 {} + 2>/dev/null || true
 find "$STAGE/usr/share/gnome-shell" -type f -exec chmod 644 {} + 2>/dev/null || true
 [ -f "$STAGE/etc/codebyr/espaces.json" ] && chmod 644 "$STAGE/etc/codebyr/espaces.json"
 
@@ -70,7 +72,7 @@ Architecture: all
 Maintainer: Codebyr OS <romain.formationoc@gmail.com>
 Installed-Size: $TAILLE
 Depends: python3, python3-gi, gir1.2-gtk-4.0, gir1.2-adw-1, bubblewrap, dbus-user-session, firefox-esr | firefox
-Recommends: flatpak, gnome-shell
+Recommends: flatpak, gnome-shell, python3-nautilus, libnotify-bin
 Section: admin
 Priority: optional
 Homepage: https://os.codebyr.dev

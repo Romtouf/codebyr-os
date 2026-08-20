@@ -4,7 +4,7 @@
 Ce qui a été fermé est listé en fin de document — un suivi qui ne reflète pas
 l'état réel ne sert à rien.
 
-**24 chantiers ouverts.** Ce document liste **tout** ce qui est identifié : les chantiers de fond, les
+**23 chantiers ouverts.** Ce document liste **tout** ce qui est identifié : les chantiers de fond, les
 correctifs de confort, la dette technique, et ce qui est volontairement écarté.
 Il vaut mieux une liste longue et honnête qu'une liste courte et rassurante —
 et un chantier écrit ici n'est pas un engagement, c'est une décision à prendre.
@@ -91,7 +91,6 @@ démarre plus », sur la fonction centrale du système.
 | | Chantier | Pourquoi | Effort |
 |---|---|---|---|
 | 🟠 | **Liste de banques préremplie** | L'utilisateur doit aujourd'hui saisir le domaine de sa banque à la main. Une liste « quelle est votre banque ? » rendrait le premier contact évident. ⚠️ Elle doit être construite à partir de données **vérifiées**, jamais devinées : un domaine faux dans une liste blanche casse l'authentification forte. *(Le reste est fait : notification au lancement + page de blocage explicite.)* | M |
-| 🟠 | **« Ouvrir en Jetable » au clic droit dans Fichiers** | C'est le geste naturel, il était promis dans la documentation, il n'existe pas. Aujourd'hui il faut passer par le menu du Sceau ou la ligne de commande | M |
 | 🟠 | **« Envoyer vers l'Espace… » dans Fichiers** | Annoncé dans l'architecture (marqué `[visé]`). Le transfert passe aujourd'hui par l'export/import d'instantané ou le presse-papiers explicite | M |
 | 🟠 | **Notifications depuis les Espaces** | Perdues depuis la 1.1.0 (bus privé). Dépend du chantier `xdg-dbus-proxy` | — |
 | 🟠 | **Thème GTK/libadwaita Codebyr** clair et sombre | Annoncé dans l'architecture (`[visé]`). Aujourd'hui : accent GNOME « teal », fonds d'écran et réglages par défaut | M |
@@ -153,6 +152,7 @@ démarre plus », sur la fonction centrale du système.
 | 🟠 | **Retour d'erreur au lancement** : le menu du Sceau prévient quand une application ne démarre pas |
 | 🟠 | **Journal système** (`journalctl -t codebyr`) — sans jamais consigner le fichier ouvert ni l'adresse visitée |
 | 🔵 | CHANGELOG public, modèles d'issues, Dependabot, actions GitHub à jour |
+| 🟠 | **« Ouvrir en Jetable » au clic droit** dans le gestionnaire de fichiers, via une extension nautilus-python. Promis dans la documentation depuis le début, il n'avait jamais existé — **à essayer sur machine** |
 | 🔴 | **Le filtre réseau parle SOCKS5**, sur le même port que HTTP. Il ne protégeait que le navigateur : tout autre programme lancé dans l'Espace passait à côté sans que rien ne le signale |
 | 🟠 | **Une application Flatpak non cloisonnée le dit à l'écran.** L'avertissement existait — dans le terminal, c'est-à-dire nulle part pour qui a cliqué dans un menu. L'utilisateur croyait son application isolée, et le liseré coloré le lui confirmait à tort |
 | ⚪ | **`codebyr-space` : 1 173 → 919 lignes**, le bac à sable dans son propre module |
@@ -185,7 +185,7 @@ tests. Détail dans [SECURITY.md](../SECURITY.md).
 
 1. **Des testeurs.** C'était le numéro deux, c'est devenu le numéro un : la
    chaîne de signature est durcie, la 1.2.0 est publiée et vérifiable. Les
-   23 autres chantiers relèvent de la supposition tant que cinq personnes
+   22 autres chantiers relèvent de la supposition tant que cinq personnes
    n'ont pas installé le système sur leur propre matériel.
 2. **`xdg-dbus-proxy`** — pour rendre aux Espaces les notifications et les
    portails perdus en 1.1.0, sans rouvrir la faille. Le point dur est analysé

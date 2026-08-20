@@ -8,9 +8,8 @@ d'eux repasse au rouge, c'est une régression de sécurité, pas un détail.
 import os
 import unittest
 
-from outils import BIN, charger
-
-espace = charger("codebyr-space")
+from outils import BIN, LIB  # noqa: F401 — place le module partagé sur sys.path
+import bac_a_sable   # noqa: E402
 
 
 class BusDeSession(unittest.TestCase):
@@ -25,7 +24,7 @@ class BusDeSession(unittest.TestCase):
 
     def _argv(self, **kw):
         env = {"XDG_RUNTIME_DIR": "/run/user/1000"}
-        return espace.wrap_bwrap("/tmp/espace-home", ["firefox"], env, **kw)
+        return bac_a_sable.wrap_bwrap("/tmp/espace-home", ["firefox"], env, **kw)
 
     def test_le_socket_du_bus_hote_est_absent(self):
         for options in ({}, {"renforce": True}, {"hors_ligne": True},
@@ -51,7 +50,7 @@ class Cloisonnement(unittest.TestCase):
 
     def _argv(self, **kw):
         env = {"XDG_RUNTIME_DIR": "/run/user/1000"}
-        return espace.wrap_bwrap("/tmp/espace-home", ["firefox"], env, **kw)
+        return bac_a_sable.wrap_bwrap("/tmp/espace-home", ["firefox"], env, **kw)
 
     def test_hors_ligne_coupe_vraiment_le_reseau(self):
         self.assertIn("--unshare-net", self._argv(hors_ligne=True))
@@ -101,32 +100,32 @@ class SondeIsolation(unittest.TestCase):
                 "x11": False, "son": True, "reseau": True, "home_isole": True}
 
     def test_lecture_des_mesures(self):
-        mesures = espace.analyser_sonde("bus_hote=non\nson=oui\nbruit\n")
+        mesures = bac_a_sable.analyser_sonde("bus_hote=non\nson=oui\nbruit\n")
         self.assertEqual(mesures, {"bus_hote": False, "son": True})
 
     def test_une_situation_conforme_passe(self):
-        resultats = espace.evaluer(self.CONFORME, self.CONFORME)
+        resultats = bac_a_sable.evaluer(self.CONFORME, self.CONFORME)
         self.assertTrue(all(ok for _l, _m, ok in resultats))
 
     def test_un_bus_hote_joignable_est_un_echec(self):
         fuite = dict(self.CONFORME, bus_hote=True)
-        resultats = espace.evaluer(fuite, self.CONFORME)
+        resultats = bac_a_sable.evaluer(fuite, self.CONFORME)
         echecs = [libelle for libelle, _m, ok in resultats if not ok]
         self.assertEqual(echecs, ["Bus de session de l'hôte joignable"])
 
     def test_une_mesure_manquante_est_un_echec(self):
-        resultats = espace.evaluer({"son": True}, self.CONFORME)
+        resultats = bac_a_sable.evaluer({"son": True}, self.CONFORME)
         self.assertFalse(all(ok for _l, _m, ok in resultats))
 
     def test_les_portes_de_sortie_sont_refusees_dans_TOUTES_les_situations(self):
-        for titre, _options, attendu in espace.SITUATIONS:
+        for titre, _options, attendu in bac_a_sable.SITUATIONS:
             for cle in ("bus_hote", "systemd_user", "bus_systeme", "x11"):
                 self.assertFalse(attendu[cle],
                                  "« %s » tolère %s : ce sont les portes de "
                                  "sortie du bac à sable" % (titre, cle))
 
     def test_la_piece_jointe_est_sans_reseau_ni_micro(self):
-        attendus = {t: a for t, _o, a in espace.SITUATIONS}
+        attendus = {t: a for t, _o, a in bac_a_sable.SITUATIONS}
         piece = attendus["Pièce jointe en Jetable"]
         self.assertFalse(piece["reseau"])
         self.assertFalse(piece["son"])
@@ -134,7 +133,7 @@ class SondeIsolation(unittest.TestCase):
     def test_la_sonde_tente_vraiment_la_connexion(self):
         # Un socket peut exister sans être joignable — et inversement, tester la
         # seule présence du fichier donnerait un faux sentiment de sécurité.
-        self.assertIn("s.connect(chemin)", espace.SONDE)
+        self.assertIn("s.connect(chemin)", bac_a_sable.SONDE)
 
 
 if __name__ == "__main__":

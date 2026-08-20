@@ -83,7 +83,7 @@ jobs:
             echo "::error::l'ISO ne porte pas la version $attendue"; exit 1; }
 
           echo "--- modules partagés (sans eux, tous les outils plantent) ---"
-          for module in registre systeme applications; do
+          for module in registre systeme applications bac_a_sable; do
             grep -q "share/codebyr/${module}.py" /tmp/contenu.txt || {
               echo "::error::${module}.py absent de l'image"; exit 1; }
             echo "  ${module}.py"

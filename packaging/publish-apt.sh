@@ -84,6 +84,61 @@ case " $protection " in
 	*)       echo "    (protection de la clé indéterminée — vérifiez-la vous-même.)" ;;
 esac
 
+# Sans terminal, l'agent ne peut pas demander la phrase de passe et gpg échoue
+# sur « Inappropriate ioctl for device » — message qui ne dit rien à personne.
+# Autant l'annoncer avant d'avoir régénéré tout le dépôt.
+# On vérifie que GPG_TTY désigne un VRAI terminal : « export GPG_TTY=$(tty) »
+# évalué hors terminal y laisse la chaîne « not a tty », non vide et donc
+# trompeuse pour un simple test de présence.
+if [ -z "${CODEBYR_PASSPHRASE_FILE:-}" ]    && { [ -z "${GPG_TTY:-}" ] || [ ! -c "${GPG_TTY}" ]; }; then
+	echo "ERREUR : pas de terminal pour saisir la phrase de passe." >&2
+	echo "         Lancez cette commande depuis un vrai terminal, ou" >&2
+	echo "         indiquez CODEBYR_PASSPHRASE_FILE." >&2
+	exit 1
+fi
+
+# ── Qui signe : transition de clé, sans rien demander aux utilisateurs ──────
+#
+# Une machine ne peut vérifier une signature que si sa copie de la clé publique
+# contient la clé qui a signé. Or ce trousseau est gravé À L'INSTALLATION :
+# ajouter une sous-clé de signature rend d'un coup le dépôt invérifiable par
+# tout le parc déjà installé. Constaté le 20/08/2026 : « Missing key 49DF…,
+# which is needed to verify signature ». Échec propre — apt refuse et le dit —
+# mais total, et qui ne se répare qu'à la main sur chaque poste.
+#
+# La parade est celle des dépôts Debian : pendant la transition, on signe avec
+# DEUX clés. apt valide dès qu'UNE signature correspond à son trousseau. Les
+# machines anciennes valident par la maîtresse, les neuves par l'une ou
+# l'autre, et personne ne tape quoi que ce soit.
+#
+# Concrètement : si la clé maîtresse est disponible (clé USB rebranchée et
+# réimportée), on signe avec elle EN PLUS de la sous-clé. Sinon on signe avec
+# la sous-clé seule — et on prévient de ce que cela implique.
+SIGNATAIRES=(-u "$KEYID")
+etat_maitresse="$(gpg --list-secret-keys --with-colons "$KEYID" 2>/dev/null \
+	| awk -F: '/^sec:/ {print $15; exit}')"
+if [ "$etat_maitresse" = "#" ]; then
+	cat >&2 <<'TRANSITION'
+    ATTENTION : la clé maîtresse n'est pas sur ce poste (elle est hors ligne,
+    c'est voulu). Le dépôt ne sera donc signé QUE par la sous-clé.
+
+    Les machines dont le trousseau date d'avant la création de cette sous-clé
+    refuseront la signature et cesseront de recevoir les mises à jour — sans
+    intervention manuelle sur chacune.
+
+    Pour une transition sans douleur : rebranchez le support, importez la
+    maîtresse le temps de publier, puis retirez-la.
+        gpg --import /mnt/d/codebyr-cles/codebyr-maitresse-SECRETE.asc
+        …publier…
+        rm $GNUPGHOME/private-keys-v1.d/<keygrip-maitresse>.key
+TRANSITION
+else
+	# Le « ! » impose la clé MAÎTRESSE elle-même — sans lui, gpg choisirait
+	# encore la sous-clé et l'on signerait deux fois avec la même.
+	SIGNATAIRES+=(-u "${KEYID}!")
+	echo "    Signature de transition : sous-clé + clé maîtresse."
+fi
+
 # Comment la phrase de passe est fournie : agent (défaut) ou fichier hors dépôt.
 GPG_PASS=()
 if [ -n "${CODEBYR_PASSPHRASE_FILE:-}" ]; then
@@ -116,10 +171,12 @@ EOF
 apt-ftparchive release . >> Release
 
 # Signatures : InRelease (clair-signé) + Release.gpg (détachée).
+# « ${SIGNATAIRES[@]} » porte une ou deux clés selon la disponibilité de la
+# maîtresse — voir le bloc « Qui signe » plus haut.
 gpg --batch --yes "${GPG_PASS[@]+"${GPG_PASS[@]}"}" \
-	--default-key "$KEYID" --clearsign -o InRelease Release
+	"${SIGNATAIRES[@]}" --clearsign -o InRelease Release
 gpg --batch --yes "${GPG_PASS[@]+"${GPG_PASS[@]}"}" \
-	--default-key "$KEYID" -abs -o Release.gpg Release
+	"${SIGNATAIRES[@]}" -abs -o Release.gpg Release
 
 echo "==> Dépôt signé. Vérification :"
 gpg --verify Release.gpg Release 2>&1 | sed -n '1,3p'

@@ -10,6 +10,21 @@ GNOME (menu du Sceau, liserés colorés) ne se recharge pas à chaud.
 
 ---
 
+## 1.3.1 — en préparation
+
+**Correctif de mise à jour, important.** L'ajout d'une sous-clé de signature a
+rendu le dépôt invérifiable par les machines déjà installées : leur trousseau,
+gravé lors de l'installation, ne connaissait pas cette nouvelle clé. `apt`
+refusait la signature — proprement, mais totalement. Trois corrections :
+
+- la clé publique publiée contient désormais la sous-clé, dans ses trois
+  exemplaires (celui qu'on importe, celui que grave l'ISO, celui qu'embarque
+  le paquet) — un test les compare pour qu'ils ne divergent plus ;
+- le paquet **rafraîchit lui-même le trousseau** à l'installation, de sorte
+  qu'une future rotation de clé ne demandera plus rien à personne ;
+- pendant la transition, le dépôt est signé par **deux** clés à la fois : les
+  machines anciennes valident par l'ancienne, les neuves par la nouvelle.
+
 ## 1.3.0 — en préparation
 
 **Le presse-papiers ne se contourne plus par le bureau.** Il était vidé quand

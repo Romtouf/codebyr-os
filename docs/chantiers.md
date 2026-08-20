@@ -152,7 +152,7 @@ démarre plus », sur la fonction centrale du système.
 | 🟠 | **Retour d'erreur au lancement** : le menu du Sceau prévient quand une application ne démarre pas |
 | 🟠 | **Journal système** (`journalctl -t codebyr`) — sans jamais consigner le fichier ouvert ni l'adresse visitée |
 | 🔵 | CHANGELOG public, modèles d'issues, Dependabot, actions GitHub à jour |
-| 🟠 | **« Ouvrir en Jetable » au clic droit** dans le gestionnaire de fichiers, via une extension nautilus-python. Promis dans la documentation depuis le début, il n'avait jamais existé — **à essayer sur machine** |
+| 🟠 | **« Ouvrir en Jetable » au clic droit** dans le gestionnaire de fichiers, via une extension nautilus-python. Promis dans la documentation depuis le début, il n'avait jamais existé — **vérifié sur machine le 20/08/2026** (Nautilus 48.3). Le premier essai n'affichait rien : `python3-nautilus` n'était qu'un *Recommends*, donc absent, et l'extension n'était pas chargée — sans le moindre message. Dépendance ferme depuis la 1.4.1 |
 | 🔴 | **Le filtre réseau parle SOCKS5**, sur le même port que HTTP. Il ne protégeait que le navigateur : tout autre programme lancé dans l'Espace passait à côté sans que rien ne le signale |
 | 🟠 | **Une application Flatpak non cloisonnée le dit à l'écran.** L'avertissement existait — dans le terminal, c'est-à-dire nulle part pour qui a cliqué dans un menu. L'utilisateur croyait son application isolée, et le liseré coloré le lui confirmait à tort |
 | ⚪ | **`codebyr-space` : 1 173 → 919 lignes**, le bac à sable dans son propre module |

@@ -105,7 +105,7 @@ démarre plus », sur la fonction centrale du système.
 
 | | Chantier | Pourquoi | Effort |
 |---|---|---|---|
-| 🔵 | **Construction de l'ISO en CI** | Longue et exigeante (root, périphériques *loop*) : plutôt un déclenchement manuel ou nocturne qu'à chaque commit | L |
+| 🔵 | **Construction de l'ISO en CI — commencée, pas finie** | Le workflow existe (`construire-iso.yml`, déclenchement manuel, conteneur Debian trixie, vérification du contenu produit). Il échoue encore sur `E: repository 'http://security.debian.org trixie/updates' does not have a Release` — l'ancienne convention de nommage du dépôt de sécurité, abandonnée depuis Bullseye. Or le même `live-build` (1:20250505+deb13u1) génère bien `trixie-security` dans le WSL du mainteneur, et le dépôt ne contient aucune configuration figée. **L'écart reste à trouver** : comparer le `config/` engendré par `lb config` des deux côtés est la piste directe | M |
 
 ---
 

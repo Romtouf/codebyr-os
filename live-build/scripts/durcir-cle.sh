@@ -138,18 +138,19 @@ cat <<FIN
   Sauvegarde faite et VÉRIFIÉE. Trois choses maintenant, dans cet ordre.
 ════════════════════════════════════════════════════════════════════════
 
-1. RANGEZ LE SUPPORT.
-   Débranchez la clé USB et mettez-la ailleurs que près de cet ordinateur.
-   Elle contient de quoi signer au nom du projet, et de quoi le révoquer.
-
-2. RETIREZ LA CLÉ MAÎTRESSE DE CE POSTE — à taper vous-même, maintenant que
-   la sauvegarde est vérifiée et rangée :
+1. RETIREZ LA CLÉ MAÎTRESSE DE CE POSTE — support TOUJOURS BRANCHÉ, puisque
+   la seconde commande y lit le fichier des sous-clés :
 
      gpg --delete-secret-keys $CLE
      gpg --import "$SORTIE/codebyr-sous-cles-SECRETE.asc"
 
    Contrôle : « gpg -K » doit afficher « sec# » (le dièse dit que la clé
    maîtresse n'est plus là — seules les sous-clés restent, c'est le but).
+
+2. ALORS SEULEMENT, RANGEZ LE SUPPORT.
+   Débranchez la clé USB et mettez-la ailleurs que près de cet ordinateur.
+   Elle contient de quoi signer au nom du projet, et de quoi le révoquer :
+   c'est le double du trousseau, pas une copie de confort.
 
 3. SIGNEZ AVEC LA SOUS-CLÉ. Le « ! » impose CETTE clé et non une autre :
 

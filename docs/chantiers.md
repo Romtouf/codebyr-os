@@ -1,6 +1,6 @@
 # Chantiers — Codebyr OS
 
-État au **20 août 2026**, pendant la préparation de la 1.2.0.
+État au **20 août 2026**, la 1.4.1 publiée (dépôt APT et ISO).
 Ce qui a été fermé est listé en fin de document — un suivi qui ne reflète pas
 l'état réel ne sert à rien.
 
@@ -184,9 +184,13 @@ tests. Détail dans [SECURITY.md](../SECURITY.md).
 ## Si je ne devais garder que trois choses
 
 1. **Des testeurs.** C'était le numéro deux, c'est devenu le numéro un : la
-   chaîne de signature est durcie, la 1.2.0 est publiée et vérifiable. Les
+   chaîne de signature est durcie, la 1.4.1 est publiée et vérifiable. Les
    22 autres chantiers relèvent de la supposition tant que cinq personnes
    n'ont pas installé le système sur leur propre matériel.
+
+   Chiffre à garder en tête : au 20 août 2026, les cinq ISO publiées totalisent
+   **zéro téléchargement**. Ce n'est pas un détail de communication — c'est ce
+   qui rend tout le reste de cette liste théorique.
 2. **`xdg-dbus-proxy`** — pour rendre aux Espaces les notifications et les
    portails perdus en 1.1.0, sans rouvrir la faille. Le point dur est analysé
    plus haut : cela se tranche sur une machine.

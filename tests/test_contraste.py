@@ -122,108 +122,51 @@ class CouleursDesEspaces(unittest.TestCase):
 
 
 class SceauDuPanneau(unittest.TestCase):
-    """Le Sceau doit se voir. C'est le point d'entrée de tout le système.
+    """Le Sceau du panneau : une tentative d'amélioration ABANDONNÉE.
 
-    Le 23/08/2026 il est devenu INVISIBLE : passé en #2e3436, la couleur de base
-    d'Adwaita, il comptait sur la recoloration symbolique de GNOME — qui ne
-    s'applique pas à une icône chargée depuis un fichier. Contraste obtenu sur
-    le panneau du thème sombre : 1.7.
+    Le 23/08/2026, trois essais successifs ont laissé l'icône invisible sur le
+    panneau, chacun plus sûr de lui que le précédent : recoloration symbolique
+    supposée, puis choix d'après « color-scheme », puis mesure de la couleur du
+    panneau. La troisième était juste sur le fond — le journal et les dates le
+    confirmaient — et l'icône ne se dessinait toujours pas.
 
-    Et aucune couleur fixe ne pouvait convenir : le panneau vaut #fafafb en
-    thème clair et #000000 en sombre. Il faut donc deux icônes, et les choisir.
+    Le mainteneur a demandé le retour à la version d'origine, et il a eu
+    raison : un défaut esthétique connu vaut mieux qu'une régression qu'on ne
+    sait pas expliquer. On garde donc l'icône historique, avec son gris
+    #5c5c5c, et ce test se contente de vérifier qu'elle est bien là et qu'elle
+    reste visible sur les deux panneaux — ce qui est exactement ce que ce gris
+    avait été choisi pour faire.
+
+    Ce qui reste à comprendre, si quelqu'un rouvre le sujet, est écrit dans
+    docs/chantiers.md.
     """
 
     PANNEAU_CLAIR = "#fafafb"
     PANNEAU_SOMBRE = "#000000"
-    ICONES = os.path.join(
+    ICONE = os.path.join(
         RACINE, "live-build", "config", "includes.chroot_after_packages",
-        "usr", "share", "gnome-shell", "extensions", "codebyr@codebyr.io", "icons")
+        "usr", "share", "gnome-shell", "extensions", "codebyr@codebyr.io",
+        "icons", "codebyr-symbolic.svg")
 
-    def _couleur(self, fichier):
-        with open(os.path.join(self.ICONES, fichier), encoding="utf-8") as f:
-            trouve = re.findall(r'fill="(#[0-9A-Fa-f]{6})"', f.read())
-        self.assertTrue(trouve, "aucun remplissage dans %s" % fichier)
-        return trouve[-1]
+    def test_l_icone_existe(self):
+        self.assertTrue(os.path.exists(self.ICONE))
 
-    def test_les_deux_variantes_existent(self):
-        for fichier in ("codebyr-symbolic.svg", "codebyr-clair-symbolic.svg"):
-            self.assertTrue(os.path.exists(os.path.join(self.ICONES, fichier)),
-                            "variante manquante : %s" % fichier)
+    def test_elle_se_voit_sur_les_deux_panneaux(self):
+        """Le gris historique n'est beau nulle part, mais visible partout.
 
-    def test_chaque_variante_se_voit_sur_son_panneau(self):
-        for fichier, panneau in (("codebyr-symbolic.svg", self.PANNEAU_CLAIR),
-                                 ("codebyr-clair-symbolic.svg", self.PANNEAU_SOMBRE)):
-            mesure = contraste(self._couleur(fichier), panneau)
-            self.assertGreaterEqual(
-                mesure, 4.5,
-                "%s ne ressort pas sur %s : %.2f" % (fichier, panneau, mesure))
-
-    def test_l_extension_mesure_le_panneau_au_lieu_de_le_deduire(self):
-        """Déduire s'est trompé deux fois. Mesurer ne se trompe pas.
-
-        Premier essai : couleur fixe, invisible sur le panneau noir. Deuxième :
-        choix d'après « color-scheme », qui vaut « default » sur Codebyr — le
-        thème CLAIR des applications — alors que GNOME affiche malgré tout un
-        panneau NOIR. Le Sceau sombre y était de nouveau invisible.
-
-        Le panneau, lui, sait de quelle couleur il est.
+        Seuil 3.0, celui des éléments non textuels. C'est le compromis que la
+        contrainte impose : le panneau vaut #fafafb en clair et #000000 en
+        sombre, et une couleur unique doit tenir sur les deux.
         """
-        chemin = os.path.join(
-            RACINE, "live-build", "config", "includes.chroot_after_packages",
-            "usr", "share", "gnome-shell", "extensions", "codebyr@codebyr.io",
-            "extension.js")
-        with open(chemin, encoding="utf-8") as f:
-            source = f.read()
-        self.assertIn("get_background_color", source,
-                      "la couleur du panneau doit être MESURÉE, pas déduite "
-                      "d'un réglage")
-        self.assertIn("codebyr-clair-symbolic.svg", source)
-        self.assertIn("style-changed", source,
-                      "le style du panneau n'est pas prêt à la création de "
-                      "l'indicateur : il faut repasser quand il l'est")
-
-    def test_l_icone_recoit_son_fichier_des_le_constructeur(self):
-        """Une icône créée vide puis remplie ne s'est jamais dessinée.
-
-        Le 23/08/2026, le Sceau a disparu du panneau : pastille de survol
-        présente, rien dedans. La cause n'était ni la couleur ni le thème, mais
-        la construction — l'icône naissait sans fichier, et lui en affecter un
-        ensuite ne suffisait pas à la faire apparaître.
-
-        La version qui s'affichait passait le fichier au constructeur. On garde
-        cette forme, et la taille explicite avec, pour ne dépendre d'aucune
-        hypothèse sur ce que la feuille de style fournit.
-        """
-        chemin = os.path.join(
-            RACINE, "live-build", "config", "includes.chroot_after_packages",
-            "usr", "share", "gnome-shell", "extensions", "codebyr@codebyr.io",
-            "extension.js")
-        with open(chemin, encoding="utf-8") as f:
-            source = f.read()
-        debut = source.index("this._icone = new St.Icon(")
-        fin = source.index("});", debut)
-        constructeur = source[debut:fin]
-        self.assertIn("gicon:", constructeur,
-                      "le fichier doit être passé au constructeur, pas affecté "
-                      "après : l'icône ne se dessine pas")
-        self.assertIn("icon_size:", constructeur,
-                      "taille explicite — une icône de taille nulle est "
-                      "invisible tout en gardant sa pastille de survol")
-
-    def test_le_defaut_est_le_sceau_clair(self):
-        """Si la mesure échoue, se tromper du côté du panneau noir.
-
-        C'est celui de GNOME par défaut, et c'est celui du poste où le Sceau a
-        disparu deux fois. Un défaut mal choisi ici redonne exactement le bogue.
-        """
-        chemin = os.path.join(
-            RACINE, "live-build", "config", "includes.chroot_after_packages",
-            "usr", "share", "gnome-shell", "extensions", "codebyr@codebyr.io",
-            "extension.js")
-        with open(chemin, encoding="utf-8") as f:
-            source = f.read()
-        self.assertIn("let sombre = true;", source,
-                      "en cas d'échec de mesure, le Sceau doit être clair")
+        with open(self.ICONE, encoding="utf-8") as f:
+            couleurs = set(re.findall(r'(?:fill|stroke)="(#[0-9A-Fa-f]{6})"', f.read()))
+        self.assertTrue(couleurs, "aucune couleur dans l'icône du Sceau")
+        for couleur in couleurs:
+            for panneau in (self.PANNEAU_CLAIR, self.PANNEAU_SOMBRE):
+                mesure = contraste(couleur, panneau)
+                self.assertGreaterEqual(
+                    mesure, 3.0,
+                    "%s ne ressort pas sur %s : %.2f" % (couleur, panneau, mesure))
 
 
 class AccentSentinelle(unittest.TestCase):

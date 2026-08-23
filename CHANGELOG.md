@@ -10,6 +10,19 @@ GNOME (menu du Sceau, liserés colorés) ne se recharge pas à chaud.
 
 ---
 
+## 1.5.5 — en préparation
+
+**Retour à l'icône du Sceau d'origine.** Trois tentatives d'amélioration l'ont
+laissée invisible dans le panneau. La dernière reposait pourtant sur un
+diagnostic vérifié — le bon code s'exécutait, sans erreur au journal — et
+l'icône ne se dessinait toujours pas.
+
+L'icône historique est restaurée telle quelle. Elle n'est pas belle, mais elle
+se voit sur les deux panneaux, ce pour quoi son gris avait été choisi. Ce qui a
+été essayé, et pourquoi chaque essai a échoué, est consigné dans
+`docs/chantiers.md` — le sujet ne sera rouvert qu'avec les moyens de l'essayer
+en direct.
+
 ## 1.5.4 — en préparation
 
 **Le Sceau ne se dessinait plus du tout.** Ni couleur ni thème en cause : la

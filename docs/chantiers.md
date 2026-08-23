@@ -4,7 +4,7 @@
 Ce qui a été fermé est listé en fin de document — un suivi qui ne reflète pas
 l'état réel ne sert à rien.
 
-**21 chantiers ouverts.** Ce document liste **tout** ce qui est identifié : les chantiers de fond, les
+**22 chantiers ouverts.** Ce document liste **tout** ce qui est identifié : les chantiers de fond, les
 correctifs de confort, la dette technique, et ce qui est volontairement écarté.
 Il vaut mieux une liste longue et honnête qu'une liste courte et rassurante —
 et un chantier écrit ici n'est pas un engagement, c'est une décision à prendre.
@@ -92,6 +92,7 @@ démarre plus », sur la fonction centrale du système.
 |---|---|---|---|
 | 🟠 | **Liste de banques préremplie** | L'utilisateur doit aujourd'hui saisir le domaine de sa banque à la main. Une liste « quelle est votre banque ? » rendrait le premier contact évident. ⚠️ Elle doit être construite à partir de données **vérifiées**, jamais devinées : un domaine faux dans une liste blanche casse l'authentification forte. *(Le reste est fait : notification au lancement + page de blocage explicite.)* | M |
 | 🟠 | **Notifications depuis les Espaces** | Perdues depuis la 1.1.0 (bus privé). Dépend du chantier `xdg-dbus-proxy` | — |
+| 🟠 | **Icône du Sceau — trois tentatives, trois échecs, revenue à l'origine** | Signalée comme peu soignée et trop petite. Le gris `#5c5c5c` historique n'est beau nulle part, mais il est visible partout : c'est le compromis qu'impose un panneau valant `#fafafb` en clair et `#000000` en sombre. **Ce qui a été essayé et n'a pas marché**, le 23/08/2026 : (1) passage en `fill` avec la couleur de base d'Adwaita, en comptant sur la recoloration symbolique de GNOME — elle ne s'applique pas à une icône chargée depuis un fichier, l'icône est devenue invisible ; (2) choix entre deux variantes d'après `color-scheme` — ce réglage vaut `default` sur Codebyr alors que le panneau est noir, donc mauvais choix ; (3) mesure de la couleur réelle du panneau — juste sur le fond (dates et journal le confirmaient : le bon code tournait, sans erreur), et **l'icône ne se dessinait toujours pas**. La piste restante est la construction de `St.Icon`, jamais confirmée. **Ne pas rouvrir sans pouvoir essayer en direct** : chaque aller-retour coûte une publication complète, et trois de suite ont laissé le Sceau invisible sur la machine du mainteneur | S |
 | 🟠 | **Ambre (Espace Navigation) invisible sur fond clair** | Mesuré : contraste **2,376** contre un seuil de 3,0 pour un élément non textuel. C'est la pastille de barre de titre qui en souffre, posée sur un bandeau presque blanc — or la couleur d'un Espace n'est jamais décorative, c'est le seul repère visuel du cloisonnement. Une Ambre à 42 % de clarté, `#BA7B1C`, conviendrait aux deux fonds (3,54 / 5,26). **Décision de conception, pas correction technique** : elle vous appartient. Le défaut est gardé chiffré par `tests/test_contraste.py` | S |
 | 🟠 | **Internationalisation (gettext)** | Toutes les chaînes des outils Codebyr sont en français, en dur. Le système propose ~150 locales, mais Codebyr lui-même reste monolingue — un frein direct à l'adoption hors francophonie | L |
 | 🟠 | **Mode invité : point d'entrée plus clair** | Le menu du Sceau ouvre le sélecteur d'utilisateur GNOME ; l'utilisateur doit encore comprendre qu'il faut choisir « Invité » | S |

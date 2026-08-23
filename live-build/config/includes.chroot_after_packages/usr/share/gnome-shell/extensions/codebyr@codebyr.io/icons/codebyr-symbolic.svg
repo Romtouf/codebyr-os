@@ -1,24 +1,8 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<!-- Codebyr OS — le Sceau, icône du panneau GNOME.
-
-     Même dessin que la marque : l'anneau brisé en trois segments autour d'un
-     cœur. Seule l'exécution change, et pour deux raisons mesurées.
-
-     1. En « fill », pas en « stroke ». Sur les 575 icônes symboliques
-        d'Adwaita, AUCUNE n'utilise stroke : la recoloration symbolique de GTK
-        travaille sur le remplissage. Avec un gris écrit en dur, l'icône
-        restait terne au lieu de suivre la couleur du texte du panneau — c'est
-        ce qui la faisait paraître sale, surtout en thème sombre.
-
-     2. Écarts égaux. Les trois segments avaient des écarts inégaux : un large
-        à droite, deux presque fermés où les bouts arrondis se chevauchaient en
-        petites bosses. À 16 pixels, cela se lisait comme un « c » verruqueux
-        plutôt que comme un anneau délibérément ouvert en trois.
-
-     Le dessin occupe 1 à 15 sur 16, soit les 87,5 % habituels d'Adwaita ; il
-     s'en tenait à 81 %, d'où son air rabougri à côté des icônes voisines.
-
-     #2e3436 est la couleur de base d'Adwaita : c'est celle que GTK remplace. -->
-<svg width="16px" height="16px" viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg">
-  <path d="M 14.535 10.509 A 7 7 0 0 1 6.905 14.914 A 1.05 1.05 0 0 1 7.233 12.84 A 4.9 4.9 0 0 0 12.575 9.756 A 1.05 1.05 0 0 1 14.535 10.509 Z M 2.56 12.405 A 7 7 0 0 1 2.56 3.595 A 1.05 1.05 0 0 1 4.192 4.916 A 4.9 4.9 0 0 0 4.192 11.084 A 1.05 1.05 0 0 1 2.56 12.405 Z M 6.905 1.086 A 7 7 0 0 1 14.535 5.491 A 1.05 1.05 0 0 1 12.575 6.244 A 4.9 4.9 0 0 0 7.233 3.16 A 1.05 1.05 0 0 1 6.905 1.086 Z M 6.5 8 a 1.5 1.5 0 1 0 3 0 a 1.5 1.5 0 1 0 -3 0 Z" fill="#2e3436"/>
+<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="-8 -8 116 116">
+  <g fill="none" stroke="#5c5c5c" stroke-width="14" stroke-linecap="round">
+    <path d="M 84.64 70 A 40 40 0 0 1 19.36 75.71"/>
+    <path d="M 13.75 66.91 A 40 40 0 0 1 36.32 12.42"/>
+    <path d="M 46.51 10.15 A 40 40 0 0 1 84.64 30"/>
+  </g>
+  <circle cx="50" cy="50" r="10" fill="#5c5c5c"/>
 </svg>

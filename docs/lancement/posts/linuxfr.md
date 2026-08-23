@@ -20,9 +20,11 @@ porte un liseré à la couleur de son Espace : on sait toujours « où » on est
 
 Concrètement :
 
-- **La pièce jointe douteuse** ? `codebyr-jetable facture.pdf` : elle s'ouvre
-  dans une bulle **sans réseau** (namespace réseau isolé) qui **s'autodétruit** à
-  la fermeture. Le piège explose dans le vide.
+- **La pièce jointe douteuse** ? Clic droit → « Ouvrir en Jetable » : elle
+  s'ouvre dans une bulle **sans réseau** (namespace réseau isolé) qui
+  **s'autodétruit** à la fermeture. Le piège explose dans le vide. Un second
+  geste, « Envoyer vers l'Espace… », déplace un document d'un compartiment à
+  l'autre sans passer par le presse-papiers.
 - **La banque** ? Le navigateur de l'Espace Banque n'a le droit de joindre QUE
   les domaines de votre banque (proxy local à liste blanche — un garde-fou
   contre l'erreur humaine, pas encore une règle réseau système : c'est
@@ -47,11 +49,34 @@ invulnérable, et je refuse de prétendre le contraire.
 
 ## Où en est le projet
 
-v1.0 : ISO live installable, testée sur machines réelles (UEFI, hors-ligne,
+v1.5.5 : ISO live installable, testée sur machines réelles (UEFI, hors-ligne,
 Wi-Fi, boutique Flatpak/Flathub incluse). Code sous GPL-3.0, tout est
 constructible avec live-build en trois commandes. Les versions sont **signées
-avec GPG** — et la procédure de vérification du README fonctionne réellement,
-de bout en bout.
+avec GPG** par une sous-clé dont la clé maîtresse vit hors ligne sur support
+amovible — et la procédure de vérification du README fonctionne réellement, de
+bout en bout, depuis un trousseau vierge.
+
+Une commande résume l'esprit du projet :
+
+```console
+codebyr-space verifier-isolation
+```
+
+Elle lance une sonde **dans un vrai bac à sable** et rapporte ce qu'un Espace
+atteint réellement — bus de session de l'hôte, `systemd --user`, socket X11,
+réseau, dossier personnel — face à ce que chaque situation est censée
+autoriser. Elle mesure au lieu d'affirmer. Sa jumelle, `verifier-poste`,
+contrôle la machine installée de la même façon : compte invité sans mot de
+passe utilisable, dossiers personnels en 0700, trousseau apt à jour, mises à
+jour automatiques réellement armées. Chaque contrôle existe parce que la chose
+en question a cassé ici une fois, en silence.
+
+Deux points à peser avant d'essayer : **aucun audit externe**, et à en croire
+les compteurs de téléchargement, **je suis encore le seul à l'utiliser**. C'est
+l'état honnête des choses, et c'est l'essentiel de la raison de ce journal.
+L'historique des correctifs de sécurité — dont une sortie de bac à sable que
+j'ai trouvée et fermée en 1.1.0 — est dans SECURITY.md, pas enfoui dans les
+commits.
 
 → **Le site (captures d'écran)** : https://os.codebyr.dev
 → **Dépôt + ISO signée** : https://github.com/Romtouf/codebyr-os

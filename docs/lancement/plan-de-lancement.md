@@ -19,10 +19,10 @@ s'emballe et entraîne les autres.
       sans se défendre — le ton « voici ce que ça fait, voici ce que ça ne fait
       pas » est notre marque.
 
-> Décision : **pas de vidéo de démo** pour le lancement 1.0. Les captures d'écran
+> Décision : **pas de vidéo de démo** pour le premier lancement. Les captures d'écran
 > portent le message. ([video-demo.md](video-demo.md) reste en réserve pour plus tard.)
 
-## Le jour J — lancement 1.0 : **LinkedIn uniquement**
+## Le jour J — premier lancement : **LinkedIn uniquement**
 
 | Heure (Paris) | Canal | Contenu |
 |---|---|---|

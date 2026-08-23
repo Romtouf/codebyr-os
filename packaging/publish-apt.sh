@@ -117,7 +117,13 @@ fi
 SIGNATAIRES=(-u "$KEYID")
 etat_maitresse="$(gpg --list-secret-keys --with-colons "$KEYID" 2>/dev/null \
 	| awk -F: '/^sec:/ {print $15; exit}')"
-if [ "$etat_maitresse" = "#" ]; then
+if [ "$etat_maitresse" = "#" ] && [ "${CODEBYR_TRANSITION_TERMINEE:-0}" = "1" ]; then
+	# Transition déclarée close : c'est le fonctionnement NORMAL, pas une
+	# alerte. Afficher ici le pavé d'arrêt reviendrait à crier au loup à chaque
+	# publication — et à apprendre au mainteneur à ne plus lire les messages,
+	# donc à manquer celui qui compte.
+	echo "    Transition terminée : signature par la sous-clé seule."
+elif [ "$etat_maitresse" = "#" ]; then
 	# On REFUSE, on n'avertit pas. Le 20/08/2026, cet avertissement a défilé
 	# vingt lignes au-dessus d'un « Bonne signature » final : le dépôt à
 	# signature unique a été produit sans que personne ne le remarque. Un
@@ -142,8 +148,7 @@ if [ "$etat_maitresse" = "#" ]; then
     Le jour où plus aucune machine n'a de trousseau d'avant la sous-clé, cette
     transition n'a plus lieu d'être : CODEBYR_TRANSITION_TERMINEE=1.
 TRANSITION
-	[ "${CODEBYR_TRANSITION_TERMINEE:-0}" = "1" ] || exit 1
-	echo "    → signature par la sous-clé seule (transition déclarée terminée)." >&2
+	exit 1
 else
 	# Le « ! » impose la clé MAÎTRESSE elle-même — sans lui, gpg choisirait
 	# encore la sous-clé et l'on signerait deux fois avec la même.
@@ -208,5 +213,10 @@ for fichier in "Release.gpg Release" "InRelease"; do
 done
 gpg --verify Release.gpg Release 2>&1 | grep -E 'using|Good signature' || true
 echo
-echo "Déployer : rsync -a --delete \"$REPODIR/\" user@serveur:/chemin/apt-repo/"
-echo "ou copier apt-repo/ dans le volume du conteneur apt.codebyr.dev."
+# L'envoi se fait depuis GIT BASH, pas d'ici : la clé SSH vit côté Windows, et
+# rsync n'existe que dans le WSL. La ligne « rsync … user@serveur » affichée
+# auparavant ne pouvait donc marcher nulle part — un mode d'emploi faux coûte
+# plus cher que pas de mode d'emploi.
+echo
+echo "Déployer, depuis GIT BASH (la clé SSH n'existe que côté Windows) :"
+echo "    cd /c/Users/pcrom/codebyros/packaging/apt-repo && scp ./* vps-local:~/docker/codebyr-apt/apt-repo/"

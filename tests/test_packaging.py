@@ -133,6 +133,24 @@ class Paquet(unittest.TestCase):
                       "la protection de la clé est en colonne 8, pas 7")
         self.assertNotIn("{print $7}", source)
 
+    def test_la_publication_refuse_un_paquet_perime(self):
+        """Publier ce qui traîne dans dist/ n'est pas publier son travail.
+
+        Le 23/08/2026, la 1.5.0 est partie avec la version précédente de
+        l'icône du panneau : le .deb avait été construit avant le correctif et
+        personne ne pouvait le voir — le numéro de version, lui, était juste.
+
+        Même piège que l'ISO périmée dans build.sh : un artefact daté qu'on
+        republie en croyant republier le code.
+        """
+        with open(os.path.join(RACINE, "packaging", "publish-apt.sh"),
+                  encoding="utf-8") as f:
+            source = f.read()
+        self.assertIn("-newer", source,
+                      "la publication doit comparer la date du paquet à celle "
+                      "des sources")
+        self.assertIn("plus ancien que le code", source)
+
     def test_la_publication_refuse_une_signature_unique(self):
         """Signer sans la clé maîtresse bloque définitivement des machines.
 

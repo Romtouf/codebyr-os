@@ -10,6 +10,17 @@ GNOME (menu du Sceau, liserés colorés) ne se recharge pas à chaud.
 
 ---
 
+## 1.5.1 — en préparation
+
+**L'icône du Sceau, pour de vrai cette fois.** La 1.5.0 annonçait une icône
+corrigée et embarquait l'ancienne : le paquet avait été construit avant le
+correctif, et rien ne pouvait le montrer — le numéro de version, lui, était le
+bon.
+
+La publication refuse désormais un paquet plus ancien que le code qu'il est
+censé contenir. C'est le même piège que l'ISO périmée : un artefact daté que
+l'on republie en croyant publier son travail.
+
 ## 1.5.0 — en préparation
 
 **`codebyr-space verifier-poste` : la machine vérifie elle-même ce qu'on lui a

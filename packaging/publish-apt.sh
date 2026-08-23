@@ -164,6 +164,36 @@ if [ -n "${CODEBYR_PASSPHRASE_FILE:-}" ]; then
 	GPG_PASS=(--pinentry-mode loopback --passphrase-file "$CODEBYR_PASSPHRASE_FILE")
 fi
 
+# ── Le paquet publié est-il celui du code actuel ? ──────────────────────────
+#
+# publish-apt.sh publie ce qui traîne dans dist/. Rien ne garantissait que ce
+# .deb ait été construit APRÈS la dernière modification du code. Le 23/08/2026,
+# la 1.5.0 a été publiée avec la version précédente de l'icône du panneau : le
+# paquet datait d'avant le correctif, et personne ne pouvait le voir — le
+# numéro de version, lui, était le bon.
+#
+# C'est le même piège que l'ISO périmée dans build.sh : un artefact daté que
+# l'on republie en croyant publier le code. On compare donc les dates, et on
+# refuse plutôt que d'avertir.
+VERSION_COURANTE="$(tr -d ' \t\r\n' < "$REPO/VERSION")"
+DEB_COURANT="$DIST/codebyr-tools_${VERSION_COURANTE}_all.deb"
+if [ ! -f "$DEB_COURANT" ]; then
+	echo "ERREUR : aucun paquet pour la version $VERSION_COURANTE." >&2
+	echo "         Lancez d'abord ./build-deb.sh" >&2
+	exit 1
+fi
+RECENT="$(find "$REPO/live-build/config/includes.chroot_after_packages" \
+	"$REPO/packaging/build-deb.sh" "$REPO/packaging/codebyr-tools.postinst" \
+	-newer "$DEB_COURANT" -print -quit 2>/dev/null || true)"
+if [ -n "$RECENT" ]; then
+	echo "ERREUR : le paquet $VERSION_COURANTE est plus ancien que le code." >&2
+	echo "         Modifié depuis sa construction : $RECENT" >&2
+	echo "         Vous publieriez une version périmée sous un numéro juste." >&2
+	echo "         Lancez ./build-deb.sh puis recommencez." >&2
+	exit 1
+fi
+echo "    Paquet $VERSION_COURANTE postérieur au code : OK."
+
 echo "==> Génération du dépôt dans $REPODIR"
 rm -rf "$REPODIR"
 mkdir -p "$REPODIR"

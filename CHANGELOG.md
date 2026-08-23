@@ -27,6 +27,19 @@ s'en plaint jamais.
 Même principe que `verifier-isolation` : on n'interroge pas le système, on
 l'observe.
 
+**« Envoyer vers l'Espace… » au clic droit.** Annoncé dans l'architecture depuis
+le début et jamais réalisé : faire passer un document d'un Espace à l'autre
+demandait d'exporter un instantané ou de passer par le presse-papiers. Le
+fichier est **copié** dans le dossier « Partagé » de l'Espace choisi —
+l'original ne bouge pas, et l'Espace de destination reste ce qu'il est.
+
+À ne pas confondre avec « Ouvrir en Jetable », qui est le geste de la méfiance.
+Celui-ci est l'inverse : on classe un document dont on ne se méfie pas.
+
+Un fichier du même nom n'est **jamais écrasé** : il devient « rapport (2).pdf ».
+Écraser en silence serait le pire comportement possible ici — on ne saurait
+même pas avoir perdu quelque chose, le geste ayant l'air d'avoir réussi.
+
 ## 1.4.1 — 20 août 2026
 
 **Le clic droit « Ouvrir en Jetable » manquait vraiment à l'appel.** La 1.4.0

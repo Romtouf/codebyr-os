@@ -40,6 +40,10 @@ import bac_a_sable  # noqa: E402
 import registre  # noqa: E402
 
 DATA_ROOT = os.path.expanduser("~/.local/share/codebyr/espaces")
+# Le sas d'un Espace : c'est là qu'atterrit tout fichier venu du dehors. Nom
+# écrit à un seul endroit — il l'était à deux, ce qui est la façon habituelle
+# dont deux moitiés d'un même système finissent par ne plus se parler.
+PARTAGE = "Partagé"
 
 
 def journal(message):
@@ -378,7 +382,7 @@ def cmd_launch(espaces, esp_id, extra, fichier=None):
     # Fichier partagé dans l'Espace (ouverture jetable d'une pièce jointe) :
     # copié dans l'Espace pour être visible dans le bac à sable isolé.
     if fichier and os.path.isfile(fichier):
-        partage = os.path.join(home, "Partagé")
+        partage = os.path.join(home, PARTAGE)
         os.makedirs(partage, exist_ok=True)
         nom = os.path.basename(fichier)
         try:
@@ -386,7 +390,7 @@ def cmd_launch(espaces, esp_id, extra, fichier=None):
         except OSError as exc:
             sys.stderr.write("codebyr-space : copie du fichier impossible (%s)\n" % exc)
         if not extra:
-            chemin = os.path.join(runtime_home, "Partagé", nom)
+            chemin = os.path.join(runtime_home, PARTAGE, nom)
             extra = _visionneuse_pour(nom) + [chemin]
         # Sous cloche : une pièce jointe s'examine blindée ET sans réseau.
         renforce = True
@@ -882,6 +886,74 @@ def _action_launch(espaces, args):
     return cmd_launch(espaces, esp_id, extra, fichier)
 
 
+def nom_libre(dossier, nom, existe=os.path.exists):
+    """Un nom qui n'écrase rien : « rapport.pdf » → « rapport (2).pdf ».
+
+    Décision pure (l'accès disque est injectable) parce qu'elle décide d'une
+    PERTE DE DONNÉES. Écraser en silence un fichier déjà présent dans un Espace
+    serait le pire comportement possible ici : l'utilisateur ne saurait même pas
+    qu'il a perdu quelque chose — le geste, lui, a l'air d'avoir réussi.
+    """
+    if not existe(os.path.join(dossier, nom)):
+        return nom
+    base, ext = os.path.splitext(nom)
+    for n in range(2, 1000):
+        candidat = "%s (%d)%s" % (base, n, ext)
+        if not existe(os.path.join(dossier, candidat)):
+            return candidat
+    return None
+
+
+def cmd_envoyer(espaces, esp_id, fichier):
+    """Dépose une COPIE d'un fichier dans le sas d'un Espace.
+
+    À ne pas confondre avec « launch --fichier », qui sert à examiner une pièce
+    jointe douteuse et impose pour cela le blindage et la coupure réseau.
+    Envoyer un document dans Travail est le geste inverse : on classe quelque
+    chose dont on ne se méfie pas, et l'Espace doit rester ce qu'il est.
+
+    C'est une COPIE : l'original ne bouge pas. Franchir une frontière entre
+    Espaces ne doit jamais faire disparaître ce qu'on avait avant.
+    """
+    esp = espaces.get(esp_id)
+    if not esp:
+        sys.stderr.write("Espace inconnu : %s\n" % esp_id)
+        return 2
+    if esp.get("ephemere"):
+        # Le dossier d'un Espace jetable vit en mémoire et disparaît avec lui :
+        # y « classer » un document reviendrait à le jeter.
+        sys.stderr.write("Un Espace jetable ne conserve rien : utilisez plutôt "
+                         "« codebyr-space launch %s --fichier … ».\n" % esp_id)
+        return 2
+    source = os.path.abspath(os.path.expanduser(fichier))
+    if not os.path.isfile(source):
+        sys.stderr.write("Fichier introuvable (ou ce n'est pas un fichier) : %s\n"
+                         % fichier)
+        return 2
+
+    partage = os.path.join(espace_home(esp), PARTAGE)
+    try:
+        os.makedirs(partage, exist_ok=True)
+        nom = nom_libre(partage, os.path.basename(source))
+        if nom is None:
+            sys.stderr.write("Trop de fichiers du même nom dans %s.\n" % PARTAGE)
+            return 1
+        shutil.copy2(source, os.path.join(partage, nom))
+    except OSError as exc:
+        sys.stderr.write("Copie impossible (%s)\n" % exc)
+        _prevenir("Envoi impossible",
+                  "Le fichier n'a pas pu être copié dans %s." % esp["nom"])
+        return 1
+
+    # Le journal note l'Espace et l'action, jamais le nom du fichier.
+    journal("envoi vers l'Espace %s" % esp["id"])
+    _prevenir("Envoyé dans %s" % esp["nom"],
+              "Le fichier vous attend dans le dossier « %s » de cet Espace."
+              % PARTAGE)
+    print("Copié dans %s → %s/%s" % (esp["nom"], PARTAGE, nom))
+    return 0
+
+
 # Table des actions : (nombre minimal d'arguments, usage, fonction).
 # Une seule source de vérité — l'ancienne cascade de « if » laissait le message
 # d'usage et le nombre d'arguments dériver l'un de l'autre à chaque ajout.
@@ -892,6 +964,8 @@ ACTIONS = {
                            lambda espaces, a: bac_a_sable.cmd_verifier_isolation()),
     "verifier-poste": (0, "verifier-poste",
                        lambda espaces, a: autotest.cmd_verifier_poste()),
+    "envoyer":    (2, "envoyer <espace> <fichier>",
+                   lambda espaces, a: cmd_envoyer(espaces, a[0], a[1])),
     "nettoyer-registre": (0, "nettoyer-registre",
                           lambda espaces, a: cmd_nettoyer_registre()),
     "launch":     (1, "launch <espace> [--fichier <f>] [-- commande...]",

@@ -81,7 +81,7 @@ démarre plus », sur la fonction centrale du système.
 
 | | Chantier | Pourquoi | Effort |
 |---|---|---|---|
-| 🔴 | **Migration Manifest V2 → V3** | Firefox accepte encore MV2, mais AMO pousse vers MV3 et finira par refuser MV2 à la signature. Le bouclier étant un simple *content script* sans page d'arrière-plan, la conversion devrait rester mécanique — mais elle doit être faite **avant** le refus, pas après | M |
+| 🔴 | **Manifest V3 — converti, reste à FAIRE SIGNER** | Le manifeste est passé en MV3 et validé par `web-ext lint` : 0 erreur. Seul avertissement restant, sans objet ici, sur Firefox pour Android — plateforme hors périmètre. `strict_min_version` aligné sur l'ESR 140.14 que Codebyr livre réellement, ce qui permet de déclarer `data_collection_permissions: none` — une clé qu'AMO exigera bientôt de toutes les extensions. **Le bouclier installé sur les machines reste celui du `.xpi` signé** : tant qu'il n'est pas régénéré via AMO, cette conversion n'a aucun effet, et `tests/test_bouclier.py` reste rouge pour le rappeler. `AMO_KEY=… AMO_SECRET=… bash live-build/scripts/sign-extension.sh` | S |
 | 🟠 | **Homographes internationaux (punycode)** | La détection gère quelques substitutions (`0`→`o`, `rn`→`m`…), pas les caractères Unicode ressemblants (cyrillique, grec). C'est une technique d'hameçonnage courante | M |
 
 ---

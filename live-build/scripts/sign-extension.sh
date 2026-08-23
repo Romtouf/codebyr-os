@@ -132,16 +132,31 @@ if [ -z "$PY" ]; then
 	echo "    (Python introuvable : vérification automatique du .xpi ignorée.)"
 fi
 if [ -n "$PY" ]; then
-	"$PY" - "$SIGNES/$(basename "$nouveau")" "$SRC/content.js" <<'VERIF'
-import sys, zipfile
-xpi, source = sys.argv[1], sys.argv[2]
+	"$PY" - "$SIGNES/$(basename "$nouveau")" "$SRC/content.js" "$SRC/manifest.json" <<'VERIF'
+import json, sys, zipfile
+xpi, source, manifeste = sys.argv[1], sys.argv[2], sys.argv[3]
 with zipfile.ZipFile(xpi) as z:
     embarque = z.read("content.js").replace(b"\r\n", b"\n")
+    scelle = json.loads(z.read("manifest.json").decode("utf-8"))
 with open(source, "rb") as f:
     attendu = f.read().replace(b"\r\n", b"\n")
 if embarque != attendu:
     sys.exit("ECHEC : le .xpi signe ne correspond pas a content.js du depot.")
 print("    content.js du .xpi = content.js du depot : OK")
+
+# Le manifeste aussi. Il porte la version de l'API (MV2/MV3), l'identifiant et
+# le plancher de version Firefox : un .xpi scelle sur un ancien manifeste
+# s'installe sans rien dire, et le bouclier se comporte alors autrement que ce
+# que le depot decrit. On compare donc les deux, comme pour le code.
+with open(manifeste, "rb") as f:
+    voulu = json.loads(f.read().decode("utf-8"))
+ecarts = [c for c in ("manifest_version", "version", "permissions",
+                      "host_permissions", "content_scripts")
+          if scelle.get(c) != voulu.get(c)]
+if ecarts:
+    sys.exit("ECHEC : le manifeste du .xpi differe du depot sur : "
+             + ", ".join(ecarts))
+print("    manifest.json du .xpi = manifest.json du depot : OK")
 VERIF
 	echo
 	echo "Vérification complète :  $PY -m unittest discover -s tests"

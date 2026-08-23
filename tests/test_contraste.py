@@ -182,6 +182,34 @@ class SceauDuPanneau(unittest.TestCase):
                       "le style du panneau n'est pas prêt à la création de "
                       "l'indicateur : il faut repasser quand il l'est")
 
+    def test_l_icone_recoit_son_fichier_des_le_constructeur(self):
+        """Une icône créée vide puis remplie ne s'est jamais dessinée.
+
+        Le 23/08/2026, le Sceau a disparu du panneau : pastille de survol
+        présente, rien dedans. La cause n'était ni la couleur ni le thème, mais
+        la construction — l'icône naissait sans fichier, et lui en affecter un
+        ensuite ne suffisait pas à la faire apparaître.
+
+        La version qui s'affichait passait le fichier au constructeur. On garde
+        cette forme, et la taille explicite avec, pour ne dépendre d'aucune
+        hypothèse sur ce que la feuille de style fournit.
+        """
+        chemin = os.path.join(
+            RACINE, "live-build", "config", "includes.chroot_after_packages",
+            "usr", "share", "gnome-shell", "extensions", "codebyr@codebyr.io",
+            "extension.js")
+        with open(chemin, encoding="utf-8") as f:
+            source = f.read()
+        debut = source.index("this._icone = new St.Icon(")
+        fin = source.index("});", debut)
+        constructeur = source[debut:fin]
+        self.assertIn("gicon:", constructeur,
+                      "le fichier doit être passé au constructeur, pas affecté "
+                      "après : l'icône ne se dessine pas")
+        self.assertIn("icon_size:", constructeur,
+                      "taille explicite — une icône de taille nulle est "
+                      "invisible tout en gardant sa pastille de survol")
+
     def test_le_defaut_est_le_sceau_clair(self):
         """Si la mesure échoue, se tromper du côté du panneau noir.
 

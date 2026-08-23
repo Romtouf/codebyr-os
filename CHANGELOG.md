@@ -10,6 +10,18 @@ GNOME (menu du Sceau, liserés colorés) ne se recharge pas à chaud.
 
 ---
 
+## 1.5.4 — en préparation
+
+**Le Sceau ne se dessinait plus du tout.** Ni couleur ni thème en cause : la
+construction. En réorganisant le code pour permettre deux variantes, l'icône
+naissait vide et recevait son fichier ensuite — et dans ce cas elle ne
+s'affiche pas. Restait la pastille de survol, vide, à sa place.
+
+Le fichier est de nouveau passé au constructeur, comme dans la version qui
+fonctionnait, avec une taille explicite. Et le suivi du thème ne peut plus
+interrompre la construction de l'indicateur : il échoue en silence plutôt que
+de tout emporter avec lui.
+
 ## 1.5.3 — en préparation
 
 **Le Sceau, enfin.** La 1.5.2 le choisissait d'après le réglage `color-scheme`,

@@ -533,23 +533,35 @@ class Indicateur extends PanelMenu.Button {
         this._extension = extension;
 
         const boite = new St.BoxLayout({style_class: 'panel-status-menu-box'});
-        // Le Sceau porte sa couleur lui-même, au lieu de s'en remettre à la
-        // recoloration symbolique de GNOME : elle ne s'applique pas à une icône
-        // chargée depuis un fichier, ce qui a rendu le Sceau INVISIBLE sur le
-        // panneau noir du thème sombre (23/08/2026). Et aucune couleur fixe ne
-        // pouvait convenir, le panneau valant #fafafb en clair et #000000 en
-        // sombre. On suit donc le réglage, et on en change avec lui.
-        this._icone = new St.Icon({style_class: 'system-status-icon'});
-        this._reglages = new Gio.Settings({schema_id: 'org.gnome.desktop.interface'});
-        this._majIcone();
-        this._surTheme = this._reglages.connect('changed::color-scheme',
-                                                () => this._majIcone());
-        // Le réglage ne suffit pas : c'est le panneau qui décide de sa couleur,
-        // et il le signale ici. C'est ce rappel qui rattrape le cas où son style
-        // n'était pas encore chargé à la création de l'indicateur.
-        this._surStyle = Main.panel.connect('style-changed', () => this._majIcone());
+
+        // L'icône reçoit son fichier ET sa taille DÈS LE CONSTRUCTEUR.
+        //
+        // C'est ainsi que faisait la version qui s'affichait ; la mienne créait
+        // une icône vide puis lui affectait le fichier ensuite, et le Sceau ne
+        // se dessinait plus du tout — pastille de survol présente, rien dedans.
+        // On ne s'écarte pas de ce qui marche pour une question de style.
+        //
+        // icon_size explicite pour la même raison : ne dépendre d'aucune
+        // hypothèse sur ce que la feuille de style fournit ou non.
+        this._icone = new St.Icon({
+            gicon: Gio.icon_new_for_string(this._cheminIcone()),
+            style_class: 'system-status-icon',
+            icon_size: 16,
+        });
         boite.add_child(this._icone);
         this.add_child(boite);
+
+        // Les rappels ne peuvent PAS interrompre la construction : une exception
+        // ici laisserait un indicateur sans icône et sans menu — exactement le
+        // symptôme observé. Ils sont accessoires, ils échouent donc en silence.
+        try {
+            this._reglages = new Gio.Settings({schema_id: 'org.gnome.desktop.interface'});
+            this._surTheme = this._reglages.connect('changed::color-scheme',
+                                                    () => this._majIcone());
+            this._surStyle = Main.panel.connect('style-changed', () => this._majIcone());
+        } catch (e) {
+            logError(e, 'Codebyr : suivi du thème indisponible');
+        }
 
         // Menu reconstruit à chaque ouverture : reflète les Espaces personnalisés.
         this.menu.connect('open-state-changed', (m, open) => {
@@ -569,7 +581,7 @@ class Indicateur extends PanelMenu.Button {
     // Le panneau, lui, sait de quelle couleur il est. On la lui demande, et on
     // décide sur sa luminance — la même formule que WCAG, celle qui sert déjà à
     // vérifier les couleurs des Espaces.
-    _majIcone() {
+    _cheminIcone() {
         // Défaut : le Sceau clair. Si la mesure échoue, mieux vaut se tromper du
         // côté du panneau noir, qui est celui de GNOME par défaut.
         let sombre = true;
@@ -589,8 +601,12 @@ class Indicateur extends PanelMenu.Button {
             // panneau repassera ici dès qu'il le sera.
         }
         const fichier = sombre ? 'codebyr-clair-symbolic.svg' : 'codebyr-symbolic.svg';
-        this._icone.gicon = Gio.icon_new_for_string(
-            this._extension.path + '/icons/' + fichier);
+        return this._extension.path + '/icons/' + fichier;
+    }
+
+    _majIcone() {
+        if (this._icone)
+            this._icone.gicon = Gio.icon_new_for_string(this._cheminIcone());
     }
 
     destroy() {

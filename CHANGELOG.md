@@ -10,6 +10,17 @@ GNOME (menu du Sceau, liserés colorés) ne se recharge pas à chaud.
 
 ---
 
+## 1.6.0 — en préparation
+
+**Le bouclier anti-hameçonnage passe en Manifest V3.** Firefox accepte encore
+l'ancien format, mais Mozilla finira par refuser de le signer — et ce jour-là,
+le bouclier ne serait plus livrable du tout. C'était le seul chantier du projet
+avec une échéance imposée de l'extérieur ; il est fait avant, pas après.
+
+Rien ne change pour vous : mêmes protections, même fonctionnement. L'extension
+ne collecte aucune donnée, ce qui est désormais déclaré explicitement dans son
+manifeste — une exigence que Mozilla imposera bientôt à toutes les extensions.
+
 ## 1.5.5 — en préparation
 
 **`codebyr-space verifier-poste` : la machine vérifie elle-même ce qu'on lui a

@@ -12,79 +12,19 @@ GNOME (menu du Sceau, liserés colorés) ne se recharge pas à chaud.
 
 ## 1.5.5 — en préparation
 
-**Retour à l'icône du Sceau d'origine.** Trois tentatives d'amélioration l'ont
-laissée invisible dans le panneau. La dernière reposait pourtant sur un
-diagnostic vérifié — le bon code s'exécutait, sans erreur au journal — et
-l'icône ne se dessinait toujours pas.
-
-L'icône historique est restaurée telle quelle. Elle n'est pas belle, mais elle
-se voit sur les deux panneaux, ce pour quoi son gris avait été choisi. Ce qui a
-été essayé, et pourquoi chaque essai a échoué, est consigné dans
-`docs/chantiers.md` — le sujet ne sera rouvert qu'avec les moyens de l'essayer
-en direct.
-
-## 1.5.4 — en préparation
-
-**Le Sceau ne se dessinait plus du tout.** Ni couleur ni thème en cause : la
-construction. En réorganisant le code pour permettre deux variantes, l'icône
-naissait vide et recevait son fichier ensuite — et dans ce cas elle ne
-s'affiche pas. Restait la pastille de survol, vide, à sa place.
-
-Le fichier est de nouveau passé au constructeur, comme dans la version qui
-fonctionnait, avec une taille explicite. Et le suivi du thème ne peut plus
-interrompre la construction de l'indicateur : il échoue en silence plutôt que
-de tout emporter avec lui.
-
-## 1.5.3 — en préparation
-
-**Le Sceau, enfin.** La 1.5.2 le choisissait d'après le réglage `color-scheme`,
-qui vaut « default » sur Codebyr — le thème *clair* des applications. Or GNOME
-affiche malgré tout un panneau noir : le Sceau sombre y restait invisible, et
-il ne restait qu'une pastille vide à sa place.
-
-L'extension **mesure** désormais la couleur réelle du panneau au lieu de la
-déduire d'un réglage, et choisit sur sa luminance. Si la mesure échoue, elle
-retient le Sceau clair — le panneau de GNOME est noir par défaut.
-
-## 1.5.2 — en préparation
-
-**Le Sceau redevient visible.** La 1.5.1 l'avait rendu invisible sur le thème
-sombre : passé à la couleur de base d'Adwaita, il comptait sur la recoloration
-symbolique de GNOME — qui ne s'applique pas à une icône chargée depuis un
-fichier. Sur un panneau noir, contraste de 1,7.
-
-Aucune couleur fixe ne pouvait convenir : le panneau GNOME vaut `#fafafb` en
-thème clair et `#000000` en sombre. Le Sceau existe donc en deux variantes, et
-l'extension choisit selon votre thème — en changeant avec lui, sans
-reconnexion.
-
-## 1.5.1 — en préparation
-
-**L'icône du Sceau, pour de vrai cette fois.** La 1.5.0 annonçait une icône
-corrigée et embarquait l'ancienne : le paquet avait été construit avant le
-correctif, et rien ne pouvait le montrer — le numéro de version, lui, était le
-bon.
-
-La publication refuse désormais un paquet plus ancien que le code qu'il est
-censé contenir. C'est le même piège que l'ISO périmée : un artefact daté que
-l'on republie en croyant publier son travail.
-
-## 1.5.0 — en préparation
-
 **`codebyr-space verifier-poste` : la machine vérifie elle-même ce qu'on lui a
 promis.** Six contrôles, chacun correspondant à un défaut réellement survenu
-ici — jamais à une hypothèse : le clic droit Jetable est-il vraiment chargeable,
-le compte invité refuse-t-il tout mot de passe, les dossiers personnels sont-ils
-privés, le trousseau connaît-il la clé qui signe aujourd'hui, les mises à jour
-sont-elles réellement armées, le bac à sable est-il opérationnel.
+ici — jamais à une hypothèse : le clic droit Jetable est-il vraiment
+chargeable, le compte invité refuse-t-il tout mot de passe, les dossiers
+personnels sont-ils privés, le trousseau connaît-il la clé qui signe
+aujourd'hui, les mises à jour sont-elles réellement armées, le bac à sable
+est-il opérationnel.
 
 Ces défauts ont un point commun qui les rend redoutables : **ils ne se voient
 pas à l'usage.** Un poste dont le trousseau a périmé, ou dont le compte invité
 a repris un mot de passe, se comporte exactement comme un poste sain. Il ne
-s'en plaint jamais.
-
-Même principe que `verifier-isolation` : on n'interroge pas le système, on
-l'observe.
+s'en plaint jamais. Même principe que `verifier-isolation` : on n'interroge pas
+le système, on l'observe.
 
 **« Envoyer vers l'Espace… » au clic droit.** Annoncé dans l'architecture depuis
 le début et jamais réalisé : faire passer un document d'un Espace à l'autre
@@ -98,6 +38,14 @@ Celui-ci est l'inverse : on classe un document dont on ne se méfie pas.
 Un fichier du même nom n'est **jamais écrasé** : il devient « rapport (2).pdf ».
 Écraser en silence serait le pire comportement possible ici — on ne saurait
 même pas avoir perdu quelque chose, le geste ayant l'air d'avoir réussi.
+
+**Pour les développeurs.** La publication refuse désormais un paquet plus ancien
+que le code qu'il est censé contenir : même piège que l'ISO périmée, un artefact
+daté qu'on republie en croyant publier son travail.
+
+Une tentative de refonte de l'icône du Sceau a été **abandonnée** après trois
+essais infructueux, et l'icône d'origine restaurée. Ce qui a été essayé, et la
+raison de chaque échec, est consigné dans `docs/chantiers.md`.
 
 ## 1.4.1 — 20 août 2026
 

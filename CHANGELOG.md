@@ -10,6 +10,23 @@ GNOME (menu du Sceau, liserés colorés) ne se recharge pas à chaud.
 
 ---
 
+## 1.5.0 — en préparation
+
+**`codebyr-space verifier-poste` : la machine vérifie elle-même ce qu'on lui a
+promis.** Six contrôles, chacun correspondant à un défaut réellement survenu
+ici — jamais à une hypothèse : le clic droit Jetable est-il vraiment chargeable,
+le compte invité refuse-t-il tout mot de passe, les dossiers personnels sont-ils
+privés, le trousseau connaît-il la clé qui signe aujourd'hui, les mises à jour
+sont-elles réellement armées, le bac à sable est-il opérationnel.
+
+Ces défauts ont un point commun qui les rend redoutables : **ils ne se voient
+pas à l'usage.** Un poste dont le trousseau a périmé, ou dont le compte invité
+a repris un mot de passe, se comporte exactement comme un poste sain. Il ne
+s'en plaint jamais.
+
+Même principe que `verifier-isolation` : on n'interroge pas le système, on
+l'observe.
+
 ## 1.4.1 — 20 août 2026
 
 **Le clic droit « Ouvrir en Jetable » manquait vraiment à l'appel.** La 1.4.0

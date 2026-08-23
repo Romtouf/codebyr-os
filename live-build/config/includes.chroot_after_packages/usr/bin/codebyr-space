@@ -35,6 +35,7 @@ import unicodedata
 # CODEBYR_LIB permet de le charger ailleurs — tests, développement.
 sys.path.insert(0, os.environ.get("CODEBYR_LIB", "/usr/share/codebyr"))
 import applications  # noqa: E402
+import autotest  # noqa: E402
 import bac_a_sable  # noqa: E402
 import registre  # noqa: E402
 
@@ -889,6 +890,8 @@ ACTIONS = {
     "isolation":  (0, "isolation", lambda espaces, a: bac_a_sable.cmd_isolation()),
     "verifier-isolation": (0, "verifier-isolation",
                            lambda espaces, a: bac_a_sable.cmd_verifier_isolation()),
+    "verifier-poste": (0, "verifier-poste",
+                       lambda espaces, a: autotest.cmd_verifier_poste()),
     "nettoyer-registre": (0, "nettoyer-registre",
                           lambda espaces, a: cmd_nettoyer_registre()),
     "launch":     (1, "launch <espace> [--fichier <f>] [-- commande...]",

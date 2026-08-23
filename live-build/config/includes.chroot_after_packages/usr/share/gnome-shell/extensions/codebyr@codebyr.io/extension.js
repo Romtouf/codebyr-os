@@ -544,6 +544,10 @@ class Indicateur extends PanelMenu.Button {
         this._majIcone();
         this._surTheme = this._reglages.connect('changed::color-scheme',
                                                 () => this._majIcone());
+        // Le réglage ne suffit pas : c'est le panneau qui décide de sa couleur,
+        // et il le signale ici. C'est ce rappel qui rattrape le cas où son style
+        // n'était pas encore chargé à la création de l'indicateur.
+        this._surStyle = Main.panel.connect('style-changed', () => this._majIcone());
         boite.add_child(this._icone);
         this.add_child(boite);
 
@@ -555,17 +559,34 @@ class Indicateur extends PanelMenu.Button {
         this._rebuild();
     }
 
-    // Panneau noir en thème sombre : il faut le Sceau clair. Panneau presque
-    // blanc en thème clair : il faut l'encre. « prefer-dark » est le seul cas
-    // sombre ; « default » et « prefer-light » sont clairs.
+    // On MESURE la couleur du panneau au lieu de la déduire du réglage.
+    //
+    // Déduire s'est trompé deux fois de suite. « color-scheme » vaut « default »
+    // sur Codebyr, ce qui désigne le thème CLAIR des applications — mais GNOME
+    // affiche malgré tout un panneau NOIR. Le Sceau, choisi sombre d'après le
+    // réglage, y était invisible : à la place de l'icône, une pastille vide.
+    //
+    // Le panneau, lui, sait de quelle couleur il est. On la lui demande, et on
+    // décide sur sa luminance — la même formule que WCAG, celle qui sert déjà à
+    // vérifier les couleurs des Espaces.
     _majIcone() {
-        let sombre = false;
+        // Défaut : le Sceau clair. Si la mesure échoue, mieux vaut se tromper du
+        // côté du panneau noir, qui est celui de GNOME par défaut.
+        let sombre = true;
         try {
-            sombre = this._reglages.get_string('color-scheme') === 'prefer-dark';
+            const c = Main.panel.get_theme_node().get_background_color();
+            if (c.alpha > 0) {
+                const canal = v => {
+                    const x = v / 255;
+                    return x <= 0.03928 ? x / 12.92 : Math.pow((x + 0.055) / 1.055, 2.4);
+                };
+                const luminance = 0.2126 * canal(c.red) + 0.7152 * canal(c.green) +
+                                  0.0722 * canal(c.blue);
+                sombre = luminance < 0.4;
+            }
         } catch (e) {
-            // Réglage illisible : on garde l'encre, visible sur le panneau clair
-            // qui est le défaut de Codebyr. Une icône terne vaut mieux qu'une
-            // icône absente.
+            // Nœud de style pas encore prêt : le rappel « style-changed » du
+            // panneau repassera ici dès qu'il le sera.
         }
         const fichier = sombre ? 'codebyr-clair-symbolic.svg' : 'codebyr-symbolic.svg';
         this._icone.gicon = Gio.icon_new_for_string(
@@ -576,6 +597,10 @@ class Indicateur extends PanelMenu.Button {
         if (this._surTheme) {
             this._reglages.disconnect(this._surTheme);
             this._surTheme = null;
+        }
+        if (this._surStyle) {
+            Main.panel.disconnect(this._surStyle);
+            this._surStyle = null;
         }
         super.destroy();
     }

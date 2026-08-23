@@ -10,6 +10,17 @@ GNOME (menu du Sceau, liserés colorés) ne se recharge pas à chaud.
 
 ---
 
+## 1.5.3 — en préparation
+
+**Le Sceau, enfin.** La 1.5.2 le choisissait d'après le réglage `color-scheme`,
+qui vaut « default » sur Codebyr — le thème *clair* des applications. Or GNOME
+affiche malgré tout un panneau noir : le Sceau sombre y restait invisible, et
+il ne restait qu'une pastille vide à sa place.
+
+L'extension **mesure** désormais la couleur réelle du panneau au lieu de la
+déduire d'un réglage, et choisit sur sa luminance. Si la mesure échoue, elle
+retient le Sceau clair — le panneau de GNOME est noir par défaut.
+
 ## 1.5.2 — en préparation
 
 **Le Sceau redevient visible.** La 1.5.1 l'avait rendu invisible sur le thème

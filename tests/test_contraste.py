@@ -158,20 +158,44 @@ class SceauDuPanneau(unittest.TestCase):
                 mesure, 4.5,
                 "%s ne ressort pas sur %s : %.2f" % (fichier, panneau, mesure))
 
-    def test_l_extension_choisit_selon_le_theme(self):
-        """Sans ce choix, on retombe sur une couleur unique — donc sur le bogue."""
+    def test_l_extension_mesure_le_panneau_au_lieu_de_le_deduire(self):
+        """Déduire s'est trompé deux fois. Mesurer ne se trompe pas.
+
+        Premier essai : couleur fixe, invisible sur le panneau noir. Deuxième :
+        choix d'après « color-scheme », qui vaut « default » sur Codebyr — le
+        thème CLAIR des applications — alors que GNOME affiche malgré tout un
+        panneau NOIR. Le Sceau sombre y était de nouveau invisible.
+
+        Le panneau, lui, sait de quelle couleur il est.
+        """
         chemin = os.path.join(
             RACINE, "live-build", "config", "includes.chroot_after_packages",
             "usr", "share", "gnome-shell", "extensions", "codebyr@codebyr.io",
             "extension.js")
         with open(chemin, encoding="utf-8") as f:
             source = f.read()
-        self.assertIn("color-scheme", source,
-                      "l'extension doit suivre le thème pour choisir le Sceau")
+        self.assertIn("get_background_color", source,
+                      "la couleur du panneau doit être MESURÉE, pas déduite "
+                      "d'un réglage")
         self.assertIn("codebyr-clair-symbolic.svg", source)
-        self.assertIn("changed::color-scheme", source,
-                      "le Sceau doit changer AVEC le thème, pas seulement au "
-                      "démarrage de la session")
+        self.assertIn("style-changed", source,
+                      "le style du panneau n'est pas prêt à la création de "
+                      "l'indicateur : il faut repasser quand il l'est")
+
+    def test_le_defaut_est_le_sceau_clair(self):
+        """Si la mesure échoue, se tromper du côté du panneau noir.
+
+        C'est celui de GNOME par défaut, et c'est celui du poste où le Sceau a
+        disparu deux fois. Un défaut mal choisi ici redonne exactement le bogue.
+        """
+        chemin = os.path.join(
+            RACINE, "live-build", "config", "includes.chroot_after_packages",
+            "usr", "share", "gnome-shell", "extensions", "codebyr@codebyr.io",
+            "extension.js")
+        with open(chemin, encoding="utf-8") as f:
+            source = f.read()
+        self.assertIn("let sombre = true;", source,
+                      "en cas d'échec de mesure, le Sceau doit être clair")
 
 
 class AccentSentinelle(unittest.TestCase):

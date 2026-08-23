@@ -121,6 +121,59 @@ class CouleursDesEspaces(unittest.TestCase):
                     "jour (%.2f au lieu de %.2f)" % (nom, reelle, mesure_attendue))
 
 
+class SceauDuPanneau(unittest.TestCase):
+    """Le Sceau doit se voir. C'est le point d'entrée de tout le système.
+
+    Le 23/08/2026 il est devenu INVISIBLE : passé en #2e3436, la couleur de base
+    d'Adwaita, il comptait sur la recoloration symbolique de GNOME — qui ne
+    s'applique pas à une icône chargée depuis un fichier. Contraste obtenu sur
+    le panneau du thème sombre : 1.7.
+
+    Et aucune couleur fixe ne pouvait convenir : le panneau vaut #fafafb en
+    thème clair et #000000 en sombre. Il faut donc deux icônes, et les choisir.
+    """
+
+    PANNEAU_CLAIR = "#fafafb"
+    PANNEAU_SOMBRE = "#000000"
+    ICONES = os.path.join(
+        RACINE, "live-build", "config", "includes.chroot_after_packages",
+        "usr", "share", "gnome-shell", "extensions", "codebyr@codebyr.io", "icons")
+
+    def _couleur(self, fichier):
+        with open(os.path.join(self.ICONES, fichier), encoding="utf-8") as f:
+            trouve = re.findall(r'fill="(#[0-9A-Fa-f]{6})"', f.read())
+        self.assertTrue(trouve, "aucun remplissage dans %s" % fichier)
+        return trouve[-1]
+
+    def test_les_deux_variantes_existent(self):
+        for fichier in ("codebyr-symbolic.svg", "codebyr-clair-symbolic.svg"):
+            self.assertTrue(os.path.exists(os.path.join(self.ICONES, fichier)),
+                            "variante manquante : %s" % fichier)
+
+    def test_chaque_variante_se_voit_sur_son_panneau(self):
+        for fichier, panneau in (("codebyr-symbolic.svg", self.PANNEAU_CLAIR),
+                                 ("codebyr-clair-symbolic.svg", self.PANNEAU_SOMBRE)):
+            mesure = contraste(self._couleur(fichier), panneau)
+            self.assertGreaterEqual(
+                mesure, 4.5,
+                "%s ne ressort pas sur %s : %.2f" % (fichier, panneau, mesure))
+
+    def test_l_extension_choisit_selon_le_theme(self):
+        """Sans ce choix, on retombe sur une couleur unique — donc sur le bogue."""
+        chemin = os.path.join(
+            RACINE, "live-build", "config", "includes.chroot_after_packages",
+            "usr", "share", "gnome-shell", "extensions", "codebyr@codebyr.io",
+            "extension.js")
+        with open(chemin, encoding="utf-8") as f:
+            source = f.read()
+        self.assertIn("color-scheme", source,
+                      "l'extension doit suivre le thème pour choisir le Sceau")
+        self.assertIn("codebyr-clair-symbolic.svg", source)
+        self.assertIn("changed::color-scheme", source,
+                      "le Sceau doit changer AVEC le thème, pas seulement au "
+                      "démarrage de la session")
+
+
 class AccentSentinelle(unittest.TestCase):
     """Le constat qui a fait écarter le thème GTK — gardé chiffré.
 

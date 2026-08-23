@@ -533,10 +533,18 @@ class Indicateur extends PanelMenu.Button {
         this._extension = extension;
 
         const boite = new St.BoxLayout({style_class: 'panel-status-menu-box'});
-        boite.add_child(new St.Icon({
-            gicon: Gio.icon_new_for_string(extension.path + '/icons/codebyr-symbolic.svg'),
-            style_class: 'system-status-icon',
-        }));
+        // Le Sceau porte sa couleur lui-même, au lieu de s'en remettre à la
+        // recoloration symbolique de GNOME : elle ne s'applique pas à une icône
+        // chargée depuis un fichier, ce qui a rendu le Sceau INVISIBLE sur le
+        // panneau noir du thème sombre (23/08/2026). Et aucune couleur fixe ne
+        // pouvait convenir, le panneau valant #fafafb en clair et #000000 en
+        // sombre. On suit donc le réglage, et on en change avec lui.
+        this._icone = new St.Icon({style_class: 'system-status-icon'});
+        this._reglages = new Gio.Settings({schema_id: 'org.gnome.desktop.interface'});
+        this._majIcone();
+        this._surTheme = this._reglages.connect('changed::color-scheme',
+                                                () => this._majIcone());
+        boite.add_child(this._icone);
         this.add_child(boite);
 
         // Menu reconstruit à chaque ouverture : reflète les Espaces personnalisés.
@@ -545,6 +553,31 @@ class Indicateur extends PanelMenu.Button {
                 this._rebuild();
         });
         this._rebuild();
+    }
+
+    // Panneau noir en thème sombre : il faut le Sceau clair. Panneau presque
+    // blanc en thème clair : il faut l'encre. « prefer-dark » est le seul cas
+    // sombre ; « default » et « prefer-light » sont clairs.
+    _majIcone() {
+        let sombre = false;
+        try {
+            sombre = this._reglages.get_string('color-scheme') === 'prefer-dark';
+        } catch (e) {
+            // Réglage illisible : on garde l'encre, visible sur le panneau clair
+            // qui est le défaut de Codebyr. Une icône terne vaut mieux qu'une
+            // icône absente.
+        }
+        const fichier = sombre ? 'codebyr-clair-symbolic.svg' : 'codebyr-symbolic.svg';
+        this._icone.gicon = Gio.icon_new_for_string(
+            this._extension.path + '/icons/' + fichier);
+    }
+
+    destroy() {
+        if (this._surTheme) {
+            this._reglages.disconnect(this._surTheme);
+            this._surTheme = null;
+        }
+        super.destroy();
     }
 
     _rebuild() {

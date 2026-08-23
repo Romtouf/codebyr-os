@@ -10,6 +10,18 @@ GNOME (menu du Sceau, liserés colorés) ne se recharge pas à chaud.
 
 ---
 
+## 1.5.2 — en préparation
+
+**Le Sceau redevient visible.** La 1.5.1 l'avait rendu invisible sur le thème
+sombre : passé à la couleur de base d'Adwaita, il comptait sur la recoloration
+symbolique de GNOME — qui ne s'applique pas à une icône chargée depuis un
+fichier. Sur un panneau noir, contraste de 1,7.
+
+Aucune couleur fixe ne pouvait convenir : le panneau GNOME vaut `#fafafb` en
+thème clair et `#000000` en sombre. Le Sceau existe donc en deux variantes, et
+l'extension choisit selon votre thème — en changeant avec lui, sans
+reconnexion.
+
 ## 1.5.1 — en préparation
 
 **L'icône du Sceau, pour de vrai cette fois.** La 1.5.0 annonçait une icône

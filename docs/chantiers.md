@@ -92,7 +92,7 @@ démarre plus », sur la fonction centrale du système.
 |---|---|---|---|
 | 🟠 | **Liste de banques préremplie** | L'utilisateur doit aujourd'hui saisir le domaine de sa banque à la main. Une liste « quelle est votre banque ? » rendrait le premier contact évident. ⚠️ Elle doit être construite à partir de données **vérifiées**, jamais devinées : un domaine faux dans une liste blanche casse l'authentification forte. *(Le reste est fait : notification au lancement + page de blocage explicite.)* | M |
 | 🟠 | **Notifications depuis les Espaces** | Perdues depuis la 1.1.0 (bus privé). Dépend du chantier `xdg-dbus-proxy` | — |
-| 🟠 | **Thème GTK/libadwaita Codebyr** clair et sombre | Annoncé dans l'architecture (`[visé]`). Aujourd'hui : accent GNOME « teal », fonds d'écran et réglages par défaut | M |
+| 🟠 | **Ambre (Espace Navigation) invisible sur fond clair** | Mesuré : contraste **2,376** contre un seuil de 3,0 pour un élément non textuel. C'est la pastille de barre de titre qui en souffre, posée sur un bandeau presque blanc — or la couleur d'un Espace n'est jamais décorative, c'est le seul repère visuel du cloisonnement. Une Ambre à 42 % de clarté, `#BA7B1C`, conviendrait aux deux fonds (3,54 / 5,26). **Décision de conception, pas correction technique** : elle vous appartient. Le défaut est gardé chiffré par `tests/test_contraste.py` | S |
 | 🟠 | **Internationalisation (gettext)** | Toutes les chaînes des outils Codebyr sont en français, en dur. Le système propose ~150 locales, mais Codebyr lui-même reste monolingue — un frein direct à l'adoption hors francophonie | L |
 | 🟠 | **Mode invité : point d'entrée plus clair** | Le menu du Sceau ouvre le sélecteur d'utilisateur GNOME ; l'utilisateur doit encore comprendre qu'il faut choisir « Invité » | S |
 

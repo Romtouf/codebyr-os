@@ -128,13 +128,24 @@ Extension GNOME Shell + réglages GNOME personnalisés :
   fenêtre ne peut pas mentir sur sa couleur).
 - **Sélecteur d'Espaces** dans la barre supérieure : voir les Espaces actifs,
   en ouvrir, en fermer, tout comprendre d'un coup d'œil.
-- **« Ouvrir en Jetable »** : depuis le menu du Sceau (lien saisi) et via
-  `codebyr-jetable <lien|fichier>`. *[visé]* : l'entrée dans les menus
-  contextuels du gestionnaire de fichiers (clic droit sur une pièce jointe ou
-  une clé USB).
-- *[visé]* : thème GTK/libadwaita « Codebyr » clair + sombre. Aujourd'hui,
-  l'habillage se limite à l'accent GNOME « teal », aux fonds d'écran et aux
-  réglages par défaut (`90_codebyr.gschema.override`).
+- **« Ouvrir en Jetable »** et **« Envoyer vers l'Espace… »** : dans le menu
+  contextuel du gestionnaire de fichiers, ainsi que depuis le menu du Sceau et
+  en ligne de commande (`codebyr-jetable`, `codebyr-space envoyer`).
+- **Habillage** : accent GNOME « teal », fonds d'écran et réglages par défaut
+  (`90_codebyr.gschema.override`).
+
+  Un thème GTK aux couleurs exactes de la charte a été **étudié puis écarté**,
+  et la raison mérite d'être écrite. GTK 4.18 ne connaît pas
+  `prefers-color-scheme` : une surcharge CSS impose donc **une seule valeur**
+  aux modes clair et sombre. Or, à la teinte de la Sentinelle (190°), aucune
+  clarté ne franchit le seuil de contraste AA dans les deux modes à la fois —
+  le basculement se fait entre 32 % de clarté (conforme en clair seulement) et
+  34 % (conforme en sombre seulement).
+
+  Livrer un accent statique reviendrait donc à choisir dans quel mode
+  l'interface serait moins lisible qu'aujourd'hui. L'accent GNOME, lui, est
+  ajusté par GNOME pour chaque mode. On garde le supporté plutôt que le
+  conforme à la marque.
 
 ### Applications
 

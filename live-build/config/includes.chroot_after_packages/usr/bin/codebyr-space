@@ -37,6 +37,7 @@ sys.path.insert(0, os.environ.get("CODEBYR_LIB", "/usr/share/codebyr"))
 import applications  # noqa: E402
 import autotest  # noqa: E402
 import bac_a_sable  # noqa: E402
+import provenance  # noqa: E402
 import registre  # noqa: E402
 
 DATA_ROOT = os.path.expanduser("~/.local/share/codebyr/espaces")
@@ -886,6 +887,17 @@ def _action_launch(espaces, args):
     return cmd_launch(espaces, esp_id, extra, fichier)
 
 
+def _espace_courant():
+    """L'Espace depuis lequel cette commande est lancée, ou None.
+
+    Posée par cmd_launch dans l'environnement de chaque Espace : un processus
+    qui tourne dedans la voit, un processus du bureau ne la voit pas. C'est
+    donc aussi la façon de savoir qu'on est « à l'extérieur ».
+    """
+    esp_id = os.environ.get("CODEBYR_ESPACE", "").strip()
+    return esp_id if provenance.identifiant_valide(esp_id) else None
+
+
 def nom_libre(dossier, nom, existe=os.path.exists):
     """Un nom qui n'écrase rien : « rapport.pdf » → « rapport (2).pdf ».
 
@@ -938,7 +950,16 @@ def cmd_envoyer(espaces, esp_id, fichier):
         if nom is None:
             sys.stderr.write("Trop de fichiers du même nom dans %s.\n" % PARTAGE)
             return 1
-        shutil.copy2(source, os.path.join(partage, nom))
+        cible = os.path.join(partage, nom)
+        shutil.copy2(source, cible)
+        # La copie garde l'origine de l'original si elle en a une ; sinon elle
+        # reçoit l'Espace d'où part l'envoi. Sans ce report, la marque
+        # disparaîtrait au premier franchissement — c'est-à-dire exactement au
+        # moment qu'elle sert à tracer.
+        if not provenance.heriter(source, cible):
+            depart = _espace_courant()
+            if depart and depart != esp_id:
+                provenance.marquer(cible, depart)
     except OSError as exc:
         sys.stderr.write("Copie impossible (%s)\n" % exc)
         _prevenir("Envoi impossible",
@@ -954,6 +975,58 @@ def cmd_envoyer(espaces, esp_id, fichier):
     return 0
 
 
+def cmd_provenance(espaces, chemin):
+    """Dit d'où vient un fichier, et si l'ouvrir ici mérite une cloche."""
+    cible = os.path.abspath(os.path.expanduser(chemin))
+    if not os.path.exists(cible):
+        sys.stderr.write("Fichier introuvable : %s\n" % chemin)
+        return 2
+    venue = provenance.origine(cible)
+    if not venue:
+        print("Origine inconnue — ce fichier n'a jamais transité par un Espace,"
+              "\nou il a perdu sa marque (clé USB, pièce jointe, partage réseau).")
+        return 0
+    esp = espaces.get(venue)
+    print("Vient de l'Espace : %s" % (esp["nom"] if esp else venue))
+    courant = _espace_courant()
+    if courant and provenance.doit_isoler(venue, courant):
+        ici = espaces.get(courant)
+        print("Vous êtes dans %s : l'ouvrir ici ferait franchir une frontière."
+              % (ici["nom"] if ici else courant))
+    return 0
+
+
+def cmd_contagion(espaces, esp_id):
+    """Compte, dans un Espace, les fichiers venus d'ailleurs.
+
+    Montrer la contagion plutôt que la supposer absente : c'est le même parti
+    pris que « verifier-isolation », appliqué aux fichiers. Un chiffre nul est
+    une information ; un chiffre élevé aussi.
+    """
+    esp = espaces.get(esp_id)
+    if not esp:
+        sys.stderr.write("Espace inconnu : %s\n" % esp_id)
+        return 2
+    racine = os.path.join(DATA_ROOT, esp_id, "home")
+    origines = []
+    total = 0
+    for dossier, _, fichiers in os.walk(racine):
+        for nom in fichiers:
+            total += 1
+            origines.append(provenance.origine(os.path.join(dossier, nom)))
+    compte = provenance.resumer(origines, esp_id)
+    print("Espace %s — %d fichier(s) au total." % (esp["nom"], total))
+    if not compte:
+        print("Aucun fichier venu d'un autre Espace.")
+        return 0
+    for venue, combien in sorted(compte.items(), key=lambda c: -c[1]):
+        autre = espaces.get(venue)
+        print("  %3d venu(s) de %s" % (combien, autre["nom"] if autre else venue))
+    print("\nCes fichiers ont franchi une frontière. Pour en examiner un sous "
+          "cloche :\n  codebyr-space launch %s --fichier <chemin>" % esp_id)
+    return 0
+
+
 # Table des actions : (nombre minimal d'arguments, usage, fonction).
 # Une seule source de vérité — l'ancienne cascade de « if » laissait le message
 # d'usage et le nombre d'arguments dériver l'un de l'autre à chaque ajout.
@@ -966,6 +1039,10 @@ ACTIONS = {
                        lambda espaces, a: autotest.cmd_verifier_poste()),
     "envoyer":    (2, "envoyer <espace> <fichier>",
                    lambda espaces, a: cmd_envoyer(espaces, a[0], a[1])),
+    "provenance": (1, "provenance <fichier>",
+                   lambda espaces, a: cmd_provenance(espaces, a[0])),
+    "contagion":  (1, "contagion <espace>",
+                   lambda espaces, a: cmd_contagion(espaces, a[0])),
     "nettoyer-registre": (0, "nettoyer-registre",
                           lambda espaces, a: cmd_nettoyer_registre()),
     "launch":     (1, "launch <espace> [--fichier <f>] [-- commande...]",

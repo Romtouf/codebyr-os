@@ -10,6 +10,34 @@ GNOME (menu du Sceau, liserés colorés) ne se recharge pas à chaud.
 
 ---
 
+## 1.7.0 — en préparation
+
+**Un fichier garde désormais la trace de l'Espace d'où il vient.**
+
+Les Espaces cloisonnent les applications. Ils ne cloisonnaient pas les
+fichiers : un document téléchargé dans Navigation, envoyé dans Travail puis
+ouvert, s'y exécutait au milieu de vos documents professionnels. Le
+cloisonnement avait parfaitement tenu — c'est vous qui aviez transporté le
+fichier de l'autre côté, d'un geste tout à fait normal.
+
+Le gestionnaire de fichiers gagne une colonne **« Espace d'origine »** : un
+document venu de Navigation se repère au milieu de vos dossiers de Travail,
+comme une fenêtre se repère à son liseré. Rien de nouveau à apprendre — la même
+idée, appliquée aux fichiers.
+
+Deux commandes l'accompagnent :
+
+- `codebyr-space provenance <fichier>` — d'où vient ce fichier, et l'ouvrir
+  ici ferait-il franchir une frontière ;
+- `codebyr-space contagion <espace>` — combien de fichiers venus d'ailleurs
+  se trouvent dans cet Espace.
+
+**Ce que cela ne fait pas.** La marque ne survit ni à une clé USB en FAT, ni à
+une pièce jointe, ni à la plupart des partages réseau : elle se perd là où elle
+servirait le plus. Windows et macOS ont la même limite, et cela reste l'une de
+leurs protections les plus efficaces. C'est un indice, pas une frontière — un
+fichier sans marque ne déclenche donc rien.
+
 ## 1.6.0 — en préparation
 
 **Le bouclier anti-hameçonnage passe en Manifest V3.** Firefox accepte encore

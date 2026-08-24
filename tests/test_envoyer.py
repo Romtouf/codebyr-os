@@ -9,6 +9,8 @@ Confondre les deux serait une régression discrète et coûteuse — un document
 travail envoyé dans un Espace soudain privé de réseau, sans explication.
 """
 import os
+import shutil
+import tempfile
 import unittest
 
 from outils import BIN, LIB  # noqa: F401 — place le module partagé sur sys.path
@@ -59,6 +61,72 @@ class NomLibre(unittest.TestCase):
         """Mille collisions : on rend la main au lieu de tourner sans fin."""
         self.assertIsNone(
             space.nom_libre("/x", "a.txt", existe=lambda p: True))
+
+
+class BoiteDEnvoi(unittest.TestCase):
+    """Le passage par lequel un fichier sort d'un Espace.
+
+    Le bac à sable monte le dossier de l'Espace PAR-DESSUS « ~ ». À
+    l'intérieur, la racine des données désigne donc un dossier fantôme du bac à
+    sable, sans rapport avec les vrais Espaces : « envoyer » y copiait le
+    fichier et annonçait « Copié dans Travail ». Il n'arrivait jamais.
+    Constaté le 24/08/2026 par le mainteneur, sur sa machine.
+
+    L'Espace dépose maintenant dans SA boîte ; l'hôte relève et distribue.
+    """
+
+    def setUp(self):
+        self.hote = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, self.hote, True)
+        self._racine = space.DATA_ROOT
+        space.DATA_ROOT = self.hote
+        self.addCleanup(setattr, space, "DATA_ROOT", self._racine)
+        self.espaces = {"travail": {"id": "travail", "nom": "Travail"},
+                        "navigation": {"id": "navigation", "nom": "Navigation"},
+                        "jetable": {"id": "jetable", "nom": "Jetable",
+                                    "ephemere": True}}
+
+    def _deposer(self, source, dest, nom="doc.pdf"):
+        dossier = os.path.join(space.boite_envoi(source), dest)
+        os.makedirs(dossier, exist_ok=True)
+        with open(os.path.join(dossier, nom), "w", encoding="utf-8") as f:
+            f.write("x")
+        return os.path.join(self.hote, dest, "home", space.PARTAGE, nom)
+
+    def test_remise(self):
+        attendu = self._deposer("navigation", "travail")
+        self.assertEqual(space.relever_envois(self.espaces), 1)
+        self.assertTrue(os.path.exists(attendu))
+
+    def test_la_boite_est_videe(self):
+        """Sans quoi le fichier serait remis à chaque ouverture d'Espace."""
+        self._deposer("navigation", "travail")
+        space.relever_envois(self.espaces)
+        self.assertEqual(space.relever_envois(self.espaces), 0)
+
+    def test_destination_inventee_ignoree(self):
+        """Le nom du dossier vient d'une zone écrite DEPUIS un Espace.
+
+        C'est-à-dire d'un endroit où l'on ne décide pas de ce qui s'écrit : une
+        destination inconnue doit être laissée où elle est, jamais suivie.
+        """
+        self._deposer("navigation", "..")
+        self._deposer("navigation", "inexistant")
+        self.assertEqual(space.relever_envois(self.espaces), 0)
+
+    def test_pas_de_remise_vers_un_jetable(self):
+        """Son dossier vit en mémoire : y déposer reviendrait à jeter."""
+        self._deposer("navigation", "jetable")
+        self.assertEqual(space.relever_envois(self.espaces), 0)
+
+    def test_collision_a_la_remise(self):
+        """Deux envois du même nom : le second ne doit pas écraser le premier."""
+        attendu = self._deposer("navigation", "travail")
+        space.relever_envois(self.espaces)
+        self._deposer("navigation", "travail")
+        space.relever_envois(self.espaces)
+        dossier = os.path.dirname(attendu)
+        self.assertEqual(len(os.listdir(dossier)), 2, os.listdir(dossier))
 
 
 class SasPartage(unittest.TestCase):

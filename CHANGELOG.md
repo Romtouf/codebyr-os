@@ -10,6 +10,25 @@ GNOME (menu du Sceau, liserés colorés) ne se recharge pas à chaud.
 
 ---
 
+## 1.9.2 — en préparation
+
+**« Envoyer vers l'Espace » ne fonctionnait pas depuis un Espace.** Le fichier
+n'arrivait jamais, alors que la commande annonçait « Copié ».
+
+La cause est le cloisonnement lui-même : à l'intérieur d'un Espace, les autres
+Espaces sont volontairement inatteignables. Le fichier partait donc dans un
+dossier sans issue du bac à sable.
+
+Chaque Espace dispose désormais d'une **boîte d'envoi**, et c'est le système
+qui distribue. Le message le dit maintenant honnêtement : « Déposé pour
+Travail — remis à la prochaine ouverture de cet Espace. » La remise a lieu dès
+que vous ouvrez l'Espace destinataire, ce qui est de toute façon le moment où
+vous allez y chercher le fichier.
+
+Aucun Espace n'écrit chez un autre : chacun ne voit que sa propre boîte.
+
+Depuis le bureau, l'envoi reste immédiat — rien ne change.
+
 ## 1.9.0 — en préparation
 
 **Un fichier venu d'un autre Espace s'ouvre sous cloche, tout seul.**

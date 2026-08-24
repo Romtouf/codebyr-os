@@ -15,7 +15,8 @@ import sys
 import tempfile
 
 
-def wrap_bwrap(home, cmd, env, renforce=False, hors_ligne=False, audio=True):
+def wrap_bwrap(home, cmd, env, renforce=False, hors_ligne=False, audio=True,
+               envoi=None):
     """Enveloppe avec bubblewrap : dossier personnel isolé, /tmp isolé,
     affichage (et éventuellement son) partagés. Repli géré par l'appelant si
     bwrap échoue.
@@ -27,6 +28,16 @@ def wrap_bwrap(home, cmd, env, renforce=False, hors_ligne=False, audio=True):
                  jamais pouvoir téléphoner dehors.
     audio      : donne accès au serveur de son PipeWire. À couper pour les
                  Espaces sensibles : ce socket, c'est aussi le MICRO.
+
+    envoi      : boîte d'envoi de CET Espace, montée sur ~/.codebyr-envoi.
+                 C'est le seul passage par lequel un fichier peut sortir vers
+                 un autre Espace. Sans elle, « envoyer » lancé DANS un Espace
+                 écrivait dans un dossier fantôme du bac à sable : la commande
+                 annonçait « Copié », et le fichier n'arrivait jamais.
+
+                 Chaque Espace voit UNIQUEMENT la sienne, au même chemin. Rien
+                 n'est partagé entre Espaces : c'est l'hôte qui relève et
+                 distribue, jamais l'Espace qui écrit chez le voisin.
 
     RÈGLE ABSOLUE — le bus de session de l'hôte n'entre JAMAIS ici.
     Un « --ro-bind » ne protège pas un socket : le noyau ne refuse l'écriture
@@ -68,6 +79,12 @@ def wrap_bwrap(home, cmd, env, renforce=False, hors_ligne=False, audio=True):
         # (dbus-run-session posera la bonne valeur juste après).
         "--unsetenv", "DBUS_SESSION_BUS_ADDRESS",
     ]
+    if envoi:
+        # Seul passage par lequel un fichier sort vers un autre Espace. Chaque
+        # Espace ne voit QUE la sienne : rien n'est partagé, l'hôte relève et
+        # distribue. Un Jetable n'en a pas — il ne conserve rien, par nature.
+        bwrap += ["--bind", envoi,
+                  os.path.join(os.path.expanduser("~"), ".codebyr-envoi")]
     if audio and not hors_ligne:
         bwrap += ["--ro-bind-try", runtime + "/pipewire-0", runtime + "/pipewire-0"]
     if hors_ligne:

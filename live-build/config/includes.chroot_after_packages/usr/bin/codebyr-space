@@ -445,8 +445,20 @@ def cmd_launch(espaces, esp_id, extra, fichier=None):
     # Dans un Espace, un fichier venu d'ailleurs s'ouvre sous cloche. Câblé au
     # lancement plutôt qu'à la création : un Espace existant en profite aussi,
     # sans quoi le correctif n'atteindrait que les Espaces créés après lui.
+    envoi = None
     if not esp.get("ephemere"):
         _preparer_ouverture(home)
+        # La boîte d'envoi de CET Espace, et la relève de ce que les autres ont
+        # déposé. Les deux se font ICI, depuis l'hôte : c'est le seul endroit
+        # d'où l'on voit tous les Espaces, et le moment où l'on va justement
+        # chercher ses fichiers.
+        envoi = boite_envoi(esp["id"])
+        try:
+            os.makedirs(envoi, exist_ok=True)
+        except OSError:
+            envoi = None
+        if not _espace_courant():
+            relever_envois(espaces)
     use_bwrap = bool(shutil.which("bwrap"))
     runtime_home = os.path.expanduser("~") if use_bwrap else home
 
@@ -542,7 +554,7 @@ def cmd_launch(espaces, esp_id, extra, fichier=None):
                     % (esp["id"], nom_app))
     elif use_bwrap:
         run = bac_a_sable.wrap_bwrap(home, cmd, env, renforce=renforce, hors_ligne=hors_ligne,
-                         audio=audio)
+                         audio=audio, envoi=envoi)
         if renforce:
             run = bac_a_sable.plafonner_ressources(run)
             detail = "Blindage actif" + (" · hors-ligne (aucun réseau)" if hors_ligne else "")
@@ -966,6 +978,65 @@ def _action_launch(espaces, args):
     return cmd_launch(espaces, esp_id, extra, fichier)
 
 
+# Boîte d'envoi : le seul passage par lequel un fichier sort d'un Espace.
+#
+# Le bac à sable monte le dossier de l'Espace PAR-DESSUS « ~ ». À l'intérieur,
+# DATA_ROOT désigne donc un dossier fantôme du bac à sable, sans rapport avec
+# les vrais Espaces. « envoyer » y copiait le fichier et annonçait « Copié » :
+# il n'arrivait jamais. Constaté le 24/08/2026.
+#
+# L'Espace dépose donc dans SA boîte, montée à un chemin fixe ; l'hôte relève
+# et distribue. Un Espace n'écrit jamais chez un autre.
+ENVOI_INTERNE = os.path.expanduser("~/.codebyr-envoi")
+
+
+def boite_envoi(esp_id):
+    """Boîte d'envoi d'un Espace, vue depuis l'HÔTE."""
+    return os.path.join(DATA_ROOT, esp_id, "envoi")
+
+
+def relever_envois(espaces):
+    """Distribue ce que les Espaces ont déposé. Renvoie le nombre remis.
+
+    Appelé depuis l'hôte, au lancement de n'importe quel Espace : c'est le
+    moment où l'on va justement chercher ses fichiers, et cela évite un
+    service qui tournerait en permanence pour un geste occasionnel.
+    """
+    remis = 0
+    for source in list(espaces):
+        racine = boite_envoi(source)
+        if not os.path.isdir(racine):
+            continue
+        for dest in os.listdir(racine):
+            # Une destination inconnue est ignorée : le nom vient d'un dossier
+            # écrit DEPUIS un Espace, donc d'une zone où l'on ne décide pas.
+            if dest not in espaces or espaces[dest].get("ephemere"):
+                continue
+            dossier = os.path.join(racine, dest)
+            if not os.path.isdir(dossier):
+                continue
+            cible = os.path.join(DATA_ROOT, dest, "home", PARTAGE)
+            try:
+                os.makedirs(cible, exist_ok=True)
+            except OSError:
+                continue
+            for nom in os.listdir(dossier):
+                chemin = os.path.join(dossier, nom)
+                if not os.path.isfile(chemin):
+                    continue
+                try:
+                    final = nom_libre(cible, os.path.basename(nom))
+                    if final is None:
+                        continue
+                    shutil.move(chemin, os.path.join(cible, final))
+                    remis += 1
+                except OSError:
+                    continue
+    if remis:
+        journal("remise de %d fichier(s) entre Espaces" % remis)
+    return remis
+
+
 def _espace_courant():
     """L'Espace depuis lequel cette commande est lancée, ou None.
 
@@ -995,6 +1066,39 @@ def nom_libre(dossier, nom, existe=os.path.exists):
     return None
 
 
+def _deposer_pour_envoi(esp, depart, source):
+    """Dépose un fichier dans la boîte d'envoi, vue de l'INTÉRIEUR d'un Espace."""
+    dossier = os.path.join(ENVOI_INTERNE, esp["id"])
+    try:
+        os.makedirs(dossier, exist_ok=True)
+    except OSError:
+        sys.stderr.write(
+            "Boîte d'envoi indisponible : cet Espace a été ouvert par une "
+            "version antérieure\nde Codebyr. Fermez-le et rouvrez-le.\n")
+        return 1
+    try:
+        nom = nom_libre(dossier, os.path.basename(source))
+        if nom is None:
+            sys.stderr.write("Trop de fichiers du même nom en attente.\n")
+            return 1
+        cible = os.path.join(dossier, nom)
+        shutil.copy2(source, cible)
+        if not provenance.heriter(source, cible, DATA_ROOT):
+            provenance.marquer(cible, depart)
+    except OSError as exc:
+        sys.stderr.write("Copie impossible (%s)\n" % exc)
+        _prevenir("Envoi impossible",
+                  "Le fichier n'a pas pu être remis à %s." % esp["nom"])
+        return 1
+    journal("dépôt pour l'Espace %s" % esp["id"])
+    _prevenir("En route vers %s" % esp["nom"],
+              "Le fichier y sera déposé dans « %s » à la prochaine ouverture "
+              "de cet Espace." % PARTAGE)
+    print("Déposé pour %s — remis à la prochaine ouverture de cet Espace."
+          % esp["nom"])
+    return 0
+
+
 def cmd_envoyer(espaces, esp_id, fichier):
     """Dépose une COPIE d'un fichier dans le sas d'un Espace.
 
@@ -1021,6 +1125,14 @@ def cmd_envoyer(espaces, esp_id, fichier):
         sys.stderr.write("Fichier introuvable (ou ce n'est pas un fichier) : %s\n"
                          % fichier)
         return 2
+
+    depart = _espace_courant()
+    if depart:
+        # On est DANS un Espace : le bac à sable rend les autres Espaces
+        # inatteignables, et c'est voulu. On dépose donc dans la boîte
+        # d'envoi, que l'hôte relèvera. Sans ce chemin, la copie partait dans
+        # un dossier fantôme et la commande annonçait un succès imaginaire.
+        return _deposer_pour_envoi(esp, depart, source)
 
     partage = os.path.join(espace_home(esp), PARTAGE)
     try:

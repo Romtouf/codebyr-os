@@ -25,6 +25,10 @@ document venu de Navigation se repère au milieu de vos dossiers de Travail,
 comme une fenêtre se repère à son liseré. Rien de nouveau à apprendre — la même
 idée, appliquée aux fichiers.
 
+Cela vaut aussi pour ce que vous **téléchargez** : un fichier reçu dans un
+Espace en porte l'origine sans qu'on ait rien eu à faire, et la garde en le
+quittant.
+
 Deux commandes l'accompagnent :
 
 - `codebyr-space provenance <fichier>` — d'où vient ce fichier, et l'ouvrir

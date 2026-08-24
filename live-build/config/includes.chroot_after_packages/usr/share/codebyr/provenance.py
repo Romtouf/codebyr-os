@@ -47,6 +47,36 @@ def identifiant_valide(esp_id):
     return bool(esp_id) and bool(FORME.match(esp_id))
 
 
+def origine_par_chemin(chemin, racine_donnees):
+    """L'Espace déduit de l'EMPLACEMENT du fichier, ou None.
+
+    Un fichier qui vit dans « <racine>/navigation/home/... » vient de
+    Navigation : c'est vrai par construction, sans qu'on ait rien eu à écrire.
+
+    Cela comble le trou qui rendait la marque presque inutile. Elle n'était
+    posée qu'au moment d'un envoi, alors qu'un fichier entre surtout dans un
+    Espace par TÉLÉCHARGEMENT — et ces fichiers-là n'étaient marqués nulle
+    part. Les surveiller demanderait un processus permanent ; leur emplacement
+    le dit déjà.
+
+    L'attribut étendu garde tout son rôle : il est ce qui survit à la SORTIE de
+    l'Espace, quand le chemin ne dit plus rien.
+    """
+    if not chemin or not racine_donnees:
+        return None
+    try:
+        relatif = os.path.relpath(os.path.realpath(chemin),
+                                  os.path.realpath(racine_donnees))
+    except (OSError, ValueError):
+        return None
+    morceaux = relatif.replace("\\", "/").split("/")
+    # « <id>/home/… » : au moins un fichier SOUS le dossier personnel, sinon on
+    # désignerait le dossier de l'Espace lui-même.
+    if len(morceaux) < 3 or morceaux[1] != "home":
+        return None
+    return morceaux[0] if identifiant_valide(morceaux[0]) else None
+
+
 def doit_isoler(origine, espace_courant):
     """Faut-il ouvrir ce fichier sous cloche plutôt que dans l'Espace courant ?
 
@@ -90,8 +120,12 @@ def marquer(chemin, esp_id):
         return False
 
 
-def origine(chemin):
+def origine(chemin, racine_donnees=None):
     """L'Espace d'où vient ce fichier, ou None.
+
+    L'attribut étendu d'abord — c'est lui qui a suivi le fichier hors de son
+    Espace. À défaut, l'emplacement : un fichier encore chez lui n'a pas besoin
+    d'être marqué pour qu'on sache d'où il vient.
 
     On revalide la forme à la LECTURE : l'attribut est inscriptible par
     n'importe quel programme du poste, et sa valeur finit dans une interface et
@@ -101,19 +135,28 @@ def origine(chemin):
     try:
         brut = os.getxattr(chemin, ATTRIBUT)
     except (OSError, AttributeError):
-        return None
-    try:
-        valeur = brut.decode("utf-8").strip()
-    except UnicodeError:
-        return None
-    return valeur if identifiant_valide(valeur) else None
+        brut = None
+    if brut is not None:
+        try:
+            valeur = brut.decode("utf-8").strip()
+        except UnicodeError:
+            valeur = ""
+        if identifiant_valide(valeur):
+            return valeur
+    return origine_par_chemin(chemin, racine_donnees)
 
 
-def heriter(source, destination):
+def heriter(source, destination, racine_donnees=None):
     """Reporte l'origine d'un fichier sur sa copie.
 
     Sans cela, la marque disparaîtrait au premier « Envoyer vers l'Espace… » —
     c'est-à-dire exactement au moment qu'elle sert à tracer.
+
+    La racine est transmise à dessein : le cas le plus courant est un fichier
+    TÉLÉCHARGÉ dans un Espace, qui n'a pas d'attribut mais dont l'emplacement
+    dit tout. C'est là qu'on transforme cette information de position en marque
+    durable, juste avant qu'il quitte son Espace et que le chemin cesse de
+    parler.
     """
-    marque = origine(source)
+    marque = origine(source, racine_donnees)
     return marquer(destination, marque) if marque else False

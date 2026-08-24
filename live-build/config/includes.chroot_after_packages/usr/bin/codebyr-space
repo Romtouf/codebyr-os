@@ -956,7 +956,7 @@ def cmd_envoyer(espaces, esp_id, fichier):
         # reçoit l'Espace d'où part l'envoi. Sans ce report, la marque
         # disparaîtrait au premier franchissement — c'est-à-dire exactement au
         # moment qu'elle sert à tracer.
-        if not provenance.heriter(source, cible):
+        if not provenance.heriter(source, cible, DATA_ROOT):
             depart = _espace_courant()
             if depart and depart != esp_id:
                 provenance.marquer(cible, depart)
@@ -981,7 +981,7 @@ def cmd_provenance(espaces, chemin):
     if not os.path.exists(cible):
         sys.stderr.write("Fichier introuvable : %s\n" % chemin)
         return 2
-    venue = provenance.origine(cible)
+    venue = provenance.origine(cible, DATA_ROOT)
     if not venue:
         print("Origine inconnue — ce fichier n'a jamais transité par un Espace,"
               "\nou il a perdu sa marque (clé USB, pièce jointe, partage réseau).")
@@ -1013,7 +1013,7 @@ def cmd_contagion(espaces, esp_id):
     for dossier, _, fichiers in os.walk(racine):
         for nom in fichiers:
             total += 1
-            origines.append(provenance.origine(os.path.join(dossier, nom)))
+            origines.append(provenance.origine(os.path.join(dossier, nom), DATA_ROOT))
     compte = provenance.resumer(origines, esp_id)
     print("Espace %s — %d fichier(s) au total." % (esp["nom"], total))
     if not compte:

@@ -34,6 +34,46 @@ class Identifiants(unittest.TestCase):
             self.assertFalse(provenance.identifiant_valide(mauvais), repr(mauvais))
 
 
+class ParEmplacement(unittest.TestCase):
+    """Un fichier encore chez lui n'a pas besoin d'être marqué.
+
+    C'est ce qui rend la fonction utile : la marque n'était posée qu'à l'envoi,
+    alors qu'un fichier entre surtout dans un Espace par TÉLÉCHARGEMENT. Ces
+    fichiers-là n'étaient marqués nulle part, et leur surveillance aurait
+    demandé un processus permanent — leur emplacement le dit déjà.
+    """
+
+    RACINE = "/home/moi/.local/share/codebyr/espaces"
+
+    def test_fichier_dans_le_dossier_personnel_d_un_espace(self):
+        self.assertEqual(
+            provenance.origine_par_chemin(
+                self.RACINE + "/navigation/home/Téléchargements/x.pdf", self.RACINE),
+            "navigation")
+
+    def test_fichier_hors_de_tout_espace(self):
+        self.assertIsNone(
+            provenance.origine_par_chemin("/home/moi/Documents/x.pdf", self.RACINE))
+
+    def test_le_dossier_de_l_espace_lui_meme_ne_compte_pas(self):
+        """« <id>/home » désigne le dossier, pas un fichier qui s'y trouve."""
+        self.assertIsNone(
+            provenance.origine_par_chemin(self.RACINE + "/travail/home", self.RACINE))
+
+    def test_fichier_hors_du_dossier_personnel(self):
+        """Les fichiers de service d'un Espace ne sont pas des documents."""
+        self.assertIsNone(
+            provenance.origine_par_chemin(
+                self.RACINE + "/banque/domaines-refuses.txt", self.RACINE))
+
+    def test_identifiant_impossible_refuse(self):
+        self.assertIsNone(
+            provenance.origine_par_chemin(self.RACINE + "/../home/x", self.RACINE))
+
+    def test_sans_racine(self):
+        self.assertIsNone(provenance.origine_par_chemin("/x/y", None))
+
+
 class Decision(unittest.TestCase):
     def test_fichier_du_meme_espace(self):
         self.assertFalse(provenance.doit_isoler("travail", "travail"))

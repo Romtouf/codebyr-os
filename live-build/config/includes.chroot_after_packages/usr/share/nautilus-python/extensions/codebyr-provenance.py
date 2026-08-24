@@ -38,6 +38,10 @@ except ImportError:      # pragma: no cover — modules partagés absents
 
 ATTRIBUT = "codebyr::origine"
 
+# Même racine que codebyr-space. Un fichier encore dans son Espace n'a pas
+# besoin d'attribut : son emplacement dit d'où il vient.
+DONNEES = os.path.expanduser("~/.local/share/codebyr/espaces")
+
 
 def _noms():
     """Identifiant d'Espace → nom lisible, pour ne pas afficher « navigation »."""
@@ -71,7 +75,7 @@ class CodebyrProvenance(GObject.GObject,
         chemin = fichier.get_location().get_path()
         if not chemin:
             return
-        venue = provenance.origine(chemin)
+        venue = provenance.origine(chemin, DONNEES)
         if not venue:
             # Colonne vide plutôt qu'« inconnu » : la plupart des fichiers d'un
             # poste n'ont jamais transité par un Espace, et remplir la colonne

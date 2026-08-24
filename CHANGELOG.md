@@ -10,7 +10,7 @@ GNOME (menu du Sceau, liserés colorés) ne se recharge pas à chaud.
 
 ---
 
-## 1.10.0 — en préparation
+## 1.10.1 — en préparation
 
 **« Nouveau document » existe enfin dans Fichiers.** Le menu ne proposait que
 « Nouveau dossier » : créer un simple fichier texte obligeait à ouvrir un
@@ -22,6 +22,11 @@ feuille de calcul, Markdown — dans votre dossier personnel comme dans chaque
 Espace.
 
 Si vous avez déjà un modèle du même nom, il n'est pas touché.
+
+Dans les Espaces, il fallait en outre **déclarer** où se trouve ce dossier :
+ce chemin n'a aucune valeur par défaut, et le programme qui l'écrit d'habitude
+ne tourne pas dans un compartiment isolé. Le dossier existait, personne ne le
+regardait.
 
 ## 1.9.2 — en préparation
 

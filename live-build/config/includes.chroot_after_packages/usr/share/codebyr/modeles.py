@@ -69,14 +69,29 @@ def installer(home, source=SOURCE):
     if not modeles:
         return 0
 
+    fichier = os.path.join(home, DECLARATION)
     declare = None
     try:
-        with open(os.path.join(home, DECLARATION), encoding="utf-8") as f:
+        with open(fichier, encoding="utf-8") as f:
             declare = dossier_declare(f.read())
     except OSError:
         pass
-    cible = declare if declare else DEFAUT
-    cible = cible if os.path.isabs(cible) else os.path.join(home, cible)
+
+    if not declare:
+        # Sans DÉCLARATION, GNOME ne sait pas où chercher : ce chemin n'a aucune
+        # valeur par défaut, il est écrit par xdg-user-dirs à la première
+        # connexion — un programme qui ne tourne jamais dans un bac à sable.
+        # Le dossier existait donc dans les Espaces, et personne ne le
+        # regardait : « Nouveau document » n'apparaissait que sur le bureau.
+        declare = DEFAUT
+        try:
+            os.makedirs(os.path.dirname(fichier), exist_ok=True)
+            with open(fichier, "a", encoding="utf-8") as f:
+                f.write('XDG_TEMPLATES_DIR="$HOME/%s"\n' % DEFAUT)
+        except OSError:
+            pass
+
+    cible = declare if os.path.isabs(declare) else os.path.join(home, declare)
 
     try:
         os.makedirs(cible, exist_ok=True)

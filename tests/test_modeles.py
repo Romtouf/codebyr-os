@@ -92,6 +92,31 @@ class Installation(unittest.TestCase):
         self.assertTrue(os.path.isdir(os.path.join(self.home, "Templates")))
         self.assertFalse(os.path.isdir(os.path.join(self.home, modeles.DEFAUT)))
 
+    def test_la_declaration_est_ecrite_si_elle_manque(self):
+        """Sans elle, GNOME ne sait pas où chercher — et le menu reste absent.
+
+        Ce chemin n'a AUCUNE valeur par défaut : il est écrit par xdg-user-dirs
+        à la première connexion, un programme qui ne tourne jamais dans un bac
+        à sable. Le dossier existait donc dans les Espaces et personne ne le
+        regardait : « Nouveau document » n'apparaissait que sur le bureau.
+        Constaté le 24/08/2026.
+        """
+        modeles.installer(self.home, SOURCE)
+        with open(os.path.join(self.home, modeles.DECLARATION),
+                  encoding="utf-8") as f:
+            self.assertEqual(modeles.dossier_declare(f.read()), modeles.DEFAUT)
+
+    def test_une_declaration_existante_n_est_pas_doublee(self):
+        config = os.path.join(self.home, ".config")
+        os.makedirs(config)
+        with open(os.path.join(config, "user-dirs.dirs"), "w",
+                  encoding="utf-8") as f:
+            f.write('XDG_TEMPLATES_DIR="$HOME/Templates"\n')
+        modeles.installer(self.home, SOURCE)
+        modeles.installer(self.home, SOURCE)
+        with open(os.path.join(config, "user-dirs.dirs"), encoding="utf-8") as f:
+            self.assertEqual(f.read().count("XDG_TEMPLATES_DIR"), 1)
+
     def test_second_passage_ne_repose_rien(self):
         """Appelé à CHAQUE ouverture d'Espace : il doit être sans effet ensuite."""
         modeles.installer(self.home, SOURCE)

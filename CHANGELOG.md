@@ -10,6 +10,19 @@ GNOME (menu du Sceau, liserés colorés) ne se recharge pas à chaud.
 
 ---
 
+## 1.10.0 — en préparation
+
+**« Nouveau document » existe enfin dans Fichiers.** Le menu ne proposait que
+« Nouveau dossier » : créer un simple fichier texte obligeait à ouvrir un
+terminal et taper `touch`.
+
+GNOME n'affiche cette entrée que si votre dossier **Modèles** contient quelque
+chose, et il était vide. Trois modèles y sont désormais déposés — texte,
+feuille de calcul, Markdown — dans votre dossier personnel comme dans chaque
+Espace.
+
+Si vous avez déjà un modèle du même nom, il n'est pas touché.
+
 ## 1.9.2 — en préparation
 
 **« Envoyer vers l'Espace » ne fonctionnait pas depuis un Espace.** Le fichier

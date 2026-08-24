@@ -37,6 +37,7 @@ sys.path.insert(0, os.environ.get("CODEBYR_LIB", "/usr/share/codebyr"))
 import applications  # noqa: E402
 import autotest  # noqa: E402
 import bac_a_sable  # noqa: E402
+import modeles  # noqa: E402
 import provenance  # noqa: E402
 import registre  # noqa: E402
 
@@ -448,6 +449,10 @@ def cmd_launch(espaces, esp_id, extra, fichier=None):
     envoi = None
     if not esp.get("ephemere"):
         _preparer_ouverture(home)
+        # « Nouveau document » n'existe dans Fichiers que si le dossier Modèles
+        # contient quelque chose. Chaque Espace a le sien : sans cela, créer un
+        # fichier texte y oblige à passer par un terminal.
+        modeles.installer(home)
         # La boîte d'envoi de CET Espace, et la relève de ce que les autres ont
         # déposé. Les deux se font ICI, depuis l'hôte : c'est le seul endroit
         # d'où l'on voit tous les Espaces, et le moment où l'on va justement

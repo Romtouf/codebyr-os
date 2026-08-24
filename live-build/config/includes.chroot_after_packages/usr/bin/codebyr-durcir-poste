@@ -36,6 +36,35 @@ while IFS=: read -r nom _ uid _ _ home _; do
 	echo "codebyr : dossier personnel de « $nom » rendu privé (0700, était $mode)."
 done < /etc/passwd
 
+# ── 1 bis) Modèles de documents ──────────────────────────────────────────────
+# GNOME Fichiers n'affiche « Nouveau document » que si le dossier Modèles
+# contient quelque chose. Vide, il ne reste que « Nouveau dossier », et créer un
+# fichier texte oblige à ouvrir un terminal pour taper « touch » — sur un
+# système qui vise des gens qui n'ouvriront jamais de terminal.
+#
+# /etc/skel ne sert qu'aux comptes créés APRÈS ; on remplit donc aussi ceux qui
+# existent déjà. On n'écrase jamais un modèle présent : celui qui a personnalisé
+# le sien l'a fait exprès.
+while IFS=: read -r nom _ uid _ _ home _; do
+	[ "$uid" -ge 1000 ] 2>/dev/null || continue
+	[ "$uid" -lt 65534 ] || continue
+	case "$home" in /home/*) ;; *) continue ;; esac
+	[ -d "$home" ] || continue
+	# Le nom du dossier dépend de la langue : on suit la déclaration de
+	# xdg-user-dirs quand elle existe, sinon le nom français par défaut.
+	cible="$(sed -n 's/^XDG_TEMPLATES_DIR="\?\$HOME\/\([^"]*\)"\?/\1/p' \
+		"$home/.config/user-dirs.dirs" 2>/dev/null | head -n1)"
+	[ -n "$cible" ] || cible="Modèles"
+	mkdir -p "$home/$cible" 2>/dev/null || continue
+	for m in /usr/share/codebyr/modeles/*; do
+		[ -f "$m" ] || continue
+		[ -e "$home/$cible/$(basename "$m")" ] && continue
+		cp "$m" "$home/$cible/" 2>/dev/null || true
+		chown "$uid" "$home/$cible/$(basename "$m")" 2>/dev/null || true
+	done
+	chown "$uid" "$home/$cible" 2>/dev/null || true
+done < /etc/passwd
+
 # ── 2) Compte invité : plus aucun mot de passe utilisable ────────────────────
 # Avant : « invite » / « invite » — le même mot de passe, public, sur TOUTES les
 # machines Codebyr. Désormais :

@@ -202,6 +202,36 @@ class Paquet(unittest.TestCase):
                          "origines autorisées : plus aucune dépendance "
                          "nouvelle ne pourrait s'installer seule")
 
+    def test_aucun_fichier_livre_en_fins_de_ligne_windows(self):
+        """Un « \\r » au bout du shebang rend le script INEXÉCUTABLE.
+
+            env: 'python3\\r': Aucun fichier ou dossier de ce nom
+
+        Sur Codebyr, cela veut dire qu'aucun Espace ne s'ouvre — la fonction
+        centrale du système. Constaté le 24/08/2026 sur une installation
+        fraîche, après que des scripts d'édition eurent réécrit des fichiers en
+        mode texte sous Windows. git avertissait à chaque commit ; personne n'a
+        lu l'avertissement.
+
+        Ce test le rend impossible à ignorer.
+        """
+        fautifs = []
+        for dossier, _, fichiers in os.walk(self.src):
+            for nom in fichiers:
+                chemin = os.path.join(dossier, nom)
+                if os.path.splitext(nom)[1] in (".png", ".jpg", ".xpi", ".gpg"):
+                    continue
+                try:
+                    with open(chemin, "rb") as f:
+                        debut = f.read(4096)
+                except OSError:
+                    continue
+                if b"\r\n" in debut:
+                    fautifs.append(os.path.relpath(chemin, self.src))
+        self.assertEqual(fautifs, [],
+                         "fins de ligne Windows dans des fichiers livrés : %s"
+                         % ", ".join(sorted(fautifs)))
+
     def test_pas_de_cache_python_dans_l_image(self):
         # Un __pycache__ traîné depuis un poste de développement finirait copié
         # tel quel dans l'ISO.

@@ -1,5 +1,23 @@
-# Distro Linux : tout en LF, toujours (les scripts CRLF cassent dans le chroot)
+# Codebyr OS — fins de ligne.
+#
+# Le dépôt est développé sous Windows et livré sous Linux. Un fichier écrit
+# avec des fins de ligne Windows y arrive avec un « \r » collé à la fin de
+# chaque ligne — y compris celle du shebang. Linux cherche alors un programme
+# nommé « python3\r », qui n'existe pas :
+#
+#     env: 'python3\r': Aucun fichier ou dossier de ce nom
+#
+# Le script n'est plus exécutable DU TOUT. Sur Codebyr, cela veut dire qu'aucun
+# Espace ne s'ouvre — la fonction centrale du système. Constaté le 24/08/2026.
+#
+# Tout ce qui part dans l'image reste donc en LF, quoi que fasse le poste de
+# développement.
 * text=auto eol=lf
+
 *.png binary
 *.jpg binary
-*.ico binary
+*.svg text eol=lf
+*.iso binary
+*.xpi binary
+*.gpg binary
+*.deb binary

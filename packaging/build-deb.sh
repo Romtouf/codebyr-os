@@ -51,6 +51,18 @@ do
 	fi
 done
 
+# 1 bis) Fins de ligne. Un « \r » à la fin du shebang rend le script
+#    INEXÉCUTABLE sous Linux : env cherche un programme nommé « python3\r ».
+#    Sur Codebyr, cela veut dire qu'aucun Espace ne s'ouvre. Le postinst était
+#    déjà protégé ainsi ; les scripts livrés ne l'étaient pas, alors que ce sont
+#    eux qui font tourner le système. Constaté le 24/08/2026.
+#
+#    On corrige ICI, dans le paquet, et pas seulement dans le dépôt : c'est la
+#    dernière barrière avant la machine de l'utilisateur, et la seule qui ne
+#    dépende ni de git ni du poste où l'on construit.
+find "$STAGE" -type f \( -name 'codebyr-*' -o -name '*.py' -o -name '*.sh' \) \
+	-exec sed -i 's/\r$//' {} + 2>/dev/null || true
+
 # 2) Droits corrects. IMPORTANT : « cp -a » depuis un checkout Windows (9p)
 #    hérite parfois de dossiers en 777 → répertoires système inscriptibles par
 #    tous = faille. On normalise : dossiers 755, scripts 755, données 644.

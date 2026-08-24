@@ -10,6 +10,28 @@ GNOME (menu du Sceau, liserés colorés) ne se recharge pas à chaud.
 
 ---
 
+## 1.8.0 — en préparation
+
+**Un fichier venu d'un autre Espace s'ouvre sous cloche, tout seul.**
+
+C'est le moment où la provenance cesse d'informer et se met à protéger. Vous
+ouvrez, depuis Travail, un document téléchargé dans Navigation : il s'ouvre
+isolé et **sans réseau**, et disparaît à la fermeture — au lieu de s'exécuter
+au milieu de vos documents professionnels. Rien à décider, rien à cliquer : une
+notification vous dit simplement ce qui vient de se passer.
+
+Cela ne concerne que l'ouverture **depuis un Espace**, car c'est là qu'on sait
+où l'on est. Et seulement les types de documents par lesquels arrivent les
+pièges : PDF, documents bureautiques, archives, pages web.
+
+**Le doute profite à l'ouverture.** Un fichier sans origine connue, ou déjà
+chez lui, s'ouvre normalement. Refuser d'ouvrir des documents ordinaires ferait
+désactiver la fonction en une semaine — et une protection désactivée ne protège
+personne.
+
+**Vos choix sont respectés.** Si vous avez déjà désigné une application pour un
+type de fichier, Codebyr ne la remplace pas.
+
 ## 1.7.0 — en préparation
 
 **Un fichier garde désormais la trace de l'Espace d'où il vient.**

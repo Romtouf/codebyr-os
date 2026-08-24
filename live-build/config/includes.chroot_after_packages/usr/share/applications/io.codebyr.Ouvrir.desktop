@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=Ouvrir avec Codebyr
+Name[en]=Open with Codebyr
+Comment=Ouvre le fichier sous cloche s'il vient d'un autre Espace
+Comment[en]=Opens the file in a disposable Space if it came from another Space
+Exec=/usr/bin/codebyr-space ouvrir %f
+Icon=io.codebyr.Jetable
+Terminal=false
+NoDisplay=true
+MimeType=application/pdf;application/rtf;application/msword;application/vnd.openxmlformats-officedocument.wordprocessingml.document;application/vnd.oasis.opendocument.text;application/vnd.ms-excel;application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;application/vnd.oasis.opendocument.spreadsheet;application/zip;application/x-7z-compressed;application/vnd.rar;text/html;

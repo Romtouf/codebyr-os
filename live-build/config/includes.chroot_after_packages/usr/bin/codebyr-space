@@ -141,6 +141,80 @@ def _preparer_profil_firefox(home, port):
     _ajouter_prefs(os.path.join(ffdir, "user.js"), prefs)
 
 
+OUVREUR = "io.codebyr.Ouvrir.desktop"
+
+
+def types_ouvreur(chemin_desktop):
+    """Les types MIME que l'ouvreur Codebyr prend en charge.
+
+    Lus DANS le .desktop plutôt que recopiés ici. Cette liste existerait sinon
+    à deux endroits, et ce projet sait ce que deviennent les listes livrées en
+    double — c'est ainsi que quatre lectures du registre ont divergé.
+    """
+    try:
+        with open(chemin_desktop, encoding="utf-8") as f:
+            for ligne in f:
+                if ligne.startswith("MimeType="):
+                    return [t for t in ligne.split("=", 1)[1].strip().split(";") if t]
+    except OSError:
+        pass
+    return []
+
+
+def associer_ouvreur(contenu, types, ouvreur=OUVREUR):
+    """Ajoute nos associations à un mimeapps.list, sans écraser les siennes.
+
+    Décision pure pour être testable — elle touche à un fichier de préférences
+    que l'utilisateur a le droit d'avoir rempli lui-même. Un type déjà associé
+    est laissé tel quel : quelqu'un qui a choisi son visionneuse de PDF a fait
+    un choix, et le lui reprendre au nom de la sécurité est le genre de geste
+    qui fait désinstaller un système.
+    """
+    lignes = (contenu or "").splitlines()
+    try:
+        debut = lignes.index("[Default Applications]")
+    except ValueError:
+        lignes = lignes + ([""] if lignes and lignes[-1] else []) + ["[Default Applications]"]
+        debut = len(lignes) - 1
+    fin = len(lignes)
+    for i in range(debut + 1, len(lignes)):
+        if lignes[i].startswith("["):
+            fin = i
+            break
+    deja = {ligne.split("=", 1)[0].strip()
+            for ligne in lignes[debut + 1:fin] if "=" in ligne}
+    ajouts = ["%s=%s" % (t, ouvreur) for t in types if t not in deja]
+    if not ajouts:
+        return contenu or ""
+    return "\n".join(lignes[:fin] + ajouts + lignes[fin:]) + "\n"
+
+
+def _preparer_ouverture(home, chemin_desktop=None):
+    """Fait de l'ouvreur Codebyr le gestionnaire par défaut DANS l'Espace.
+
+    C'est là, et seulement là, que la question a un sens : on y sait où l'on
+    est, donc on peut dire qu'un fichier vient d'ailleurs. Sur le bureau il n'y
+    a pas d'« ici », et rien n'est modifié.
+    """
+    types = types_ouvreur(chemin_desktop
+                          or os.path.join("/usr/share/applications", OUVREUR))
+    if not types:
+        return
+    cible = os.path.join(home, ".config", "mimeapps.list")
+    try:
+        os.makedirs(os.path.dirname(cible), exist_ok=True)
+        contenu = ""
+        if os.path.exists(cible):
+            with open(cible, encoding="utf-8") as f:
+                contenu = f.read()
+        nouveau = associer_ouvreur(contenu, types)
+        if nouveau != contenu:
+            with open(cible, "w", encoding="utf-8") as f:
+                f.write(nouveau)
+    except OSError:
+        pass    # un défaut de préférence ne doit jamais empêcher un lancement
+
+
 def _prevenir(titre, message):
     """Dit quelque chose à l'utilisateur du bureau, sans dépendance dure.
 
@@ -368,6 +442,11 @@ def cmd_launch(espaces, esp_id, extra, fichier=None):
         sys.stderr.write("Espace inconnu : %s\n" % esp_id)
         return 2
     home = espace_home(esp)
+    # Dans un Espace, un fichier venu d'ailleurs s'ouvre sous cloche. Câblé au
+    # lancement plutôt qu'à la création : un Espace existant en profite aussi,
+    # sans quoi le correctif n'atteindrait que les Espaces créés après lui.
+    if not esp.get("ephemere"):
+        _preparer_ouverture(home)
     use_bwrap = bool(shutil.which("bwrap"))
     runtime_home = os.path.expanduser("~") if use_bwrap else home
 
@@ -996,6 +1075,66 @@ def cmd_provenance(espaces, chemin):
     return 0
 
 
+def decider_ouverture(origine, espace_courant):
+    """« jetable » ou « normale ». Décision pure, pour être testable.
+
+    Un fichier venu d'un AUTRE Espace s'ouvre sous cloche : blindé, sans
+    réseau, détruit à la fermeture. C'est le seul moment où la marque sert
+    vraiment à quelque chose — jusqu'ici elle informait, elle protège.
+
+    Le doute profite à l'ouverture normale. Un fichier sans origine connue, ou
+    déjà chez lui, s'ouvre comme d'habitude : refuser d'ouvrir des documents
+    ordinaires ferait désactiver la fonction dès la première semaine, et une
+    protection désactivée ne protège personne.
+    """
+    return "jetable" if provenance.doit_isoler(origine, espace_courant) else "normale"
+
+
+def cmd_ouvrir(espaces, chemin, lanceur=None):
+    """Ouvre un fichier, sous cloche s'il vient d'un autre Espace.
+
+    Destiné à être le gestionnaire par défaut DANS les Espaces : c'est là que
+    la question se pose, puisqu'on y sait où l'on est. Sur le bureau, il n'y a
+    pas d'« ici », donc rien à franchir — voir provenance.doit_isoler.
+    """
+    cible = os.path.abspath(os.path.expanduser(chemin))
+    if not os.path.isfile(cible):
+        sys.stderr.write("Fichier introuvable : %s\n" % chemin)
+        return 2
+
+    courant = _espace_courant()
+    venue = provenance.origine(cible, DATA_ROOT)
+    choix = decider_ouverture(venue, courant)
+
+    if lanceur is None:
+        def lanceur(argv):
+            subprocess.Popen(argv, stdout=subprocess.DEVNULL,
+                             stderr=subprocess.DEVNULL)
+
+    if choix == "jetable":
+        autre = espaces.get(venue)
+        journal("ouverture sous cloche d'un fichier venu de %s" % venue)
+        _prevenir("Ouvert sous cloche",
+                  "Ce fichier vient de l'Espace %s. Il s'ouvre isolé et sans "
+                  "réseau, et disparaîtra à la fermeture."
+                  % (autre["nom"] if autre else venue))
+        try:
+            lanceur(["/usr/bin/codebyr-jetable", cible])
+        except OSError as exc:
+            # Échouer ici empêcherait d'ouvrir un document parfaitement
+            # légitime. On le dit, et on ouvre normalement.
+            sys.stderr.write("codebyr-space : Jetable indisponible (%s)\n" % exc)
+            choix = "normale"
+
+    if choix == "normale":
+        try:
+            lanceur(["xdg-open", cible])
+        except OSError as exc:
+            sys.stderr.write("codebyr-space : ouverture impossible (%s)\n" % exc)
+            return 1
+    return 0
+
+
 def cmd_contagion(espaces, esp_id):
     """Compte, dans un Espace, les fichiers venus d'ailleurs.
 
@@ -1041,6 +1180,8 @@ ACTIONS = {
                    lambda espaces, a: cmd_envoyer(espaces, a[0], a[1])),
     "provenance": (1, "provenance <fichier>",
                    lambda espaces, a: cmd_provenance(espaces, a[0])),
+    "ouvrir":     (1, "ouvrir <fichier>",
+                   lambda espaces, a: cmd_ouvrir(espaces, a[0])),
     "contagion":  (1, "contagion <espace>",
                    lambda espaces, a: cmd_contagion(espaces, a[0])),
     "nettoyer-registre": (0, "nettoyer-registre",

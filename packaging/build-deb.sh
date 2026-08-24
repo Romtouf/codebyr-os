@@ -40,6 +40,7 @@ for chemin in \
 	usr/share/gnome-shell/extensions/codebyr@codebyr.io \
 	usr/share/codebyr \
 	usr/share/nautilus-python \
+	usr/share/applications/io.codebyr.Ouvrir.desktop \
 	etc/codebyr/espaces.json
 do
 	if [ -e "$SRC/$chemin" ]; then
@@ -58,6 +59,7 @@ find "$STAGE/usr/bin" -type f -exec chmod 755 {} + 2>/dev/null || true
 find "$STAGE/usr/share/codebyr" "$STAGE/usr/share/nautilus-python" \
 	-type f -exec chmod 644 {} + 2>/dev/null || true
 find "$STAGE/usr/share/gnome-shell" -type f -exec chmod 644 {} + 2>/dev/null || true
+find "$STAGE/usr/share/applications" -type f -exec chmod 644 {} + 2>/dev/null || true
 [ -f "$STAGE/etc/codebyr/espaces.json" ] && chmod 644 "$STAGE/etc/codebyr/espaces.json"
 
 # 3) Taille installée (en Ko), pour le control.

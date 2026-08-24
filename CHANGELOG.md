@@ -10,7 +10,7 @@ GNOME (menu du Sceau, liserés colorés) ne se recharge pas à chaud.
 
 ---
 
-## 1.8.0 — en préparation
+## 1.9.0 — en préparation
 
 **Un fichier venu d'un autre Espace s'ouvre sous cloche, tout seul.**
 
@@ -31,6 +31,16 @@ personne.
 
 **Vos choix sont respectés.** Si vous avez déjà désigné une application pour un
 type de fichier, Codebyr ne la remplace pas.
+
+**Et une fois le document examiné ?** Clic droit → **« Ce fichier
+m'appartient »**. Il s'ouvrira désormais normalement dans cet Espace. Sans ce
+geste, une facture parfaitement légitime repartirait sous cloche à chaque
+ouverture, sans qu'on puisse jamais l'annoter ni l'enregistrer.
+
+Adopter ne déclare pas un fichier sain — personne ne peut le savoir. C'est
+l'examen sous cloche qui permet de juger ; l'adoption enregistre que vous avez
+jugé. Et elle ne vaut que pour cet Espace : envoyé ailleurs, le document
+redevient étranger.
 
 ## 1.7.0 — en préparation
 

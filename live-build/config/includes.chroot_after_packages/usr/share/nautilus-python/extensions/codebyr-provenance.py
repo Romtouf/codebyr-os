@@ -19,6 +19,7 @@ on le voit tout de suite.
 Installé dans /usr/share/nautilus-python/extensions/ ; nécessite python3-nautilus.
 """
 import os
+import subprocess
 import sys
 
 import gi
@@ -36,6 +37,7 @@ except ImportError:      # pragma: no cover — modules partagés absents
     provenance = None
     registre = None
 
+SPACE = "/usr/bin/codebyr-space"
 ATTRIBUT = "codebyr::origine"
 
 # Même racine que codebyr-space. Un fichier encore dans son Espace n'a pas
@@ -52,6 +54,60 @@ def _noms():
                 for e in registre.charger()["espaces"] if e.get("id")}
     except Exception:
         return {}
+
+
+class CodebyrAdopter(GObject.GObject, Nautilus.MenuProvider):
+    """« Ce fichier m'appartient » — après l'avoir examiné sous cloche.
+
+    Sans ce geste, un document légitime venu d'un autre Espace repartirait
+    isolé à chaque ouverture, sans qu'on puisse jamais l'annoter ni
+    l'enregistrer. C'est ainsi qu'une protection finit désactivée.
+
+    L'entrée n'apparaît QUE sur un fichier réellement étranger, et seulement
+    depuis un Espace : ailleurs elle n'aurait rien à adopter.
+    """
+
+    def _adopter(self, _element, chemins):
+        for chemin in chemins:
+            try:
+                subprocess.Popen([SPACE, "adopter", chemin],
+                                 stdout=subprocess.DEVNULL,
+                                 stderr=subprocess.DEVNULL)
+            except OSError:
+                pass
+
+    def _construire(self, fichiers):
+        courant = os.environ.get("CODEBYR_ESPACE", "").strip()
+        if provenance is None or not courant or not fichiers:
+            return []
+        if not os.path.exists(SPACE):
+            return []
+        chemins = []
+        for f in fichiers:
+            if f.is_directory() or f.get_uri_scheme() != "file":
+                return []
+            chemin = f.get_location().get_path()
+            if not chemin:
+                return []
+            if not provenance.doit_isoler(provenance.origine(chemin, DONNEES),
+                                          courant):
+                return []   # rien à adopter : au moins un fichier est déjà chez lui
+            chemins.append(chemin)
+
+        element = Nautilus.MenuItem(
+            name="Codebyr::Adopter",
+            label=("Ce fichier m'appartient" if len(chemins) == 1
+                   else "Ces %d fichiers m'appartiennent" % len(chemins)),
+            tip="Après l'avoir examiné : il s'ouvrira normalement dans cet "
+                "Espace, au lieu de partir sous cloche à chaque fois.")
+        element.connect("activate", self._adopter, chemins)
+        return [element]
+
+    def get_file_items(self, *args):
+        return self._construire(args[-1] if args else None)
+
+    def get_background_items(self, *args):
+        return []
 
 
 class CodebyrProvenance(GObject.GObject,

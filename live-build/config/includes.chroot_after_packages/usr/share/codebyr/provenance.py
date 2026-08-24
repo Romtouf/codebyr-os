@@ -146,6 +146,25 @@ def origine(chemin, racine_donnees=None):
     return origine_par_chemin(chemin, racine_donnees)
 
 
+def adopter(chemin, espace_courant):
+    """Ce fichier devient un fichier de CET Espace : il s'ouvrira normalement.
+
+    Le geste qui manquait. Sans lui, une facture parfaitement légitime reçue
+    par Navigation repartirait sous cloche à chaque ouverture, sans qu'on
+    puisse jamais l'annoter ni l'enregistrer — et c'est ainsi qu'on fait
+    désactiver une protection en une semaine.
+
+    Adopter ne DÉCLARE PAS un fichier sain : personne ne peut le savoir, et
+    surtout pas ce module. C'est l'examen sous cloche qui permet de juger ;
+    l'adoption ne fait qu'enregistrer que vous avez jugé.
+
+    On réécrit l'origine plutôt que de l'effacer : le fichier redevient
+    étranger s'il part vers un autre Espace, ce qui est la bonne réponse — le
+    jugement portait sur celui-ci, pas sur tous les autres.
+    """
+    return marquer(chemin, espace_courant)
+
+
 def heriter(source, destination, racine_donnees=None):
     """Reporte l'origine d'un fichier sur sa copie.
 

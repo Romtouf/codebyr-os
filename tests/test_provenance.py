@@ -155,6 +155,29 @@ class SurDisque(unittest.TestCase):
         self.assertTrue(provenance.heriter(source, copie))
         self.assertEqual(provenance.origine(copie), "navigation")
 
+    def test_adoption(self):
+        """Le geste qui empêche la protection de devenir un obstacle.
+
+        Sans lui, une facture légitime venue de Navigation repartirait sous
+        cloche à chaque ouverture, sans qu'on puisse l'annoter ni
+        l'enregistrer — et c'est ainsi qu'on fait désactiver une protection.
+        """
+        chemin = self._fichier()
+        provenance.marquer(chemin, "navigation")
+        self.assertTrue(provenance.doit_isoler(
+            provenance.origine(chemin), "travail"))
+        self.assertTrue(provenance.adopter(chemin, "travail"))
+        self.assertFalse(provenance.doit_isoler(
+            provenance.origine(chemin), "travail"))
+
+    def test_l_adoption_ne_vaut_que_pour_cet_espace(self):
+        """Le jugement portait sur un Espace, pas sur tous les autres."""
+        chemin = self._fichier()
+        provenance.marquer(chemin, "navigation")
+        provenance.adopter(chemin, "travail")
+        self.assertTrue(provenance.doit_isoler(
+            provenance.origine(chemin), "personnel"))
+
     def test_heritage_depuis_un_fichier_nu(self):
         self.assertFalse(provenance.heriter(self._fichier("a"), self._fichier("b")))
 

@@ -1135,6 +1135,35 @@ def cmd_ouvrir(espaces, chemin, lanceur=None):
     return 0
 
 
+def cmd_adopter(espaces, chemin):
+    """Après examen : ce fichier appartient désormais à l'Espace courant."""
+    cible = os.path.abspath(os.path.expanduser(chemin))
+    if not os.path.isfile(cible):
+        sys.stderr.write("Fichier introuvable : %s\n" % chemin)
+        return 2
+    courant = _espace_courant()
+    if not courant:
+        sys.stderr.write(
+            "Adopter n'a de sens que DANS un Espace : c'est là qu'un fichier "
+            "peut appartenir\nà quelque part. Lancez cette commande depuis "
+            "l'Espace où vous voulez le garder.\n")
+        return 2
+    venue = provenance.origine(cible, DATA_ROOT)
+    if not provenance.doit_isoler(venue, courant):
+        print("Ce fichier est déjà chez lui : rien à faire.")
+        return 0
+    if not provenance.adopter(cible, courant):
+        sys.stderr.write("Marque impossible à écrire (système de fichiers "
+                         "sans attributs étendus ?).\n")
+        return 1
+    esp = espaces.get(courant)
+    journal("adoption d'un fichier venu de %s dans %s" % (venue, courant))
+    print("Adopté dans %s : ce fichier s'ouvrira désormais normalement ici."
+          % (esp["nom"] if esp else courant))
+    print("(Il redeviendra étranger si vous l'envoyez vers un autre Espace.)")
+    return 0
+
+
 def cmd_contagion(espaces, esp_id):
     """Compte, dans un Espace, les fichiers venus d'ailleurs.
 
@@ -1182,6 +1211,8 @@ ACTIONS = {
                    lambda espaces, a: cmd_provenance(espaces, a[0])),
     "ouvrir":     (1, "ouvrir <fichier>",
                    lambda espaces, a: cmd_ouvrir(espaces, a[0])),
+    "adopter":    (1, "adopter <fichier>",
+                   lambda espaces, a: cmd_adopter(espaces, a[0])),
     "contagion":  (1, "contagion <espace>",
                    lambda espaces, a: cmd_contagion(espaces, a[0])),
     "nettoyer-registre": (0, "nettoyer-registre",

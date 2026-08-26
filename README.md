@@ -182,9 +182,12 @@ Notes :
 Chaque version est **signée avec la clé GPG du projet**. Vérifiez l'intégrité ET
 l'authenticité de votre ISO :
 
+`codebyr-signing-key.asc` est joint à chaque release, à côté de l'ISO et des
+sommes de contrôle : les trois fichiers se téléchargent ensemble.
+
 ```bash
 # 1) Importer la clé publique Codebyr (une seule fois)
-gpg --import codebyr-signing-key.asc      # depuis le dépôt
+gpg --import codebyr-signing-key.asc
 
 # 2) Vérifier la signature du fichier d'empreintes
 gpg --verify SHA256SUMS.asc SHA256SUMS
@@ -195,9 +198,38 @@ sha256sum -c SHA256SUMS
 #   → doit afficher : ...amd64.iso : Réussi
 ```
 
-Empreinte de la clé de signature :
-`E6FB 6616 EC58 E15F 40DA  876C B1E8 C803 CE59 6E68`.
 Si la signature n'est pas « Good » / « valide », **n'utilisez pas l'ISO**.
+
+### Deux empreintes, et c'est normal
+
+**Ancre de confiance** — la clé maîtresse, hors ligne, jamais sur une machine
+connectée :
+
+```
+E6FB 6616 EC58 E15F 40DA  876C B1E8 C803 CE59 6E68
+```
+
+**Ce que `gpg` affichera** — la sous-clé de signature, certifiée par la
+précédente, et celle qui signe réellement les versions :
+
+```
+49DF 7B88 5583 0CCD 3476  6334 5884 F50B 8858 1C19
+```
+
+Voir une empreinte différente de l'ancre n'est donc **pas** un signe
+d'anomalie : c'est le fonctionnement normal d'une clé maîtresse gardée hors
+ligne. Ce qui compte est que `gpg` écrive « Good signature ». La sous-clé
+change quand elle expire ; l'ancre, elle, ne bouge pas — c'est celle-là qu'il
+faut comparer entre plusieurs sources.
+
+**Où retrouver la clé si un fichier manque** — deux hébergements indépendants,
+et les comparer vaut mieux que d'en croire un seul :
+
+```bash
+curl -O https://raw.githubusercontent.com/Romtouf/codebyr-os/main/codebyr-signing-key.asc
+```
+
+L'empreinte de l'ancre est également affichée sur <https://os.codebyr.dev>.
 
 ## Structure du dépôt
 

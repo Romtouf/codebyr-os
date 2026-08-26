@@ -206,7 +206,19 @@
       <article class="card reveal">
         <div class="card__ico">✷</div>
         <h3>Jetable automatique</h3>
-        <p>Une pièce jointe douteuse s'ouvre dans une bulle <strong>blindée et sans réseau</strong> ; un lien douteux, dans une bulle <strong>blindée</strong> qui s'autodétruit (le réseau reste ouvert : il faut bien charger la page). Menu du Sceau → « Ouvrir un lien en Jetable ».</p>
+        <p>Une pièce jointe douteuse s'ouvre dans une bulle <strong>blindée et sans réseau</strong> ; un lien douteux, dans une bulle <strong>blindée</strong> qui s'autodétruit (le réseau reste ouvert : il faut bien charger la page). <strong>Clic droit → « Ouvrir en Jetable »</strong>, ou depuis le menu du Sceau pour un lien.</p>
+      </article>
+      <article class="card reveal">
+        <div class="card__ico">◉</div>
+        <h3>Un fichier garde son origine</h3>
+        <p>Les compartiments séparent les applications&nbsp;; ils ne suivaient pas les <em>fichiers</em>. Un document téléchargé dans Navigation, ouvert depuis Travail, s'exécutait au milieu de vos documents professionnels — le cloisonnement avait tenu, c'est vous qui aviez porté le fichier de l'autre côté.</p>
+        <p>Chaque fichier garde désormais l'Espace d'où il vient. Ouvert ailleurs, il part <strong>sous cloche</strong> tout seul. Une fois que vous l'avez examiné&nbsp;: clic droit → «&nbsp;Ce fichier m'appartient&nbsp;», et il s'ouvre normalement.</p>
+      </article>
+      <article class="card reveal">
+        <div class="card__ico">⌾</div>
+        <h3>Vérifier plutôt que croire</h3>
+        <p><code>codebyr-space verifier-isolation</code> lance une sonde <strong>dans un vrai bac à sable</strong> et rapporte ce qu'un Espace atteint réellement — bus de session, réseau, dossier personnel — face à ce qui devrait être permis.</p>
+        <p><code>verifier-poste</code> fait de même pour la machine&nbsp;: compte invité, droits des dossiers, trousseau à jour, mises à jour réellement armées. Chaque contrôle existe parce que la chose en question a cassé une fois, en silence.</p>
       </article>
       <article class="card reveal">
         <div class="card__ico">⛨</div>
@@ -311,6 +323,7 @@
           <li>Protéger contre du matériel déjà compromis.</li>
           <li>Empêcher un Espace d'atteindre le <strong>micro</strong> : le serveur de son est partagé (Banque, elle, l'a coupé par défaut).</li>
           <li>Séparer les Espaces par <strong>compte Unix</strong> : ils tournent tous sous le vôtre. Le bac à sable les cloisonne, mais un programme lancé hors Espace voit tout.</li>
+          <li><strong>Avoir été audité.</strong> Aucun audit de sécurité externe n'a été réalisé à ce jour. Les correctifs passés sont détaillés publiquement, y compris ce qui était vulnérable et comment — mais personne d'extérieur n'a encore examiné l'ensemble.</li>
         </ul>
       </div>
     </div>
@@ -451,10 +464,17 @@
     <p class="cta__fine">
       Chaque version est <strong>signée avec la clé GPG du projet</strong> —
       <a href="https://github.com/Romtouf/codebyr-os#vérifier-votre-téléchargement-recommandé" target="_blank" rel="noopener">vérifiez votre téléchargement</a>.
-      <br>Empreinte de la clé, à comparer avec celle affichée par <code>gpg</code>&nbsp;:
+      La clé publique est jointe à chaque version, à côté de l'image.
+      <br><strong>Ancre de confiance</strong> — la clé maîtresse, gardée hors ligne&nbsp;:
       <br><code class="empreinte">E6FB&nbsp;6616&nbsp;EC58&nbsp;E15F&nbsp;40DA&nbsp;&nbsp;876C&nbsp;B1E8&nbsp;C803&nbsp;CE59&nbsp;6E68</code>
       <br><span class="cta__note">Elle est publiée ici <em>et</em> dans le dépôt, sur deux
       hébergements indépendants&nbsp;: si les deux ne concordent pas, ne faites confiance à aucune.</span>
+      <br><strong>Ce que <code>gpg</code> affichera</strong> — la sous-clé qui signe les versions,
+      certifiée par l'ancre ci-dessus&nbsp;:
+      <br><code class="empreinte">49DF&nbsp;7B88&nbsp;5583&nbsp;0CCD&nbsp;3476&nbsp;&nbsp;6334&nbsp;5884&nbsp;F50B&nbsp;8858&nbsp;1C19</code>
+      <br><span class="cta__note">Voir cette empreinte-là plutôt que l'ancre n'est <em>pas</em> une anomalie&nbsp;:
+      c'est le fonctionnement normal d'une clé maîtresse gardée hors ligne. Ce qui compte est que
+      <code>gpg</code> écrive «&nbsp;Good signature&nbsp;».</span>
       <br>Gratuit &amp; open source · GPL-3.0 · basé sur Debian &amp; Calamares
     </p>
   </div>

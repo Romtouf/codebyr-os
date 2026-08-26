@@ -43,6 +43,16 @@ def empreintes_de(chemin):
 class UneSeuleEmpreinte(unittest.TestCase):
 
     def test_toutes_les_mentions_concordent(self):
+        """Aucune empreinte inconnue ne doit circuler — une coquille se voit ici.
+
+        Deux valeurs sont légitimes, et il a fallu publier les DEUX : l'ancre,
+        et la sous-clé que `gpg` affiche réellement. Ne montrer que l'ancre
+        conduisait un utilisateur attentif à constater que les empreintes ne
+        correspondent pas — et, suivant l'avertissement du site lui-même, à
+        refuser une version parfaitement valide.
+
+        Toute troisième valeur reste une erreur.
+        """
         vues = {}
         for relatif in FICHIERS:
             chemin = os.path.join(RACINE, relatif)
@@ -51,8 +61,33 @@ class UneSeuleEmpreinte(unittest.TestCase):
             for e in empreintes_de(chemin):
                 vues.setdefault(e, []).append(relatif)
         self.assertTrue(vues, "l'empreinte n'est publiée nulle part")
-        self.assertEqual(list(vues), [EMPREINTE],
-                         "empreintes divergentes : %r" % vues)
+        inconnues = {e: f for e, f in vues.items() if e not in (EMPREINTE, SOUS_CLE)}
+        self.assertEqual(inconnues, {},
+                         "empreintes inconnues : %r" % inconnues)
+        self.assertIn(EMPREINTE, vues, "l'ancre de confiance doit être publiée")
+
+    def test_la_sous_cle_est_expliquee_la_ou_elle_est_montree(self):
+        """Montrer une empreinte sans dire ce qu'elle est fabrique du doute.
+
+        Un utilisateur qui lit deux empreintes différentes sans explication
+        conclut à une anomalie. Partout où la sous-clé apparaît devant un
+        utilisateur, le texte doit dire que c'est celle que `gpg` affiche et
+        que c'est normal.
+        """
+        for relatif in FICHIERS:
+            chemin = os.path.join(RACINE, relatif)
+            if not os.path.exists(chemin):
+                continue
+            if SOUS_CLE not in empreintes_de(chemin):
+                continue
+            with open(chemin, encoding="utf-8") as f:
+                contenu = f.read().lower()
+            self.assertIn("sous-clé", contenu,
+                          "%s montre la sous-clé sans la nommer" % relatif)
+            self.assertTrue(
+                "hors ligne" in contenu or "hors-ligne" in contenu,
+                "%s doit expliquer POURQUOI l'ancre diffère : elle est hors "
+                "ligne" % relatif)
 
     def test_publiee_sur_deux_hebergements_independants(self):
         # Le dépôt et le site ne sont pas servis par la même machine : c'est

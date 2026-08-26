@@ -202,6 +202,31 @@ class Paquet(unittest.TestCase):
                          "origines autorisées : plus aucune dépendance "
                          "nouvelle ne pourrait s'installer seule")
 
+    def test_la_cle_publique_voyage_avec_l_image(self):
+        """Une procédure de vérification qu'on ne peut pas suivre ne vaut rien.
+
+        La release v1.5.5 est partie sans `codebyr-signing-key.asc`, alors que
+        ses propres instructions commencent par « gpg --import
+        codebyr-signing-key.asc ». Depuis un poste vierge, la commande échoue,
+        puis la vérification échoue faute de clé publique.
+
+        Personne du côté du projet ne pouvait le voir : le mainteneur a cette
+        clé importée depuis des mois. Il a fallu un regard extérieur, sur une
+        machine qui ne l'avait pas.
+
+        La cause tenait à une phrase : le script disait « et
+        codebyr-signing-key.asc dans le dépôt », ce qui se lit « elle y est
+        déjà, rien à joindre ».
+        """
+        with open(os.path.join(RACINE, "live-build", "scripts",
+                               "sign-release.sh"), encoding="utf-8") as f:
+            source = f.read()
+        self.assertIn('cp -f "$CLE_PUB" "$DIST/"', source,
+                      "la clé publique doit être déposée à côté des sommes, "
+                      "pour être publiée avec elles")
+        self.assertIn("dist/codebyr-signing-key.asc", source,
+                      "la commande de publication doit lister la clé")
+
     def test_aucun_fichier_livre_en_fins_de_ligne_windows(self):
         """Un « \\r » au bout du shebang rend le script INEXÉCUTABLE.
 

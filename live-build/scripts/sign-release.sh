@@ -75,4 +75,27 @@ fi
 echo "==> Vérification"
 gpg --verify SHA256SUMS.asc SHA256SUMS
 sha256sum -c SHA256SUMS
-echo "OK. Publier : SHA256SUMS, SHA256SUMS.asc (et codebyr-signing-key.asc dans le dépôt)."
+
+# La clé publique voyage AVEC l'image, pas seulement dans le dépôt.
+#
+# La release v1.5.5 est partie sans elle, alors que ses propres instructions
+# commencent par « gpg --import codebyr-signing-key.asc ». Depuis un poste
+# vierge, cette commande échoue, puis la vérification échoue à son tour faute
+# de clé publique : la procédure documentée était infaisable. Le mainteneur ne
+# pouvait pas le voir — il a la clé importée depuis des mois.
+#
+# La ligne affichée ici disait « et codebyr-signing-key.asc dans le dépôt »,
+# ce qui se lit comme « elle y est déjà, rien à joindre ». On la copie donc à
+# côté des sommes, et on donne la commande complète : il ne reste rien à
+# reconstituer de tête au moment de publier.
+cp -f "$CLE_PUB" "$DIST/" 2>/dev/null || true
+VERSION_ISO="$(basename "$ISO")"
+echo
+echo "OK. Publier les QUATRE fichiers — la clé comprise :"
+echo
+echo "    gh release create vX.Y.Z --title '…' --notes-file '…' \\"
+echo "        dist/$VERSION_ISO \\"
+echo "        dist/SHA256SUMS dist/SHA256SUMS.asc dist/codebyr-signing-key.asc"
+echo
+echo "Sans la clé, « gpg --import codebyr-signing-key.asc » — première ligne des"
+echo "instructions d'installation — échoue sur un poste qui ne l'a pas déjà."

@@ -25,6 +25,43 @@ GNOME (menu du Sceau, liserés colorés) ne se recharge pas à chaud.
 
 Détails et travail restant : [suivi du lot](docs/securite-2026-09-12.md).
 
+## 1.11.0 — en préparation
+
+**Lot de sécurité important.** Plusieurs frontières ont été renforcées à la
+source. Rien ne change dans votre usage quotidien ; ce qui change, c'est ce
+qu'un programme hostile peut atteindre.
+
+**Le réseau d'un Espace est enfin cloisonné pour de bon.** La liste blanche ne
+s'appliquait qu'au navigateur : tout autre programme lancé dans l'Espace
+passait à côté. Chaque Espace restreint a désormais son propre réseau, sans
+interface vers l'extérieur, et ne joint rien d'autre que son filtre.
+
+**Le Blindage filtre les appels système.** Un programme ne peut plus inspecter
+ni modifier la mémoire d'un autre, charger un module noyau, ni emprunter les
+chemins habituels d'évasion.
+
+**Une application ne peut plus se faire passer pour un autre Espace.** Elle
+annonçait elle-même sa « classe de fenêtre » : il suffisait de se déclarer
+« Banque » pour en obtenir la couleur — sur un système dont toute la lecture
+repose sur cette couleur. La filiation est maintenant vérifiée.
+
+**Plus d'ouverture d'Espace sans isolation.** Sans bubblewrap, rien ne se lance
+du tout, au lieu de continuer en mode réduit.
+
+**Fichiers, transferts et restauration** ne suivent plus les liens et ne
+peuvent plus atteindre un fichier hors de l'Espace. Une restauration conserve
+les anciennes données à côté, sous `avant-restauration-*` — pensez à les
+supprimer quand vous n'en voulez plus, elles occupent de la place.
+
+**Ce que cela peut changer pour vous.** Une application sans prise en charge de
+proxy perdra son accès réseau dans un Espace restreint : il n'y a plus de repli
+vers un accès direct. Les applications Flatpak sont refusées dans les Espaces
+blindés, jetables ou à réseau restreint, leurs permissions n'étant pas
+équivalentes. Après la mise à jour, **fermez et rouvrez vos Espaces**.
+
+Les limites et ce qui reste à faire sont détaillés dans
+[docs/securite-2026-09-12.md](docs/securite-2026-09-12.md).
+
 ## 1.10.1 — en préparation
 
 **« Nouveau document » existe enfin dans Fichiers.** Le menu ne proposait que

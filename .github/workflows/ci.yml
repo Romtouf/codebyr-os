@@ -180,6 +180,15 @@ jobs:
           apt-get update -qq
           apt-get install -y --no-install-recommends git ca-certificates python3 bubblewrap dbus-daemon libseccomp2 firefox-esr nodejs
       - uses: actions/checkout@v7
+      - name: Autoriser les espaces de noms utilisateur si possible
+        # Ubuntu 24.04 les restreint par AppArmor et le conteneur en hérite :
+        # bwrap échoue alors sur « setting up uid map: Permission denied ».
+        # Sans effet ailleurs ; l'échec n'est pas fatal, les tests concernés
+        # se contentent alors de s'ignorer en le disant.
+        continue-on-error: true
+        run: |
+          sysctl -w kernel.apparmor_restrict_unprivileged_userns=0 || true
+          sysctl -w kernel.unprivileged_userns_clone=1 || true
       - name: Préparer les comptes jetables du conteneur CI
         run: |
           mkdir -p /usr/share/codebyr

@@ -16,6 +16,33 @@ from outils import BIN, LIB, charger
 import bac_a_sable
 
 
+def espaces_utilisateur_possibles():
+    """bwrap peut-il reellement creer un espace de noms utilisateur ici ?
+
+    Question d'ENVIRONNEMENT, pas de code. Ubuntu 24.04 restreint les espaces
+    de noms utilisateur non privilegies par AppArmor, et un conteneur de CI en
+    herite : bwrap echoue alors sur « setting up uid map: Permission denied ».
+
+    Sans cette sonde, deux tests parfaitement valides apparaissent en rouge sur
+    le runner distant. Un echec qui ne designe pas un defaut du projet apprend
+    a ignorer la CI, ce qui coute plus cher que les deux tests concernes.
+
+    La sonde est VOLONTAIREMENT etroite : elle ne repond non que si bwrap ne
+    peut pas creer l'espace de noms du tout. Une regression du bac a sable
+    continue donc d'echouer, elle n'est pas ignoree.
+    """
+    try:
+        essai = subprocess.run(
+            ["bwrap", "--unshare-user", "--ro-bind", "/", "/", "/bin/true"],
+            capture_output=True, text=True, timeout=15)
+    except (OSError, subprocess.SubprocessError):
+        return False
+    return essai.returncode == 0
+
+
+USERNS = espaces_utilisateur_possibles()
+
+
 @unittest.skipUnless(os.environ.get("CODEBYR_TEST_LINUX") == "1", "Intégration Linux explicite")
 class ReseauReel(unittest.TestCase):
     def _lancer_banque(self, home, application):
@@ -48,6 +75,9 @@ raise SystemExit(s["cmd_launch"](espaces,"banque",%r))
             self.fail("Délai dépassé : %r" % exc.stderr)
         self.assertEqual(resultat.returncode, 0, resultat.stderr)
 
+    @unittest.skipUnless(
+        USERNS, "bwrap ne peut pas creer d'espace de noms utilisateur ici "
+                "(restriction AppArmor du conteneur, pas un defaut du projet)")
     def test_lancement_complet_banque(self):
         sonde = ('import socket; s=socket.create_connection(("127.0.0.1",17890),timeout=3); '
                  's.sendall(bytes.fromhex("434f4e4e45435420696e7465726469742e746573743a34343320485454502f312e310d0a0d0a")); '
@@ -56,6 +86,9 @@ raise SystemExit(s["cmd_launch"](espaces,"banque",%r))
             self._lancer_banque(home, ["/usr/bin/python3", "-c", sonde])
 
     @unittest.skipUnless(Path("/usr/bin/firefox-esr").exists(), "Firefox ESR requis")
+    @unittest.skipUnless(
+        USERNS, "bwrap ne peut pas creer d'espace de noms utilisateur ici "
+                "(restriction AppArmor du conteneur, pas un defaut du projet)")
     def test_firefox_headless_dans_banque_blindee(self):
         with tempfile.TemporaryDirectory() as home:
             self._lancer_banque(home, ["/usr/bin/firefox-esr", "--headless", "--screenshot",

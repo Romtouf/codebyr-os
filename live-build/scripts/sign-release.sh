@@ -25,6 +25,13 @@ export GNUPGHOME
 SIGNER="${CODEBYR_SIGNER:-E6FB6616EC58E15F40DA876CB1E8C803CE596E68}"
 CLE_PUB="$REPO/codebyr-signing-key.asc"
 
+# pinentry a besoin de savoir sur quel terminal demander la phrase de passe.
+# Le script le sait aussi bien que nous : inutile de faire retenir un
+# « export GPG_TTY » de plus à chaque publication.
+if [ -z "${GPG_TTY:-}" ] && [ -t 0 ]; then
+	GPG_TTY="$(tty 2>/dev/null)" && export GPG_TTY
+fi
+
 gpg --list-secret-keys "$SIGNER" >/dev/null 2>&1 || {
 	echo "ERREUR : clé privée $SIGNER introuvable dans $GNUPGHOME." >&2; exit 1; }
 

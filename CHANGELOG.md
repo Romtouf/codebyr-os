@@ -25,6 +25,17 @@ GNOME (menu du Sceau, liserés colorés) ne se recharge pas à chaud.
 
 Détails et travail restant : [suivi du lot](docs/securite-2026-09-12.md).
 
+## 1.11.1 — en préparation
+
+**Les deux vérifications disent maintenant où les lancer.** Utilisées depuis un
+Espace au lieu du bureau, elles donnaient des résultats faux — et
+`verifier-isolation` concluait « au moins un contrôle a échoué, ne publiez pas
+cette version » alors que tout allait bien.
+
+La sonde s'exécutait dans un compartiment imbriqué et mesurait les restrictions
+de l'Espace courant, pas celles qu'on voulait vérifier. Elles refusent
+désormais, en expliquant pourquoi et quoi faire.
+
 ## 1.11.0 — en préparation
 
 **Lot de sécurité important.** Plusieurs frontières ont été renforcées à la

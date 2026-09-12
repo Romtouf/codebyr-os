@@ -31,6 +31,7 @@ collecte touche au disque.
 import os
 import shutil
 import subprocess
+import sys
 
 # — Ce que l'on contrôle, et l'incident qui l'a rendu nécessaire —
 TROUSSEAU = "/usr/share/keyrings/codebyr-archive-keyring.gpg"
@@ -262,6 +263,23 @@ LIBELLES = (
 
 def cmd_verifier_poste():
     """Affiche l'état réel du poste. Code de sortie non nul si un contrôle échoue."""
+    depuis = os.environ.get("CODEBYR_ESPACE", "").strip()
+    if depuis:
+        # Dans un Espace, ce sont les fichiers du bac à sable qu'on lirait,
+        # et « sudo » y est volontairement impossible (no_new_privs). Les
+        # mesures ne diraient rien du poste.
+        ecrire = sys.stderr.write
+        ecrire("Cet autotest porte sur LE POSTE, et doit être lancé "
+               "depuis le bureau.")
+        ecrire(os.linesep)
+        ecrire("Vous êtes dans l'Espace « %s » : les fichiers lus seraient "
+               "ceux du bac à sable," % depuis)
+        ecrire(os.linesep)
+        ecrire("et « sudo » y est volontairement impossible.")
+        ecrire(os.linesep + os.linesep)
+        ecrire("Ouvrez un terminal ordinaire du bureau et relancez.")
+        ecrire(os.linesep)
+        return 2
     resultats = relever()
     print("Autotest du poste — ce qui est mesuré sur cette machine, "
           "pas ce qui est promis.\n")

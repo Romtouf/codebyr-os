@@ -280,6 +280,31 @@ def cmd_verifier_isolation():
     if not shutil.which("bwrap"):
         sys.stderr.write("bubblewrap absent : aucun bac à sable à vérifier.\n")
         return 2
+    depuis = os.environ.get("CODEBYR_ESPACE", "").strip()
+    if depuis:
+        # La sonde tournerait dans un bac à sable IMBRIQUÉ, héritant des
+        # restrictions de l'Espace courant : elle mesurerait celles-ci, pas
+        # les nôtres. Lancée depuis Banque le 12/09/2026, elle a annoncé
+        # « aucun réseau » pour un Espace ordinaire, puis « au moins un
+        # contrôle a échoué, ne publiez pas cette version » — une accusation
+        # fausse dans un cas parfaitement normal.
+        #
+        # Un outil qui crie au loup quand on l'emploie depuis le mauvais
+        # endroit finit ignoré, et c'est justement celui qu'il faudra croire
+        # le jour où il aura raison.
+        ecrire = sys.stderr.write
+        ecrire("Cette vérification doit être lancée DEPUIS LE BUREAU, "
+               "pas depuis un Espace.")
+        ecrire(os.linesep)
+        ecrire("Vous êtes dans « %s » : la sonde s'exécuterait dans un bac "
+               "à sable imbriqué," % depuis)
+        ecrire(os.linesep)
+        ecrire("et mesurerait les restrictions de cet Espace, pas celles "
+               "qu'on veut vérifier.")
+        ecrire(os.linesep + os.linesep)
+        ecrire("Ouvrez un terminal ordinaire du bureau et relancez.")
+        ecrire(os.linesep)
+        return 2
     print("Vérification de l'isolation — une sonde est lancée dans un vrai "
           "bac à sable.\n")
     tout_va_bien = True

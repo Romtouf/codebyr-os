@@ -19,7 +19,7 @@ n'écrit la nôtre que dans un dossier personnel d'Espace, jamais dans celui de
 l'utilisateur.
 """
 import os
-import shutil
+import fichiers_surs
 
 SOURCE = "/usr/share/codebyr/modeles"
 DECLARATION = ".config/user-dirs.dirs"
@@ -72,7 +72,7 @@ def installer(home, source=SOURCE):
     fichier = os.path.join(home, DECLARATION)
     declare = None
     try:
-        with open(fichier, encoding="utf-8") as f:
+        with fichiers_surs.ouvrir(fichier, encoding="utf-8") as f:
             declare = dossier_declare(f.read())
     except OSError:
         pass
@@ -85,16 +85,19 @@ def installer(home, source=SOURCE):
         # regardait : « Nouveau document » n'apparaissait que sur le bureau.
         declare = DEFAUT
         try:
-            os.makedirs(os.path.dirname(fichier), exist_ok=True)
-            with open(fichier, "a", encoding="utf-8") as f:
+            fichiers_surs.mkdir(os.path.dirname(fichier))
+            with fichiers_surs.ouvrir(fichier, "a", encoding="utf-8") as f:
                 f.write('XDG_TEMPLATES_DIR="$HOME/%s"\n' % DEFAUT)
         except OSError:
             pass
 
-    cible = declare if os.path.isabs(declare) else os.path.join(home, declare)
+    # Une déclaration écrite dans le bac à sable ne choisit jamais un chemin hôte.
+    if os.path.isabs(declare) or ".." in declare.replace("\\", "/").split("/"):
+        return 0
+    cible = os.path.join(home, declare)
 
     try:
-        os.makedirs(cible, exist_ok=True)
+        fichiers_surs.mkdir(cible)
         presents = set(os.listdir(cible))
     except OSError:
         return 0
@@ -102,7 +105,7 @@ def installer(home, source=SOURCE):
     poses = 0
     for nom in a_installer(modeles, presents):
         try:
-            shutil.copy2(os.path.join(source, nom), os.path.join(cible, nom))
+            fichiers_surs.copier(os.path.join(source, nom), os.path.join(cible, nom))
             poses += 1
         except OSError:
             continue

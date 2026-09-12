@@ -16,7 +16,7 @@ import tempfile
 
 
 def wrap_bwrap(home, cmd, env, renforce=False, hors_ligne=False, audio=True,
-               envoi=None):
+               envoi=None, filtre=None):
     """Enveloppe avec bubblewrap : dossier personnel isolé, /tmp isolé,
     affichage (et éventuellement son) partagés. Repli géré par l'appelant si
     bwrap échoue.
@@ -87,13 +87,17 @@ def wrap_bwrap(home, cmd, env, renforce=False, hors_ligne=False, audio=True,
                   os.path.join(os.path.expanduser("~"), ".codebyr-envoi")]
     if audio and not hors_ligne:
         bwrap += ["--ro-bind-try", runtime + "/pipewire-0", runtime + "/pipewire-0"]
-    if hors_ligne:
+    if filtre:
+        bwrap += ["--ro-bind", filtre, "/run/codebyr-proxy"]
+    if hors_ligne or filtre:
         # Aucune interface réseau : exfiltration impossible.
         bwrap += ["--unshare-net"]
     if renforce:
         # Blindage : bac à sable utilisateur, zéro privilège, session neuve.
-        bwrap += ["--unshare-user-try", "--unshare-cgroup-try",
+        bwrap += ["--unshare-user", "--unshare-cgroup-try",
                   "--new-session", "--cap-drop", "ALL"]
+    if renforce:
+        cmd = ["python3", "/usr/share/codebyr/filtre_syscalls.py", "--"] + cmd
     return bwrap + ["--"] + cmd
 
 
@@ -124,6 +128,7 @@ def plafonner_ressources(run):
         return ["systemd-run", "--user", "--scope", "--quiet",
                 "-p", "MemoryMax=2G", "-p", "MemorySwapMax=0",
                 "-p", "TasksMax=800", "--"] + run
+    sys.stderr.write("Codebyr : plafonds mémoire/processus indisponibles (session systemd utilisateur absente).\n")
     return run
 
 

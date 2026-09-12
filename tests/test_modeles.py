@@ -72,6 +72,8 @@ class ChoixDesFichiers(unittest.TestCase):
             modeles.a_installer(["a.txt"], {"a.txt", "autre.odt"}), [])
 
 
+@unittest.skipUnless(hasattr(os, "O_NOFOLLOW") and os.supports_dir_fd,
+                     "accès disque par descripteurs (O_NOFOLLOW, dir_fd) — Linux")
 class Installation(unittest.TestCase):
     def setUp(self):
         self.home = tempfile.mkdtemp()

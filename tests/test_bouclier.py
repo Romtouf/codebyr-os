@@ -71,7 +71,7 @@ class XpiSigne(unittest.TestCase):
     def _xpi(self):
         trouves = sorted(glob.glob(os.path.join(SIGNES, "*.xpi")))
         if not trouves:
-            self.skipTest("aucun .xpi signé livré")
+            self.fail("aucun .xpi signé livré")
         return trouves[0]
 
     RAPPEL = ("\nLe bouclier réellement installé sur les machines est celui du "
@@ -98,6 +98,9 @@ class XpiSigne(unittest.TestCase):
             embarque = json.loads(z.read("manifest.json").decode("utf-8"))
         with open(os.path.join(SRC, "manifest.json"), encoding="utf-8") as f:
             source = json.load(f)
+        for cle in ("manifest_version", "content_scripts", "host_permissions", "browser_specific_settings"):
+            self.assertEqual(embarque.get(cle), source.get(cle),
+                             "Manifeste signé différent : " + cle + self.RAPPEL)
         self.assertEqual(embarque.get("version"), source.get("version"),
                          "version du manifeste ≠ version signée." + self.RAPPEL)
         self.assertEqual(embarque.get("permissions"), source.get("permissions"),

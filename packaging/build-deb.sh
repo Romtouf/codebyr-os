@@ -99,7 +99,7 @@ Version: $VERSION
 Architecture: all
 Maintainer: Codebyr OS <romain.formationoc@gmail.com>
 Installed-Size: $TAILLE
-Depends: python3, python3-gi, gir1.2-gtk-4.0, gir1.2-adw-1, bubblewrap, dbus-user-session, firefox-esr | firefox, python3-nautilus
+Depends: python3 (>= 3.12), libseccomp2, python3-gi, gir1.2-gtk-4.0, gir1.2-adw-1, bubblewrap, dbus-user-session, firefox-esr | firefox, python3-nautilus
 Recommends: flatpak, gnome-shell, libnotify-bin
 Section: admin
 Priority: optional

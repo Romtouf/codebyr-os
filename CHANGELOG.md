@@ -10,6 +10,21 @@ GNOME (menu du Sceau, liserés colorés) ne se recharge pas à chaud.
 
 ---
 
+## Non publié — correctifs de sécurité du 12 septembre 2026
+
+- Accès aux fichiers des Espaces sans suivre les liens, écritures atomiques,
+  transferts exclusifs et origine posée avant publication.
+- Restauration validée avant bascule, avec conservation des anciennes données.
+- Lancement refusé sans bubblewrap et sans repli non isolé du Jetable.
+- Réseau restreint des applications natives imposé par namespace et proxy ;
+  filtre seccomp complémentaire pour le Blindage.
+- Flatpak refusé dans les modes qu'il ne garantit pas ; message honnête pour
+  les installations dédiées. Préférences proxy Firefox remplacées par clé.
+- Tests de frontières sur Linux, prototype à deux UID non livré par défaut,
+  contrôle renforcé du manifeste XPI et workflow de signature sans injection.
+
+Détails et travail restant : [suivi du lot](docs/securite-2026-09-12.md).
+
 ## 1.10.1 — en préparation
 
 **« Nouveau document » existe enfin dans Fichiers.** Le menu ne proposait que

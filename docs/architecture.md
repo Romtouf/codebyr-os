@@ -1,5 +1,8 @@
 # Codebyr OS — Architecture technique
 
+Évolution locale non publiée : [correctifs et prototype UID, septembre 2026](securite-2026-09-12.md).
+Les états historiques ci-dessous ne valent pas validation de la dernière ISO.
+
 > **Comment lire ce document.** Chaque composant porte un état explicite :
 > **[implémenté]** = présent dans l'ISO et dans `codebyr-tools` aujourd'hui ;
 > **[visé]** = décision d'architecture retenue, pas encore écrite. Un document

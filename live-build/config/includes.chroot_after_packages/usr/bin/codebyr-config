@@ -19,6 +19,7 @@ from gi.repository import Adw, Gtk, Gio, GLib  # noqa: E402
 # de l'utilisateur ; on n'enregistre jamais que les différences (voir le module).
 sys.path.insert(0, os.environ.get("CODEBYR_LIB", "/usr/share/codebyr"))
 import applications  # noqa: E402
+import bac_a_sable  # noqa: E402
 import registre  # noqa: E402
 
 
@@ -51,7 +52,7 @@ def capacites_machine():
     return [
         ("Bac à sable (bubblewrap)", bool(shutil.which("bwrap"))),
         ("Isolation utilisateur", user_ns()),
-        ("Plafonds mémoire / processus", bool(shutil.which("systemd-run"))),
+        ("Plafonds mémoire / processus", bac_a_sable.systemd_scope_dispo()),
         # Sans lui, une application d'un Espace n'a aucun bus de session : le bus
         # de l'hôte n'est plus exposé au bac à sable (il permettait d'en sortir).
         ("Bus de session privé par Espace", bool(shutil.which("dbus-run-session"))),

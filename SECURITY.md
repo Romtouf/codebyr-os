@@ -1,5 +1,19 @@
 # Politique de sécurité
 
+## Correctifs locaux du 12 septembre 2026 — non publiés
+
+Les défauts de liens dans les échanges et la préparation des Espaces, le
+repli sans bubblewrap et la restauration destructive ont été traités dans
+les sources. Le réseau restreint natif passe désormais par un namespace
+sans interface externe et un relais vers le proxy ; le Blindage ajoute un
+filtre seccomp. Les installations existantes ne bénéficient pas de ces
+changements tant qu'un paquet validé n'a pas été publié et installé.
+
+Le prototype UID reste réservé aux tests : le bureau utilise encore un
+seul compte Unix. Voir [le périmètre, les tests et les limites du lot](docs/securite-2026-09-12.md).
+Le modèle ci-dessous décrit aussi des versions antérieures ; ne pas déduire
+la protection d'un poste de la seule présence de ce document.
+
 ## Signaler une vulnérabilité
 
 **Ne signalez pas les vulnérabilités dans les issues publiques.**

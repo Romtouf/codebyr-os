@@ -154,6 +154,21 @@ function ppid(pid) {
     }
 }
 
+// Un PID peut être réutilisé : la naissance est le champ 22 de /proc/PID/stat.
+function naissanceCorrespond(pid, rundir) {
+    try {
+        const [ok, bytes] = GLib.file_get_contents('/proc/' + pid + '/stat');
+        const [okBirth, birth] = GLib.file_get_contents(rundir + '/birth-' + pid);
+        if (!ok || !okBirth)
+            return false;
+        const stat = new TextDecoder().decode(bytes);
+        const champs = stat.slice(stat.lastIndexOf(')') + 1).trim().split(/\s+/);
+        return champs[19] === new TextDecoder().decode(birth).trim();
+    } catch (e) {
+        return false;
+    }
+}
+
 // Association par filiation : on remonte les processus parents de la fenêtre
 // jusqu'à trouver un marqueur « pid-<N> » posé par codebyr-space.
 function espaceParProcessus(win, espaces, rundir) {
@@ -165,7 +180,7 @@ function espaceParProcessus(win, espaces, rundir) {
     for (let i = 0; i < 12 && cur > 1; i++) {
         try {
             const [ok, bytes] = GLib.file_get_contents(rundir + '/pid-' + cur);
-            if (ok) {
+            if (ok && naissanceCorrespond(cur, rundir)) {
                 const id = new TextDecoder().decode(bytes).trim();
                 const esp = espaces.find(e => e.id === id);
                 if (esp)
@@ -293,8 +308,7 @@ class Coloriage {
         const tenter = () => {
             if (rec.lisere)
                 return;
-            const esp = espacePourFenetre(win, this._espaces)
-                || espaceParProcessus(win, this._espaces, this._rundir);
+            const esp = espaceParProcessus(win, this._espaces, this._rundir);
             if (esp)
                 this._colorer(win, rec, esp);
         };
@@ -386,7 +400,7 @@ function espaceFocalise(espaces, rundir) {
     try { win = global.display.focus_window; } catch (e) {}
     if (!win)
         return null;
-    return espacePourFenetre(win, espaces) || espaceParProcessus(win, espaces, rundir);
+    return espaceParProcessus(win, espaces, rundir);
 }
 
 // ── Presse-papiers inter-Espaces ─────────────────────────────────────────

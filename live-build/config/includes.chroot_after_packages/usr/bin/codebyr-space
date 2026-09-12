@@ -9,8 +9,7 @@ Chaque Espace a :
   - un marqueur de fenêtre « codebyr-<id> » pour que l'extension GNOME
     colore ses fenêtres.
 
-Isolation : bubblewrap si disponible (isolation réelle du système de
-fichiers), sinon repli sur un dossier personnel séparé. Le bus de session de
+Isolation : bubblewrap obligatoire ; aucun lancement sans bac à sable. Le bus de session de
 l'hôte n'entre JAMAIS dans un Espace (voir wrap_bwrap).
 
 La liste des actions est produite à partir de la table ACTIONS : « --help » ne
@@ -37,6 +36,7 @@ sys.path.insert(0, os.environ.get("CODEBYR_LIB", "/usr/share/codebyr"))
 import applications  # noqa: E402
 import autotest  # noqa: E402
 import bac_a_sable  # noqa: E402
+import fichiers_surs
 import modeles  # noqa: E402
 import provenance  # noqa: E402
 import registre  # noqa: E402
@@ -94,7 +94,7 @@ def espace_home(esp):
             pass
         return tempfile.mkdtemp(prefix="codebyr-jetable-%s-" % esp["id"])
     home = os.path.join(DATA_ROOT, esp["id"], "home")
-    os.makedirs(home, exist_ok=True)
+    fichiers_surs.mkdir(home)
     return home
 
 
@@ -123,10 +123,10 @@ def _preparer_profil_firefox(home, port):
     """Pré-configure le profil Firefox de l'Espace pour passer par le filtre réseau."""
     ffbase = os.path.join(home, ".mozilla", "firefox")
     ffdir = os.path.join(ffbase, "codebyr.default")
-    os.makedirs(ffdir, exist_ok=True)
+    fichiers_surs.mkdir(ffdir)
     ini = os.path.join(ffbase, "profiles.ini")
     if not os.path.exists(ini):
-        with open(ini, "w", encoding="utf-8") as f:
+        with fichiers_surs.ouvrir(ini, "w", encoding="utf-8") as f:
             f.write("[Profile0]\nName=codebyr\nIsRelative=1\nPath=codebyr.default\n"
                     "Default=1\n\n[General]\nStartWithLastProfile=1\nVersion=2\n")
     prefs = [
@@ -203,14 +203,14 @@ def _preparer_ouverture(home, chemin_desktop=None):
         return
     cible = os.path.join(home, ".config", "mimeapps.list")
     try:
-        os.makedirs(os.path.dirname(cible), exist_ok=True)
+        fichiers_surs.mkdir(os.path.dirname(cible))
         contenu = ""
         if os.path.exists(cible):
-            with open(cible, encoding="utf-8") as f:
+            with fichiers_surs.ouvrir(cible, encoding="utf-8") as f:
                 contenu = f.read()
         nouveau = associer_ouvreur(contenu, types)
         if nouveau != contenu:
-            with open(cible, "w", encoding="utf-8") as f:
+            with fichiers_surs.ouvrir(cible, "w", encoding="utf-8") as f:
                 f.write(nouveau)
     except OSError:
         pass    # un défaut de préférence ne doit jamais empêcher un lancement
@@ -242,7 +242,7 @@ def journal_refus(esp_id):
     return os.path.join(DATA_ROOT, esp_id, "domaines-refuses.txt")
 
 
-def _demarrer_filtre_reseau(esp, home, app_cmd):
+def _demarrer_filtre_reseau(esp, home, app_cmd, chemin_socket=None):
     """Si l'Espace a une liste blanche et lance Firefox : démarre le filtre
     et configure le navigateur pour l'utiliser. Renvoie le processus proxy.
 
@@ -253,24 +253,24 @@ def _demarrer_filtre_reseau(esp, home, app_cmd):
     reseau = esp.get("reseau") or {}
     if reseau.get("mode") != "liste-blanche":
         return None
-    if "firefox" not in os.path.basename(app_cmd[0]):
-        return None
     domaines = reseau.get("domaines") or []
     srv = None
     try:
         # On ouvre NOUS-MÊMES la socket d'écoute et on la transmet au filtre :
         # plus de course entre « trouver un port libre » et « s'y installer »,
         # et le port écoute déjà quand le navigateur démarre.
-        srv = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        srv.bind(("127.0.0.1", 0))
+        srv = socket.socket(socket.AF_UNIX if chemin_socket else socket.AF_INET,
+                            socket.SOCK_STREAM)
+        srv.bind(chemin_socket if chemin_socket else ("127.0.0.1", 0))
         srv.listen(64)
-        port = srv.getsockname()[1]
+        port = 17890 if chemin_socket else srv.getsockname()[1]
 
         # Le profil est configuré AVANT de lancer le filtre, volontairement : si
         # le filtre ne démarre pas, le navigateur pointe vers un port muet et ne
         # joint plus rien. L'ordre inverse laissait l'Espace Banque avec un accès
         # Internet complet quand le filtre manquait à l'appel.
-        _preparer_profil_firefox(home, port)
+        if "firefox" in os.path.basename(app_cmd[0]):
+            _preparer_profil_firefox(home, port)
 
         proc = subprocess.Popen(["codebyr-net-proxy", "--fd", str(srv.fileno()),
                                  "--journal", journal_refus(esp["id"])] + domaines,
@@ -296,7 +296,7 @@ def _demarrer_filtre_reseau(esp, home, app_cmd):
     except OSError as exc:
         sys.stderr.write("codebyr-space : filtre réseau indisponible (%s) — "
                          "le navigateur de cet Espace ne joindra aucun site.\n" % exc)
-        return None
+        raise
     finally:
         # Le filtre a sa propre copie de la socket : la nôtre n'a plus lieu d'être.
         if srv is not None:
@@ -325,14 +325,14 @@ def _ecrire_stockage_manage(home, doms):
     fournis en DONNÉE (pas injectés dans le code), pour que l'extension reste
     statique et signable. Firefox lit ce fichier par utilisateur sous Linux."""
     msdir = os.path.join(home, ".mozilla", "managed-storage")
-    os.makedirs(msdir, exist_ok=True)
+    fichiers_surs.mkdir(msdir)
     manifeste = {
         "name": BOUCLIER_ID,
         "description": "Domaines bancaires protégés par Codebyr.",
         "type": "storage",
         "data": {"domaines": doms},
     }
-    with open(os.path.join(msdir, BOUCLIER_ID + ".json"), "w", encoding="utf-8") as f:
+    with fichiers_surs.ouvrir(os.path.join(msdir, BOUCLIER_ID + ".json"), "w", encoding="utf-8") as f:
         json.dump(manifeste, f, ensure_ascii=False)
 
 
@@ -344,14 +344,17 @@ def _ajouter_prefs(chemin, prefs):
     préférence des centaines de fois. On dédoublonne, et on écrit une seule fois."""
     existantes = []
     try:
-        with open(chemin, encoding="utf-8") as f:
+        with fichiers_surs.ouvrir(chemin, encoding="utf-8") as f:
             existantes = [l.rstrip("\n") for l in f if l.strip()]
     except OSError:
         pass
-    for p in prefs:
-        if p not in existantes:
-            existantes.append(p)
-    with open(chemin, "w", encoding="utf-8") as f:
+    def cle(ligne):
+        resultat = re.match(r'\s*user_pref\("([^"\n]+)"\s*,', ligne)
+        return resultat.group(1) if resultat else None
+    gerees = {cle(p) for p in prefs} - {None}
+    existantes = [l for l in existantes if cle(l) not in gerees]
+    existantes.extend(dict.fromkeys(prefs))
+    with fichiers_surs.ouvrir(chemin, "w", encoding="utf-8") as f:
         f.write("\n".join(existantes) + "\n")
 
 
@@ -373,10 +376,10 @@ def _installer_bouclier(esp, home, espaces):
     ffbase = os.path.join(home, ".mozilla", "firefox")
     ffdir = os.path.join(ffbase, "codebyr.default")
     extdir = os.path.join(ffdir, "extensions")
-    os.makedirs(extdir, exist_ok=True)
+    fichiers_surs.mkdir(extdir)
     ini = os.path.join(ffbase, "profiles.ini")
     if not os.path.exists(ini):
-        with open(ini, "w", encoding="utf-8") as f:
+        with fichiers_surs.ouvrir(ini, "w", encoding="utf-8") as f:
             f.write("[Profile0]\nName=codebyr\nIsRelative=1\nPath=codebyr.default\n"
                     "Default=1\n\n[General]\nStartWithLastProfile=1\nVersion=2\n")
 
@@ -403,7 +406,9 @@ def _installer_bouclier(esp, home, espaces):
         'user_pref("extensions.enabledScopes", 15);',
     ])
 
-    shutil.copy2(signe, os.path.join(extdir, BOUCLIER_ID + ".xpi"))
+    with open(signe, "rb") as src, fichiers_surs.ouvrir(
+            os.path.join(extdir, BOUCLIER_ID + ".xpi"), "wb") as dst:
+        shutil.copyfileobj(src, dst)
     print("Bouclier anti-hameçonnage actif [signé] "
           "(%d domaine(s) de banque protégé(s))." % len(doms))
 
@@ -431,6 +436,8 @@ def _visionneuse_pour(nom):
     elif ext in (".odt", ".doc", ".docx", ".xls", ".xlsx", ".ods",
                  ".ppt", ".pptx", ".odp", ".rtf", ".csv"):
         v = premier("libreoffice", "soffice")
+    elif ext in (".zip", ".7z", ".rar", ".tar", ".gz", ".xz", ".bz2"):
+        v = premier("file-roller", "engrampa")
     # Défaut (texte, sans extension, type inconnu) : éditeur de texte.
     if v is None:
         v = premier("gnome-text-editor", "gedit", "evince", "papers")
@@ -441,6 +448,13 @@ def cmd_launch(espaces, esp_id, extra, fichier=None):
     esp = espaces.get(esp_id)
     if not esp:
         sys.stderr.write("Espace inconnu : %s\n" % esp_id)
+        return 2
+    if not shutil.which("bwrap"):
+        _prevenir("Isolation indisponible", "bubblewrap manque : lancement refusé. Réparez le paquet codebyr-tools.")
+        sys.stderr.write("bubblewrap absent : lancement refusé.\n")
+        return 1
+    if fichier and not os.path.isfile(fichier):
+        sys.stderr.write("Fichier introuvable : lancement refusé.\n")
         return 2
     home = espace_home(esp)
     # Dans un Espace, un fichier venu d'ailleurs s'ouvre sous cloche. Câblé au
@@ -459,18 +473,18 @@ def cmd_launch(espaces, esp_id, extra, fichier=None):
         # chercher ses fichiers.
         envoi = boite_envoi(esp["id"])
         try:
-            os.makedirs(envoi, exist_ok=True)
+            fichiers_surs.mkdir(envoi)
         except OSError:
             envoi = None
         if not _espace_courant():
             relever_envois(espaces)
-    use_bwrap = bool(shutil.which("bwrap"))
+    use_bwrap = True  # vérifié avant toute préparation ; jamais de repli non isolé
     runtime_home = os.path.expanduser("~") if use_bwrap else home
 
     # Niveau d'isolation : « renforce » déclaré dans le registre (ex. Banque),
     # ou imposé automatiquement pour l'examen d'une pièce jointe.
     renforce = esp.get("blindage") == "renforce"
-    hors_ligne = False
+    hors_ligne = (esp.get("reseau") or {}).get("mode") in ("coupe", "hors-ligne")
     # Son : le socket PipeWire donne aussi accès au MICRO. Un Espace peut le
     # refuser dans le registre ("audio": false) — c'est le cas de Banque, qui
     # n'a aucun besoin de son et représente la cible la plus sensible.
@@ -480,12 +494,13 @@ def cmd_launch(espaces, esp_id, extra, fichier=None):
     # copié dans l'Espace pour être visible dans le bac à sable isolé.
     if fichier and os.path.isfile(fichier):
         partage = os.path.join(home, PARTAGE)
-        os.makedirs(partage, exist_ok=True)
+        fichiers_surs.mkdir(partage)
         nom = os.path.basename(fichier)
         try:
-            shutil.copy2(fichier, os.path.join(partage, nom))
+            nom = fichiers_surs.copier_unique(fichier, partage, nom)
         except OSError as exc:
             sys.stderr.write("codebyr-space : copie du fichier impossible (%s)\n" % exc)
+            return 1
         if not extra:
             chemin = os.path.join(runtime_home, PARTAGE, nom)
             extra = _visionneuse_pour(nom) + [chemin]
@@ -498,6 +513,11 @@ def cmd_launch(espaces, esp_id, extra, fichier=None):
     # peut ni l'enfermer dans le nôtre (sandbox imbriqué = échec), ni lui donner
     # un bus de session privé (elle a besoin du vrai bus pour ses portails).
     est_flatpak = os.path.basename(app_cmd[0]) == "flatpak" or app_cmd[0].endswith("/flatpak")
+    if est_flatpak and (renforce or hors_ligne or esp.get("ephemere") or
+                        (esp.get("reseau") or {}).get("mode") == "liste-blanche"):
+        _prevenir("Application incompatible avec cet Espace",
+                  "Les permissions Flatpak ne garantissent pas le blindage ou le réseau demandé. Utilisez une application native.")
+        return 1
     cmd = build_command(esp, home, app_cmd)
 
     # Bus de session privé par Espace : les apps « mono-instance » (Fichiers,
@@ -526,6 +546,20 @@ def cmd_launch(espaces, esp_id, extra, fichier=None):
         env["MOZ_ALLOW_DOWNGRADE"] = "1"
 
     ephemere = esp.get("ephemere")
+    proxy = None
+    filtre = None
+    filtre_tmp = None
+    if (esp.get("reseau") or {}).get("mode") == "liste-blanche" and not hors_ligne:
+        filtre_tmp = tempfile.TemporaryDirectory(prefix="codebyr-filtre-")
+        filtre = os.path.join(filtre_tmp.name, "proxy")
+        try:
+            proxy = _demarrer_filtre_reseau(esp, home, app_cmd, filtre)
+        except OSError:
+            filtre_tmp.cleanup()
+            _prevenir("Filtre indisponible", "Lancement refusé : le réseau restreint ne peut pas être établi.")
+            return 1
+        cmd = ["python3", "/usr/share/codebyr/relais_reseau.py",
+               "/run/codebyr-proxy", "17890", "--"] + cmd
     if est_flatpak:
         appid = app_cmd[-1] if len(app_cmd) >= 2 else ""
         if appid and _flatpak_app_dans_espace(esp["id"], appid):
@@ -534,7 +568,8 @@ def cmd_launch(espaces, esp_id, extra, fichier=None):
             env["FLATPAK_USER_DIR"] = _espace_flatpak_dir(esp["id"])
             env["HOME"] = home
             run = cmd
-            print("Application Flatpak propre à l'Espace %s (isolée)." % esp["nom"])
+            print("Application Flatpak dédiée à %s : permissions Flatpak applicables." % esp["nom"])
+            _prevenir("Permissions Flatpak", "Installation dédiée ; les accès aux fichiers et au réseau dépendent des permissions de cette application.")
         else:
             # App Flatpak SYSTÈME : installée pour toute la machine. Elle a son
             # propre bac à sable Flatpak, mais ses données sont communes à tous
@@ -557,20 +592,15 @@ def cmd_launch(espaces, esp_id, extra, fichier=None):
                 "installez-la DANS l'Espace depuis « Configuration Codebyr ».")
             journal("Espace %s : application Flatpak système %s (non cloisonnée)"
                     % (esp["id"], nom_app))
-    elif use_bwrap:
+    else:
         run = bac_a_sable.wrap_bwrap(home, cmd, env, renforce=renforce, hors_ligne=hors_ligne,
-                         audio=audio, envoi=envoi)
+                         audio=audio, envoi=envoi, filtre=filtre)
         if renforce:
             run = bac_a_sable.plafonner_ressources(run)
             detail = "Blindage actif" + (" · hors-ligne (aucun réseau)" if hors_ligne else "")
             print("🛡  %s dans l'Espace %s." % (detail, esp["nom"]))
         if not audio:
             print("🎤 Son et micro coupés dans l'Espace %s." % esp["nom"])
-    else:
-        env["HOME"] = home
-        run = cmd
-        sys.stderr.write("codebyr-space : bubblewrap absent, isolation réduite "
-                         "(dossier personnel séparé).\n")
 
     print("Ouverture de « %s » dans l'Espace %s…" % (os.path.basename(cmd[0]), esp["nom"]))
     journal("Espace %s : ouverture de %s%s%s%s"
@@ -588,7 +618,6 @@ def cmd_launch(espaces, esp_id, extra, fichier=None):
         pass
     _nettoyer_marqueurs()
 
-    proxy = _demarrer_filtre_reseau(esp, home, app_cmd)
     # Bouclier anti-hameçonnage dans TOUS les navigateurs, y compris celui de
     # l'Espace Banque. On l'en excluait au motif que sa liste blanche suffit —
     # mais cette liste est saisie à la main par l'utilisateur. Le jour où un
@@ -602,9 +631,25 @@ def cmd_launch(espaces, esp_id, extra, fichier=None):
         except OSError as exc:
             sys.stderr.write("codebyr-space : bouclier indisponible (%s)\n" % exc)
 
-    proc = subprocess.Popen(run, env=env)
-    mapfile = os.path.join(rundir, "pid-%d" % proc.pid)
     try:
+        proc = subprocess.Popen(run, env=env)
+    except OSError:
+        if proxy:
+            proxy.terminate()
+            proxy.wait(timeout=5)
+        if filtre_tmp:
+            filtre_tmp.cleanup()
+        if ephemere:
+            shutil.rmtree(home, ignore_errors=True)
+        raise
+    mapfile = os.path.join(rundir, "pid-%d" % proc.pid)
+    birthfile = os.path.join(rundir, "birth-%d" % proc.pid)
+    try:
+        naissance = _naissance_processus(proc.pid)
+        if not naissance:
+            raise OSError("Processus terminé avant son enregistrement")
+        with fichiers_surs.ouvrir(birthfile, "w", encoding="ascii") as f:
+            f.write(naissance)
         with open(mapfile, "w", encoding="utf-8") as f:
             f.write(esp["id"])
     except OSError:
@@ -615,8 +660,15 @@ def cmd_launch(espaces, esp_id, extra, fichier=None):
         if proxy:
             try:
                 proxy.terminate()
-            except OSError:
+                proxy.wait(timeout=5)
+            except (OSError, subprocess.TimeoutExpired):
                 pass
+        if filtre_tmp:
+            filtre_tmp.cleanup()
+        try:
+            os.remove(birthfile)
+        except OSError:
+            pass
         if mapfile:
             try:
                 os.remove(mapfile)
@@ -631,6 +683,25 @@ def cmd_launch(espaces, esp_id, extra, fichier=None):
 def _rundir():
     return os.path.join(
         os.environ.get("XDG_RUNTIME_DIR") or "/run/user/%d" % os.getuid(), "codebyr")
+
+
+def _naissance_processus(pid):
+    if pid <= 1:
+        return None
+    try:
+        with open("/proc/%d/stat" % pid, encoding="utf-8") as f:
+            return f.read().rsplit(")", 1)[1].split()[19]
+    except (OSError, IndexError):
+        return None
+
+
+def _marqueur_actuel(pid, rundir):
+    try:
+        with fichiers_surs.ouvrir(os.path.join(rundir, "birth-%d" % pid), encoding="ascii") as f:
+            attendu = f.read(128).strip()
+        return bool(attendu) and attendu == _naissance_processus(pid)
+    except OSError:
+        return False
 
 
 def _nettoyer_marqueurs():
@@ -653,11 +724,12 @@ def _nettoyer_marqueurs():
             pid = int(nom[4:])
         except ValueError:
             continue
-        if not os.path.isdir("/proc/%d" % pid):
-            try:
-                os.remove(os.path.join(rundir, nom))
-            except OSError:
-                pass
+        if not _marqueur_actuel(pid, rundir):
+            for obsolete in (nom, "birth-%d" % pid):
+                try:
+                    os.remove(os.path.join(rundir, obsolete))
+                except OSError:
+                    pass
 
 
 def cmd_close(espaces, esp_id):
@@ -684,8 +756,15 @@ def cmd_close(espaces, esp_id):
         except ValueError:
             continue
         try:
-            os.kill(pid, signal.SIGTERM)
-            ferme += 1
+            # pidfd cible un processus précis, jamais le futur porteur de son PID.
+            fd = os.pidfd_open(pid)
+            try:
+                if not _marqueur_actuel(pid, rundir):
+                    continue
+                signal.pidfd_send_signal(fd, signal.SIGTERM)
+                ferme += 1
+            finally:
+                os.close(fd)
         except OSError:
             try:
                 os.remove(path)
@@ -750,17 +829,52 @@ def cmd_import(espaces, esp_id, source=None):
     if not os.path.exists(source):
         sys.stderr.write("Archive introuvable : %s\n" % source)
         return 1
-    cmd_close(espaces, esp_id)
-    home = os.path.join(DATA_ROOT, esp_id, "home")
-    shutil.rmtree(home, ignore_errors=True)
-    os.makedirs(home, exist_ok=True)
-    with tarfile.open(source, "r:gz") as tar:
-        try:
-            tar.extractall(home, filter="data")   # sûr (Python 3.12+)
-        except TypeError:
-            tar.extractall(home)
-    print("Espace %s restauré depuis %s" % (esp["nom"], os.path.basename(source)))
-    return 0
+    # Extraire avant de fermer ou toucher aux données existantes. Le dossier
+    # temporaire est un frère du home, inaccessible depuis le bac à sable.
+    parent = os.path.join(DATA_ROOT, esp_id)
+    fichiers_surs.mkdir(parent)
+    home = os.path.join(parent, "home")
+    sauvegarde = None
+    try:
+        with tempfile.TemporaryDirectory(prefix=".restauration-", dir=parent) as stage:
+            neuf = os.path.join(stage, "home")
+            os.mkdir(neuf, 0o700)
+            with tarfile.open(source, "r:gz") as tar:
+                membres = []
+                taille = 0
+                for membre in tar:
+                    taille += membre.size
+                    if len(membres) >= 100000 or taille > 20 * 1024**3:
+                        raise ValueError("Archive trop volumineuse (100 000 entrées / 20 Gio maximum)")
+                    # Aucun lien ni fichier spécial ne doit entrer par import.
+                    if not (membre.isfile() or membre.isdir()):
+                        raise ValueError("Archive contenant un lien ou fichier spécial")
+                    membres.append(membre)
+                tar.extractall(neuf, members=membres, filter="data")
+            cmd_close(espaces, esp_id)
+            # Ne pas remplacer le dossier d'un Espace encore en activité.
+            if _espace_courant() == esp_id:
+                raise ValueError("Fermez cet Espace puis restaurez depuis le bureau")
+            with fichiers_surs.dossier(parent):
+                if os.path.lexists(home):
+                    if os.path.islink(home):
+                        raise ValueError("Dossier personnel symbolique refusé")
+                    sauvegarde = tempfile.mkdtemp(prefix="avant-restauration-", dir=parent)
+                    os.rmdir(sauvegarde)
+                    os.rename(home, sauvegarde)
+                try:
+                    os.rename(neuf, home)
+                except OSError:
+                    if sauvegarde:
+                        os.rename(sauvegarde, home)
+                    raise
+        print("Espace %s restauré." % esp["nom"])
+        if sauvegarde:
+            print("Anciennes données conservées : %s" % sauvegarde)
+        return 0
+    except (OSError, tarfile.TarError, ValueError) as exc:
+        sys.stderr.write("Restauration refusée, anciennes données conservées : %s\n" % exc)
+        return 1
 
 
 FLATHUB_REPO = "/etc/flatpak/remotes.d/flathub.flatpakrepo"
@@ -1010,33 +1124,52 @@ def relever_envois(espaces):
     remis = 0
     for source in list(espaces):
         racine = boite_envoi(source)
-        if not os.path.isdir(racine):
-            continue
-        for dest in os.listdir(racine):
-            # Une destination inconnue est ignorée : le nom vient d'un dossier
-            # écrit DEPUIS un Espace, donc d'une zone où l'on ne décide pas.
-            if dest not in espaces or espaces[dest].get("ephemere"):
-                continue
-            dossier = os.path.join(racine, dest)
-            if not os.path.isdir(dossier):
-                continue
-            cible = os.path.join(DATA_ROOT, dest, "home", PARTAGE)
-            try:
-                os.makedirs(cible, exist_ok=True)
-            except OSError:
-                continue
-            for nom in os.listdir(dossier):
-                chemin = os.path.join(dossier, nom)
-                if not os.path.isfile(chemin):
+        try:
+            with fichiers_surs.dossier(racine) as racine_fd:
+                destinations = os.listdir(racine_fd)
+            for dest in destinations:
+                if dest not in espaces or espaces[dest].get("ephemere"):
                     continue
+                dossier = os.path.join(racine, dest)
                 try:
-                    final = nom_libre(cible, os.path.basename(nom))
-                    if final is None:
-                        continue
-                    shutil.move(chemin, os.path.join(cible, final))
-                    remis += 1
+                    with fichiers_surs.dossier(dossier) as source_fd:
+                        noms = os.listdir(source_fd)
+                        cible = os.path.join(DATA_ROOT, dest, "home", PARTAGE)
+                        fichiers_surs.mkdir(cible)
+                        for nom in noms:
+                            if nom.startswith(".codebyr-"):
+                                continue
+                            try:
+                                # Le descripteur conserve le dossier même si son
+                                # nom est remplacé pendant la remise.
+                                # ouvrir() refuse /proc/self/fd (liens), donc
+                                # copier depuis un fd ouvert relativement ici.
+                                entree = os.open(nom, os.O_RDONLY | os.O_NOFOLLOW |
+                                                os.O_NONBLOCK, dir_fd=source_fd)
+                                try:
+                                    import stat
+                                    st = os.fstat(entree)
+                                    if not stat.S_ISREG(st.st_mode) or st.st_nlink != 1:
+                                        continue
+                                    # Copie privée : jamais de déplacement d'un
+                                    # chemin fourni par l'Espace vers l'hôte.
+                                    with tempfile.TemporaryDirectory(prefix="codebyr-envoi-") as t:
+                                        copie = os.path.join(t, "document")
+                                        with os.fdopen(os.dup(entree), "rb") as src, open(copie, "wb") as dst:
+                                            shutil.copyfileobj(src, dst)
+                                        fichiers_surs.copier_unique(copie, cible, nom, source)
+                                    actuel = os.stat(nom, dir_fd=source_fd, follow_symlinks=False)
+                                    if (actuel.st_dev, actuel.st_ino) == (st.st_dev, st.st_ino):
+                                        os.unlink(nom, dir_fd=source_fd)
+                                    remis += 1
+                                finally:
+                                    os.close(entree)
+                            except OSError:
+                                continue
                 except OSError:
                     continue
+        except OSError:
+            continue
     if remis:
         journal("remise de %d fichier(s) entre Espaces" % remis)
     return remis
@@ -1075,21 +1208,15 @@ def _deposer_pour_envoi(esp, depart, source):
     """Dépose un fichier dans la boîte d'envoi, vue de l'INTÉRIEUR d'un Espace."""
     dossier = os.path.join(ENVOI_INTERNE, esp["id"])
     try:
-        os.makedirs(dossier, exist_ok=True)
+        fichiers_surs.mkdir(dossier)
     except OSError:
         sys.stderr.write(
             "Boîte d'envoi indisponible : cet Espace a été ouvert par une "
             "version antérieure\nde Codebyr. Fermez-le et rouvrez-le.\n")
         return 1
     try:
-        nom = nom_libre(dossier, os.path.basename(source))
-        if nom is None:
-            sys.stderr.write("Trop de fichiers du même nom en attente.\n")
-            return 1
-        cible = os.path.join(dossier, nom)
-        shutil.copy2(source, cible)
-        if not provenance.heriter(source, cible, DATA_ROOT):
-            provenance.marquer(cible, depart)
+        origine = provenance.origine(source, DATA_ROOT) or depart
+        fichiers_surs.copier_unique(source, dossier, os.path.basename(source), origine)
     except OSError as exc:
         sys.stderr.write("Copie impossible (%s)\n" % exc)
         _prevenir("Envoi impossible",
@@ -1141,21 +1268,9 @@ def cmd_envoyer(espaces, esp_id, fichier):
 
     partage = os.path.join(espace_home(esp), PARTAGE)
     try:
-        os.makedirs(partage, exist_ok=True)
-        nom = nom_libre(partage, os.path.basename(source))
-        if nom is None:
-            sys.stderr.write("Trop de fichiers du même nom dans %s.\n" % PARTAGE)
-            return 1
-        cible = os.path.join(partage, nom)
-        shutil.copy2(source, cible)
-        # La copie garde l'origine de l'original si elle en a une ; sinon elle
-        # reçoit l'Espace d'où part l'envoi. Sans ce report, la marque
-        # disparaîtrait au premier franchissement — c'est-à-dire exactement au
-        # moment qu'elle sert à tracer.
-        if not provenance.heriter(source, cible, DATA_ROOT):
-            depart = _espace_courant()
-            if depart and depart != esp_id:
-                provenance.marquer(cible, depart)
+        fichiers_surs.mkdir(partage)
+        origine = provenance.origine(source, DATA_ROOT)
+        nom = fichiers_surs.copier_unique(source, partage, os.path.basename(source), origine)
     except OSError as exc:
         sys.stderr.write("Copie impossible (%s)\n" % exc)
         _prevenir("Envoi impossible",
@@ -1241,11 +1356,12 @@ def cmd_ouvrir(espaces, chemin, lanceur=None):
             # Échouer ici empêcherait d'ouvrir un document parfaitement
             # légitime. On le dit, et on ouvre normalement.
             sys.stderr.write("codebyr-space : Jetable indisponible (%s)\n" % exc)
-            choix = "normale"
+            _prevenir("Ouverture refusée", "Le Jetable est indisponible. Le fichier reste fermé.")
+            return 1
 
     if choix == "normale":
         try:
-            lanceur(["xdg-open", cible])
+            lanceur(_visionneuse_pour(cible) + [cible])
         except OSError as exc:
             sys.stderr.write("codebyr-space : ouverture impossible (%s)\n" % exc)
             return 1
@@ -1379,7 +1495,12 @@ def main(argv):
     if len(args) < minimum:
         sys.stderr.write("Usage : codebyr-space %s\n" % usage)
         return 2
-    return executer(load_espaces(), args)
+    try:
+        return executer(load_espaces(), args)
+    except (OSError, ValueError) as exc:
+        sys.stderr.write("codebyr-space : opération refusée (%s)\n" % exc)
+        _prevenir("Opération interrompue", "Un accès sûr aux données n'a pas pu être établi. Consultez le terminal pour le détail.")
+        return 1
 
 
 if __name__ == "__main__":

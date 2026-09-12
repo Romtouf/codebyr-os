@@ -33,19 +33,15 @@ jobs:
     name: Image live depuis un checkout propre
     runs-on: ubuntu-latest
     timeout-minutes: 120
+    container:
+      image: debian:trixie
+      options: --privileged
     steps:
-      - uses: actions/checkout@v7
-
-      - name: Faire de la place
-        # Le runner arrive avec une vingtaine de gigaoctets d'outils dont on
-        # n'a aucun usage, et la construction en demande une dizaine
-        # (chroot ~4 Go, cache ~1,5 Go, squashfs, ISO). Sans ce ménage, elle
-        # meurt à mi-parcours sur un disque plein.
+      - name: Préparer Debian trixie
         run: |
-          echo "Avant :"; df -h / | tail -1
-          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc \
-                      /usr/local/share/boost "$AGENT_TOOLSDIRECTORY" || true
-          echo "Après :"; df -h / | tail -1
+          apt-get update -qq
+          apt-get install -y --no-install-recommends sudo git ca-certificates
+      - uses: actions/checkout@v7
 
       - name: Installer live-build
         run: |
@@ -83,7 +79,7 @@ jobs:
             echo "::error::l'ISO ne porte pas la version $attendue"; exit 1; }
 
           echo "--- modules partagés (sans eux, tous les outils plantent) ---"
-          for module in registre systeme applications bac_a_sable; do
+          for module in registre systeme applications bac_a_sable fichiers_surs filtre_syscalls relais_reseau; do
             grep -q "share/codebyr/${module}.py" /tmp/contenu.txt || {
               echo "::error::${module}.py absent de l'image"; exit 1; }
             echo "  ${module}.py"

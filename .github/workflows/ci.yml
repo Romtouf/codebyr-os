@@ -28,7 +28,7 @@ jobs:
 
       - uses: actions/setup-python@v7
         with:
-          python-version: '3.11'
+          python-version: '3.13'
 
       - name: Lister les sources
         id: sources
@@ -65,7 +65,7 @@ jobs:
         run: |
           pip install --quiet ruff
           ruff check --no-cache --select E9,F --output-format=github \
-            ${{ steps.sources.outputs.python }} tests/
+            ${{ steps.sources.outputs.python }} live-build/config/includes.chroot_after_packages/usr/share/codebyr/*.py tests/
 
       - name: Syntaxe shell
         run: |
@@ -150,6 +150,7 @@ jobs:
         run: |
           set -e
           deb=$(ls packaging/dist/codebyr-tools_*_all.deb)
+          python3 -B tools/verifier_paquet.py "$deb"
           dpkg-deb --info "$deb"
           dpkg-deb --contents "$deb"
           # Les outils doivent être exécutables : un codebyr-space en 644 rend
@@ -165,3 +166,26 @@ jobs:
           name: codebyr-tools-deb
           path: packaging/dist/*.deb
           retention-days: 14
+
+  isolation-linux:
+    name: Frontières réelles sous Debian 13
+    runs-on: ubuntu-latest
+    container:
+      image: debian:trixie
+      options: --privileged
+    timeout-minutes: 15
+    steps:
+      - name: Installer les outils de test
+        run: |
+          apt-get update -qq
+          apt-get install -y --no-install-recommends git ca-certificates python3 bubblewrap dbus-daemon libseccomp2 firefox-esr nodejs
+      - uses: actions/checkout@v7
+      - name: Préparer les comptes jetables du conteneur CI
+        run: |
+          mkdir -p /usr/share/codebyr
+          python3 -B tools/prototype_uid.py creer travail
+          python3 -B tools/prototype_uid.py creer navigation
+      - name: Tester les frontières Linux et les régressions
+        env:
+          CODEBYR_TEST_LINUX: '1'
+        run: python3 -B -m unittest discover -s tests -v

@@ -39,7 +39,7 @@ def journaliser(host):
     if not JOURNAL or not host:
         return
     with _VERROU:
-        if host in _VUS:
+        if host in _VUS or len(_VUS) >= 1000:
             return
         _VUS.add(host)
     try:
@@ -325,15 +325,24 @@ def main(argv):
         srv.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         srv.bind(("127.0.0.1", port))
         srv.listen(64)
-    port = srv.getsockname()[1]
-    sys.stderr.write("codebyr-net-proxy : filtre actif sur 127.0.0.1:%d (%d domaine(s))\n"
-                     % (port, len(patterns)))
+    sys.stderr.write("codebyr-net-proxy : filtre actif (%d domaine(s))\n" % len(patterns))
+    places = threading.BoundedSemaphore(64)
+
+    def traiter(client):
+        try:
+            gerer(client, patterns)
+        finally:
+            places.release()
+
     while True:
         try:
             client, _ = srv.accept()
         except OSError:
             break
-        threading.Thread(target=gerer, args=(client, patterns), daemon=True).start()
+        if not places.acquire(blocking=False):
+            client.close()
+            continue
+        threading.Thread(target=traiter, args=(client,), daemon=True).start()
     return 0
 
 

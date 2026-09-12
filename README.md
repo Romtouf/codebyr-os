@@ -14,6 +14,15 @@ installée sur machine réelle. Voir la [feuille de route](#feuille-de-route).
 
 ![Bureau Codebyr OS — vue d'ensemble GNOME, fond d'écran au Sceau, dock des applications](captures_ecran/01-bureau.png)
 
+## Correctifs en cours de validation — septembre 2026
+
+Le dépôt contient un lot de corrections **non publié** : frontières des
+fichiers, restauration conservant l'ancien état, absence de repli sans
+isolation, réseau restreint dans un namespace et seccomp pour le Blindage.
+Le prototype UID par Espace est séparé du lanceur livré ; aucune migration
+n'est automatique. Voir le [rapport de travail et les validations restantes](docs/securite-2026-09-12.md).
+Les descriptions de versions publiées ci-dessous ne remplacent pas ce suivi.
+
 ## Le concept : les Espaces
 
 Là où Qubes parle de « qubes », de « domaines » et de « VM templates », Codebyr OS
@@ -53,8 +62,7 @@ depuis le menu du Sceau.
   utilisateur, zéro privilège (`--cap-drop ALL`), session neuve, plafonds
   mémoire/processus (anti fork-bomb). Actif par défaut sur Banque.
 - **Jetable automatique** : menu du Sceau → « Ouvrir un lien en Jetable », ou
-  `codebyr-jetable <lien|fichier>` (l'entrée au clic droit dans le gestionnaire
-  de fichiers reste à faire). Une pièce jointe douteuse s'ouvre dans une bulle
+  `codebyr-jetable <lien|fichier>` (également disponible au clic droit dans Fichiers). Une pièce jointe douteuse s'ouvre dans une bulle
   **blindée et sans réseau** (namespace réseau
   isolé : le piège ne peut rien exfiltrer) ; un lien douteux s'ouvre dans une
   bulle **blindée** qui s'autodétruit — le réseau y reste ouvert, il est
@@ -218,7 +226,9 @@ précédente, et celle qui signe réellement les versions :
 
 Voir une empreinte différente de l'ancre n'est donc **pas** un signe
 d'anomalie : c'est le fonctionnement normal d'une clé maîtresse gardée hors
-ligne. Ce qui compte est que `gpg` écrive « Good signature ». La sous-clé
+ligne. Une « Good signature » doit aussi provenir de la clé maîtresse dont vous
+avez vérifié l'empreinte complète par une source indépendante. Une signature
+valide faite par une autre clé ne prouve pas l'origine Codebyr. La sous-clé
 change quand elle expire ; l'ancre, elle, ne bouge pas — c'est celle-là qu'il
 faut comparer entre plusieurs sources.
 

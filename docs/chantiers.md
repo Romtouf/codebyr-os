@@ -1,13 +1,15 @@
 # Chantiers — Codebyr OS
 
-État au **20 août 2026**, la 1.4.1 publiée (dépôt APT et ISO).
-Ce qui a été fermé est listé en fin de document — un suivi qui ne reflète pas
-l'état réel ne sert à rien.
+Mise à jour de lecture : **12 septembre 2026**, base locale **1.10.1**.
+Les tableaux ci-dessous sont l'historique des chantiers et comportent des
+estimations anciennes. Le suivi du [lot de sécurité et du prototype UID](securite-2026-09-12.md)
+fait foi pour les changements locaux de septembre ; ils ne sont pas publiés.
 
-**22 chantiers ouverts.** Ce document liste **tout** ce qui est identifié : les chantiers de fond, les
-correctifs de confort, la dette technique, et ce qui est volontairement écarté.
-Il vaut mieux une liste longue et honnête qu'une liste courte et rassurante —
-et un chantier écrit ici n'est pas un engagement, c'est une décision à prendre.
+Le réseau par namespace et le filtre seccomp sont implémentés dans ce lot,
+avec tests Linux, mais attendent la validation des applications graphiques.
+Le manifeste source et le XPI embarqué sont tous deux en MV3 : les champs
+fonctionnels sont désormais comparés par les tests. La re-signature MV3
+n'est donc plus un chantier ouvert sur cette copie du dépôt.
 
 ## Comment lire
 
@@ -139,7 +141,7 @@ démarre plus », sur la fonction centrale du système.
 
 ## Fait
 
-### 1.2.0 (en préparation)
+### Historique des versions 1.2 et suivantes
 
 | | Chantier |
 |---|---|

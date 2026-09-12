@@ -63,6 +63,8 @@ class NomLibre(unittest.TestCase):
             space.nom_libre("/x", "a.txt", existe=lambda p: True))
 
 
+@unittest.skipUnless(hasattr(os, "O_NOFOLLOW") and os.supports_dir_fd,
+                     "accès disque par descripteurs (O_NOFOLLOW, dir_fd) — Linux")
 class BoiteDEnvoi(unittest.TestCase):
     """Le passage par lequel un fichier sort d'un Espace.
 

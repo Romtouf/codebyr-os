@@ -82,5 +82,27 @@ class DepuisLeBureau(unittest.TestCase):
         self.assertIn(self._sans_bruit(autotest.cmd_verifier_poste), (0, 1))
 
 
+class Notifications(unittest.TestCase):
+    """Une notification doit porter le nom du système, pas celui de l'outil.
+
+    Constaté le 12/09/2026 : le refus de Flatpak dans un Espace blindé
+    s'affichait sous l'en-tête « notify-send ». Le message était juste ; sa
+    signature disait au lecteur qu'un utilitaire en ligne de commande lui
+    parlait. Sur un système dont l'argument est la lisibilité, cela retire au
+    message l'autorité qu'il devrait avoir.
+    """
+
+    def test_les_notifications_sont_signees_codebyr(self):
+        import os.path
+        from outils import BIN
+        for outil in ("codebyr-space", "codebyr-installer"):
+            with open(os.path.join(BIN, outil), encoding="utf-8") as f:
+                source = f.read()
+            if "notify-send" not in source:
+                continue
+            self.assertIn("--app-name=Codebyr", source,
+                          "%s envoie une notification non signée" % outil)
+
+
 if __name__ == "__main__":
     unittest.main()

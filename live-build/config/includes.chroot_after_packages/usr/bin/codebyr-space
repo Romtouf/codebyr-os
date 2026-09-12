@@ -224,7 +224,12 @@ def _prevenir(titre, message):
     if not shutil.which("notify-send"):
         return
     try:
-        subprocess.Popen(["notify-send", "--icon=dialog-information",
+        # « --app-name » : sans lui, GNOME affiche « notify-send » en en-tête,
+        # c'est-à-dire le nom du programme qui envoie. Sur un système dont
+        # l'argument est la lisibilité, une notification signée du nom d'un
+        # outil en ligne de commande décrédibilise le message qu'elle porte.
+        subprocess.Popen(["notify-send", "--app-name=Codebyr",
+                          "--icon=dialog-information",
                           titre, message],
                          stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     except OSError:

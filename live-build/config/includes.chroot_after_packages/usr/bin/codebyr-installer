@@ -20,7 +20,7 @@ if [ ! -d /run/live ] && [ ! -d /lib/live/mount/medium ] \
    && ! grep -qw "boot=live" /proc/cmdline 2>/dev/null; then
     message="Codebyr OS est déjà installé sur cette machine : rien à installer."
     echo "$message" >&2
-    notify-send --icon=dialog-information "Codebyr OS" "$message" 2>/dev/null \
+    notify-send --app-name=Codebyr --icon=dialog-information "Codebyr OS" "$message" 2>/dev/null \
         || zenity --info --text="$message" 2>/dev/null || true
     exit 1
 fi

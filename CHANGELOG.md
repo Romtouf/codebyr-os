@@ -74,7 +74,7 @@ blindés, jetables ou à réseau restreint, leurs permissions n'étant pas
 Les limites et ce qui reste à faire sont détaillés dans
 [docs/securite-2026-09-12.md](docs/securite-2026-09-12.md).
 
-## 1.10.1 — en préparation
+## 1.10.1 — 24 août 2026
 
 **« Nouveau document » existe enfin dans Fichiers.** Le menu ne proposait que
 « Nouveau dossier » : créer un simple fichier texte obligeait à ouvrir un
@@ -92,7 +92,7 @@ ce chemin n'a aucune valeur par défaut, et le programme qui l'écrit d'habitude
 ne tourne pas dans un compartiment isolé. Le dossier existait, personne ne le
 regardait.
 
-## 1.9.2 — en préparation
+## 1.9.2 — 24 août 2026
 
 **« Envoyer vers l'Espace » ne fonctionnait pas depuis un Espace.** Le fichier
 n'arrivait jamais, alors que la commande annonçait « Copié ».
@@ -111,7 +111,7 @@ Aucun Espace n'écrit chez un autre : chacun ne voit que sa propre boîte.
 
 Depuis le bureau, l'envoi reste immédiat — rien ne change.
 
-## 1.9.0 — en préparation
+## 1.9.0 — 24 août 2026
 
 **Un fichier venu d'un autre Espace s'ouvre sous cloche, tout seul.**
 
@@ -143,7 +143,7 @@ l'examen sous cloche qui permet de juger ; l'adoption enregistre que vous avez
 jugé. Et elle ne vaut que pour cet Espace : envoyé ailleurs, le document
 redevient étranger.
 
-## 1.7.0 — en préparation
+## 1.7.0 — 24 août 2026
 
 **Un fichier garde désormais la trace de l'Espace d'où il vient.**
 
@@ -175,7 +175,7 @@ servirait le plus. Windows et macOS ont la même limite, et cela reste l'une de
 leurs protections les plus efficaces. C'est un indice, pas une frontière — un
 fichier sans marque ne déclenche donc rien.
 
-## 1.6.0 — en préparation
+## 1.6.0 — 23 août 2026
 
 **Le bouclier anti-hameçonnage passe en Manifest V3.** Firefox accepte encore
 l'ancien format, mais Mozilla finira par refuser de le signer — et ce jour-là,
@@ -186,7 +186,7 @@ Rien ne change pour vous : mêmes protections, même fonctionnement. L'extension
 ne collecte aucune donnée, ce qui est désormais déclaré explicitement dans son
 manifeste — une exigence que Mozilla imposera bientôt à toutes les extensions.
 
-## 1.5.5 — en préparation
+## 1.5.5 — 23 août 2026
 
 **`codebyr-space verifier-poste` : la machine vérifie elle-même ce qu'on lui a
 promis.** Six contrôles, chacun correspondant à un défaut réellement survenu

@@ -25,6 +25,12 @@ GNOME (menu du Sceau, liserés colorés) ne se recharge pas à chaud.
 
 Détails et travail restant : [suivi du lot](docs/securite-2026-09-12.md).
 
+## 1.11.2 — en préparation
+
+**Les notifications portent le nom de Codebyr.** Elles s'affichaient sous
+l'en-tête « notify-send », c'est-à-dire le nom de l'utilitaire qui les envoie —
+y compris lorsqu'elles annoncent un refus de sécurité.
+
 ## 1.11.1 — en préparation
 
 **« Revenir à un instantané » ne fonctionnait plus du tout.** La restauration

@@ -27,6 +27,16 @@ Détails et travail restant : [suivi du lot](docs/securite-2026-09-12.md).
 
 ## 1.11.1 — en préparation
 
+**« Revenir à un instantané » ne fonctionnait plus du tout.** La restauration
+refusait toute archive contenant un lien — et tout dossier personnel en
+contient, ne serait-ce que par le profil du navigateur. On pouvait donc
+sauvegarder un Espace, jamais le restaurer, et l'interface annonçait
+« restauration impossible ».
+
+Les liens internes sont désormais acceptés. Ce qu'il fallait refuser n'était
+pas le lien, mais le lien qui **sort** de l'Espace : un lien vers un chemin
+absolu ou remontant par `..` est toujours rejeté, comme les fichiers spéciaux.
+
 **Les deux vérifications disent maintenant où les lancer.** Utilisées depuis un
 Espace au lieu du bureau, elles donnaient des résultats faux — et
 `verifier-isolation` concluait « au moins un contrôle a échoué, ne publiez pas

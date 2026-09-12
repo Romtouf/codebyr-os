@@ -846,9 +846,24 @@ def cmd_import(espaces, esp_id, source=None):
                     taille += membre.size
                     if len(membres) >= 100000 or taille > 20 * 1024**3:
                         raise ValueError("Archive trop volumineuse (100 000 entrées / 20 Gio maximum)")
-                    # Aucun lien ni fichier spécial ne doit entrer par import.
-                    if not (membre.isfile() or membre.isdir()):
-                        raise ValueError("Archive contenant un lien ou fichier spécial")
+                    # Les liens sont ACCEPTÉS, les fichiers spéciaux refusés.
+                    #
+                    # Refuser tout lien paraissait prudent ; cela rendait la
+                    # restauration impossible sur un vrai Espace. Un dossier
+                    # personnel avec un profil Firefox contient des liens
+                    # symboliques : « Revenir à un instantané » échouait donc
+                    # toujours, sur une archive produite par Codebyr lui-même.
+                    # On pouvait sauvegarder, jamais restaurer. Constaté le
+                    # 12/09/2026 sur une VM.
+                    #
+                    # Ce qu'il fallait refuser n'est pas le lien, c'est le lien
+                    # qui SORT de l'Espace. « filter="data" » ci-dessous s'en
+                    # charge : chemins absolus, traversées par « .. » et cibles
+                    # hors destination sont rejetés par tarfile lui-même, et
+                    # lèvent une erreur que l'on attrape.
+                    if not (membre.isfile() or membre.isdir()
+                            or membre.issym() or membre.islnk()):
+                        raise ValueError("Archive contenant un fichier spécial")
                     membres.append(membre)
                 tar.extractall(neuf, members=membres, filter="data")
             cmd_close(espaces, esp_id)

@@ -10,28 +10,13 @@ GNOME (menu du Sceau, liserés colorés) ne se recharge pas à chaud.
 
 ---
 
-## Non publié — correctifs de sécurité du 12 septembre 2026
-
-- Accès aux fichiers des Espaces sans suivre les liens, écritures atomiques,
-  transferts exclusifs et origine posée avant publication.
-- Restauration validée avant bascule, avec conservation des anciennes données.
-- Lancement refusé sans bubblewrap et sans repli non isolé du Jetable.
-- Réseau restreint des applications natives imposé par namespace et proxy ;
-  filtre seccomp complémentaire pour le Blindage.
-- Flatpak refusé dans les modes qu'il ne garantit pas ; message honnête pour
-  les installations dédiées. Préférences proxy Firefox remplacées par clé.
-- Tests de frontières sur Linux, prototype à deux UID non livré par défaut,
-  contrôle renforcé du manifeste XPI et workflow de signature sans injection.
-
-Détails et travail restant : [suivi du lot](docs/securite-2026-09-12.md).
-
-## 1.11.2 — en préparation
+## 1.11.2 — 12 septembre 2026
 
 **Les notifications portent le nom de Codebyr.** Elles s'affichaient sous
 l'en-tête « notify-send », c'est-à-dire le nom de l'utilitaire qui les envoie —
 y compris lorsqu'elles annoncent un refus de sécurité.
 
-## 1.11.1 — en préparation
+## 1.11.1 — 12 septembre 2026
 
 **« Revenir à un instantané » ne fonctionnait plus du tout.** La restauration
 refusait toute archive contenant un lien — et tout dossier personnel en
@@ -52,7 +37,7 @@ La sonde s'exécutait dans un compartiment imbriqué et mesurait les restriction
 de l'Espace courant, pas celles qu'on voulait vérifier. Elles refusent
 désormais, en expliquant pourquoi et quoi faire.
 
-## 1.11.0 — en préparation
+## 1.11.0 — 12 septembre 2026
 
 **Lot de sécurité important.** Plusieurs frontières ont été renforcées à la
 source. Rien ne change dans votre usage quotidien ; ce qui change, c'est ce

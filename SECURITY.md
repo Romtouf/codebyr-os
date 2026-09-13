@@ -110,7 +110,8 @@ qui indique aussi, sans détour, ce qui n'est **pas encore** en place.
 
 ## Durcissement de la base
 
-Debian stable, AppArmor actif, pare-feu nftables (`policy drop` en entrée),
+Debian stable, AppArmor actif — avec un profil propre au filtre réseau des
+Espaces depuis 1.12.1 —, pare-feu nftables (`policy drop` en entrée),
 Wayland, mises à jour de sécurité automatiques (`unattended-upgrades`),
 `sysctl` durcis (kptr_restrict, ptrace_scope, protections liens/fifo…, et
 depuis 1.12.0 : BPF non privilégié, kexec, userfaultfd, TIOCSTI, compteurs de
@@ -159,6 +160,7 @@ surface applicative minimale (`--apt-recommends false`).
 
 | Version | Correctif |
 |---|---|
+| 1.12.1 | **Filtre réseau non confiné.** Le seul programme qui parle au réseau pour un Espace restreint tournait hors bac à sable, avec tous les droits de l'utilisateur. Il est désormais confiné par AppArmor (socket héritée, résolution, connexions sortantes, journal des refus — rien d'autre) et démarre en Python isolé, sans module du dossier personnel. |
 | 1.12.0 | **Navigation, l'Espace le plus exposé au web, n'était pas blindé** : pas de filtre d'appels système (io_uring, qui contourne seccomp et reste une source majeure de failles noyau, y était accessible), pas d'abandon des capabilities ni de session neuve. Blindé par défaut, avec des plafonds adaptés à un navigateur (75 % de la mémoire, 4096 tâches) pour ne pas tuer une session chargée. |
 | 1.12.0 | **Le filtre réseau pouvait servir de passage vers le réseau local.** Il jugeait le nom, jamais l'adresse résolue, et tourne sur l'hôte : un domaine autorisé pointant vers 127.0.0.1 ou la box ouvrait à un Espace restreint un réseau qu'il ne voit pas. Les adresses non publiques sont refusées, en HTTP, HTTPS et SOCKS5. |
 | 1.12.0 | **Carte graphique offerte à tous les Espaces**, sans condition. Retirée de Banque et de Jetable, et de toute pièce jointe examinée. |

@@ -24,6 +24,25 @@ bluez-firmware
 # GNOME est vide et la batterie n'est pas optimisée.
 power-profiles-daemon
 
+# Compression de l'initramfs. Sans zstd, initramfs-tools retombe sur gzip
+# (« W: No zstd in /usr/bin... ») : image de démarrage plus grosse et plus
+# lente à charger, à chaque mise à jour du noyau. Constaté le 13/09/2026 sur
+# une installation chiffrée, où l'initramfs est relu à chaque démarrage.
+zstd
+
+# Machines virtuelles : presse-papiers avec l'hôte, redimensionnement de
+# l'écran, glisser-déposer. Sans eux, essayer Codebyr dans VMware ou GNOME Boxes
+# — ce que fait presque tout le monde avant d'installer — donne un écran figé en
+# 800x600 où l'on ne peut rien coller. Constaté le 13/09/2026.
+#
+# À savoir : le presse-papiers devient alors commun avec la machine hôte. Le
+# cloisonnement entre Espaces reste entier, mais ce qu'on y copie peut sortir
+# vers l'hôte. C'est le prix d'un essai en machine virtuelle, et c'est cohérent :
+# un hyperviseur hostile n'a jamais fait partie du modèle de menaces.
+open-vm-tools
+open-vm-tools-desktop
+spice-vdagent
+
 # Impression : découverte + config + impression sans pilote (IPP moderne)
 cups-browsed
 cups-filters

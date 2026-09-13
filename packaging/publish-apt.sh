@@ -90,6 +90,13 @@ esac
 # On vérifie que GPG_TTY désigne un VRAI terminal : « export GPG_TTY=$(tty) »
 # évalué hors terminal y laisse la chaîne « not a tty », non vide et donc
 # trompeuse pour un simple test de présence.
+#
+# Le script lit lui-même le terminal sur lequel il tourne, comme
+# sign-release.sh : exiger un « export GPG_TTY=$(tty) » préalable faisait
+# échouer la publication à chaque nouvelle fenêtre WSL (13/09/2026).
+if [ -z "${GPG_TTY:-}" ] && [ -t 0 ]; then
+	GPG_TTY="$(tty 2>/dev/null)" && export GPG_TTY
+fi
 if [ -z "${CODEBYR_PASSPHRASE_FILE:-}" ]    && { [ -z "${GPG_TTY:-}" ] || [ ! -c "${GPG_TTY}" ]; }; then
 	echo "ERREUR : pas de terminal pour saisir la phrase de passe." >&2
 	echo "         Lancez cette commande depuis un vrai terminal, ou" >&2

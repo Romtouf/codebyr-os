@@ -1,0 +1,12 @@
+# Codebyr OS — disposition du clavier dans l'initramfs.
+#
+# La phrase de passe du disque chiffré est demandée AVANT que le système ne
+# démarre, par l'initramfs. Debian n'y charge par défaut aucune disposition de
+# clavier (KEYMAP=n) : la saisie se fait alors en QWERTY, quelle que soit la
+# langue choisie à l'installation.
+#
+# L'écran graphique (Plymouth) connaît la disposition par /etc/default/keyboard.
+# Mais s'il échoue — pilote graphique, touche Échap, mode texte —, la saisie
+# retombe sur le clavier du noyau. KEYMAP=y y charge la disposition de
+# l'installation (console-setup) : un « a » reste un « a ».
+KEYMAP=y

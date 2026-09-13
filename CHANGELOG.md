@@ -10,6 +10,26 @@ GNOME (menu du Sceau, liserés colorés) ne se recharge pas à chaud.
 
 ---
 
+## 1.13.0 — en préparation
+
+**Le disque est chiffré par défaut à l'installation.** La case « Chiffrer le
+système » est désormais cochée d'avance : un ordinateur perdu ou volé ne livre
+plus vos Espaces ni leurs sauvegardes. Vous choisissez une phrase de passe
+pendant l'installation ; elle est demandée à chaque démarrage. Vous pouvez
+encore décocher la case, mais le choix sûr est celui qu'on fait sans rien
+toucher.
+
+**La phrase de passe se tape avec votre clavier.** Elle est demandée par
+l'écran de démarrage, clavier français chargé, et non plus par le chargeur de
+démarrage, qui lisait tout en QWERTY : une phrase de passe choisie sur un
+clavier AZERTY pouvait ne plus ouvrir le disque.
+
+⚠️ **Retenez bien cette phrase de passe.** Sans elle, personne — pas même
+Codebyr — ne peut rouvrir le disque.
+
+Ceci ne concerne que les **nouvelles** installations : un disque déjà installé
+n'est pas modifié par la mise à jour.
+
 ## 1.12.2 — 13 septembre 2026
 
 **L'Espace Navigation change légèrement de couleur.** Son Ambre était trop

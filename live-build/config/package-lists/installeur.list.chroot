@@ -17,6 +17,14 @@ efibootmgr
 cryptsetup
 cryptsetup-initramfs
 keyutils
+
+# Clavier AZERTY au déverrouillage du disque chiffré. Sans console-setup (qui
+# tire kbd et keyboard-configuration), l'initramfs ne peut charger aucune
+# disposition : si l'écran graphique échoue, la phrase de passe se tape en
+# QWERTY. Voir etc/initramfs-tools/conf.d/codebyr-clavier. La disposition « fr »
+# reste fixée après coup par le hook 0500-debrand et par Calamares.
+console-setup
+kbd
 dosfstools
 e2fsprogs
 os-prober

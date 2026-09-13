@@ -1,0 +1,9 @@
+[D-BUS Service]
+# Déclaré UNIQUEMENT pour les Espaces : ce dossier n'entre dans XDG_DATA_DIRS
+# que dans le bac à sable (voir codebyr-space). Sur le bureau, c'est GNOME Shell
+# qui fournit ce nom, et rien ici ne doit pouvoir le remplacer.
+#
+# Le bus privé de l'Espace démarre ce service à la PREMIÈRE notification : tant
+# qu'aucune application n'en envoie, rien ne tourne.
+Name=org.freedesktop.Notifications
+Exec=/usr/bin/python3 /usr/share/codebyr/relais_notifications.py --service

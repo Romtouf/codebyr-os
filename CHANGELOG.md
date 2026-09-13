@@ -10,6 +10,22 @@ GNOME (menu du Sceau, liserés colorés) ne se recharge pas à chaud.
 
 ---
 
+## 1.14.0 — en préparation
+
+**Les notifications reviennent dans les Espaces.** Une application qui prévient
+d'un téléchargement terminé ou d'une erreur parlait dans le vide depuis la
+1.1.0 : pour fermer une faille, les Espaces avaient perdu l'accès au service de
+notifications du bureau.
+
+Elles s'affichent désormais, sous le nom de leur Espace — « Espace Jetable »,
+« Espace Banque ». Une application ne peut pas choisir cet en-tête : une page
+piégée ouverte en Jetable ne peut donc pas afficher une fausse alerte signée
+« Banque ». Le texte est nettoyé, borné, et le nombre de notifications est
+limité pour qu'aucune application ne puisse noyer l'écran.
+
+L'isolation n'a pas bougé d'un pouce : le bus de session de l'hôte n'entre
+toujours pas dans un Espace.
+
 ## 1.13.0 — 13 septembre 2026
 
 **Le disque est chiffré par défaut à l'installation.** La case « Chiffrer le

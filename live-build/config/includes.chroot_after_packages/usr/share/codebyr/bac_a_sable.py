@@ -17,7 +17,7 @@ import tempfile
 
 
 def wrap_bwrap(home, cmd, env, renforce=False, hors_ligne=False, audio=True,
-               envoi=None, filtre=None, gpu=True):
+               envoi=None, filtre=None, gpu=True, notifications=None):
     """Enveloppe avec bubblewrap : dossier personnel isolé, /tmp isolé,
     affichage (et éventuellement son) partagés. Repli géré par l'appelant si
     bwrap échoue.
@@ -39,6 +39,12 @@ def wrap_bwrap(home, cmd, env, renforce=False, hors_ligne=False, audio=True,
                  Clé distincte du Blindage, comme le son : Navigation est
                  blindée mais sert à regarder des vidéos, et la priver de la
                  carte graphique ferait payer la sécurité en saccades.
+
+    notifications : socket par laquelle l'Espace fait afficher une notification
+                 sur le bureau. Le bus de session de l'hôte n'entre toujours
+                 pas ici (voir la RÈGLE ABSOLUE plus bas) : seul passe du
+                 texte, que l'hôte nettoie et affiche sous le nom de l'Espace.
+                 Voir relais_notifications.py.
 
     envoi      : boîte d'envoi de CET Espace, montée sur ~/.codebyr-envoi.
                  C'est le seul passage par lequel un fichier peut sortir vers
@@ -101,6 +107,8 @@ def wrap_bwrap(home, cmd, env, renforce=False, hors_ligne=False, audio=True,
         bwrap += ["--ro-bind-try", runtime + "/pipewire-0", runtime + "/pipewire-0"]
     if filtre:
         bwrap += ["--ro-bind", filtre, "/run/codebyr-proxy"]
+    if notifications:
+        bwrap += ["--ro-bind", notifications, "/run/codebyr-notif"]
     if hors_ligne or filtre:
         # Aucune interface réseau : exfiltration impossible.
         bwrap += ["--unshare-net"]

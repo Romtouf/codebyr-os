@@ -27,6 +27,7 @@ import subprocess
 import sys
 import tarfile
 import tempfile
+import threading
 import time
 import unicodedata
 
@@ -40,6 +41,7 @@ import fichiers_surs
 import modeles  # noqa: E402
 import provenance  # noqa: E402
 import registre  # noqa: E402
+import relais_notifications  # noqa: E402
 
 DATA_ROOT = os.path.expanduser("~/.local/share/codebyr/espaces")
 # Le sas d'un Espace : c'est là qu'atterrit tout fichier venu du dehors. Nom
@@ -541,6 +543,11 @@ def cmd_launch(espaces, esp_id, extra, fichier=None):
                              "n'aura aucun bus de session (paquet « dbus » manquant ?).\n")
 
     env = dict(os.environ)
+    # Le service de notifications n'est déclaré QUE pour les Espaces : son
+    # fichier .service vit dans un dossier de données à part, ajouté ici. Sur
+    # le bureau, c'est GNOME Shell qui fournit ce nom, et rien ne le remplace.
+    env["XDG_DATA_DIRS"] = "/usr/share/codebyr/bus:" + env.get(
+        "XDG_DATA_DIRS", "/usr/local/share:/usr/share")
     env["CODEBYR_ESPACE"] = esp["id"]
     env["CODEBYR_ESPACE_COULEUR"] = esp["couleur"]
     # Sous Wayland, c'est MOZ_APP_REMOTINGNAME qui fixe l'app_id de Firefox
@@ -554,6 +561,25 @@ def cmd_launch(espaces, esp_id, extra, fichier=None):
         env["MOZ_ALLOW_DOWNGRADE"] = "1"
 
     ephemere = esp.get("ephemere")
+    # Notifications : une socket par Espace, servie par l'hôte tant que
+    # l'Espace vit. Le service qui la joint tourne DANS l'Espace, sur son bus
+    # privé — celui-ci n'est jamais remplacé (voir relais_notifications.py).
+    notif_tmp = tempfile.TemporaryDirectory(prefix="codebyr-notif-")
+    notif = os.path.join(notif_tmp.name, "notif")
+    try:
+        notif_srv = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        notif_srv.bind(notif)
+        notif_srv.listen(8)
+        threading.Thread(
+            target=relais_notifications.servir,
+            args=(notif_srv, esp["nom"]),
+            kwargs={"journal": journal}, daemon=True).start()
+    except OSError as exc:
+        # Sans notifications, l'Espace s'ouvre quand même : elles sont un
+        # confort, pas une frontière de sécurité.
+        sys.stderr.write("codebyr-space : notifications indisponibles (%s)\n" % exc)
+        notif_srv = None
+        notif = None
     proxy = None
     filtre = None
     filtre_tmp = None
@@ -602,7 +628,8 @@ def cmd_launch(espaces, esp_id, extra, fichier=None):
                     % (esp["id"], nom_app))
     else:
         run = bac_a_sable.wrap_bwrap(home, cmd, env, renforce=renforce, hors_ligne=hors_ligne,
-                         audio=audio, envoi=envoi, filtre=filtre, gpu=gpu)
+                         audio=audio, envoi=envoi, filtre=filtre, gpu=gpu,
+                         notifications=notif)
         if renforce:
             run = bac_a_sable.plafonner_ressources(run, *bac_a_sable.plafonds_de(esp))
             detail = "Blindage actif" + (" · hors-ligne (aucun réseau)" if hors_ligne else "")
@@ -647,6 +674,9 @@ def cmd_launch(espaces, esp_id, extra, fichier=None):
             proxy.wait(timeout=5)
         if filtre_tmp:
             filtre_tmp.cleanup()
+        if notif_srv:
+            notif_srv.close()
+        notif_tmp.cleanup()
         if ephemere:
             shutil.rmtree(home, ignore_errors=True)
         raise
@@ -673,6 +703,9 @@ def cmd_launch(espaces, esp_id, extra, fichier=None):
                 pass
         if filtre_tmp:
             filtre_tmp.cleanup()
+        if notif_srv:
+            notif_srv.close()
+        notif_tmp.cleanup()
         try:
             os.remove(birthfile)
         except OSError:

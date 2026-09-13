@@ -237,14 +237,31 @@ class Lisere extends St.DrawingArea {
         super._init({reactive: false, can_focus: false, track_hover: false});
         this._espace = espace;
         this.connect('repaint', () => this._dessiner());
-        const etiq = new St.Label({
+        // Le NOM de l'Espace, écrit : le seul repère qui ne dépend pas de la
+        // perception des couleurs. Pour un deutéranope, Personnel et Travail
+        // ont la même teinte (écart CIEDE2000 de 2,7) — l'étiquette est alors
+        // ce qui dit où l'on se trouve. Elle doit donc se LIRE : 12 px gras,
+        // texte sombre (contraste ≥ 4,98 sur toutes les couleurs d'Espace).
+        this._etiq = new St.Label({
             text: espace.nom,
             style: `background-color: ${espace.couleur}; color: #0A1318;` +
-                   `font-weight: 700; font-size: 10px; padding: 1px 8px;` +
-                   `border-radius: 6px;`,
+                   `font-weight: 700; font-size: 12px; padding: 2px 9px;` +
+                   `border-radius: 7px;`,
         });
-        etiq.set_position(12, -8);
-        this.add_child(etiq);
+        this.add_child(this._etiq);
+        this._placerEtiquette(true);
+    }
+    // Posée à cheval sur le bord supérieur, l'étiquette dépasse au-dessus de la
+    // fenêtre. Quand la fenêtre touche le haut de l'écran — maximisée, ou
+    // simplement placée tout en haut —, cette moitié passait SOUS la barre
+    // supérieure de GNOME et l'étiquette disparaissait : c'est le cas le plus
+    // courant pour un navigateur. Elle se range alors dans la fenêtre.
+    _placerEtiquette(dehors) {
+        let h = 0;
+        try { h = this._etiq.get_preferred_height(-1)[1]; } catch (e) {}
+        h = Math.round(h || 20);
+        this._etiq.set_position(12, dehors ? -Math.round(h / 2) : EP + 2);
+        return h;
     }
     _dessiner() {
         let cr = null;
@@ -267,10 +284,13 @@ class Lisere extends St.DrawingArea {
                 cr.$dispose();
         }
     }
-    majGeometrie(rect) {
+    majGeometrie(rect, zone) {
         // le liseré épouse le bord de la fenêtre (visible même maximisée)
         this.set_position(rect.x, rect.y);
         this.set_size(rect.width, rect.height);
+        const h = this._placerEtiquette(true);
+        if (zone && rect.y - Math.ceil(h / 2) < zone.y)
+            this._placerEtiquette(false);
         this.queue_repaint();
     }
 });
@@ -356,7 +376,9 @@ class Coloriage {
             if (actor)
                 global.window_group.set_child_above_sibling(lisere, actor);
             const sync = () => {
-                try { lisere.majGeometrie(win.get_frame_rect()); } catch (e) {}
+                let zone = null;
+                try { zone = win.get_work_area_current_monitor(); } catch (e) {}
+                try { lisere.majGeometrie(win.get_frame_rect(), zone); } catch (e) {}
             };
             rec.lisere = lisere;
             rec.signals.push(win.connect('position-changed', sync));

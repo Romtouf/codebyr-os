@@ -237,6 +237,45 @@ class Daltonisme(unittest.TestCase):
                                        "constat (et docs/chantiers.md)" % (a, b, vision))
 
 
+class EtiquetteDuNom(unittest.TestCase):
+    """Le nom de l'Espace, écrit en haut à gauche de chaque fenêtre.
+
+    Pour qui ne distingue pas Azur d'Améthyste, c'est lui qui dit si l'on est
+    dans Personnel ou dans Travail. Il était déjà là, mais en 10 px, et il
+    disparaissait sous la barre supérieure dès qu'une fenêtre touchait le haut
+    de l'écran — le cas le plus courant pour un navigateur.
+    """
+
+    def setUp(self):
+        chemin = os.path.join(RACINE, "live-build", "config",
+                              "includes.chroot_after_packages", "usr", "share",
+                              "gnome-shell", "extensions", "codebyr@codebyr.io",
+                              "extension.js")
+        with open(chemin, encoding="utf-8") as f:
+            self.code = f.read()
+        debut = self.code.index("const Lisere = GObject.registerClass(")
+        self.lisere = self.code[debut:self.code.index("class Coloriage", debut)]
+
+    def test_le_nom_est_ecrit_en_texte_sombre_et_lisible(self):
+        self.assertIn("text: espace.nom", self.lisere)
+        self.assertIn("color: #0A1318", self.lisere)
+        taille = int(re.search(r"font-size: (\d+)px", self.lisere).group(1))
+        self.assertGreaterEqual(taille, 12, "l'étiquette du nom redevient illisible")
+
+    def test_le_texte_sombre_se_lit_sur_toutes_les_couleurs_d_espace(self):
+        jetons_ = jetons()
+        for nom in CouleursDesEspaces.ESPACES:
+            if nom == "--esp-systeme":
+                continue    # réservée au système, jamais portée par un Espace
+            self.assertGreaterEqual(contraste(jetons_[nom], "#0A1318"), AA, nom)
+
+    def test_l_etiquette_se_range_dans_la_fenetre_en_haut_de_l_ecran(self):
+        self.assertIn("get_work_area_current_monitor()", self.code)
+        self.assertIn("majGeometrie(win.get_frame_rect(), zone)", self.code)
+        self.assertIn("rect.y - Math.ceil(h / 2) < zone.y", self.lisere)
+        self.assertIn("this._placerEtiquette(false)", self.lisere)
+
+
 class SceauDuPanneau(unittest.TestCase):
     """Le Sceau du panneau : une tentative d'amélioration ABANDONNÉE.
 

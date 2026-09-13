@@ -17,6 +17,12 @@ claire pour se voir sur les fenêtres et le menu en thème clair. Elle devient u
 peu plus soutenue : visible sur les deux thèmes, et mieux distinguée du rouge
 de Jetable pour les personnes daltoniennes.
 
+**Le nom de l'Espace se lit sur chaque fenêtre.** Une petite étiquette en haut à
+gauche indiquait déjà l'Espace, mais en très petit, et elle disparaissait sous
+la barre du haut dès qu'une fenêtre était agrandie. Elle est plus grande et
+reste visible dans tous les cas. C'est aussi le repère qui ne dépend pas des
+couleurs : utile à qui distingue mal le bleu de Personnel du violet de Travail.
+
 ## 1.12.1 — 13 septembre 2026
 
 **Le filtre réseau est confiné par AppArmor.** C'est le seul programme qui

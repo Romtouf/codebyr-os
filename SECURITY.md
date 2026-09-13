@@ -7,10 +7,9 @@ Espaces, repli sans bubblewrap et restauration destructive corrigés ; réseau
 restreint imposé par un namespace sans interface externe et un relais vers le
 proxy ; filtre seccomp ajouté au Blindage.
 
-**1.12.0, en préparation** : cinq écarts entre ce que Codebyr promet et ce que
-le code appliquait, relevés par une relecture du 12 septembre — détaillés dans
-l'historique ci-dessous. Une machine ne les reçoit qu'une fois ce paquet publié
-et installé.
+**Publié en 1.12.0** : cinq écarts entre ce que Codebyr promet et ce que le
+code appliquait, relevés par une relecture du 12 septembre — détaillés dans
+l'historique ci-dessous, et validés sur un bureau GNOME réel.
 
 Le prototype UID reste réservé aux tests : le bureau utilise encore un
 seul compte Unix. Voir [le périmètre, les tests et les limites du lot](docs/securite-2026-09-12.md).

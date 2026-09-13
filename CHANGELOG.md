@@ -10,7 +10,7 @@ GNOME (menu du Sceau, liserés colorés) ne se recharge pas à chaud.
 
 ---
 
-## 1.12.0 — en préparation
+## 1.12.0 — 13 septembre 2026
 
 **Navigation est désormais blindée.** C'est l'Espace où l'on passe ses
 journées sur le web — donc le plus exposé — et il ne l'était pas : ni filtre

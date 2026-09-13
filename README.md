@@ -59,8 +59,10 @@ depuis le menu du Sceau.
   c'est ce qui empêche d'en sortir), liserés colorés par fenêtre (extension
   GNOME Shell dédiée).
 - **Le Blindage** : niveau d'isolation renforcé par Espace — espace de noms
-  utilisateur, zéro privilège (`--cap-drop ALL`), session neuve, plafonds
-  mémoire/processus (anti fork-bomb). Actif par défaut sur Banque.
+  utilisateur, zéro privilège (`--cap-drop ALL`), session neuve, filtre
+  d'appels système, plafonds mémoire/processus (anti fork-bomb). Actif par
+  défaut sur Banque, Navigation et Jetable ; Banque et Jetable n'ont en plus
+  aucun accès direct à la carte graphique.
 - **Jetable automatique** : menu du Sceau → « Ouvrir un lien en Jetable », ou
   `codebyr-jetable <lien|fichier>` (également disponible au clic droit dans Fichiers). Une pièce jointe douteuse s'ouvre dans une bulle
   **blindée et sans réseau** (namespace réseau

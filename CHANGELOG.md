@@ -10,7 +10,7 @@ GNOME (menu du Sceau, liserés colorés) ne se recharge pas à chaud.
 
 ---
 
-## 1.13.0 — en préparation
+## 1.13.0 — 13 septembre 2026
 
 **Le disque est chiffré par défaut à l'installation.** La case « Chiffrer le
 système » est désormais cochée d'avance : un ordinateur perdu ou volé ne livre
@@ -26,6 +26,18 @@ clavier AZERTY pouvait ne plus ouvrir le disque.
 
 ⚠️ **Retenez bien cette phrase de passe.** Sans elle, personne — pas même
 Codebyr — ne peut rouvrir le disque.
+
+**Le démarrage sécurisé est vérifié.** La chaîne complète — micrologiciel,
+chargeur de démarrage, noyau — a été éprouvée sur une machine dont le démarrage
+sécurisé est activé, comme la plupart des PC vendus aujourd'hui. Le noyau s'y
+verrouille alors de lui-même : plus rien ne peut le modifier en marche.
+
+**Corrections trouvées en éprouvant cette version.** L'écran de démarrage
+n'affichait pas la demande de phrase de passe : on voyait une machine figée.
+Les fenêtres de Codebyr apparaissaient avec une icône générique dans le dock.
+Les machines virtuelles n'avaient ni presse-papiers partagé ni redimensionnement
+de l'écran, alors que c'est ainsi que l'on essaie un système avant de
+l'installer.
 
 Ceci ne concerne que les **nouvelles** installations : un disque déjà installé
 n'est pas modifié par la mise à jour.

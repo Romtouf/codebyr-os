@@ -91,7 +91,7 @@ depuis le menu du Sceau.
   Espace, et un rapport honnête des capacités d'isolation de votre machine
   (`codebyr-space isolation`).
 - **Installeur graphique** Calamares aux couleurs Codebyr : partitionnement
-  assisté ou manuel, chiffrement LUKS optionnel, nettoyage automatique des
+  assisté ou manuel, **disque chiffré par défaut** (LUKS2), nettoyage automatique des
   artefacts de session live.
 - **Multilingue** : français par défaut, ~150 locales disponibles, polices
   Noto (latin, CJK, emoji). Clavier AZERTY par défaut.

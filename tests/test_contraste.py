@@ -278,11 +278,23 @@ class EtiquetteDuNom(unittest.TestCase):
                 continue    # réservée au système, jamais portée par un Espace
             self.assertGreaterEqual(contraste(jetons_[nom], "#0A1318"), AA, nom)
 
-    def test_l_etiquette_se_range_dans_la_fenetre_en_haut_de_l_ecran(self):
+    def test_en_haut_de_l_ecran_l_etiquette_s_efface_sans_rien_recouvrir(self):
+        # Rangée dans une fenêtre agrandie, elle recouvrait le premier bouton
+        # de l'application (Fichiers, 13/09/2026). Elle s'efface ; le nom de
+        # l'Espace actif est alors lu dans la barre du haut.
         self.assertIn("get_work_area_current_monitor()", self.code)
         self.assertIn("majGeometrie(win.get_frame_rect(), zone)", self.code)
         self.assertIn("rect.y - Math.ceil(h / 2) < zone.y", self.lisere)
-        self.assertIn("this._placerEtiquette(false)", self.lisere)
+        self.assertIn("this._etiq.hide()", self.lisere)
+        self.assertNotIn("EP + 2", self.lisere)
+
+    def test_le_nom_de_l_espace_actif_est_ecrit_a_cote_du_sceau(self):
+        self.assertIn("afficherEspace(esp)", self.code)
+        self.assertIn("this._repereNom.text = esp.nom", self.code)
+        self.assertIn("'notify::focus-window'", self.code)
+        self.assertIn("esp => this._indicateur?.afficherEspace(esp)", self.code)
+        # Lecteurs d'écran : le nom est aussi annoncé, pas seulement affiché.
+        self.assertIn("'Codebyr — Espace actif : ' + esp.nom", self.code)
 
 
 class SceauDuPanneau(unittest.TestCase):

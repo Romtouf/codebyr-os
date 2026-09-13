@@ -68,3 +68,35 @@ assert.equal(espaceParProcessus(win, espaces, '/run/codebyr'), null);
         # Aucune décision effective ne doit réintroduire la classe auto-déclarée.
         usages = re.findall(r"espacePourFenetre\(", source)
         self.assertEqual(len(usages), 1, json.dumps(usages))  # définition historique seule
+
+class NomDeLEspaceActif(unittest.TestCase):
+    """Le nom affiché à côté du Sceau ne doit pas pouvoir être usurpé.
+
+    Une application choisit elle-même sa classe de fenêtre : il lui suffirait
+    d'annoncer « codebyr-banque » pour que la barre du haut écrive « Banque »
+    sur une fenêtre de Navigation. Un faux repère de confiance est pire
+    qu'aucun. Le nom vient donc de l'Espace que le liseré a établi par
+    filiation des processus, et de rien d'autre.
+    """
+
+    def setUp(self):
+        source = EXTENSION.read_text(encoding="utf-8")
+        debut = source.index("    _signalerEspaceActif() {")
+        self.signal = source[debut:source.index("\n    }\n", debut)]
+        debut = source.index("    _colorer(win, rec, esp) {")
+        self.colorer = source[debut:source.index("\n    }\n", debut)]
+        debut = source.index("    _suivre(win, diag) {")
+        self.suivre = source[debut:source.index("\n    }\n", debut)]
+
+    def test_le_nom_vient_de_l_espace_etabli_par_le_lisere(self):
+        self.assertIn("rec && rec.lisere ? rec.esp : null", self.signal)
+        self.assertIn("rec.esp = esp", self.colorer)
+
+    def test_aucune_identification_par_la_classe_de_fenetre(self):
+        for interdit in ("espacePourFenetre", "espaceFocalise", "classeDe",
+                         "get_wm_class", "gtk_application_id"):
+            self.assertNotIn(interdit, self.signal, interdit)
+
+    def test_l_espace_du_lisere_est_etabli_par_filiation(self):
+        self.assertIn("espaceParProcessus(win, this._espaces, this._rundir)", self.suivre)
+        self.assertNotIn("espacePourFenetre", self.suivre)

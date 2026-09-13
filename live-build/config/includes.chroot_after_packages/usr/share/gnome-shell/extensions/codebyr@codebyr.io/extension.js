@@ -271,18 +271,6 @@ class Lisere extends St.Widget {
         // n'est pas encore sur la scène. majGeometrie la corrige aussitôt.
         this._etiq.set_position(12, -10);
     }
-    // Posée à cheval sur le bord supérieur, l'étiquette dépasse au-dessus de la
-    // fenêtre. Quand la fenêtre touche le haut de l'écran — maximisée, ou
-    // simplement placée tout en haut —, cette moitié passerait SOUS la barre
-    // supérieure de GNOME : c'est le cas le plus courant pour un navigateur.
-    // Elle se range alors dans la fenêtre.
-    _placerEtiquette(dehors) {
-        let h = 0;
-        try { h = this._etiq.get_preferred_height(-1)[1]; } catch (e) {}
-        h = Math.round(h || 20);
-        this._etiq.set_position(12, dehors ? -Math.round(h / 2) : EP + 2);
-        return h;
-    }
     _dessiner() {
         let cr = null;
         try {
@@ -310,24 +298,62 @@ class Lisere extends St.Widget {
         this.set_size(rect.width, rect.height);
         this._trait.set_position(0, 0);
         this._trait.set_size(rect.width, rect.height);
-        const h = this._placerEtiquette(true);
-        if (zone && rect.y - Math.ceil(h / 2) < zone.y)
-            this._placerEtiquette(false);
+
+        // L'étiquette est posée à cheval sur le bord supérieur. Quand la
+        // fenêtre touche le haut de l'écran — maximisée, ou simplement placée
+        // tout en haut —, sa moitié haute passerait SOUS la barre supérieure ;
+        // rangée dans la fenêtre, elle recouvrirait le premier bouton de
+        // l'application (constaté sur Fichiers le 13/09/2026). Elle est alors
+        // masquée : la barre du haut affiche le nom de l'Espace de la fenêtre
+        // active, à côté du Sceau, sans rien recouvrir.
+        let h = 0;
+        try { h = this._etiq.get_preferred_height(-1)[1]; } catch (e) {}
+        h = Math.round(h || 20);
+        if (zone && rect.y - Math.ceil(h / 2) < zone.y) {
+            this._etiq.hide();
+        } else {
+            this._etiq.set_position(12, -Math.round(h / 2));
+            this._etiq.show();
+        }
         this._trait.queue_repaint();
     }
 });
 
 class Coloriage {
-    constructor(espaces) {
+    constructor(espaces, surEspaceActif = null) {
         this._espaces = espaces;
-        this._suivis = new Map();   // MetaWindow -> {lisere, signals:[]}
+        this._suivis = new Map();   // MetaWindow -> {lisere, esp, signals:[]}
         this._displaySignals = [];
         this._rundir = GLib.get_user_runtime_dir() + '/codebyr';
+        // Prévenu à chaque changement de fenêtre active, avec son Espace — ou
+        // null. C'est ce qui alimente le nom affiché à côté du Sceau.
+        this._surEspaceActif = surEspaceActif;
+    }
+
+    // L'Espace de la fenêtre active, tel que CE liseré l'a établi : par
+    // filiation des processus, avec contrôle de la date de naissance. Jamais
+    // par la classe de fenêtre, qu'une application choisit elle-même — le nom
+    // affiché dans la barre du haut serait sinon usurpable, et un faux
+    // « Banque » y serait pire qu'aucun repère.
+    _signalerEspaceActif() {
+        if (!this._surEspaceActif)
+            return;
+        let esp = null;
+        try {
+            const win = global.display.focus_window;
+            const rec = win ? this._suivis.get(win) : null;
+            esp = rec && rec.lisere ? rec.esp : null;
+        } catch (e) {}
+        try { this._surEspaceActif(esp); } catch (e) {
+            logError(e, 'Codebyr: nom de l\'Espace actif');
+        }
     }
 
     activer() {
         this._displaySignals.push(
             global.display.connect('window-created', (_d, win) => this._suivre(win, true)));
+        this._displaySignals.push(
+            global.display.connect('notify::focus-window', () => this._signalerEspaceActif()));
         // À chaque réempilement des fenêtres, on remet chaque liseré juste
         // au-dessus de SA fenêtre (sinon il passe dessous et on ne voit rien).
         this._displaySignals.push(
@@ -393,6 +419,7 @@ class Coloriage {
     _colorer(win, rec, esp) {
         try {
             const lisere = new Lisere(esp);
+            rec.esp = esp;
             global.window_group.add_child(lisere);
             const actor = win.get_compositor_private();
             if (actor)
@@ -403,6 +430,9 @@ class Coloriage {
                 try { lisere.majGeometrie(win.get_frame_rect(), zone); } catch (e) {}
             };
             rec.lisere = lisere;
+            // Fenêtre déjà active quand son Espace est enfin établi (retentatives) :
+            // le nom apparaît sans attendre le prochain changement de focus.
+            this._signalerEspaceActif();
             rec.signals.push(win.connect('position-changed', sync));
             rec.signals.push(win.connect('size-changed', sync));
             sync();
@@ -441,6 +471,7 @@ class Coloriage {
         if (rec.lisere)
             rec.lisere.destroy();
         this._suivis.delete(win);
+        this._signalerEspaceActif();
     }
 
     detruire() {
@@ -450,6 +481,7 @@ class Coloriage {
         this._displaySignals = [];
         for (const win of [...this._suivis.keys()])
             this._retirer(win);
+        this._surEspaceActif = null;
     }
 }
 
@@ -610,7 +642,22 @@ class Indicateur extends PanelMenu.Button {
             gicon: Gio.icon_new_for_string(extension.path + '/icons/codebyr-symbolic.svg'),
             style_class: 'system-status-icon',
         }));
+        // L'Espace de la fenêtre active, écrit : toujours au même endroit, sans
+        // jamais recouvrir une application. Masqué hors Espace.
+        this._repere = new St.BoxLayout({visible: false, y_align: Clutter.ActorAlign.CENTER});
+        this._repereCouleur = new St.Widget({
+            width: 10, height: 10, y_align: Clutter.ActorAlign.CENTER,
+            style: 'border-radius: 5px; margin-right: 6px;',
+        });
+        this._repereNom = new St.Label({
+            y_align: Clutter.ActorAlign.CENTER,
+            style: 'font-weight: 700;',
+        });
+        this._repere.add_child(this._repereCouleur);
+        this._repere.add_child(this._repereNom);
+        boite.add_child(this._repere);
         this.add_child(boite);
+        this.accessible_name = 'Codebyr';
 
         // Menu reconstruit à chaque ouverture : reflète les Espaces personnalisés.
         this.menu.connect('open-state-changed', (m, open) => {
@@ -618,6 +665,19 @@ class Indicateur extends PanelMenu.Button {
                 this._rebuild();
         });
         this._rebuild();
+    }
+
+    afficherEspace(esp) {
+        if (!esp) {
+            this._repere.hide();
+            this.accessible_name = 'Codebyr';
+            return;
+        }
+        this._repereCouleur.set_style(
+            `border-radius: 5px; margin-right: 6px; background-color: ${esp.couleur};`);
+        this._repereNom.text = esp.nom;
+        this._repere.show();
+        this.accessible_name = 'Codebyr — Espace actif : ' + esp.nom;
     }
 
     _rebuild() {
@@ -1053,7 +1113,8 @@ export default class CodebyrExtension extends Extension {
         this._indicateur = new Indicateur(this);
         Main.panel.addToStatusArea('codebyr-espaces', this._indicateur, 1, 'right');
         try {
-            this._coloriage = new Coloriage(this._espaces);
+            this._coloriage = new Coloriage(this._espaces,
+                esp => this._indicateur?.afficherEspace(esp));
             this._coloriage.activer();
         } catch (e) {
             logError(e, 'Codebyr: activation du coloriage');

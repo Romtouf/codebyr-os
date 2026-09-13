@@ -17,11 +17,13 @@ claire pour se voir sur les fenêtres et le menu en thème clair. Elle devient u
 peu plus soutenue : visible sur les deux thèmes, et mieux distinguée du rouge
 de Jetable pour les personnes daltoniennes.
 
-**Le nom de l'Espace se lit sur chaque fenêtre.** Une petite étiquette en haut à
-gauche indiquait déjà l'Espace, mais en très petit, et elle disparaissait sous
-la barre du haut dès qu'une fenêtre était agrandie. Elle est plus grande et
-reste visible dans tous les cas. C'est aussi le repère qui ne dépend pas des
-couleurs : utile à qui distingue mal le bleu de Personnel du violet de Travail.
+**Le nom de l'Espace se lit, sans dépendre des couleurs.** Chaque fenêtre porte
+de nouveau une étiquette avec le nom de son Espace, en haut à gauche : elle
+avait disparu depuis la 1.0.4. Quand une fenêtre est agrandie, l'étiquette
+s'efface pour ne cacher aucun bouton, et le nom de l'Espace de la fenêtre
+active s'affiche dans la barre du haut, à côté du Sceau. C'est le repère utile
+à qui distingue mal le bleu de Personnel du violet de Travail — et il ne peut
+pas être imité par une application.
 
 ## 1.12.1 — 13 septembre 2026
 

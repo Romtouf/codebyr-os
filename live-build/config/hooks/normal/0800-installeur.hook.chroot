@@ -33,6 +33,11 @@ for d in /usr/share/applications/calamares*.desktop \
          /usr/share/applications/install-debian.desktop; do
     [ -f "$d" ] || continue
     grep -q '^NoDisplay=true' "$d" || echo 'NoDisplay=true' >> "$d"
+    # Masqué ne suffit pas : « Install Debian » revendiquait encore la fenêtre
+    # de Calamares (StartupWMClass=calamares). GNOME affichait alors son nom et
+    # son icône Debian pendant l'installation de Codebyr. Seul notre lanceur
+    # revendique désormais cette classe.
+    sed -i '/^StartupWMClass=/d' "$d"
 done
 
 # 3) Droits.

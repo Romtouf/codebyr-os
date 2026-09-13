@@ -11,3 +11,8 @@ Terminal=false
 Categories=System;
 Keywords=install;installer;calamares;disque;
 StartupNotify=true
+# La fenêtre de Calamares porte la classe « calamares ». Sans cette ligne,
+# GNOME la rattachait au lanceur caché de Debian (« Install Debian »), et
+# affichait son icône — un losange bleu — dans le dock, la vue d'ensemble et
+# Alt+Tab pendant toute l'installation.
+StartupWMClass=calamares

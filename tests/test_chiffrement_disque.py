@@ -119,5 +119,24 @@ class AmorcageCompatible(unittest.TestCase):
         self.assertNotIn("GRUB_ENABLE_CRYPTODISK", script)
 
 
+class LanceurDeLInstallateur(unittest.TestCase):
+    """Pendant l'installation, GNOME doit afficher Codebyr, pas Debian.
+
+    Le lanceur caché « Install Debian » revendiquait la fenêtre de Calamares :
+    son nom et son icône (un losange bleu) apparaissaient dans le dock, la vue
+    d'ensemble et Alt+Tab — constaté sur la VM le 13/09/2026.
+    """
+
+    def test_notre_lanceur_revendique_la_fenetre_de_calamares(self):
+        lanceur = _lire(os.path.join(ETC, "..", "usr", "share", "applications",
+                                     "io.codebyr.Installer.desktop"))
+        self.assertIn("StartupWMClass=calamares", lanceur.splitlines())
+
+    def test_le_lanceur_debian_ne_la_revendique_plus(self):
+        hook = _lire(os.path.join(RACINE, "live-build", "config", "hooks", "normal",
+                                  "0800-installeur.hook.chroot"))
+        self.assertIn("sed -i '/^StartupWMClass=/d' \"$d\"", hook)
+
+
 if __name__ == "__main__":
     unittest.main()

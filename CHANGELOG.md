@@ -10,7 +10,7 @@ GNOME (menu du Sceau, liserés colorés) ne se recharge pas à chaud.
 
 ---
 
-## 1.12.1 — en préparation
+## 1.12.1 — 13 septembre 2026
 
 **Le filtre réseau est confiné par AppArmor.** C'est le seul programme qui
 parle à Internet pour le compte d'un Espace restreint, et il tourne hors du bac

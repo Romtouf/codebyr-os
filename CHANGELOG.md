@@ -10,7 +10,7 @@ GNOME (menu du Sceau, liserés colorés) ne se recharge pas à chaud.
 
 ---
 
-## 1.12.2 — en préparation
+## 1.12.2 — 13 septembre 2026
 
 **L'Espace Navigation change légèrement de couleur.** Son Ambre était trop
 claire pour se voir sur les fenêtres et le menu en thème clair. Elle devient un

@@ -628,7 +628,7 @@ class Indicateur extends PanelMenu.Button {
         boite.add_child(entry);
         boite.add_child(new St.Label({text: 'Couleur :', style: 'margin-top: 4px;'}));
 
-        const palette = ['#4E8FEF', '#8F6CF0', '#2FA36B', '#E09A32',
+        const palette = ['#4E8FEF', '#8F6CF0', '#2FA36B', '#BF7600',
             '#E25551', '#43C7DF', '#E5679B', '#6E7E89'];
         const rang = new St.BoxLayout({style: 'spacing: 8px;'});
         const boutons = [];

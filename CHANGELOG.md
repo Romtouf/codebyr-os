@@ -10,6 +10,13 @@ GNOME (menu du Sceau, liserés colorés) ne se recharge pas à chaud.
 
 ---
 
+## 1.12.2 — en préparation
+
+**L'Espace Navigation change légèrement de couleur.** Son Ambre était trop
+claire pour se voir sur les fenêtres et le menu en thème clair. Elle devient un
+peu plus soutenue : visible sur les deux thèmes, et mieux distinguée du rouge
+de Jetable pour les personnes daltoniennes.
+
 ## 1.12.1 — 13 septembre 2026
 
 **Le filtre réseau est confiné par AppArmor.** C'est le seul programme qui

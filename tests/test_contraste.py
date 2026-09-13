@@ -79,13 +79,11 @@ class CouleursDesEspaces(unittest.TestCase):
         self.assertEqual(len(set(valeurs)), len(valeurs),
                          "deux Espaces partagent une couleur")
 
-    # Défaut CONNU et mesuré, pas ignoré. L'Ambre de l'Espace Navigation ne
-    # ressort pas sur fond clair : 2.376 pour un seuil de 3.0. C'est la pastille
-    # de barre de titre qui en souffre, posée sur un bandeau presque blanc.
-    # Corriger une couleur de marque est une décision de conception, pas une
-    # correction technique : consignée dans docs/chantiers.md, avec la valeur
-    # proposée. Le test garde le reste et surveille que ça n'empire pas.
-    CONNUS = {"--esp-navigation": 2.376}
+    # Défauts CONNUS et mesurés, pas ignorés : une couleur de marque ne se
+    # corrige pas en douce, c'est une décision de conception. L'Ambre de
+    # Navigation y a figuré à 2.376 jusqu'au 13/09/2026 ; elle en est sortie en
+    # passant de #E09A32 à #BF7600.
+    CONNUS = {}
 
     def test_visibles_sur_les_deux_fonds(self):
         """Un liseré invisible sur un fond ne cloisonne plus rien.
@@ -119,6 +117,124 @@ class CouleursDesEspaces(unittest.TestCase):
                 reelle, mesure_attendue, places=3,
                 msg="la valeur de %s a changé sans que le constat soit mis à "
                     "jour (%.2f au lieu de %.2f)" % (nom, reelle, mesure_attendue))
+
+
+# ── Daltonisme ─────────────────────────────────────────────────────────────
+#
+# Simulation de Machado, Oliveira et Fernandes (2009), sévérité complète, puis
+# écart de couleur CIEDE2000 entre les deux couleurs simulées. En dessous de
+# quelques unités, deux pastilles de 10 pixels se confondent.
+
+_SIMULATION = {
+    "deutéranopie": ((0.367322, 0.860646, -0.227968), (0.280085, 0.672501, 0.047413),
+                     (-0.011820, 0.042940, 0.968881)),
+    "protanopie": ((0.152286, 1.052583, -0.204868), (0.114503, 0.786281, 0.099216),
+                   (-0.003882, -0.048116, 1.051998)),
+}
+
+
+def _lineaire(c):
+    return c / 12.92 if c <= 0.04045 else ((c + 0.055) / 1.055) ** 2.4
+
+
+def _encode(c):
+    c = max(0.0, min(1.0, c))
+    return 12.92 * c if c <= 0.0031308 else 1.055 * c ** (1 / 2.4) - 0.055
+
+
+def _rgb_lineaire(hexa):
+    hexa = hexa.lstrip("#")
+    return [_lineaire(int(hexa[i:i + 2], 16) / 255) for i in (0, 2, 4)]
+
+
+def simuler(hexa, vision):
+    m = _SIMULATION[vision]
+    v = _rgb_lineaire(hexa)
+    return [_encode(sum(m[r][k] * v[k] for k in range(3))) for r in range(3)]
+
+
+def _lab(rgb_encode):
+    import math
+    r, g, b = [_lineaire(c) for c in rgb_encode]
+    x = (0.4124 * r + 0.3576 * g + 0.1805 * b) / 0.95047
+    y = 0.2126 * r + 0.7152 * g + 0.0722 * b
+    z = (0.0193 * r + 0.1192 * g + 0.9505 * b) / 1.08883
+    f = lambda t: t ** (1 / 3) if t > 0.008856 else 7.787 * t + 16 / 116
+    return 116 * f(y) - 16, 500 * (f(x) - f(y)), 200 * (f(y) - f(z))
+
+
+def ecart(rgb1, rgb2):
+    """CIEDE2000."""
+    import math
+    L1, a1, b1 = _lab(rgb1)
+    L2, a2, b2 = _lab(rgb2)
+    cm = (math.hypot(a1, b1) + math.hypot(a2, b2)) / 2
+    g = 0.5 * (1 - math.sqrt(cm ** 7 / (cm ** 7 + 25 ** 7)))
+    a1p, a2p = (1 + g) * a1, (1 + g) * a2
+    c1p, c2p = math.hypot(a1p, b1), math.hypot(a2p, b2)
+    h1p = math.degrees(math.atan2(b1, a1p)) % 360
+    h2p = math.degrees(math.atan2(b2, a2p)) % 360
+    dlp, dcp = L2 - L1, c2p - c1p
+    dh = h2p - h1p
+    if c1p * c2p == 0:
+        dh = 0
+    elif dh > 180:
+        dh -= 360
+    elif dh < -180:
+        dh += 360
+    dhp = 2 * math.sqrt(c1p * c2p) * math.sin(math.radians(dh / 2))
+    lm, cmp_ = (L1 + L2) / 2, (c1p + c2p) / 2
+    hs = h1p + h2p
+    if c1p * c2p == 0:
+        hm = hs
+    elif abs(h1p - h2p) > 180:
+        hm = (hs + 360) / 2 if hs < 360 else (hs - 360) / 2
+    else:
+        hm = hs / 2
+    t = (1 - 0.17 * math.cos(math.radians(hm - 30)) + 0.24 * math.cos(math.radians(2 * hm))
+         + 0.32 * math.cos(math.radians(3 * hm + 6)) - 0.20 * math.cos(math.radians(4 * hm - 63)))
+    dth = 30 * math.exp(-((hm - 275) / 25) ** 2)
+    rc = 2 * math.sqrt(cmp_ ** 7 / (cmp_ ** 7 + 25 ** 7))
+    sl = 1 + 0.015 * (lm - 50) ** 2 / math.sqrt(20 + (lm - 50) ** 2)
+    sc, sh = 1 + 0.045 * cmp_, 1 + 0.015 * cmp_ * t
+    rt = -math.sin(math.radians(2 * dth)) * rc
+    return math.sqrt((dlp / sl) ** 2 + (dcp / sc) ** 2 + (dhp / sh) ** 2
+                     + rt * (dcp / sc) * (dhp / sh))
+
+
+class Daltonisme(unittest.TestCase):
+    """Environ 8 % des hommes voient mal les rouges et les verts.
+
+    Pour eux, la couleur d'un Espace peut en rejoindre une autre. Ce test garde
+    ce qui a été choisi pour l'éviter, et chiffre ce qui ne l'est pas encore.
+    """
+
+    def setUp(self):
+        self.jetons = jetons()
+
+    def _ecart(self, a, b, vision):
+        return ecart(simuler(self.jetons[a], vision), simuler(self.jetons[b], vision))
+
+    def test_navigation_reste_distincte_de_jetable(self):
+        # Assombrir l'Ambre pour la rendre visible sur fond clair la rapproche
+        # du rouge de Jetable chez un deutéranope. #BF7600 a été retenue parce
+        # qu'elle s'en écarte le plus à contraste égal (7,8, contre 6,3 pour
+        # #BA7B1C). Jetable garde de toute façon son trait pointillé.
+        self.assertGreaterEqual(
+            self._ecart("--esp-navigation", "--esp-jetable", "deutéranopie"), 7.5)
+
+    # Défaut CONNU et mesuré. Azur (Personnel) et Améthyste (Travail) se
+    # confondent pour un deutéranope, et presque pour un protanope — sans trait
+    # distinctif pour compenser, contrairement à Jetable. Consigné dans
+    # docs/chantiers.md : c'est une décision de conception qui reste à prendre.
+    CONFUSIONS_CONNUES = {("--esp-personnel", "--esp-travail", "deutéranopie"): 2.7,
+                          ("--esp-personnel", "--esp-travail", "protanopie"): 6.7}
+
+    def test_les_confusions_connues_sont_chiffrees_et_n_empirent_pas(self):
+        for (a, b, vision), mesure in self.CONFUSIONS_CONNUES.items():
+            self.assertAlmostEqual(self._ecart(a, b, vision), mesure, delta=0.1,
+                                   msg="%s / %s en %s a changé : mettez à jour le "
+                                       "constat (et docs/chantiers.md)" % (a, b, vision))
 
 
 class SceauDuPanneau(unittest.TestCase):

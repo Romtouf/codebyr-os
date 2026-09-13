@@ -31,9 +31,16 @@ l'appartenance d'une fenêtre ou d'un contenu à un Espace.
 | Personnel | Azur | `#4E8FEF` | Vie quotidienne |
 | Travail | Améthyste | `#8F6CF0` | Professionnel |
 | Banque | Émeraude | `#2FA36B` | Financier, isolement maximal |
-| Navigation | Ambre | `#E09A32` | Web ordinaire |
+| Navigation | Ambre | `#BF7600` | Web ordinaire |
 | Jetable | Braise | `#E25551` | Éphémère, autodétruit |
 | Système | Ardoise | `#6E7E89` | Réservé au système, non attribuable |
+
+L'Ambre valait `#E09A32` jusqu'à la 1.12.2 : trop claire pour ressortir sur
+fond clair (2,28 pour un seuil de 3,0). `#BF7600` est la teinte ambrée qui offre
+la meilleure marge à la fois sur fond clair, sur fond sombre et pour le texte
+de l'étiquette — et, à contraste égal, celle qui se distingue le mieux de
+Jetable pour les personnes deutéranopes. Choix mesuré : voir
+`tests/test_contraste.py`.
 
 Règles :
 - Une couleur d'Espace n'est jamais utilisée comme accent d'interface générique.

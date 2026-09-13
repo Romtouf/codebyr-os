@@ -59,6 +59,13 @@ utilisateur non technique.
   système, plafonds mémoire/processus. Actif par défaut sur Banque, Jetable
   et — à partir de 1.12.0 — Navigation. Banque et Jetable n'ont pas non plus
   d'accès direct à la carte graphique (`"gpu": false`).
+- **Le disque est chiffré par défaut** depuis 1.13.0 : la case est cochée
+  d'avance à l'installation (LUKS2, argon2id). Un ordinateur perdu ou volé ne
+  livre ni les Espaces, ni leurs instantanés, ni les domaines bancaires
+  déclarés. `/boot` reste en clair, séparé : il ne contient que le noyau, et
+  c'est ce qui permet de saisir la phrase de passe avec le clavier choisi à
+  l'installation plutôt qu'avec celui de GRUB, toujours QWERTY. Aucun fichier
+  de clé n'est déposé sur cette partition — vérifié sur une installation réelle.
 - Un domaine autorisé dont l'adresse désigne la machine ou le réseau local
   (bouclage, plages privées, lien local) est refusé par le filtre réseau, qui
   se connecte à l'adresse qu'il a vérifiée et non à un nom résolu une seconde
@@ -160,6 +167,7 @@ surface applicative minimale (`--apt-recommends false`).
 
 | Version | Correctif |
 |---|---|
+| 1.13.0 | **Disque non chiffré par défaut.** Le chiffrement était proposé sans être coché : la protection dépendait de l'utilisateur qui pense à la cocher. Case cochée d'avance, LUKS2/argon2id, /boot séparé en clair (aucune donnée, aucun fichier de clé) pour que la phrase de passe se tape avec le clavier de l'installation — GRUB, qui la demandait auparavant, lit toujours en QWERTY et rendait un disque AZERTY impossible à ouvrir. |
 | 1.12.1 | **Filtre réseau non confiné.** Le seul programme qui parle au réseau pour un Espace restreint tournait hors bac à sable, avec tous les droits de l'utilisateur. Il est désormais confiné par AppArmor (socket héritée, résolution, connexions sortantes, journal des refus — rien d'autre) et démarre en Python isolé, sans module du dossier personnel. |
 | 1.12.0 | **Navigation, l'Espace le plus exposé au web, n'était pas blindé** : pas de filtre d'appels système (io_uring, qui contourne seccomp et reste une source majeure de failles noyau, y était accessible), pas d'abandon des capabilities ni de session neuve. Blindé par défaut, avec des plafonds adaptés à un navigateur (75 % de la mémoire, 4096 tâches) pour ne pas tuer une session chargée. |
 | 1.12.0 | **Le filtre réseau pouvait servir de passage vers le réseau local.** Il jugeait le nom, jamais l'adresse résolue, et tourne sur l'hôte : un domaine autorisé pointant vers 127.0.0.1 ou la box ouvrait à un Espace restreint un réseau qu'il ne voit pas. Les adresses non publiques sont refusées, en HTTP, HTTPS et SOCKS5. |

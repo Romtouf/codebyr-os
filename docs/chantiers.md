@@ -36,7 +36,7 @@ n'est donc plus un chantier ouvert sur cette copie du dépôt.
 | 🔴 | **Profils AppArmor pour les composants Codebyr** | Seuls les profils Debian de série sont actifs. `codebyr-space`, `codebyr-net-proxy` et l'extension n'ont pas de profil dédié | M |
 | 🔴 | **Durcissement noyau au démarrage** | `GRUB_CMDLINE_LINUX` ne contient rien (`lockdown`, `init_on_alloc`, `slab_nomerge`…). `lockdown` n'a de sens qu'avec Secure Boot : à traiter ensemble | M |
 | 🔴 | **Secure Boot de bout en bout** | `shim-signed` et `grub-efi-amd64-signed` sont dans l'image, mais le parcours complet n'a jamais été vérifié sur une machine avec Secure Boot **activé** | M |
-| 🟠 | **LUKS pré-coché par défaut** | L'architecture annonce une case pré-cochée avec une formulation grand public ; en réalité c'est le parcours Calamares standard. Soit on le fait, soit on corrige la promesse (marqué `[visé]` aujourd'hui) | M |
+| ✅ | **LUKS pré-coché par défaut — fait le 13/09/2026 (1.13.0)** | `preCheckEncryption: true`, et /boot séparé en clair pour que la phrase de passe soit demandée par l'initramfs (clavier AZERTY) et non par GRUB (QWERTY). Racine en LUKS2/argon2id. Validé par une installation complète : aucun fichier de clé sur /boot, phrase de passe acceptée au clavier français | S |
 
 ### Le point dur de `xdg-dbus-proxy`
 

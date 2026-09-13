@@ -21,6 +21,7 @@ GLib.set_prgname("io.codebyr.Bienvenue")
 GLib.set_application_name("Bienvenue dans Codebyr OS")
 
 sys.path.insert(0, os.environ.get("CODEBYR_LIB", "/usr/share/codebyr"))
+import interface  # noqa: E402
 import systeme  # noqa: E402
 
 MARQUEUR = os.path.expanduser("~/.config/codebyr/bienvenue-vu")
@@ -83,11 +84,7 @@ def legende_espaces():
     grille.set_margin_top(8)
     for nom, coul in ESPACES:
         ligne = Gtk.Box(spacing=10, halign=Gtk.Align.START)
-        p = Gtk.Box(); p.set_size_request(16, 16); p.set_valign(Gtk.Align.CENTER)
-        css = Gtk.CssProvider()
-        css.load_from_data(("box{background:%s;border-radius:8px;}" % coul).encode())
-        p.get_style_context().add_provider(css, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
-        ligne.append(p)
+        ligne.append(interface.pastille(coul, 16))
         ligne.append(Gtk.Label(label=nom, xalign=0))
         grille.append(ligne)
     return grille

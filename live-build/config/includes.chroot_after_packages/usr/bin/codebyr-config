@@ -28,6 +28,7 @@ GLib.set_application_name("Configuration Codebyr")
 sys.path.insert(0, os.environ.get("CODEBYR_LIB", "/usr/share/codebyr"))
 import applications  # noqa: E402
 import bac_a_sable  # noqa: E402
+import interface  # noqa: E402
 import registre  # noqa: E402
 
 
@@ -167,14 +168,7 @@ class Fenetre(Adw.ApplicationWindow):
             row = Adw.SwitchRow(title=e.get("nom", e.get("id")) + tag,
                                 subtitle=e.get("couleur", ""))
             row.set_active(e.get("blindage") == "renforce")
-            pastille = Gtk.Box()
-            pastille.set_size_request(18, 18)
-            pastille.set_valign(Gtk.Align.CENTER)
-            css = Gtk.CssProvider()
-            css.load_from_data(
-                ("box{background:%s;border-radius:9px;}" % e.get("couleur", "#888")).encode())
-            pastille.get_style_context().add_provider(css, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
-            row.add_prefix(pastille)
+            row.add_prefix(interface.pastille(e.get("couleur", "#888888"), 18))
             row.connect("notify::active", self._basculer_blindage, e.get("id"))
             gesp.add(row)
 

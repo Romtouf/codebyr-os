@@ -78,6 +78,13 @@ utilisateur non technique.
   (bouclage, plages privées, lien local) est refusé par le filtre réseau, qui
   se connecte à l'adresse qu'il a vérifiée et non à un nom résolu une seconde
   fois (1.12.0).
+- Les **notifications** d'un Espace s'affichent sous le nom de cet Espace, que
+  l'application ne choisit pas : une page piégée ouverte en Jetable ne peut pas
+  signer une fausse alerte « Banque ». Leur texte est nettoyé (ni balises, ni
+  caractères de contrôle) et borné, leur débit limité, et les boutons d'action
+  refusés — ils rouvriraient un canal vers l'Espace. Le bus de session de
+  l'hôte, lui, n'entre toujours pas : seule une socket transportant deux
+  chaînes de texte relie l'Espace au bureau (1.14.0).
 - Le presse-papiers ne « suit » pas passivement d'un Espace à l'autre : il est
   vidé dès que le focus passe à un Espace différent de celui qui l'a rempli —
   **et aussi dès qu'on quitte un Espace sensible** (Blindage ou réseau

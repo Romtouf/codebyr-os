@@ -10,7 +10,7 @@ GNOME (menu du Sceau, liserés colorés) ne se recharge pas à chaud.
 
 ---
 
-## 1.14.0 — en préparation
+## 1.14.0 — 13 septembre 2026
 
 **Les notifications reviennent dans les Espaces.** Une application qui prévient
 d'un téléchargement terminé ou d'une erreur parlait dans le vide depuis la

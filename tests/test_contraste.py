@@ -224,9 +224,10 @@ class Daltonisme(unittest.TestCase):
             self._ecart("--esp-navigation", "--esp-jetable", "deutéranopie"), 7.5)
 
     # Défaut CONNU et mesuré. Azur (Personnel) et Améthyste (Travail) se
-    # confondent pour un deutéranope, et presque pour un protanope — sans trait
-    # distinctif pour compenser, contrairement à Jetable. Consigné dans
-    # docs/chantiers.md : c'est une décision de conception qui reste à prendre.
+    # confondent pour un deutéranope, et presque pour un protanope. Compensé
+    # depuis la 1.12.2 par le NOM écrit (étiquette de fenêtre, et barre du haut
+    # pour la fenêtre active — voir EtiquetteDuNom) ; les teintes, elles,
+    # restent à distinguer. Consigné dans docs/chantiers.md.
     CONFUSIONS_CONNUES = {("--esp-personnel", "--esp-travail", "deutéranopie"): 2.7,
                           ("--esp-personnel", "--esp-travail", "protanopie"): 6.7}
 

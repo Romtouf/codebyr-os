@@ -228,34 +228,54 @@ function cheminArrondi(cr, x, y, w, h, r) {
 }
 
 const Lisere = GObject.registerClass(
-class Lisere extends St.DrawingArea {
+class Lisere extends St.Widget {
     _init(espace) {
-        // St ne rend PAS les bordures CSS « dashed » (toujours pleines) : on
-        // dessine donc le liseré à la main avec Cairo. Les Espaces éphémères
-        // (Jetable) obtiennent un vrai trait pointillé — la couleur seule ne
-        // suffit pas (accessibilité daltonisme, cf. charte).
-        super._init({reactive: false, can_focus: false, track_hover: false});
+        // UN CONTENEUR, DEUX ENFANTS : le trait et l'étiquette.
+        //
+        // St ne rend PAS les bordures CSS « dashed » (toujours pleines) : le
+        // trait est donc dessiné à la main avec Cairo, dans un St.DrawingArea.
+        // Les Espaces éphémères (Jetable) obtiennent un vrai pointillé — la
+        // couleur seule ne suffit pas (accessibilité daltonisme, cf. charte).
+        //
+        // Mais un St.DrawingArea ne peint que SON dessin, jamais les acteurs
+        // qu'on lui ajoute. Quand le liseré en est devenu un (1.0.4, pour le
+        // pointillé), l'étiquette du nom, restée son enfant, a cessé de
+        // s'afficher — sur toutes les fenêtres, pendant six semaines, sans
+        // rien qui le signale. Constaté le 13/09/2026. Le dessin et l'étiquette
+        // sont donc FRÈRES dans un conteneur ordinaire, comme en 1.0.
+        super._init({
+            reactive: false, can_focus: false, track_hover: false,
+            layout_manager: new Clutter.FixedLayout(),
+        });
         this._espace = espace;
-        this.connect('repaint', () => this._dessiner());
+
+        this._trait = new St.DrawingArea({reactive: false});
+        this._trait.connect('repaint', () => this._dessiner());
+        this.add_child(this._trait);
+
         // Le NOM de l'Espace, écrit : le seul repère qui ne dépend pas de la
         // perception des couleurs. Pour un deutéranope, Personnel et Travail
         // ont la même teinte (écart CIEDE2000 de 2,7) — l'étiquette est alors
         // ce qui dit où l'on se trouve. Elle doit donc se LIRE : 12 px gras,
         // texte sombre (contraste ≥ 4,98 sur toutes les couleurs d'Espace).
+        // Ajoutée APRÈS le trait : elle se peint par-dessus.
         this._etiq = new St.Label({
             text: espace.nom,
+            reactive: false,
             style: `background-color: ${espace.couleur}; color: #0A1318;` +
                    `font-weight: 700; font-size: 12px; padding: 2px 9px;` +
                    `border-radius: 7px;`,
         });
         this.add_child(this._etiq);
-        this._placerEtiquette(true);
+        // Position provisoire : la mesurer ici n'a pas de sens, le conteneur
+        // n'est pas encore sur la scène. majGeometrie la corrige aussitôt.
+        this._etiq.set_position(12, -10);
     }
     // Posée à cheval sur le bord supérieur, l'étiquette dépasse au-dessus de la
     // fenêtre. Quand la fenêtre touche le haut de l'écran — maximisée, ou
-    // simplement placée tout en haut —, cette moitié passait SOUS la barre
-    // supérieure de GNOME et l'étiquette disparaissait : c'est le cas le plus
-    // courant pour un navigateur. Elle se range alors dans la fenêtre.
+    // simplement placée tout en haut —, cette moitié passerait SOUS la barre
+    // supérieure de GNOME : c'est le cas le plus courant pour un navigateur.
+    // Elle se range alors dans la fenêtre.
     _placerEtiquette(dehors) {
         let h = 0;
         try { h = this._etiq.get_preferred_height(-1)[1]; } catch (e) {}
@@ -266,10 +286,10 @@ class Lisere extends St.DrawingArea {
     _dessiner() {
         let cr = null;
         try {
-            const [w, h] = this.get_surface_size();
+            const [w, h] = this._trait.get_surface_size();
             if (w <= EP || h <= EP)
                 return;
-            cr = this.get_context();
+            cr = this._trait.get_context();
             const {r, g, b} = hexVersRGB(this._espace.couleur);
             cr.setLineWidth(EP);
             cr.setSourceRGBA(r, g, b, 1);
@@ -288,10 +308,12 @@ class Lisere extends St.DrawingArea {
         // le liseré épouse le bord de la fenêtre (visible même maximisée)
         this.set_position(rect.x, rect.y);
         this.set_size(rect.width, rect.height);
+        this._trait.set_position(0, 0);
+        this._trait.set_size(rect.width, rect.height);
         const h = this._placerEtiquette(true);
         if (zone && rect.y - Math.ceil(h / 2) < zone.y)
             this._placerEtiquette(false);
-        this.queue_repaint();
+        this._trait.queue_repaint();
     }
 });
 

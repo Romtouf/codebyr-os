@@ -256,6 +256,15 @@ class EtiquetteDuNom(unittest.TestCase):
         debut = self.code.index("const Lisere = GObject.registerClass(")
         self.lisere = self.code[debut:self.code.index("class Coloriage", debut)]
 
+    def test_l_etiquette_n_est_pas_l_enfant_d_une_surface_de_dessin(self):
+        # Un St.DrawingArea ne peint que son dessin Cairo, jamais ses enfants :
+        # l'étiquette, placée dedans, a été invisible de la 1.0.4 à la 1.12.1.
+        self.assertIn("class Lisere extends St.Widget", self.lisere)
+        self.assertNotIn("extends St.DrawingArea", self.lisere)
+        self.assertIn("this._trait = new St.DrawingArea", self.lisere)
+        self.assertNotIn("this._trait.add_child", self.lisere)
+        self.assertIn("this.add_child(this._etiq)", self.lisere)
+
     def test_le_nom_est_ecrit_en_texte_sombre_et_lisible(self):
         self.assertIn("text: espace.nom", self.lisere)
         self.assertIn("color: #0A1318", self.lisere)

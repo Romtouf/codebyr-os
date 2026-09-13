@@ -1,0 +1,65 @@
+# Codebyr OS — confinement du filtre réseau des Espaces (codebyr-net-proxy).
+#
+# POURQUOI CE COMPOSANT EN PREMIER
+# Le filtre est le seul programme qui parle au réseau POUR le compte d'un
+# Espace restreint — donc pour un Espace peut-être déjà compromis. Il tourne
+# hors du bac à sable, sur l'hôte, sous l'identité de l'utilisateur : une faille
+# dans son analyse des requêtes lui donnerait tout ce que l'utilisateur peut
+# faire. Ce profil réduit ce « tout » à ce dont un filtre a besoin : écouter la
+# socket qu'on lui transmet, résoudre un nom, se connecter à Internet, noter les
+# domaines refusés. Ni lire les documents, ni lancer un programme, ni toucher au
+# reste du dossier personnel.
+#
+# PYTHON SANS LE DOSSIER PERSONNEL
+# L'abstraction « python » standard n'est volontairement PAS incluse : elle
+# autorise ~/.local/lib/python3.*, et un fichier .pth déposé là est EXÉCUTÉ au
+# démarrage de l'interpréteur. Le script est lancé en mode isolé
+# (« python3 -IS ») et ce profil ne lui ouvre que la bibliothèque du système.
+#
+# Personnalisation locale sans modifier ce fichier : /etc/apparmor.d/local/codebyr-net-proxy
+
+abi <abi/4.0>,
+
+include <tunables/global>
+
+profile codebyr-net-proxy /usr/bin/codebyr-net-proxy {
+  include <abstractions/base>
+  # Résolution de noms : /etc/hosts, resolv.conf, nsswitch, bibliothèques NSS.
+  include <abstractions/nameservice>
+
+  # ── L'interpréteur et la bibliothèque standard, rien d'autre ─────────────
+  /usr/bin/python3.[0-9]* rix,
+  /usr/bin/codebyr-net-proxy r,
+  /usr/lib/python3.[0-9]*/ r,
+  /usr/lib/python3.[0-9]*/** r,
+  /usr/lib/python3.[0-9]*/lib-dynload/*.so mr,
+  # Python tente parfois d'écrire un cache compilé à côté des modules : refus
+  # silencieux plutôt qu'une alerte dans le journal à chaque lancement.
+  deny /usr/lib/python3.[0-9]*/**/__pycache__/{,*} w,
+
+  # ── Réseau ───────────────────────────────────────────────────────────────
+  # Connexions sortantes vers les sites autorisés (et écoute sur 127.0.0.1
+  # quand le filtre reçoit un port plutôt qu'une socket).
+  network inet stream,
+  network inet6 stream,
+  # La socket Unix d'écoute est ouverte par codebyr-space et HÉRITÉE : le
+  # filtre accepte et relaie, il n'en crée ni n'en nomme aucune.
+  unix (accept, receive, send, getattr, getopt, setopt, shutdown) type=stream,
+
+  # ── Le seul fichier écrit : les domaines refusés, pour les proposer ensuite
+  # dans « Configuration Codebyr » (convention partagée avec codebyr-space).
+  owner @{HOME}/.local/share/codebyr/espaces/*/domaines-refuses.txt w,
+
+  # Sortie d'erreur héritée quand le filtre est lancé depuis un terminal.
+  owner /dev/pts/[0-9]* rw,
+
+  # ── Arrêt ────────────────────────────────────────────────────────────────
+  # codebyr-space arrête le filtre par SIGTERM à la fermeture de l'Espace. Un
+  # processus confiné refuse par défaut les signaux d'un processus non
+  # confiné : sans cette règle, chaque filtre survivrait à son Espace.
+  signal (receive) set=(term, kill, int, hup) peer=unconfined,
+  # Les outils ordinaires (ps, top) peuvent le voir ; personne ne s'y attache.
+  ptrace (readby) peer=unconfined,
+
+  include if exists <local/codebyr-net-proxy>
+}

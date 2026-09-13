@@ -1,5 +1,8 @@
-#!/usr/bin/env python3
+#!/usr/bin/python3 -IS
 # -*- coding: utf-8 -*-
+# -IS : mode isolé, sans le module site. Ni variable PYTHON* de l'environnement,
+# ni paquet du dossier personnel, ni fichier .pth ne s'exécute avant ce
+# filtre — c'est aussi ce que son profil AppArmor suppose (etc/apparmor.d).
 """
 codebyr-net-proxy — filtre réseau à liste blanche pour un Espace.
 

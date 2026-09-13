@@ -43,7 +43,8 @@ for chemin in \
 	usr/share/applications/io.codebyr.Ouvrir.desktop \
 	etc/skel \
 	etc/codebyr/espaces.json \
-	etc/sysctl.d/91-codebyr-noyau.conf
+	etc/sysctl.d/91-codebyr-noyau.conf \
+	etc/apparmor.d/codebyr-net-proxy
 do
 	if [ -e "$SRC/$chemin" ]; then
 		mkdir -p "$STAGE/$(dirname "$chemin")"
@@ -83,6 +84,12 @@ find "$STAGE/etc/skel" -type d -exec chmod 755 {} + 2>/dev/null || true
 # Même raison que pour les scripts : un réglage noyau suivi d'un « \r » serait
 # rejeté par systemd-sysctl, en silence pour qui ne lit pas le journal.
 [ -d "$STAGE/etc/sysctl.d" ] && sed -i 's/\r$//' "$STAGE"/etc/sysctl.d/*.conf
+# Profils AppArmor : un « \r » y est une erreur de syntaxe, et un profil qui ne
+# se charge pas laisse le programme NON confiné, sans rien qui le signale.
+if [ -d "$STAGE/etc/apparmor.d" ]; then
+	find "$STAGE/etc/apparmor.d" -type f -exec sed -i 's/\r$//' {} +
+	find "$STAGE/etc/apparmor.d" -type f -exec chmod 644 {} +
+fi
 
 # 3) Taille installée (en Ko), pour le control.
 TAILLE="$(du -sk "$STAGE" | cut -f1)"

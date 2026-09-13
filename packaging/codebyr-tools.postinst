@@ -52,6 +52,18 @@ case "$1" in
 			/usr/lib/systemd/systemd-sysctl "$SYSCTL_CODEBYR" 2>/dev/null || true
 		fi
 
+		# Profil AppArmor du filtre réseau. Au démarrage, apparmor.service
+		# charge tout /etc/apparmor.d ; sur une machine déjà en marche, un
+		# nouveau profil n'agit qu'une fois chargé — d'où cette ligne.
+		# Le filtre en cours (Espace Banque ouvert) reste tel quel ; le
+		# prochain lancement est confiné.
+		# Chemins absolus, pour la même raison que systemd-sysctl ci-dessus.
+		PROFIL_FILTRE=/etc/apparmor.d/codebyr-net-proxy
+		if [ -f "$PROFIL_FILTRE" ] && [ -x /usr/sbin/apparmor_parser ] \
+				&& /usr/bin/aa-enabled --quiet 2>/dev/null; then
+			/usr/sbin/apparmor_parser --replace --write-cache "$PROFIL_FILTRE" 2>/dev/null || true
+		fi
+
 		# Rattrapage des machines DÉJÀ installées : dossiers personnels privés
 		# (0700) et neutralisation du mot de passe public du compte invité.
 		# Ces deux correctifs vivaient dans l'image live ou dans le script

@@ -10,6 +10,19 @@ GNOME (menu du Sceau, liserés colorés) ne se recharge pas à chaud.
 
 ---
 
+## 1.12.1 — en préparation
+
+**Le filtre réseau est confiné par AppArmor.** C'est le seul programme qui
+parle à Internet pour le compte d'un Espace restreint, et il tourne hors du bac
+à sable. S'il était un jour trompé par une requête malveillante, il ne pourrait
+plus lire vos documents, lancer un programme ni écrire ailleurs que dans la
+liste des sites bloqués : AppArmor le lui interdit, quoi qu'il arrive.
+
+Il démarre aussi en mode isolé : aucun module Python extérieur au système ne
+peut s'y glisser avant lui.
+
+Rien ne change dans votre usage.
+
 ## 1.12.0 — 13 septembre 2026
 
 **Navigation est désormais blindée.** C'est l'Espace où l'on passe ses

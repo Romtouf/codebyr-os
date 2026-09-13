@@ -10,6 +10,40 @@ GNOME (menu du Sceau, liserés colorés) ne se recharge pas à chaud.
 
 ---
 
+## 1.12.0 — en préparation
+
+**Navigation est désormais blindée.** C'est l'Espace où l'on passe ses
+journées sur le web — donc le plus exposé — et il ne l'était pas : ni filtre
+d'appels système, ni abandon des privilèges. Il reçoit
+maintenant le même Blindage que Banque et Jetable, avec des plafonds de
+mémoire adaptés à un navigateur, pour qu'une session chargée ne soit jamais
+fermée d'autorité.
+
+**Le filtre réseau ne peut plus servir de passage vers votre réseau local.**
+Il vérifiait le nom d'un site, pas l'adresse où ce nom mène. Un domaine
+autorisé qu'on aurait fait pointer vers votre box, un NAS ou la machine
+elle-même aurait ouvert à un Espace restreint ce que son cloisonnement doit
+lui interdire. Une page explique désormais ce refus.
+
+**Banque et Jetable n'ont plus accès direct à la carte graphique.** Ses
+pilotes sont l'une des plus larges portes d'entrée du noyau. Ces deux Espaces
+n'en ont besoin ni pour la vidéo ni pour la 3D ; l'affichage reste assuré.
+
+**Le système ferme plusieurs accès au noyau** dont un usage ordinaire n'a
+jamais besoin — et les ferme dès la mise à jour, sans attendre un redémarrage.
+
+**Le menu du Sceau vérifie ce qu'il lit** dans la liste des Espaces avant de
+s'en servir pour lancer une commande ou colorer une fenêtre.
+
+**Ce que cela peut changer pour vous.** Une application Flatpak ajoutée à
+l'Espace Navigation sera refusée, comme elle l'est déjà dans Banque : ses
+permissions ne garantissent pas le Blindage. Si vous aviez désactivé le
+Blindage de Navigation vous-même, votre choix est conservé. Les vidéos lues
+dans Jetable sollicitent davantage le processeur.
+
+`codebyr-space verifier-isolation` contrôle aussi la carte graphique et
+l'Espace Navigation.
+
 ## 1.11.2 — 12 septembre 2026
 
 **Les notifications portent le nom de Codebyr.** Elles s'affichaient sous

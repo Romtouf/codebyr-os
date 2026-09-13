@@ -21,6 +21,7 @@ deux défauts de la forme « --port » : la course entre le choix du port libre 
 sa prise effective (un autre programme pouvait s'y glisser), et le cas où le
 navigateur démarrait plus vite que le filtre et tombait sur un port muet.
 """
+import ipaddress
 import os
 import select
 import socket
@@ -75,6 +76,61 @@ def autorise(host, patterns):
     return False
 
 
+class AdresseInterne(OSError):
+    """Le nom est autorisé, mais il ne désigne que des adresses internes."""
+
+
+def adresse_interne(ip):
+    """Vrai si l'adresse n'est pas une adresse d'Internet.
+
+    Bouclage (cette machine), réseau local, lien local, plages réservées ou
+    de documentation, multidiffusion : tout ce qu'un site public n'a jamais
+    besoin d'être. Une adresse IPv4 déguisée en IPv6 (« ::ffff:127.0.0.1 »)
+    est jugée sur l'adresse qu'elle cache.
+
+    Une adresse qu'on ne sait pas lire est traitée comme interne : dans le
+    doute, ce filtre refuse.
+    """
+    try:
+        a = ipaddress.ip_address(ip.split("%", 1)[0])
+    except ValueError:
+        return True
+    if a.version == 6 and a.ipv4_mapped is not None:
+        a = a.ipv4_mapped
+    return not a.is_global or a.is_multicast
+
+
+def connecter(host, port, timeout=15):
+    """Résout, écarte les adresses internes, puis se connecte à celle VÉRIFIÉE.
+
+    Le filtre juge un NOM ; c'est le DNS qui décide où ce nom mène. Or ce
+    proxy tourne sur l'hôte, pas dans l'Espace : il joint le réseau local de
+    la machine, que l'Espace, lui, ne voit pas. Un domaine autorisé — ou
+    n'importe quel sous-domaine couvert par « *. » — dont l'adresse pointerait
+    vers la box, un NAS ou 127.0.0.1 ferait donc du filtre un passage vers ce
+    que le cloisonnement réseau est censé rendre inaccessible.
+
+    On se connecte à l'adresse examinée, jamais à un nom résolu une seconde
+    fois : entre deux résolutions, un DNS hostile peut changer de réponse.
+    """
+    derniere = None
+    for famille, genre, proto, _nom, adresse in socket.getaddrinfo(
+            host, port, 0, socket.SOCK_STREAM):
+        if adresse_interne(adresse[0]):
+            if derniere is None:
+                derniere = AdresseInterne(host)
+            continue
+        s = socket.socket(famille, genre, proto)
+        s.settimeout(timeout)
+        try:
+            s.connect(adresse)
+            return s
+        except OSError as exc:
+            s.close()
+            derniere = exc
+    raise derniere or OSError("aucune adresse pour %s" % host)
+
+
 def tunnel(a, b):
     try:
         while True:
@@ -116,8 +172,16 @@ PAGE = u"""<!doctype html><html lang="fr"><meta charset="utf-8">
 <h1>%s</h1><p>%s</p></div>"""
 
 
-def bloque(client, host, patterns=()):
-    if patterns:
+def bloque(client, host, patterns=(), interne=False):
+    if interne:
+        titre = u"Ce site mène à votre réseau local"
+        detail = (u"<code>%s</code> est autorisé, mais son adresse désigne cette "
+                  u"machine ou un appareil de votre réseau — box, imprimante, "
+                  u"NAS — et non un site Internet.<br><br>"
+                  u"Un Espace à réseau restreint n'y a jamais accès : c'est ce "
+                  u"qui empêche un nom de domaine détourné de servir de passage "
+                  u"vers vos autres appareils." % echapper(host))
+    elif patterns:
         titre = u"Ce site n'est pas celui de votre banque"
         detail = (u"L'Espace Banque ne peut joindre que les adresses que vous "
                   u"avez déclarées. <code>%s</code> n'en fait pas partie.<br><br>"
@@ -218,7 +282,11 @@ def gerer_socks(client, patterns, debut):
         client.sendall(reponse_socks(SOCKS_REFUS))
         return
 
-    amont = socket.create_connection((host, port), timeout=15)
+    try:
+        amont = connecter(host, port)
+    except AdresseInterne:
+        client.sendall(reponse_socks(SOCKS_REFUS))
+        return
     client.sendall(reponse_socks(SOCKS_OK))
     client.settimeout(None)
     tunnel(client, amont)
@@ -262,7 +330,11 @@ def gerer(client, patterns):
                 bloque(client, host, patterns)
                 client.close()
                 return
-            amont = socket.create_connection((host, port), timeout=15)
+            try:
+                amont = connecter(host, port)
+            except AdresseInterne:
+                bloque(client, host, patterns, interne=True)
+                return
             client.sendall(b"HTTP/1.1 200 Connection established\r\n\r\n")
             client.settimeout(None)
             tunnel(client, amont)
@@ -284,7 +356,11 @@ def gerer(client, patterns):
                 bloque(client, host, patterns)
                 client.close()
                 return
-            amont = socket.create_connection((host, 80), timeout=15)
+            try:
+                amont = connecter(host, 80)
+            except AdresseInterne:
+                bloque(client, host, patterns, interne=True)
+                return
             amont.sendall(premier)
             client.settimeout(None)
             tunnel(client, amont)

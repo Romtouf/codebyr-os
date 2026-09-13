@@ -3,9 +3,9 @@
   "espaces": [
     { "id": "personnel",  "nom": "Personnel",  "couleur": "#4E8FEF", "app": "org.gnome.Nautilus.desktop", "ephemere": false },
     { "id": "travail",    "nom": "Travail",    "couleur": "#8F6CF0", "app": "org.gnome.Nautilus.desktop", "ephemere": false },
-    { "id": "banque",     "nom": "Banque",     "couleur": "#2FA36B", "app": "firefox-esr.desktop",        "ephemere": false, "blindage": "renforce", "audio": false, "reseau": { "mode": "liste-blanche", "domaines": [] } },
-    { "id": "navigation", "nom": "Navigation", "couleur": "#E09A32", "app": "firefox-esr.desktop",        "ephemere": false },
-    { "id": "jetable",    "nom": "Jetable",    "couleur": "#E25551", "app": "firefox-esr.desktop",        "ephemere": true,  "blindage": "renforce" }
+    { "id": "banque",     "nom": "Banque",     "couleur": "#2FA36B", "app": "firefox-esr.desktop",        "ephemere": false, "blindage": "renforce", "audio": false, "gpu": false, "reseau": { "mode": "liste-blanche", "domaines": [] } },
+    { "id": "navigation", "nom": "Navigation", "couleur": "#E09A32", "app": "firefox-esr.desktop",        "ephemere": false, "blindage": "renforce", "plafonds": { "memoire": "75%", "taches": 4096 } },
+    { "id": "jetable",    "nom": "Jetable",    "couleur": "#E25551", "app": "firefox-esr.desktop",        "ephemere": true,  "blindage": "renforce", "gpu": false }
   ],
   "apps": [
     { "nom": "Navigateur",       "cmd": "firefox-esr" },

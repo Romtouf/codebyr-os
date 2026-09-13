@@ -36,6 +36,22 @@ case "$1" in
 			fi
 		fi
 
+		# Réglages noyau : un fichier dans /etc/sysctl.d n'est lu qu'au
+		# démarrage. Sans cette ligne, la protection arriverait avec la mise à
+		# jour mais n'agirait qu'au prochain redémarrage — des jours ou des
+		# semaines plus tard sur un portable qu'on met en veille.
+		# « || true » : dans un conteneur ou un chroot, le noyau refuse ; ce
+		# n'est pas une raison de faire échouer la mise à jour.
+		#
+		# Chemin absolu : systemd-sysctl n'est PAS dans le PATH sur Debian
+		# (/usr/lib/systemd). Un « command -v » le cherchait en vain, la
+		# condition restait fausse, et rien ne s'appliquait avant le
+		# redémarrage — sans la moindre trace.
+		SYSCTL_CODEBYR=/etc/sysctl.d/91-codebyr-noyau.conf
+		if [ -f "$SYSCTL_CODEBYR" ] && [ -x /usr/lib/systemd/systemd-sysctl ]; then
+			/usr/lib/systemd/systemd-sysctl "$SYSCTL_CODEBYR" 2>/dev/null || true
+		fi
+
 		# Rattrapage des machines DÉJÀ installées : dossiers personnels privés
 		# (0700) et neutralisation du mot de passe public du compte invité.
 		# Ces deux correctifs vivaient dans l'image live ou dans le script

@@ -84,7 +84,7 @@ Responsabilités :
 | Situation | Niveau | Pourquoi |
 |---|---|---|
 | Tout Espace | Bac à sable bubblewrap (dossier isolé, `/tmp` isolé, bus D-Bus privé) | Isolation réelle des fichiers, du réseau et des processus |
-| Espaces sensibles (Banque, Jetable) | **Blindage** : espace de noms utilisateur, `--cap-drop ALL`, session neuve, plafonds mémoire/processus | L'isolation renforcée là où le risque est maximal |
+| Espaces exposés (Banque, Navigation, Jetable) | **Blindage** : espace de noms utilisateur, `--cap-drop ALL`, session neuve, filtre d'appels système, plafonds mémoire/processus réglables par Espace | L'isolation renforcée là où le risque est maximal — le web hostile en tête |
 
 - Le backend est **invisible** : l'utilisateur voit « Banque », jamais un détail technique.
 - Réseau par Espace : le **navigateur** de Banque ne joint que la liste

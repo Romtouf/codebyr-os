@@ -42,7 +42,8 @@ for chemin in \
 	usr/share/nautilus-python \
 	usr/share/applications/io.codebyr.Ouvrir.desktop \
 	etc/skel \
-	etc/codebyr/espaces.json
+	etc/codebyr/espaces.json \
+	etc/sysctl.d/91-codebyr-noyau.conf
 do
 	if [ -e "$SRC/$chemin" ]; then
 		mkdir -p "$STAGE/$(dirname "$chemin")"
@@ -78,6 +79,10 @@ find "$STAGE/usr/share/applications" -type f -exec chmod 644 {} + 2>/dev/null ||
 find "$STAGE/etc/skel" -type f -exec chmod 644 {} + 2>/dev/null || true
 find "$STAGE/etc/skel" -type d -exec chmod 755 {} + 2>/dev/null || true
 [ -f "$STAGE/etc/codebyr/espaces.json" ] && chmod 644 "$STAGE/etc/codebyr/espaces.json"
+[ -d "$STAGE/etc/sysctl.d" ] && chmod 644 "$STAGE"/etc/sysctl.d/*.conf
+# Même raison que pour les scripts : un réglage noyau suivi d'un « \r » serait
+# rejeté par systemd-sysctl, en silence pour qui ne lit pas le journal.
+[ -d "$STAGE/etc/sysctl.d" ] && sed -i 's/\r$//' "$STAGE"/etc/sysctl.d/*.conf
 
 # 3) Taille installée (en Ko), pour le control.
 TAILLE="$(du -sk "$STAGE" | cut -f1)"

@@ -9,6 +9,7 @@ qu'un Espace peut atteindre. Le sortir le rend lisible d'un seul tenant, et
 laisse dans la commande ce qui relève du cycle de vie des Espaces.
 """
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -16,7 +17,7 @@ import tempfile
 
 
 def wrap_bwrap(home, cmd, env, renforce=False, hors_ligne=False, audio=True,
-               envoi=None, filtre=None):
+               envoi=None, filtre=None, gpu=True):
     """Enveloppe avec bubblewrap : dossier personnel isolé, /tmp isolé,
     affichage (et éventuellement son) partagés. Repli géré par l'appelant si
     bwrap échoue.
@@ -28,6 +29,16 @@ def wrap_bwrap(home, cmd, env, renforce=False, hors_ligne=False, audio=True,
                  jamais pouvoir téléphoner dehors.
     audio      : donne accès au serveur de son PipeWire. À couper pour les
                  Espaces sensibles : ce socket, c'est aussi le MICRO.
+    gpu        : accès direct à la carte graphique (/dev/dri). Ses pilotes
+                 sont l'une des plus larges surfaces du noyau offertes à un
+                 programme ordinaire, et beaucoup ne vident pas la mémoire
+                 graphique d'une application à l'autre. À couper là où l'on
+                 n'a besoin ni de vidéo ni de 3D : l'affichage reste assuré,
+                 en rendu logiciel.
+
+                 Clé distincte du Blindage, comme le son : Navigation est
+                 blindée mais sert à regarder des vidéos, et la priver de la
+                 carte graphique ferait payer la sécurité en saccades.
 
     envoi      : boîte d'envoi de CET Espace, montée sur ~/.codebyr-envoi.
                  C'est le seul passage par lequel un fichier peut sortir vers
@@ -65,7 +76,6 @@ def wrap_bwrap(home, cmd, env, renforce=False, hors_ligne=False, audio=True,
         "--symlink", "usr/sbin", "/sbin",
         "--proc", "/proc",
         "--dev", "/dev",
-        "--dev-bind-try", "/dev/dri", "/dev/dri",
         "--tmpfs", "/tmp",
         "--bind", home, os.path.expanduser("~"),
         "--ro-bind-try", runtime + "/wayland-0", runtime + "/wayland-0",
@@ -85,6 +95,8 @@ def wrap_bwrap(home, cmd, env, renforce=False, hors_ligne=False, audio=True,
         # distribue. Un Jetable n'en a pas — il ne conserve rien, par nature.
         bwrap += ["--bind", envoi,
                   os.path.join(os.path.expanduser("~"), ".codebyr-envoi")]
+    if gpu:
+        bwrap += ["--dev-bind-try", "/dev/dri", "/dev/dri"]
     if audio and not hors_ligne:
         bwrap += ["--ro-bind-try", runtime + "/pipewire-0", runtime + "/pipewire-0"]
     if filtre:
@@ -121,13 +133,46 @@ def systemd_scope_dispo():
     return _SCOPE_DISPO
 
 
-def plafonner_ressources(run):
+MEMOIRE_DEFAUT = "2G"
+TACHES_DEFAUT = 800
+FORME_MEMOIRE = re.compile(r"[1-9][0-9]*[KMGT]|[1-9][0-9]?%|100%")
+
+
+def plafonds_de(esp):
+    """Les plafonds d'un Espace blindé : (mémoire, tâches).
+
+    Les valeurs par défaut conviennent à un Espace qu'on ouvre pour un geste
+    précis — Banque, Jetable. Pas au navigateur du quotidien : pour systemd,
+    une « tâche » est un fil d'exécution, et un Firefox ouvert sur une
+    quinzaine de sites en compte plus de 800 ; ses 2 Go sont vite dépassés.
+    Le plafond tuerait alors tout l'Espace, d'un coup, en pleine lecture.
+    Navigation déclare donc les siens dans le registre.
+
+    Une valeur mal formée est ignorée au profit du défaut : un plafond qu'on
+    ne comprend pas ne doit ni lever la protection, ni empêcher l'ouverture.
+    """
+    reglages = esp.get("plafonds") if isinstance(esp.get("plafonds"), dict) else {}
+    memoire = reglages.get("memoire")
+    if not (isinstance(memoire, str) and FORME_MEMOIRE.fullmatch(memoire)):
+        memoire = MEMOIRE_DEFAUT
+    taches = reglages.get("taches")
+    if not (isinstance(taches, int) and not isinstance(taches, bool)
+            and 64 <= taches <= 32768):
+        taches = TACHES_DEFAUT
+    return memoire, taches
+
+
+def plafonner_ressources(run, memoire=MEMOIRE_DEFAUT, taches=TACHES_DEFAUT):
     """Enveloppe la commande dans un cgroup borné : un Espace compromis ne peut
-    pas épuiser la mémoire de la machine ni la saturer de processus (fork-bomb)."""
+    pas épuiser la mémoire de la machine ni la saturer de processus (fork-bomb).
+
+    Une mémoire en pourcentage (« 75% ») se rapporte à la mémoire physique
+    installée : c'est ce qui exprime le mieux « ne pas épuiser la machine »,
+    quelle que soit sa taille."""
     if systemd_scope_dispo():
         return ["systemd-run", "--user", "--scope", "--quiet",
-                "-p", "MemoryMax=2G", "-p", "MemorySwapMax=0",
-                "-p", "TasksMax=800", "--"] + run
+                "-p", "MemoryMax=%s" % memoire, "-p", "MemorySwapMax=0",
+                "-p", "TasksMax=%d" % taches, "--"] + run
     sys.stderr.write("Codebyr : plafonds mémoire/processus indisponibles (session systemd utilisateur absente).\n")
     return run
 
@@ -193,6 +238,7 @@ mesures = {
     "bus_systeme": joignable("/run/dbus/system_bus_socket"),
     "x11": os.path.isdir("/tmp/.X11-unix"),
     "son": os.path.exists(os.path.join(runtime, "pipewire-0")) if runtime else False,
+    "gpu": os.path.exists("/dev/dri"),
 }
 try:
     with open("/proc/net/dev", encoding="utf-8") as f:
@@ -215,22 +261,31 @@ CONTROLES = (
     ("bus_systeme", "Bus système joignable"),
     ("x11", "Socket X11 de l'hôte visible"),
     ("son", "Son et micro (PipeWire)"),
+    ("gpu", "Carte graphique (accès direct)"),
     ("reseau", "Accès au réseau"),
     ("home_isole", "Dossier personnel bien isolé"),
 )
 
-# Ce qu'on attend selon la situation. Les trois premières lignes doivent être
+# Ce qu'on attend selon la situation. Les quatre premières lignes doivent être
 # fausses PARTOUT : ce sont les portes de sortie du bac à sable.
+#
+# « None » : non exigé. La carte graphique n'est attendue que là où on l'a
+# RETIRÉE — ailleurs, sa présence dépend du matériel (une machine virtuelle
+# n'en a souvent pas), et l'exiger ferait échouer à tort une machine saine.
 SITUATIONS = (
     ("Espace ordinaire", {},
      {"bus_hote": False, "systemd_user": False, "bus_systeme": False, "x11": False,
-      "son": True, "reseau": True, "home_isole": True}),
-    ("Espace blindé, sans micro (Banque)", {"renforce": True, "audio": False},
+      "son": True, "gpu": None, "reseau": True, "home_isole": True}),
+    ("Espace blindé (Navigation)", {"renforce": True},
      {"bus_hote": False, "systemd_user": False, "bus_systeme": False, "x11": False,
-      "son": False, "reseau": True, "home_isole": True}),
-    ("Pièce jointe en Jetable", {"renforce": True, "hors_ligne": True},
+      "son": True, "gpu": None, "reseau": True, "home_isole": True}),
+    ("Espace blindé, sans micro ni carte graphique (Banque)",
+     {"renforce": True, "audio": False, "gpu": False},
      {"bus_hote": False, "systemd_user": False, "bus_systeme": False, "x11": False,
-      "son": False, "reseau": False, "home_isole": True}),
+      "son": False, "gpu": False, "reseau": True, "home_isole": True}),
+    ("Pièce jointe en Jetable", {"renforce": True, "hors_ligne": True, "gpu": False},
+     {"bus_hote": False, "systemd_user": False, "bus_systeme": False, "x11": False,
+      "son": False, "gpu": False, "reseau": False, "home_isole": True}),
 )
 
 
@@ -251,7 +306,11 @@ def evaluer(mesures, attendu):
         if cle not in mesures:
             resultat.append((libelle, None, False))
             continue
-        resultat.append((libelle, mesures[cle], mesures[cle] == attendu[cle]))
+        # attendu[cle] et non .get() : une clé OUBLIÉE dans une situation doit
+        # faire planter la vérification, pas passer pour « non exigée ».
+        exige = attendu[cle]
+        resultat.append((libelle, mesures[cle],
+                         exige is None or mesures[cle] == exige))
     return resultat
 
 

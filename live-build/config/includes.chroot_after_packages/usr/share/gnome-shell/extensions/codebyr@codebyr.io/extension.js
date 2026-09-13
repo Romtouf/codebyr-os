@@ -73,6 +73,19 @@ function signatureRegistres() {
     return signature;
 }
 
+// La couleur d'un Espace entre telle quelle dans des feuilles de style St.
+// Une valeur comme « red; background-image: url(...) » y ajouterait ses propres
+// règles : la seule chose que l'on accepte est ce qu'une couleur doit être.
+// C'est vérifié ICI, à la lecture, et non à chaque usage : il y en a cinq, et
+// le sixième, un jour, oublierait de le faire.
+const COULEUR_DEFAUT = '#43C7DF';
+const FORME_COULEUR = /^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/;
+
+function couleurSure(couleur) {
+    return (typeof couleur === 'string' && FORME_COULEUR.test(couleur))
+        ? couleur : COULEUR_DEFAUT;
+}
+
 function fusionner() {
     const signature = signatureRegistres();
     if (_fusionCache && signature === _fusionSignature)
@@ -91,6 +104,7 @@ function fusionner() {
         if (!base || !base.id)
             continue;
         const espace = Object.assign({}, base, perso.get(base.id) || {});
+        espace.couleur = couleurSure(espace.couleur);
         espace._systeme = true;
         espaces.push(espace);
         vus.add(base.id);
@@ -99,6 +113,7 @@ function fusionner() {
         if (!e || !e.id || vus.has(e.id))
             continue;
         const espace = Object.assign({}, e);
+        espace.couleur = couleurSure(espace.couleur);
         espace._systeme = false;
         espaces.push(espace);
         vus.add(e.id);
@@ -902,7 +917,10 @@ class Indicateur extends PanelMenu.Button {
     }
 
     _lancer(id, cmd) {
-        let commande = '/usr/bin/codebyr-space launch ' + id;
+        // L'identifiant vient du registre : échappé, il reste UN argument.
+        // Sans cela, « banque -- /bin/sh » ajouterait son propre « -- » et
+        // choisirait le programme lancé dans l'Espace.
+        let commande = '/usr/bin/codebyr-space launch ' + GLib.shell_quote(id);
         if (cmd)
             commande += ' -- ' + cmd;
         this._executer(commande, 'Impossible d\'ouvrir l\'Espace ' + id);
@@ -910,7 +928,7 @@ class Indicateur extends PanelMenu.Button {
 
     _gerer(action, id, nom) {
         try {
-            this._executer('/usr/bin/codebyr-space ' + action + ' ' + id,
+            this._executer('/usr/bin/codebyr-space ' + action + ' ' + GLib.shell_quote(id),
                 'Action « ' + action + ' » impossible sur ' + nom);
             const msgs = {
                 close: 'Espace fermé : ',
@@ -971,7 +989,7 @@ class Indicateur extends PanelMenu.Button {
             b.connect('clicked', () => {
                 dlg.close();
                 this._executer(
-                    '/usr/bin/codebyr-space import ' + id + ' ' + GLib.shell_quote(dir + '/' + f),
+                    '/usr/bin/codebyr-space import ' + GLib.shell_quote(id) + ' ' + GLib.shell_quote(dir + '/' + f),
                     'Restauration de ' + nom + ' impossible');
                 Main.notify('Codebyr', nom + ' restauré à l\'instantané du ' + label);
             });

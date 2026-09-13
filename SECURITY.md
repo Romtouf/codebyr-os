@@ -1,13 +1,16 @@
 # Politique de sécurité
 
-## Correctifs locaux du 12 septembre 2026 — non publiés
+## Lot de sécurité de septembre 2026
 
-Les défauts de liens dans les échanges et la préparation des Espaces, le
-repli sans bubblewrap et la restauration destructive ont été traités dans
-les sources. Le réseau restreint natif passe désormais par un namespace
-sans interface externe et un relais vers le proxy ; le Blindage ajoute un
-filtre seccomp. Les installations existantes ne bénéficient pas de ces
-changements tant qu'un paquet validé n'a pas été publié et installé.
+**Publié en 1.11.0** : défauts de liens dans les échanges et la préparation des
+Espaces, repli sans bubblewrap et restauration destructive corrigés ; réseau
+restreint imposé par un namespace sans interface externe et un relais vers le
+proxy ; filtre seccomp ajouté au Blindage.
+
+**1.12.0, en préparation** : cinq écarts entre ce que Codebyr promet et ce que
+le code appliquait, relevés par une relecture du 12 septembre — détaillés dans
+l'historique ci-dessous. Une machine ne les reçoit qu'une fois ce paquet publié
+et installé.
 
 Le prototype UID reste réservé aux tests : le bureau utilise encore un
 seul compte Unix. Voir [le périmètre, les tests et les limites du lot](docs/securite-2026-09-12.md).
@@ -53,8 +56,14 @@ utilisateur non technique.
   ne peuvent s'en servir ; seule sa session graphique locale est autorisée, sans
   mot de passe.
 - Le Blindage ajoute : espace de noms utilisateur, abandon de toutes les
-  capabilities, session neuve (anti-injection TIOCSTI), plafonds
-  mémoire/processus.
+  capabilities, session neuve (anti-injection TIOCSTI), filtre d'appels
+  système, plafonds mémoire/processus. Actif par défaut sur Banque, Jetable
+  et — à partir de 1.12.0 — Navigation. Banque et Jetable n'ont pas non plus
+  d'accès direct à la carte graphique (`"gpu": false`).
+- Un domaine autorisé dont l'adresse désigne la machine ou le réseau local
+  (bouclage, plages privées, lien local) est refusé par le filtre réseau, qui
+  se connecte à l'adresse qu'il a vérifiée et non à un nom résolu une seconde
+  fois (1.12.0).
 - Le presse-papiers ne « suit » pas passivement d'un Espace à l'autre : il est
   vidé dès que le focus passe à un Espace différent de celui qui l'a rempli —
   **et aussi dès qu'on quitte un Espace sensible** (Blindage ou réseau
@@ -104,7 +113,9 @@ qui indique aussi, sans détour, ce qui n'est **pas encore** en place.
 
 Debian stable, AppArmor actif, pare-feu nftables (`policy drop` en entrée),
 Wayland, mises à jour de sécurité automatiques (`unattended-upgrades`),
-`sysctl` durcis (kptr_restrict, ptrace_scope, protections liens/fifo…),
+`sysctl` durcis (kptr_restrict, ptrace_scope, protections liens/fifo…, et
+depuis 1.12.0 : BPF non privilégié, kexec, userfaultfd, TIOCSTI, compteurs de
+performance — livrés par le paquet, donc aussi aux machines déjà installées),
 surface applicative minimale (`--apt-recommends false`).
 
 ## Limites connues (transparence)
@@ -149,6 +160,10 @@ surface applicative minimale (`--apt-recommends false`).
 
 | Version | Correctif |
 |---|---|
+| 1.12.0 | **Navigation, l'Espace le plus exposé au web, n'était pas blindé** : pas de filtre d'appels système (io_uring, qui contourne seccomp et reste une source majeure de failles noyau, y était accessible), pas d'abandon des capabilities ni de session neuve. Blindé par défaut, avec des plafonds adaptés à un navigateur (75 % de la mémoire, 4096 tâches) pour ne pas tuer une session chargée. |
+| 1.12.0 | **Le filtre réseau pouvait servir de passage vers le réseau local.** Il jugeait le nom, jamais l'adresse résolue, et tourne sur l'hôte : un domaine autorisé pointant vers 127.0.0.1 ou la box ouvrait à un Espace restreint un réseau qu'il ne voit pas. Les adresses non publiques sont refusées, en HTTP, HTTPS et SOCKS5. |
+| 1.12.0 | **Carte graphique offerte à tous les Espaces**, sans condition. Retirée de Banque et de Jetable, et de toute pièce jointe examinée. |
+| 1.12.0 | **Menu du Sceau** : identifiant d'Espace non échappé dans une ligne de commande (arguments supplémentaires passés à `codebyr-space`, dont un `--` choisissant le programme lancé) et couleur non vérifiée dans les feuilles de style. Aucun chemin normal ne produisait ces valeurs ; le registre est désormais vérifié à la lecture comme à l'écriture. |
 | 1.1.0 | **Sortie de bac à sable par le bus de session.** Le socket `$XDG_RUNTIME_DIR/bus` de l'hôte était monté (en lecture seule) dans chaque Espace. Un `--ro-bind` ne protège pas un socket : le noyau ne refuse l'écriture sur un montage read-only que pour les fichiers, répertoires et liens. Du code hostile dans un Espace pouvait donc parler au bus de session complet, appeler `systemd --user` (`StartTransientUnit`) et exécuter du code **hors** du bac à sable, sous l'identité de l'utilisateur — puis lire les données de tous les autres Espaces. Le socket n'est plus exposé ; chaque Espace n'a que son bus privé (`dbus-run-session`). |
 | 1.1.0 | **Dossier personnel lisible par le compte invité sur le système installé.** Le `chmod 700` n'existait que dans l'image live, sur un compte supprimé à l'installation. Désormais appliqué à l'installation **et** rattrapé par `apt` sur les postes existants (`codebyr-durcir-poste`). |
 | 1.1.0 | **Mot de passe du compte invité, public et identique partout** (`invite`/`invite`). Remplacé par un compte sans mot de passe utilisable (`*`), dont seule la session graphique locale est autorisée. |

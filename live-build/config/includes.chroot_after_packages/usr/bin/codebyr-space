@@ -494,6 +494,8 @@ def cmd_launch(espaces, esp_id, extra, fichier=None):
     # refuser dans le registre ("audio": false) — c'est le cas de Banque, qui
     # n'a aucun besoin de son et représente la cible la plus sensible.
     audio = esp.get("audio", True) is not False
+    # Carte graphique : même logique que le son (voir bac_a_sable.wrap_bwrap).
+    gpu = esp.get("gpu", True) is not False
 
     # Fichier partagé dans l'Espace (ouverture jetable d'une pièce jointe) :
     # copié dans l'Espace pour être visible dans le bac à sable isolé.
@@ -512,6 +514,7 @@ def cmd_launch(espaces, esp_id, extra, fichier=None):
         # Sous cloche : une pièce jointe s'examine blindée ET sans réseau.
         renforce = True
         hors_ligne = True
+        gpu = False
 
     app_cmd = extra if extra else applications.resoudre(esp.get("app", "org.gnome.Nautilus.desktop"))
     # Une application Flatpak s'isole DÉJÀ dans son propre bac à sable : on ne
@@ -599,9 +602,9 @@ def cmd_launch(espaces, esp_id, extra, fichier=None):
                     % (esp["id"], nom_app))
     else:
         run = bac_a_sable.wrap_bwrap(home, cmd, env, renforce=renforce, hors_ligne=hors_ligne,
-                         audio=audio, envoi=envoi, filtre=filtre)
+                         audio=audio, envoi=envoi, filtre=filtre, gpu=gpu)
         if renforce:
-            run = bac_a_sable.plafonner_ressources(run)
+            run = bac_a_sable.plafonner_ressources(run, *bac_a_sable.plafonds_de(esp))
             detail = "Blindage actif" + (" · hors-ligne (aucun réseau)" if hors_ligne else "")
             print("🛡  %s dans l'Espace %s." % (detail, esp["nom"]))
         if not audio:
@@ -1046,6 +1049,13 @@ def cmd_create(nom, couleur):
         return 2
     if not couleur.startswith("#"):
         couleur = "#" + couleur
+    # La couleur finit dans les feuilles de style du bureau (liseré, menu du
+    # Sceau). L'extension la vérifie aussi en lisant le registre, mais un
+    # registre ne doit pas contenir ce qu'on refuserait d'y lire.
+    # fullmatch, et non match avec « $ » : « $ » tolère un saut de ligne final.
+    if not re.fullmatch(r"#(?:[0-9A-Fa-f]{3}|[0-9A-Fa-f]{6})", couleur):
+        sys.stderr.write("Couleur invalide : %r (attendu : #RRGGBB).\n" % couleur)
+        return 2
     base = unicodedata.normalize("NFKD", nom).encode("ascii", "ignore").decode().lower()
     base = re.sub(r"[^a-z0-9]+", "-", base).strip("-") or "espace"
     esp_id = registre.identifiant_libre(base)

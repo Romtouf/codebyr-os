@@ -97,7 +97,8 @@ class SondeIsolation(unittest.TestCase):
     """
 
     CONFORME = {"bus_hote": False, "systemd_user": False, "bus_systeme": False,
-                "x11": False, "son": True, "reseau": True, "home_isole": True}
+                "x11": False, "son": True, "gpu": True, "reseau": True,
+                "home_isole": True}
 
     def test_lecture_des_mesures(self):
         mesures = bac_a_sable.analyser_sonde("bus_hote=non\nson=oui\nbruit\n")

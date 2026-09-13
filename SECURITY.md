@@ -59,6 +59,14 @@ utilisateur non technique.
   système, plafonds mémoire/processus. Actif par défaut sur Banque, Jetable
   et — à partir de 1.12.0 — Navigation. Banque et Jetable n'ont pas non plus
   d'accès direct à la carte graphique (`"gpu": false`).
+- **Le démarrage est vérifié** quand la machine a le démarrage sécurisé
+  activé — le cas de la plupart des PC vendus aujourd'hui. Chaîne éprouvée le
+  13/09/2026 : micrologiciel → `shim` → GRUB → noyau signé par Debian. Le noyau
+  s'y verrouille alors de lui-même — niveau `integrity` : plus rien ne peut
+  **modifier** le noyau en marche (module non signé, `kexec`, écriture directe
+  en mémoire), même en administrateur. Le niveau `confidentiality`, qui
+  interdirait aussi de le **lire**, n'est pas activé : il casserait des usages
+  ordinaires comme la veille prolongée.
 - **Le disque est chiffré par défaut** depuis 1.13.0 : la case est cochée
   d'avance à l'installation (LUKS2, argon2id). Un ordinateur perdu ou volé ne
   livre ni les Espaces, ni leurs instantanés, ni les domaines bancaires

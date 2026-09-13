@@ -11,7 +11,15 @@ import sys
 import gi
 gi.require_version("Gtk", "4.0")
 gi.require_version("Adw", "1")
-from gi.repository import Adw, Gtk, Gio  # noqa: E402
+from gi.repository import Adw, GLib, Gio, Gtk  # noqa: E402
+
+# Identité de la fenêtre pour le bureau. Sous Wayland, GTK annonce le NOM DE
+# PROGRAMME, pas l'identifiant de l'application : sans cette ligne, la fenêtre
+# se présentait comme « codebyr-assistant », GNOME ne trouvait aucun lanceur de ce nom et
+# affichait l'icône générique — un losange gris — dans le dock, la vue
+# d'ensemble et Alt+Tab. Constaté le 13/09/2026 sur une installation réelle.
+GLib.set_prgname("io.codebyr.Assistant")
+GLib.set_application_name("Assistant de sécurité")
 
 # Registre partagé : vue fusionnée (défauts du système + choix de l'utilisateur).
 sys.path.insert(0, os.environ.get("CODEBYR_LIB", "/usr/share/codebyr"))

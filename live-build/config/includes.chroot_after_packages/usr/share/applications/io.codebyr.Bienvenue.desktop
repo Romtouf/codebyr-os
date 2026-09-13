@@ -1,0 +1,18 @@
+[Desktop Entry]
+Type=Application
+Name=Bienvenue dans Codebyr OS
+Name[fr]=Bienvenue dans Codebyr OS
+Comment=Revoir la présentation de Codebyr OS
+Comment[fr]=Revoir la présentation de Codebyr OS
+Exec=codebyr-bienvenue
+Icon=io.codebyr.Bienvenue
+Terminal=false
+Categories=System;Documentation;
+# GNOME rattache une fenêtre à son application par le NOM de ce fichier, qui
+# doit valoir exactement l'identifiant déclaré par le programme
+# (Adw.Application(application_id="io.codebyr.Bienvenue")). Sans ce fichier,
+# la fenêtre de bienvenue n'était rattachée à rien : le dock et la vue
+# d'ensemble affichaient l'icône générique — un losange — pendant toute
+# l'installation. L'entrée de /etc/xdg/autostart ne sert PAS à ce rattachement.
+StartupWMClass=io.codebyr.Bienvenue
+Keywords=bienvenue;présentation;découverte;codebyr;

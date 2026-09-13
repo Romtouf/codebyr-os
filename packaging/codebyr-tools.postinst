@@ -15,6 +15,20 @@ case "$1" in
 		if command -v update-desktop-database >/dev/null 2>&1; then
 			update-desktop-database -q /usr/share/applications 2>/dev/null || true
 		fi
+		# Cache d'icônes. Dès qu'un cache existe, GTK s'y fie et IGNORE les
+		# fichiers qui n'y figurent pas : une icône livrée par ce paquet
+		# resterait invisible, remplacée par l'icône générique du bureau — un
+		# losange gris dans le dock et la vue d'ensemble. Constaté le
+		# 13/09/2026 sur une machine où une installation apt avait créé le
+		# cache avant que l'icône n'arrive.
+		#
+		# L'image, elle, n'a aucun cache : GTK y parcourt les dossiers, et les
+		# icônes s'affichent sans rien faire.
+		if [ -x /usr/sbin/update-icon-caches ]; then
+			/usr/sbin/update-icon-caches /usr/share/icons/hicolor 2>/dev/null || true
+		elif command -v gtk-update-icon-cache >/dev/null 2>&1; then
+			gtk-update-icon-cache -f /usr/share/icons/hicolor 2>/dev/null || true
+		fi
 		# Trousseau apt : la clé publique du projet évolue (ajout d'une
 		# sous-clé de signature, rotation). Le trousseau, lui, a été figé à
 		# l'installation — et apt refuse alors une signature parfaitement

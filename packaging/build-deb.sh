@@ -41,6 +41,9 @@ for chemin in \
 	usr/share/codebyr \
 	usr/share/nautilus-python \
 	usr/share/applications/io.codebyr.Ouvrir.desktop \
+	usr/share/applications/io.codebyr.Bienvenue.desktop \
+	usr/share/icons/hicolor/scalable/apps/io.codebyr.Bienvenue.svg \
+	etc/xdg/autostart/codebyr-bienvenue.desktop \
 	etc/skel \
 	etc/codebyr/espaces.json \
 	etc/sysctl.d/91-codebyr-noyau.conf \

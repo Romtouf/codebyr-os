@@ -265,5 +265,72 @@ class Paquet(unittest.TestCase):
         self.assertEqual(parasites, [], "caches Python à supprimer : %s" % parasites)
 
 
+class LanceursGraphiques(unittest.TestCase):
+    """Une fenêtre sans lanceur du même nom n'est rattachée à aucune application.
+
+    GNOME associe une fenêtre à son application par le NOM du fichier .desktop,
+    qui doit valoir exactement l'identifiant déclaré par le programme. Sans lui,
+    le dock et la vue d'ensemble affichent l'icône générique — un losange gris —
+    au lieu de celle de Codebyr. Constaté le 13/09/2026 : la fenêtre de
+    bienvenue n'avait qu'une entrée dans /etc/xdg/autostart, qui ne sert pas à
+    ce rattachement.
+    """
+
+    def setUp(self):
+        self.racine = os.path.join(RACINE, "live-build", "config",
+                                   "includes.chroot_after_packages")
+
+    def _identifiants(self):
+        trouves = {}
+        for chemin in sorted(glob.glob(os.path.join(BIN, "codebyr-*"))):
+            with open(chemin, encoding="utf-8") as f:
+                source = f.read()
+            m = re.search(r'application_id="([^"]+)"', source)
+            if m:
+                trouves[os.path.basename(chemin)] = m.group(1)
+        return trouves
+
+    def test_chaque_application_graphique_a_son_lanceur(self):
+        identifiants = self._identifiants()
+        self.assertIn("codebyr-bienvenue", identifiants, "outil introuvable")
+        for outil, appid in identifiants.items():
+            lanceur = os.path.join(self.racine, "usr", "share", "applications",
+                                   appid + ".desktop")
+            self.assertTrue(os.path.exists(lanceur),
+                            "%s se déclare « %s » mais aucun lanceur de ce nom "
+                            "n'est livré : GNOME affichera l'icône générique"
+                            % (outil, appid))
+
+    def test_le_paquet_rafraichit_le_cache_d_icones(self):
+        # Dès qu'un cache d'icônes existe, GTK s'y fie et ignore les fichiers
+        # absents : une icône livrée par le paquet resterait invisible,
+        # remplacée par l'icône générique du bureau. Constaté le 13/09/2026.
+        with open(os.path.join(RACINE, "packaging", "codebyr-tools.postinst"),
+                  encoding="utf-8") as f:
+            postinst = f.read()
+        self.assertIn("update-icon-caches", postinst)
+        self.assertIn("/usr/share/icons/hicolor", postinst)
+
+    def test_la_fenetre_annonce_son_identite_au_bureau(self):
+        # Sous Wayland, GTK annonce le NOM DE PROGRAMME : sans set_prgname,
+        # la fenêtre se présente comme « codebyr-bienvenue » et GNOME ne
+        # trouve aucun lanceur de ce nom (icône générique).
+        for outil, appid in self._identifiants().items():
+            with open(os.path.join(BIN, outil), encoding="utf-8") as f:
+                source = f.read()
+            self.assertIn('GLib.set_prgname("%s")' % appid, source,
+                          "%s n'annonce pas son identité au bureau" % outil)
+
+    def test_chaque_lanceur_a_son_icone(self):
+        dossier = os.path.join(self.racine, "usr", "share", "applications")
+        for nom in sorted(os.listdir(dossier)):
+            with open(os.path.join(dossier, nom), encoding="utf-8") as f:
+                icone = re.search(r"(?m)^Icon=(.+)$", f.read()).group(1).strip()
+            if icone.startswith("io.codebyr."):
+                svg = os.path.join(self.racine, "usr", "share", "icons", "hicolor",
+                                   "scalable", "apps", icone + ".svg")
+                self.assertTrue(os.path.exists(svg), "%s : icône absente (%s)" % (nom, icone))
+
+
 if __name__ == "__main__":
     unittest.main()

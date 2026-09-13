@@ -15,6 +15,14 @@ gi.require_version("Gtk", "4.0")
 gi.require_version("Adw", "1")
 from gi.repository import Adw, Gtk, Gio, GLib  # noqa: E402
 
+# Identité de la fenêtre pour le bureau. Sous Wayland, GTK annonce le NOM DE
+# PROGRAMME, pas l'identifiant de l'application : sans cette ligne, la fenêtre
+# se présentait comme « codebyr-config », GNOME ne trouvait aucun lanceur de ce nom et
+# affichait l'icône générique — un losange gris — dans le dock, la vue
+# d'ensemble et Alt+Tab. Constaté le 13/09/2026 sur une installation réelle.
+GLib.set_prgname("io.codebyr.Config")
+GLib.set_application_name("Configuration Codebyr")
+
 # Registre partagé : la vue est la FUSION des défauts du système et des choix
 # de l'utilisateur ; on n'enregistre jamais que les différences (voir le module).
 sys.path.insert(0, os.environ.get("CODEBYR_LIB", "/usr/share/codebyr"))

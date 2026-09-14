@@ -100,6 +100,11 @@ profile codebyr-uid /usr/lib/codebyr/codebyr-uid {
   capability setuid,
   capability setgid,
   capability sys_admin,
+  # Arrêter le premier processus d'un Espace, qui tourne SOUS UN AUTRE COMPTE.
+  # Root y est ordinairement autorisé sans y penser ; sous profil, cela passe
+  # par une capacité, et sans elle la fermeture d'un Espace échouait en
+  # silence. Constaté sur la machine d'essai le 14/09/2026.
+  capability kill,
 
   # ── Sockets ──────────────────────────────────────────────────────────────
   # Celle du service, celles qu'il crée pour les ordres d'un Espace.

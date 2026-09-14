@@ -127,7 +127,10 @@ def refus_apparmor(depuis):
         if "apparmor=" not in ligne or "DENIED" not in ligne or "codebyr" not in ligne:
             continue
         champs = dict(re.findall(r'(\w+)="([^"]*)"', ligne))
-        resume = "%s %s (%s)" % (champs.get("operation", "?"), champs.get("name", "?"),
+        # Un refus de capacité ne porte pas de « name » mais un « capname » :
+        # sans lui, la ligne disait « capable ? » — un refus sans son objet.
+        quoi = champs.get("name") or champs.get("capname") or "?"
+        resume = "%s %s (%s)" % (champs.get("operation", "?"), quoi,
                                  champs.get("profile", "?"))
         if resume not in refus:
             refus.append(resume)
@@ -192,9 +195,15 @@ def main():
                    systemctl("is-enabled", "codebyr-uid.socket").stdout.strip() == "enabled")
     reussi &= dire("socket en écoute",
                    systemctl("is-active", "codebyr-uid.socket").stdout.strip() == "active")
+    # Un échec laissé par un essai précédent teinte tout ce qui suit : on le
+    # dit, puis on remet le compteur à zéro pour éprouver CETTE version.
+    etat = systemctl("is-active", "codebyr-uid.service").stdout.strip()
+    if etat == "failed":
+        print("       (le service portait l'échec d'un essai précédent : oublié)")
+        systemctl("reset-failed", "codebyr-uid.service")
+        etat = systemctl("is-active", "codebyr-uid.service").stdout.strip()
     reussi &= dire("service à l'arrêt tant qu'aucun Espace ne le demande",
-                   systemctl("is-active", "codebyr-uid.service").stdout.strip() != "active",
-                   systemctl("is-active", "codebyr-uid.service").stdout.strip())
+                   etat != "active", etat)
     charge = subprocess.run(["/usr/sbin/aa-status"], capture_output=True, text=True)
     reussi &= dire("profil AppArmor chargé", "codebyr-uid" in charge.stdout,
                    "" if "codebyr-uid" in charge.stdout else "absent de aa-status")

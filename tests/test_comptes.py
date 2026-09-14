@@ -349,6 +349,44 @@ class DroitsDExecution(unittest.TestCase):
                             "non exécutable dans le dépôt : %s" % ligne)
 
 
+class RienNeSurvitAUnEchec(unittest.TestCase):
+    """Vu le 14/09/2026 sur la VM, dans cet ordre.
+
+    Une préparation a échoué à mi-chemin : le socket Wayland était monté dans
+    la passerelle et le droit accordé, rien n'a été défait. L'essai suivant a
+    monté un second socket PAR-DESSUS ; la fermeture n'en a retiré qu'un, et
+    s'est dite réussie quand même.
+    """
+
+    def setUp(self):
+        self.code = _code(SERVICE)
+
+    def test_une_preparation_qui_echoue_defait_ce_qu_elle_a_pose(self):
+        preparer = self.code.split("def preparer(")[1].split("def _preparer(")[0]
+        self.assertIn("except Exception", preparer)
+        self.assertIn("fermer(", preparer)
+        self.assertIn("raise", preparer)
+
+    def test_un_espace_deja_ouvert_n_est_pas_referme_par_un_echec(self):
+        preparer = self.code.split("def preparer(")[1].split("def _preparer(")[0]
+        self.assertIn("deja_ouvert", preparer)
+
+    def test_un_montage_ne_s_empile_jamais_sur_un_autre(self):
+        presenter = self.code.split("def presenter(")[1].split("def retirer(")[0]
+        self.assertLess(presenter.index("umount"), presenter.index("--bind"))
+
+    def test_la_fermeture_ne_se_dit_pas_reussie_quand_elle_ne_l_est_pas(self):
+        fermer = self.code.split("def fermer(")[1].split("def traiter(")[0]
+        self.assertIn("'incomplet'", fermer)
+        # Plus aucun échec avalé en silence dans le rangement.
+        self.assertIsNone(re.search(r"^\s*pass$", fermer, re.M))
+
+    def test_le_retrait_du_droit_ne_peut_pas_echouer_en_silence(self):
+        fermer = self.code.split("def fermer(")[1].split("def traiter(")[0]
+        bloc = fermer.split("except subprocess.CalledProcessError")[1][:200]
+        self.assertIn("echecs.append", bloc)
+
+
 class LesUnites(unittest.TestCase):
 
     def test_le_service_est_demarre_a_la_demande(self):

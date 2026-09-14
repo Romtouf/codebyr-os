@@ -139,6 +139,68 @@ def poser_le_premier_processus():
     return None
 
 
+def montages_sous(chemin):
+    lignes = subprocess.run(
+        ["/usr/bin/findmnt", "-rn", "-o", "TARGET"],
+        capture_output=True, text=True).stdout.splitlines()
+    return [l for l in lignes if l.startswith(chemin + "/")]
+
+
+def signaler_restes(nom, uid_bureau, affichage):
+    """Dit, AVANT de commencer, ce qu'un essai précédent a laissé derrière lui.
+
+    Sans cela, un « NON » peut venir de l'essai d'avant et non de celui-ci —
+    c'est exactement ce qui s'est produit le 14/09/2026 : une préparation
+    interrompue avait laissé un montage, et le suivant s'est empilé dessus.
+    """
+    restes = montages_sous(comptes.chemin_passerelle(nom))
+    acl = subprocess.run(["/usr/bin/getfacl", "-p",
+                          "/run/user/%d/%s" % (uid_bureau, affichage)],
+                         capture_output=True, text=True).stdout
+    # Toute entrée nominative, pas seulement celles au nom d'un Espace : un
+    # compte supprimé depuis laisse son droit sous forme de NUMÉRO.
+    droits = [l for l in acl.splitlines()
+              if l.startswith("user:") and not l.startswith("user::")]
+    if not restes and not droits:
+        dire("aucun reste d'un essai précédent", True)
+        return
+    dire("aucun reste d'un essai précédent", False,
+         "%d montage(s), %d droit(s)" % (len(restes), len(droits)))
+    for ligne in restes + droits:
+        print("       → %s" % ligne)
+
+
+def diagnostiquer_passerelle(passerelle, debut):
+    """Dit ce qui reste d'une passerelle, et pourquoi, sans qu'on ait à le demander.
+
+    Écrit après un « NON » dont la cause n'était pas lisible dans la sortie :
+    plutôt que de deviner et de renvoyer un essai de plus, on montre ce qui
+    est resté, comment c'est monté, et ce que le service en a dit.
+    """
+    print("       ┌ ce qui reste dans la passerelle :")
+    try:
+        for nom in sorted(os.listdir(passerelle)):
+            chemin = os.path.join(passerelle, nom)
+            print("       │   %s%s" % (nom, "  (point de montage)"
+                                       if os.path.ismount(chemin) else ""))
+    except OSError as exc:
+        print("       │   illisible : %s" % exc)
+    montages = subprocess.run(
+        ["/usr/bin/findmnt", "-rn", "-o", "TARGET,SOURCE,PROPAGATION"],
+        capture_output=True, text=True).stdout.splitlines()
+    print("       ├ montages sous la passerelle :")
+    for ligne in montages:
+        if ligne.startswith(passerelle):
+            print("       │   %s" % ligne)
+    journal = subprocess.run(
+        ["/usr/bin/journalctl", "--no-pager", "-o", "cat", "-t", "codebyr-uid",
+         "--since", "@%d" % int(debut)],
+        capture_output=True, text=True).stdout.splitlines()
+    print("       └ ce que le service a écrit au journal :")
+    for ligne in journal[-12:]:
+        print("           %s" % ligne)
+
+
 def ordonner(uid, gid, socket_ordres, demande):
     """Fait exécuter une commande DANS l'Espace, comme le fera le lanceur.
 
@@ -180,6 +242,7 @@ def main():
     bureau = pwd.getpwuid(uid)
     affichage = os.path.basename(os.environ.get("WAYLAND_DISPLAY", "wayland-0"))
 
+    debut = time.time()
     print("Essai du service « un UID par Espace »\n")
     dire("session du bureau", True, "%s (UID %d), affichage %s"
          % (bureau.pw_name, bureau.pw_uid, affichage))
@@ -201,6 +264,8 @@ def main():
     os.chmod(script, 0o644)
     nom = comptes.nom_compte(bureau.pw_uid, ESPACE)
     reussi = True
+    signaler_restes(nom, uid, affichage)
+    fermeture_faite = False
     try:
         print("\n── 1. Le service prépare l'Espace ────────────────────────────────")
         r = demander(bureau.pw_uid, bureau.pw_gid,
@@ -296,9 +361,14 @@ def main():
 
         print("\n── 7. La fermeture retire tout ───────────────────────────────────")
         r3 = demander(bureau.pw_uid, bureau.pw_gid, {"action": "fermer", "espace": ESPACE})
-        dire("réponse du service", r3.get("ok"), r3.get("erreur", ""))
-        reussi &= dire("passerelle retirée", not os.path.exists(r["passerelle"]),
-                       r["passerelle"])
+        fermeture_faite = True
+        # Compté désormais : un service qui dit « fermé » sans l'avoir fait est
+        # précisément ce que cet essai doit attraper.
+        reussi &= dire("réponse du service", r3.get("ok"), r3.get("erreur", ""))
+        if not dire("passerelle retirée", not os.path.exists(r["passerelle"]),
+                    r["passerelle"]):
+            reussi = False
+            diagnostiquer_passerelle(r["passerelle"], debut)
         reussi &= dire("dépôt retiré", not os.path.exists(r.get("depot", "")),
                        r.get("depot", ""))
         acl = subprocess.run(["/usr/bin/getfacl", "-p",
@@ -308,6 +378,13 @@ def main():
                        ("user:%d" % espace.pw_uid) not in acl.stdout
                        and (":%s:" % r["compte"]) not in acl.stdout)
     finally:
+        # Un essai arrêté en route fermait sans passer par le service : le
+        # montage et le DROIT sur le socket du bureau lui survivaient, et
+        # l'essai suivant partait d'un état faussé. On ferme donc toujours par
+        # le service, qui sait ce qu'il a posé.
+        if not fermeture_faite:
+            demander(bureau.pw_uid, bureau.pw_gid,
+                     {"action": "fermer", "espace": ESPACE})
         service.terminate()
         service.wait(timeout=5)
         # Ceinture : si l'essai s'est arrêté avant la fermeture, la portée

@@ -196,7 +196,20 @@ def droit_sur_socket(chemin, uid, accorder=True):
 
 
 def presenter(source, destination):
-    """Présente un socket du bureau dans la passerelle, par un montage lié."""
+    """Présente un socket du bureau dans la passerelle, par un montage lié.
+
+    Un montage déjà présent — laissé par une préparation interrompue — serait
+    RECOUVERT par le nouveau, et la fermeture n'en retirerait qu'un : la
+    passerelle survivrait à l'Espace. Constaté le 14/09/2026. On retire donc
+    d'abord ce qui est là, avant de monter.
+    """
+    for _ in range(8):
+        if not os.path.ismount(destination):
+            break
+        subprocess.run(["/usr/bin/umount", destination],
+                       check=True, capture_output=True)
+    else:
+        raise OSError("montages empilés impossibles à retirer : %s" % destination)
     if not os.path.exists(destination):
         with open(destination, "w"):
             pass
@@ -205,12 +218,24 @@ def presenter(source, destination):
 
 
 def retirer(destination):
+    """Retire un socket présenté. Renvoie la raison d'un échec, ou None.
+
+    Rien n'est ignoré : un démontage refusé passait ici en silence, et la
+    fermeture se disait réussie en laissant la passerelle en place — constaté
+    le 14/09/2026. Root ne prétend pas avoir rangé ce qu'il n'a pas rangé.
+    """
     if os.path.ismount(destination):
-        subprocess.run(["/usr/bin/umount", destination], capture_output=True)
+        r = subprocess.run(["/usr/bin/umount", destination],
+                           capture_output=True, text=True)
+        if r.returncode != 0:
+            return "démontage refusé : %s" % (r.stderr.strip() or r.returncode)
     try:
         os.unlink(destination)
-    except OSError:
+    except FileNotFoundError:
         pass
+    except OSError as exc:
+        return "suppression refusée : %s" % exc
+    return None
 
 
 def socket_d_ordres(depot):
@@ -292,6 +317,34 @@ def arreter_portee(compte):
 
 
 def preparer(uid_demandeur, espace, affichage, son, memoire=None, taches=None):
+    """Tout ou rien : une préparation qui échoue défait ce qu'elle a posé.
+
+    Constaté le 14/09/2026 : le premier processus refusait de démarrer, alors
+    que le socket Wayland était déjà monté dans la passerelle et le DROIT déjà
+    accordé au compte de l'Espace. Rien n'était défait. L'Espace n'existait
+    pas, mais son compte gardait l'accès à l'affichage du bureau — et l'essai
+    suivant a monté un second socket par-dessus le premier.
+
+    Un Espace déjà ouvert n'est pas refermé si une nouvelle préparation échoue :
+    on ne ferme pas sous les yeux de l'utilisateur ce qui fonctionnait.
+    """
+    nom = comptes.nom_compte(uid_demandeur, espace)
+    ouvert = OUVERTS.get(nom)
+    deja_ouvert = bool(ouvert) and ouvert[0].poll() is None
+    try:
+        return _preparer(uid_demandeur, espace, affichage, son, memoire, taches)
+    except Exception:
+        if not deja_ouvert:
+            try:
+                defait = fermer(uid_demandeur, espace)
+                if not defait.get("ok"):
+                    journal("préparation de %s défaite en partie seulement" % nom)
+            except Exception as exc:
+                journal("préparation de %s impossible à défaire : %s" % (nom, exc))
+        raise
+
+
+def _preparer(uid_demandeur, espace, affichage, son, memoire, taches):
     nom = comptes.nom_compte(uid_demandeur, espace)
     home = comptes.chemin_home(uid_demandeur, espace)
     utilisateur = compte_systeme(nom, home)
@@ -352,21 +405,34 @@ def fermer(uid_demandeur, espace):
         except subprocess.TimeoutExpired:
             ouvert[0].kill()
     arreter_portee(nom)
+    # Chaque étape est tentée même si la précédente a échoué — un montage
+    # récalcitrant ne doit pas empêcher de retirer le droit sur le socket, qui
+    # est la vraie barrière — mais aucun échec n'est tu.
+    echecs = []
     passerelle = comptes.chemin_passerelle(nom)
     if os.path.isdir(passerelle):
-        for fichier in os.listdir(passerelle):
-            retirer(os.path.join(passerelle, fichier))
+        for fichier in sorted(os.listdir(passerelle)):
+            echec = retirer(os.path.join(passerelle, fichier))
+            if echec:
+                echecs.append("%s, %s" % (fichier, echec))
             source = os.path.join("/run/user/%d" % uid_demandeur, fichier)
             if os.path.exists(source):
                 try:
                     droit_sur_socket(source, utilisateur.pw_uid, accorder=False)
-                except subprocess.CalledProcessError:
-                    pass
+                except subprocess.CalledProcessError as exc:
+                    # Le plus grave des échecs possibles ici : le compte de
+                    # l'Espace garderait l'accès au socket du bureau.
+                    echecs.append("%s, DROIT NON RETIRÉ : %s" % (
+                        fichier, (exc.stderr or b"").decode("utf-8", "replace").strip()))
         try:
             os.rmdir(passerelle)
-        except OSError:
-            pass
+        except OSError as exc:
+            echecs.append("passerelle conservée : %s" % exc)
     vider_depot(comptes.chemin_depot(nom))
+    if echecs:
+        for echec in echecs:
+            journal("fermeture incomplète de %s : %s" % (nom, echec))
+        return {"ok": False, "erreur": "incomplet"}
     journal("Espace %s refermé" % nom)
     return {"ok": True}
 

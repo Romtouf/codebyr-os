@@ -695,3 +695,36 @@ class LeMasqueDesACL(unittest.TestCase):
     def test_une_destination_illisible_se_dit_au_journal(self):
         relever = _fonction(_source(), "relever_envois", "_espace_courant")
         self.assertIn('journal("relève impossible de %s vers %s : %s"', relever)
+
+
+class LeReglageDansLaConfiguration(unittest.TestCase):
+    """Le réglage vivait dans un fichier JSON : autant dire nulle part."""
+
+    def setUp(self):
+        with open(os.path.join(outils.BIN, "codebyr-config"), encoding="utf-8") as f:
+            self.source = f.read()
+
+    def test_la_configuration_propose_le_reglage(self):
+        self.assertIn("Compte séparé, par Espace", self.source)
+
+    def test_elle_ecrit_la_cle_que_le_lanceur_lit(self):
+        # Deux moitiés du même réglage : si l'une écrit « separe » et l'autre
+        # lit « dedie », la case ne fait rien et personne ne le voit.
+        self.assertIn('valeur = "dedie" if actif else None', self.source)
+        self.assertIn('registre.modifier_espace(esp_id, {"compte": valeur})', self.source)
+        self.assertTrue(compte_dedie.demande({"compte": "dedie"}))
+
+    def test_elle_dit_ce_qui_va_se_passer_aux_donnees(self):
+        # Un réglage qui déplace des fichiers doit dire qu'il les déplace, et
+        # comment revenir en arrière.
+        for phrase in ("suivent à sa prochaine ouverture", "reviennent si vous le",
+                       "rien n'est effacé"):
+            self.assertIn(phrase, self.source, phrase)
+
+    def test_elle_previent_quand_le_service_n_est_pas_la(self):
+        self.assertIn("compte_dedie.SOCKET_SERVICE", self.source)
+        self.assertIn("n'est pas actif", self.source)
+        self.assertIn("row.set_sensitive(service)", self.source)
+
+    def test_elle_annonce_la_limite_des_applications_flatpak(self):
+        self.assertIn("applications Flatpak ne s'ouvriront pas", self.source)

@@ -132,8 +132,22 @@ qui indique aussi, sans détour, ce qui n'est **pas encore** en place.
 
 ## Durcissement de la base
 
+**Un compte Unix par Espace (1.15.0, au choix de l'utilisateur).** Un Espace
+peut tourner sous son propre compte système : son dossier lui appartient (0700),
+hors du dossier personnel, et le compte du bureau ne peut pas le lire. Ce qui
+s'échappe du bac à sable retrouve alors ce compte-là, et rien d'autre. Le
+service qui prépare ces comptes tourne en root, sur activation de socket ; il
+n'exécute aucune commande venant du client, ne prend aucun chemin de lui,
+n'ouvre jamais le dossier d'exécution du bureau (donc jamais son bus de
+session), et refuse toute demande venant d'un Espace — sans quoi « jetable »
+ferait ouvrir « banque ». Ce que le bureau veut ouvrir est exécuté par un
+premier processus lancé sous le compte de l'Espace, sans aucun privilège : root
+ne voit jamais la commande. Les données ne passent jamais par root non plus :
+le bureau emballe ce qu'il a le droit de lire, l'Espace déballe chez lui.
+
 Debian stable, AppArmor actif — avec un profil propre au filtre réseau des
-Espaces depuis 1.12.1 —, pare-feu nftables (`policy drop` en entrée),
+Espaces depuis 1.12.1, et au service des comptes d'Espaces depuis 1.15.0 —,
+pare-feu nftables (`policy drop` en entrée),
 Wayland, mises à jour de sécurité automatiques (`unattended-upgrades`),
 `sysctl` durcis (kptr_restrict, ptrace_scope, protections liens/fifo…, et
 depuis 1.12.0 : BPF non privilégié, kexec, userfaultfd, TIOCSTI, compteurs de
@@ -172,6 +186,17 @@ surface applicative minimale (`--apt-recommends false`).
   `~/.config/codebyr/presse-papiers-libre` désactive le vidage automatique.
 - **Applications Flatpak** : proviennent de Flathub — confiance déléguée à
   Flathub et à l'éditeur de chaque application.
+- **Compte séparé : ce qui n'y fonctionne pas encore.** Une application Flatpak
+  installée dans un Espace ne s'ouvre pas sous compte séparé (elle a son propre
+  bac à sable et ses propres données, que Codebyr ne déplace pas), et la carte
+  graphique n'est pas accessible au compte de l'Espace : l'affichage s'y fait en
+  rendu logiciel. Les deux sont annoncés dans la fenêtre de configuration, et
+  c'est pourquoi le réglage reste au choix de l'utilisateur plutôt qu'appliqué
+  d'office.
+- **Compte séparé : le bureau reste au-dessus.** Il dit à l'Espace quoi
+  exécuter — il pouvait déjà tout exécuter sous sa propre identité, donc cela ne
+  lui donne rien de neuf. L'inverse n'est pas vrai : un Espace ne commande rien
+  au bureau, et ne peut pas demander l'ouverture d'un autre Espace.
 - **Sites bancaires réels et liste blanche** : beaucoup de banques chargent des
   ressources depuis des domaines tiers (CDN, prestataire 3-D Secure, captcha).
   Une liste blanche saisie à la main peut donc casser une authentification

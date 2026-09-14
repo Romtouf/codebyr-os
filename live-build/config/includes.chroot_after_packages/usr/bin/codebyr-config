@@ -28,6 +28,7 @@ GLib.set_application_name("Configuration Codebyr")
 sys.path.insert(0, os.environ.get("CODEBYR_LIB", "/usr/share/codebyr"))
 import applications  # noqa: E402
 import bac_a_sable  # noqa: E402
+import compte_dedie  # noqa: E402
 import interface  # noqa: E402
 import registre  # noqa: E402
 
@@ -193,6 +194,8 @@ class Fenetre(Adw.ApplicationWindow):
             row.connect("notify::active", self._basculer_audio, e.get("id"))
             gson.add(row)
 
+        self._groupe_comptes_dedies()
+
         # Capacités réelles de la machine (transparence)
         gcap = Adw.PreferencesGroup(
             title="Isolation disponible sur cette machine",
@@ -209,6 +212,72 @@ class Fenetre(Adw.ApplicationWindow):
             gcap.add(r)
 
         self._groupe_applications()
+
+    # ---- Compte séparé par Espace (le réglage, pas un fichier à éditer) ----
+    def _groupe_comptes_dedies(self):
+        """Le réglage qui donne à un Espace son propre compte Unix.
+
+        Il vivait dans un fichier JSON : autant dire nulle part, pour qui n'ouvre
+        pas de terminal. Ce qu'il change mérite d'être dit en toutes lettres,
+        parce qu'il déplace des données — et ce qui déplace des données doit
+        aussi dire comment revenir en arrière.
+        """
+        service = os.path.exists(compte_dedie.SOCKET_SERVICE)
+        description = (
+            "Un Espace sous compte séparé possède ses fichiers sous une identité "
+            "à lui. Ce qui s'échapperait de son bac à sable ne pourrait plus lire "
+            "les autres Espaces, ni votre dossier personnel. Ses données le "
+            "suivent à sa prochaine ouverture, et reviennent si vous le "
+            "désactivez — rien n'est effacé.")
+        if not service:
+            description += ("\n\nLe service des comptes d'Espaces n'est pas actif "
+                            "sur cette machine : ce réglage reste sans effet.")
+        groupe = Adw.PreferencesGroup(title="Compte séparé, par Espace",
+                                      description=description)
+        self._page.add(groupe)
+        self._groupes.append(groupe)
+        for e in self._data.get("espaces", []):
+            actif = e.get("compte") == "dedie"
+            flatpak = self._a_des_applications_flatpak(e)
+            if flatpak:
+                sous_titre = ("Ses applications Flatpak ne s'ouvriront pas sous "
+                              "compte séparé")
+            elif actif:
+                sous_titre = "Ses fichiers lui appartiennent"
+            else:
+                sous_titre = "Ses fichiers appartiennent à votre compte"
+            row = Adw.SwitchRow(title=e.get("nom", e.get("id")), subtitle=sous_titre)
+            row.set_active(actif)
+            row.set_sensitive(service)
+            row.add_prefix(interface.pastille(e.get("couleur", "#888888"), 18))
+            row.connect("notify::active", self._basculer_compte, e.get("id"))
+            groupe.add(row)
+
+    def _a_des_applications_flatpak(self, esp):
+        """Cet Espace a-t-il des applications que le compte séparé ne sait pas ouvrir ?"""
+        if os.path.isdir(os.path.expanduser(
+                "~/.local/share/codebyr/espaces/%s/flatpak" % esp.get("id"))):
+            return True
+        return any("flatpak" in (a.get("cmd") or "") for a in esp.get("apps", []))
+
+    def _basculer_compte(self, row, _pspec, esp_id):
+        # « None » pour désactiver, comme pour le Blindage : retirer la clé
+        # laisserait revenir la valeur par défaut du système, et le bouton
+        # semblerait ne servir à rien.
+        actif = bool(row.get_active())
+        valeur = "dedie" if actif else None
+        for e in self._data.get("espaces", []):
+            if e.get("id") == esp_id:
+                e["compte"] = valeur
+                break
+        registre.modifier_espace(esp_id, {"compte": valeur})
+        self._dire("Ses données déménageront à sa prochaine ouverture."
+                   if actif else "Ses données reviendront à sa prochaine ouverture.")
+        self._construire()
+
+    def _dire(self, message):
+        if hasattr(self, "_toaster"):
+            self._toaster.add_toast(Adw.Toast(title=message))
 
     # ---- Section « Sites bloqués » (mode apprentissage du filtre réseau) ----
     def _journal_refus(self, esp_id):

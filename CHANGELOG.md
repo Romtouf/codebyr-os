@@ -10,6 +10,40 @@ GNOME (menu du Sceau, liserés colorés) ne se recharge pas à chaud.
 
 ---
 
+## 1.15.0 — 14 septembre 2026
+
+**Chaque Espace peut désormais avoir son propre compte sur la machine.** C'est
+le changement le plus profond depuis la première version. Il s'active Espace par
+Espace, dans « Configuration Codebyr » → *Compte séparé, par Espace*.
+
+Jusqu'ici, tous vos Espaces tournaient sous votre compte. Le bac à sable les
+séparait par ce qu'ils *voient* ; rien ne les séparait par ce qu'ils ont le
+*droit* de toucher. Un programme qui s'échappait du bac à sable retrouvait vos
+documents et ceux de tous les autres Espaces. Avec un compte séparé, cette
+frontière devient une règle du système, que le noyau vérifie à chaque ouverture
+de fichier : ce qui s'échappe de Jetable ne peut plus lire Banque, ni votre
+dossier personnel.
+
+Ce que vous verrez, si vous activez le réglage :
+
+- **à la première ouverture, les fichiers de l'Espace déménagent** vers son
+  compte. Rien n'est effacé ; si vous décochez la case, ils reviennent, avec ce
+  que vous avez fait entre-temps ;
+- **tout le reste continue** : envoyer un fichier à un Espace, en faire sortir
+  un, examiner une pièce jointe, sauvegarder, restaurer, effacer. Les fichiers
+  passent par des boîtes que l'Espace et vous êtes seuls à partager ;
+- **l'Espace jetable garde sa promesse** : son dossier vit en mémoire vive et
+  disparaît à la fermeture, sans jamais toucher le disque ;
+- **la mémoire est plafonnée pour l'Espace entier**, et non plus fenêtre par
+  fenêtre.
+
+Le réglage est **désactivé par défaut** : rien ne change tant que vous ne
+l'activez pas, et rien ne tourne en arrière-plan tant qu'aucun Espace ne le
+demande. Deux limites sont annoncées dans la fenêtre de configuration : une
+application **Flatpak** installée dans un Espace ne s'ouvre pas sous compte
+séparé, et l'accélération graphique n'y est pas encore disponible (l'affichage
+se fait en rendu logiciel).
+
 ## 1.14.0 — 13 septembre 2026
 
 **Les notifications reviennent dans les Espaces.** Une application qui prévient

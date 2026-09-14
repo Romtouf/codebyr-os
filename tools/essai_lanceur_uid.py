@@ -55,6 +55,16 @@ PERSONNE = 65534
 # Réglages de Banque, tels qu'ils sont livrés, avec un domaine autorisé.
 DOMAINE_AUTORISE = "example.org"
 DOMAINE_REFUSE = "example.com"
+# Exécuté DANS l'Espace réglé comme Banque : on demande au filtre, par le relais
+# local du bac à sable, un tunnel vers un domaine hors liste. La première ligne
+# de sa réponse est gardée dans le dossier de l'Espace.
+DEMANDE_REFUSEE = r'''
+import os, socket
+s = socket.create_connection(("127.0.0.1", 17890), timeout=15)
+s.sendall(b"CONNECT %s:443 HTTP/1.1\r\nHost: x\r\n\r\n")
+with open(os.path.join(os.environ["HOME"], "refus.txt"), "wb") as f:
+    f.write(s.recv(300))
+'''
 COMME_BANQUE = {"app": "firefox-esr.desktop", "blindage": "renforce",
                 "audio": False, "gpu": False,
                 "reseau": {"mode": "liste-blanche", "domaines": [DOMAINE_AUTORISE]}}
@@ -416,15 +426,24 @@ def main():
         reussi &= dire("site autorisé atteint à travers le dépôt",
                        taille > 4000, "capture de %d octets" % taille)
         avant_refus = time.time()
-        tentative = lanceur(bureau, "launch", ESPACE, "--", "firefox-esr", "--headless",
-                            "--screenshot", os.path.join(home, "refus.png"),
-                            "https://" + DOMAINE_REFUSE + "/")
-        # Informatif : un lanceur arrêté au bout du délai est tué, et un
-        # lanceur tué ne range pas son marqueur — c'est ce qui a trompé
-        # l'étape 1 d'un essai suivant.
+        # Une demande directe au filtre, depuis le même Espace blindé, et non
+        # Firefox : en capture sans affichage, Firefox attend un chargement
+        # que sa page d'erreur ne déclenche jamais, et restait bloqué jusqu'au
+        # délai — l'essai tuait alors le lanceur (vu le 14/09/2026).
+        tentative = lanceur(bureau, "launch", ESPACE, "--", "/usr/bin/python3", "-c",
+                            DEMANDE_REFUSEE % DOMAINE_REFUSE)
         dire("tentative sur le site refusé terminée d'elle-même",
              tentative.returncode != 124,
              "code %s en %.0f s" % (tentative.returncode, time.time() - avant_refus))
+        reponse_filtre = ""
+        try:
+            with open(os.path.join(home, "refus.txt"), encoding="latin-1") as f:
+                reponse_filtre = f.read()
+        except OSError:
+            pass
+        reussi &= dire("le filtre répond par un refus, pas par un tunnel",
+                       bool(reponse_filtre) and " 200 " not in reponse_filtre.split("\n")[0],
+                       reponse_filtre.split("\n")[0].strip()[:60] or "aucune réponse")
         refuses = ""
         try:
             with open(journal_refus, encoding="utf-8") as f:

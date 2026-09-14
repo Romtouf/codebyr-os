@@ -98,6 +98,13 @@ VERROU = threading.Lock()
 # milliseconde puisqu'il le dit lui-même.
 DELAI_DEMARRAGE = 10.0
 
+# Au bout de ce temps sans rien à faire ET sans aucun Espace ouvert, le service
+# s'arrête ; systemd le relance à la connexion suivante. Sans cela, il restait
+# en mémoire jusqu'au redémarrage dès qu'un Espace avait été ouvert une fois,
+# alors que la promesse est « rien ne tourne tant que personne n'ouvre
+# d'Espace ». Constaté sur la machine d'essai le 14/09/2026.
+DELAI_REPOS = 120.0
+
 
 def journal(message):
     syslog.syslog(syslog.LOG_INFO, message)
@@ -716,10 +723,32 @@ def servir_client(client):
             pass
 
 
-def servir(srv):
+def au_repos():
+    """Plus aucun Espace ouvert, et plus personne qui en tienne un.
+
+    S'arrêter pendant qu'un Espace vit serait le pire moment : ce service est
+    le seul à savoir quels Espaces sont ouverts, et le suivant, ne le sachant
+    plus, arrêterait leur portée en croyant faire le ménage — fermant sous les
+    yeux de l'utilisateur ce qu'il avait ouvert.
+    """
+    with VERROU:
+        vivants = [nom for nom, (proc, _s) in OUVERTS.items() if proc.poll() is None]
+        return not vivants and TENUES.total() == 0
+
+
+def servir(srv, repos=None):
+    if repos:
+        srv.settimeout(repos)
     while True:
         try:
             client, _ = srv.accept()
+        except TimeoutError:
+            # Sous-classe d'OSError : à attraper AVANT elle, sinon le service
+            # s'arrêterait à chaque attente au lieu de se rendormir.
+            if au_repos():
+                journal("plus aucun Espace ouvert : le service s'arrête")
+                return 0
+            continue
         except OSError:
             return 0
         if threading.active_count() > TENUES.maximum + 16:
@@ -749,6 +778,10 @@ def main(argv):
             sys.stderr.write("codebyr-uid : lancé par systemd (codebyr-uid.socket).\n")
             return 2
         srv = socket.socket(fileno=3)
+        # Le repos ne vaut que lancé par systemd : lui seul sait relancer le
+        # service à la connexion suivante. En essai, le service est lancé à la
+        # main, et doit rester tant qu'on l'éprouve.
+        return servir(srv, repos=DELAI_REPOS)
     return servir(srv)
 
 

@@ -195,11 +195,12 @@ def main():
                    systemctl("is-enabled", "codebyr-uid.socket").stdout.strip() == "enabled")
     reussi &= dire("socket en écoute",
                    systemctl("is-active", "codebyr-uid.socket").stdout.strip() == "active")
-    # Un échec laissé par un essai précédent teinte tout ce qui suit : on le
-    # dit, puis on remet le compteur à zéro pour éprouver CETTE version.
+    # Ce qu'un essai précédent a laissé teinte tout ce qui suit : on remet le
+    # service à zéro, puis on vérifie qu'il ne revient QUE sur demande.
     etat = systemctl("is-active", "codebyr-uid.service").stdout.strip()
-    if etat == "failed":
-        print("       (le service portait l'échec d'un essai précédent : oublié)")
+    if etat in ("active", "failed"):
+        print("       (le service restait d'un essai précédent (%s) : arrêté)" % etat)
+        systemctl("stop", "codebyr-uid.service")
         systemctl("reset-failed", "codebyr-uid.service")
         etat = systemctl("is-active", "codebyr-uid.service").stdout.strip()
     reussi &= dire("service à l'arrêt tant qu'aucun Espace ne le demande",

@@ -600,3 +600,41 @@ class LePlafondDEspaces(unittest.TestCase):
     def test_le_service_verifie_au_moment_de_creer(self):
         creation = _code(SERVICE).split("def compte_systeme(")[1].split("\ndef ")[0]
         self.assertLess(creation.index("trop_d_espaces("), creation.index("useradd"))
+
+
+class LeServiceSeRendort(unittest.TestCase):
+    """« Rien ne tourne tant que personne n'ouvre d'Espace » — y compris APRÈS.
+
+    Une fois démarré, le service restait en mémoire jusqu'au redémarrage. Vu
+    sur la machine d'essai le 14/09/2026 : la promesse n'était vraie qu'au
+    premier démarrage.
+    """
+
+    def setUp(self):
+        self.code = _code(SERVICE)
+
+    def test_il_s_arrete_quand_plus_aucun_espace_n_est_ouvert(self):
+        servir = self.code.split("def servir(")[1].split("\ndef ")[0]
+        self.assertIn("au_repos()", servir)
+        self.assertIn("return 0", servir)
+
+    def test_il_ne_s_arrete_jamais_pendant_qu_un_espace_vit(self):
+        # Le suivant, ne sachant plus quels Espaces sont ouverts, arrêterait
+        # leur portée en croyant faire le ménage.
+        repos = self.code.split("def au_repos(")[1].split("\ndef ")[0]
+        self.assertIn("proc.poll() is None", repos)
+        self.assertIn("TENUES.total()", repos)
+        self.assertIn("with VERROU:", repos)
+
+    def test_l_attente_ne_passe_pas_pour_un_arret(self):
+        # TimeoutError est une sous-classe d'OSError : attrapée après elle, le
+        # service s'arrêterait à chaque attente au lieu de se rendormir.
+        servir = self.code.split("def servir(")[1].split("\ndef ")[0]
+        self.assertLess(servir.index("except TimeoutError"), servir.index("except OSError"))
+
+    def test_le_repos_ne_vaut_que_lance_par_systemd(self):
+        # En essai, le service est lancé à la main : personne ne le relancerait.
+        principal = self.code.split("def main(")[1]
+        systemd = principal.split("LISTEN_FDS")[1]
+        self.assertIn("repos=DELAI_REPOS", systemd)
+        self.assertNotIn("repos=", principal.split("LISTEN_FDS")[0])

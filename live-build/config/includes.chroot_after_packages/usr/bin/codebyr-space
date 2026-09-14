@@ -37,6 +37,7 @@ sys.path.insert(0, os.environ.get("CODEBYR_LIB", "/usr/share/codebyr"))
 import applications  # noqa: E402
 import autotest  # noqa: E402
 import bac_a_sable  # noqa: E402
+import compte_dedie  # noqa: E402
 import fichiers_surs
 import modeles  # noqa: E402
 import provenance  # noqa: E402
@@ -249,7 +250,7 @@ def journal_refus(esp_id):
     return os.path.join(DATA_ROOT, esp_id, "domaines-refuses.txt")
 
 
-def _demarrer_filtre_reseau(esp, home, app_cmd, chemin_socket=None):
+def _demarrer_filtre_reseau(esp, home, app_cmd, chemin_socket=None, compte_dedie_=False):
     """Si l'Espace a une liste blanche et lance Firefox : démarre le filtre
     et configure le navigateur pour l'utiliser. Renvoie le processus proxy.
 
@@ -269,6 +270,9 @@ def _demarrer_filtre_reseau(esp, home, app_cmd, chemin_socket=None):
         srv = socket.socket(socket.AF_UNIX if chemin_socket else socket.AF_INET,
                             socket.SOCK_STREAM)
         srv.bind(chemin_socket if chemin_socket else ("127.0.0.1", 0))
+        if compte_dedie_:
+            # Dans le dépôt, que seuls le bureau et cet Espace traversent.
+            os.chmod(chemin_socket, 0o666)
         srv.listen(64)
         port = 17890 if chemin_socket else srv.getsockname()[1]
 
@@ -276,7 +280,10 @@ def _demarrer_filtre_reseau(esp, home, app_cmd, chemin_socket=None):
         # le filtre ne démarre pas, le navigateur pointe vers un port muet et ne
         # joint plus rien. L'ordre inverse laissait l'Espace Banque avec un accès
         # Internet complet quand le filtre manquait à l'appel.
-        if "firefox" in os.path.basename(app_cmd[0]):
+        #
+        # Sous compte dédié, c'est l'Espace qui l'a déjà fait, plus tôt et dans
+        # le même ordre : le bureau n'a plus accès à son dossier.
+        if "firefox" in os.path.basename(app_cmd[0]) and not compte_dedie_:
             _preparer_profil_firefox(home, port)
 
         proc = subprocess.Popen(["codebyr-net-proxy", "--fd", str(srv.fileno()),
@@ -377,7 +384,16 @@ def _installer_bouclier(esp, home, espaces):
     vérification des signatures d'extensions dans le profil — un affaiblissement
     réel du navigateur pour installer une protection. Sans .xpi signé, on
     n'installe rien, et on le dit."""
-    doms = _domaines_proteges(espaces)
+    _installer_bouclier_pour(home, _domaines_proteges(espaces))
+
+
+def _installer_bouclier_pour(home, doms):
+    """Le bouclier, à partir de la seule liste des domaines protégés.
+
+    Séparé pour pouvoir être posé DEPUIS un Espace à compte dédié : celui-ci
+    ne peut pas lire le registre de l'utilisateur, on ne lui transmet que la
+    liste dont il a besoin.
+    """
     if not doms or not os.path.isdir(BOUCLIER_DIR):
         return
     ffbase = os.path.join(home, ".mozilla", "firefox")
@@ -451,6 +467,18 @@ def _visionneuse_pour(nom):
     return v or ["xdg-open"]
 
 
+def _refuser_compte_dedie(esp, raison):
+    """Un Espace à compte dédié qui ne peut pas s'ouvrir tel quel ne s'ouvre pas.
+
+    Jamais de repli sous le compte du bureau : ce serait retirer à l'Espace, en
+    silence, la protection qu'on lui a promise (voir compte_dedie.py).
+    """
+    sys.stderr.write("codebyr-space : %s ne s'ouvre pas — %s.\n" % (esp["nom"], raison))
+    _prevenir("Espace %s : ouverture refusée" % esp["nom"], raison[:1].upper() + raison[1:] + ".")
+    journal("Espace %s : compte dédié, ouverture refusée (%s)" % (esp["id"], raison))
+    return 1
+
+
 def cmd_launch(espaces, esp_id, extra, fichier=None):
     esp = espaces.get(esp_id)
     if not esp:
@@ -463,12 +491,50 @@ def cmd_launch(espaces, esp_id, extra, fichier=None):
     if fichier and not os.path.isfile(fichier):
         sys.stderr.write("Fichier introuvable : lancement refusé.\n")
         return 2
-    home = espace_home(esp)
+    if not compte_dedie.demande(esp):
+        return _lancer(espaces, esp, extra, fichier, None)
+
+    # Tout ce qui peut refuser l'ouverture se décide AVANT de demander le
+    # compte au service : rien à défaire si l'on s'arrête ici.
+    app_prevue = extra if extra else applications.resoudre(
+        esp.get("app", "org.gnome.Nautilus.desktop"))
+    refus = compte_dedie.incompatibilites(
+        esp, fichier, est_flatpak=os.path.basename(app_prevue[0]) == "flatpak")
+    if refus:
+        return _refuser_compte_dedie(esp, refus[0])
+    hors_ligne = (esp.get("reseau") or {}).get("mode") in ("coupe", "hors-ligne")
+    try:
+        session = compte_dedie.Session(
+            esp["id"],
+            os.path.basename(os.environ.get("WAYLAND_DISPLAY") or "wayland-0"),
+            esp.get("audio", True) is not False and not hors_ligne,
+            *bac_a_sable.plafonds_de(esp))
+    except compte_dedie.Indisponible as exc:
+        return _refuser_compte_dedie(esp, str(exc))
+    try:
+        return _lancer(espaces, esp, extra, fichier, session)
+    finally:
+        # Rendre la tenue, quel que soit le chemin de sortie : le service
+        # referme l'Espace quand sa dernière application est partie.
+        session.rendre()
+
+
+def _lancer(espaces, esp, extra, fichier, session):
+    """Le lancement proprement dit. `session` : compte dédié tenu, ou None."""
+    home = session.home if session else espace_home(esp)
     # Dans un Espace, un fichier venu d'ailleurs s'ouvre sous cloche. Câblé au
     # lancement plutôt qu'à la création : un Espace existant en profite aussi,
     # sans quoi le correctif n'atteindrait que les Espaces créés après lui.
     envoi = None
-    if not esp.get("ephemere"):
+    if session:
+        # Le dossier de l'Espace n'est plus accessible au bureau — c'est tout
+        # l'objet du compte dédié. Ce qui s'y prépare (associations, modèles,
+        # profil de navigateur, bouclier) est donc fait PAR l'Espace, sur
+        # ordre, plus bas (voir cmd_interne_preparer). Pas de boîte d'envoi
+        # pour l'instant : elle suivra la migration des données.
+        if not _espace_courant():
+            relever_envois(espaces)
+    elif not esp.get("ephemere"):
         _preparer_ouverture(home)
         # « Nouveau document » n'existe dans Fichiers que si le dossier Modèles
         # contient quelque chose. Chaque Espace a le sien : sans cela, créer un
@@ -561,14 +627,35 @@ def cmd_launch(espaces, esp_id, extra, fichier=None):
         env["MOZ_ALLOW_DOWNGRADE"] = "1"
 
     ephemere = esp.get("ephemere")
+    liste_blanche = (esp.get("reseau") or {}).get("mode") == "liste-blanche"
+    if session:
+        env["CODEBYR_COMPTE_DEDIE"] = "1"
+        # AVANT le filtre réseau, et c'est voulu : le profil du navigateur doit
+        # pointer vers le filtre avant que celui-ci existe. Dans l'ordre
+        # inverse, un filtre absent laissait Banque avec Internet en entier.
+        if not _preparer_depuis_l_espace(session, espaces, app_cmd,
+                                         liste_blanche and not hors_ligne):
+            return _refuser_compte_dedie(
+                esp, "son dossier n'a pas pu être préparé (voir le journal)")
     # Notifications : une socket par Espace, servie par l'hôte tant que
     # l'Espace vit. Le service qui la joint tourne DANS l'Espace, sur son bus
     # privé — celui-ci n'est jamais remplacé (voir relais_notifications.py).
-    notif_tmp = tempfile.TemporaryDirectory(prefix="codebyr-notif-")
-    notif = os.path.join(notif_tmp.name, "notif")
+    if session:
+        # Dans le dépôt, que le compte de l'Espace traverse ; un nom par
+        # lanceur, car deux applications du même Espace s'y côtoient.
+        notif_tmp = None
+        notif = os.path.join(session.depot, "notif-%d" % os.getpid())
+    else:
+        notif_tmp = tempfile.TemporaryDirectory(prefix="codebyr-notif-")
+        notif = os.path.join(notif_tmp.name, "notif")
     try:
         notif_srv = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
         notif_srv.bind(notif)
+        if session:
+            # Le dépôt fait le tri (seuls le bureau et cet Espace le
+            # traversent) ; sur la socket, il faut le droit d'écrire pour s'y
+            # connecter.
+            os.chmod(notif, 0o666)
         notif_srv.listen(8)
         threading.Thread(
             target=relais_notifications.servir,
@@ -583,13 +670,18 @@ def cmd_launch(espaces, esp_id, extra, fichier=None):
     proxy = None
     filtre = None
     filtre_tmp = None
-    if (esp.get("reseau") or {}).get("mode") == "liste-blanche" and not hors_ligne:
-        filtre_tmp = tempfile.TemporaryDirectory(prefix="codebyr-filtre-")
-        filtre = os.path.join(filtre_tmp.name, "proxy")
+    if liste_blanche and not hors_ligne:
+        if session:
+            filtre = os.path.join(session.depot, "proxy-%d" % os.getpid())
+        else:
+            filtre_tmp = tempfile.TemporaryDirectory(prefix="codebyr-filtre-")
+            filtre = os.path.join(filtre_tmp.name, "proxy")
         try:
-            proxy = _demarrer_filtre_reseau(esp, home, app_cmd, filtre)
+            proxy = _demarrer_filtre_reseau(esp, home, app_cmd, filtre,
+                                            compte_dedie_=bool(session))
         except OSError:
-            filtre_tmp.cleanup()
+            if filtre_tmp:
+                filtre_tmp.cleanup()
             _prevenir("Filtre indisponible", "Lancement refusé : le réseau restreint ne peut pas être établi.")
             return 1
         cmd = ["python3", "/usr/share/codebyr/relais_reseau.py",
@@ -629,9 +721,15 @@ def cmd_launch(espaces, esp_id, extra, fichier=None):
     else:
         run = bac_a_sable.wrap_bwrap(home, cmd, env, renforce=renforce, hors_ligne=hors_ligne,
                          audio=audio, envoi=envoi, filtre=filtre, gpu=gpu,
-                         notifications=notif)
+                         notifications=notif,
+                         passerelle=session.passerelle if session else None,
+                         chez=session.home if session else None)
         if renforce:
-            run = bac_a_sable.plafonner_ressources(run, *bac_a_sable.plafonds_de(esp))
+            if not session:
+                # Sous compte dédié, les plafonds sont déjà posés par le service
+                # sur l'Espace ENTIER ; « systemd-run --user » ne traverserait
+                # de toute façon pas le changement de compte.
+                run = bac_a_sable.plafonner_ressources(run, *bac_a_sable.plafonds_de(esp))
             detail = "Blindage actif" + (" · hors-ligne (aucun réseau)" if hors_ligne else "")
             print("🛡  %s dans l'Espace %s." % (detail, esp["nom"]))
         if not audio:
@@ -660,40 +758,48 @@ def cmd_launch(espaces, esp_id, extra, fichier=None):
     # blanche le laisse passer, et le bouclier n'était pas là pour crier.
     # Or l'erreur humaine est précisément la menace que cette fonctionnalité
     # existe pour couvrir.
-    if "firefox" in os.path.basename(app_cmd[0]):
+    #
+    # Sous compte dédié, l'Espace l'a déjà installé lui-même, dans son dossier.
+    if "firefox" in os.path.basename(app_cmd[0]) and not session:
         try:
             _installer_bouclier(esp, home, espaces)
         except OSError as exc:
             sys.stderr.write("codebyr-space : bouclier indisponible (%s)\n" % exc)
 
+    marqueurs = []
+
+    def marquer(pid):
+        """Note « ce processus appartient à tel Espace » pour l'extension GNOME."""
+        mapfile = os.path.join(rundir, "pid-%d" % pid)
+        birthfile = os.path.join(rundir, "birth-%d" % pid)
+        marqueurs.append(birthfile)
+        try:
+            naissance = _naissance_processus(pid)
+            if not naissance:
+                raise OSError("Processus terminé avant son enregistrement")
+            with fichiers_surs.ouvrir(birthfile, "w", encoding="ascii") as f:
+                f.write(naissance)
+            with open(mapfile, "w", encoding="utf-8") as f:
+                f.write(esp["id"])
+            marqueurs.append(mapfile)
+        except OSError:
+            pass
+
     try:
-        proc = subprocess.Popen(run, env=env)
-    except OSError:
-        if proxy:
-            proxy.terminate()
-            proxy.wait(timeout=5)
-        if filtre_tmp:
-            filtre_tmp.cleanup()
-        if notif_srv:
-            notif_srv.close()
-        notif_tmp.cleanup()
-        if ephemere:
-            shutil.rmtree(home, ignore_errors=True)
-        raise
-    mapfile = os.path.join(rundir, "pid-%d" % proc.pid)
-    birthfile = os.path.join(rundir, "birth-%d" % proc.pid)
-    try:
-        naissance = _naissance_processus(proc.pid)
-        if not naissance:
-            raise OSError("Processus terminé avant son enregistrement")
-        with fichiers_surs.ouvrir(birthfile, "w", encoding="ascii") as f:
-            f.write(naissance)
-        with open(mapfile, "w", encoding="utf-8") as f:
-            f.write(esp["id"])
-    except OSError:
-        mapfile = None
-    try:
-        rc = proc.wait()
+        if session:
+            # Exécuté par le premier processus de l'Espace, sous SON compte :
+            # le bureau ne peut pas devenir un autre compte, et root ne voit
+            # jamais la commande (voir codebyr-espace-init).
+            try:
+                rc = compte_dedie.executer(session.ordres, run, env,
+                                           au_lancement=marquer)
+            except compte_dedie.Indisponible as exc:
+                _prevenir("Espace %s : ouverture impossible" % esp["nom"], str(exc))
+                rc = 1
+        else:
+            proc = subprocess.Popen(run, env=env)
+            marquer(proc.pid)
+            rc = proc.wait()
     finally:
         if proxy:
             try:
@@ -705,20 +811,101 @@ def cmd_launch(espaces, esp_id, extra, fichier=None):
             filtre_tmp.cleanup()
         if notif_srv:
             notif_srv.close()
-        notif_tmp.cleanup()
-        try:
-            os.remove(birthfile)
-        except OSError:
-            pass
-        if mapfile:
+        if notif_tmp:
+            notif_tmp.cleanup()
+        if session:
+            # Nos sockets dans le dépôt : l'Espace survit peut-être à ce
+            # lanceur (une autre de ses fenêtres), le dépôt aussi.
+            for chemin in (notif, filtre):
+                if chemin:
+                    try:
+                        os.unlink(chemin)
+                    except OSError:
+                        pass
+        for chemin in marqueurs:
             try:
-                os.remove(mapfile)
+                os.remove(chemin)
             except OSError:
                 pass
         if ephemere and os.path.isdir(home) and home.startswith(tempfile.gettempdir()):
             shutil.rmtree(home, ignore_errors=True)
             print("Espace jetable détruit.")
     return rc
+
+
+INTERNE_PREPARER = "interne-preparer"
+PORT_FILTRE_INTERNE = 17890
+
+
+def _preparer_depuis_l_espace(session, espaces, app_cmd, filtre_reseau):
+    """Fait préparer le dossier de l'Espace PAR l'Espace. Renvoie True si fait.
+
+    Le bureau n'a plus accès à ce dossier : ce qui s'y écrivait à chaque
+    ouverture est demandé au premier processus de l'Espace, qui l'exécute sous
+    le compte de l'Espace. Hors du bac à sable — il écrit dans son propre
+    dossier, rien de plus — mais sans que le bac à sable puisse l'atteindre :
+    la socket d'ordres n'y est jamais montée.
+
+    C'est aussi plus sûr qu'avant : le bureau écrivait dans un dossier que
+    l'Espace contrôle, où un lien symbolique posé par l'Espace pouvait le
+    faire écrire ailleurs. Un Espace qui se piège lui-même n'atteint plus que
+    ses propres fichiers.
+    """
+    charge = {
+        "firefox": "firefox" in os.path.basename(app_cmd[0]),
+        "filtre_reseau": bool(filtre_reseau),
+        "domaines_proteges": _domaines_proteges(espaces),
+    }
+    env = {"PATH": "/usr/bin:/bin", "LANG": os.environ.get("LANG", "C.UTF-8"),
+           "HOME": session.home,
+           "CODEBYR_LIB": os.environ.get("CODEBYR_LIB", "/usr/share/codebyr")}
+    try:
+        code = compte_dedie.executer(
+            session.ordres,
+            ["/usr/bin/python3", os.path.realpath(__file__), INTERNE_PREPARER,
+             json.dumps(charge)],
+            env)
+    except compte_dedie.Indisponible as exc:
+        sys.stderr.write("codebyr-space : préparation impossible (%s)\n" % exc)
+        return False
+    return code == 0
+
+
+def cmd_interne_preparer(brut):
+    """Prépare le dossier d'un Espace, depuis l'Espace, sous son propre compte.
+
+    Appelé par le lanceur à travers le premier processus de l'Espace, jamais à
+    la main. Refuse de tourner ailleurs que sous un compte d'Espace : sur le
+    bureau, il écrirait dans le mauvais dossier.
+    """
+    import pwd
+    import comptes
+    compte = pwd.getpwuid(os.getuid())
+    if not comptes.est_compte_d_espace(compte.pw_name):
+        sys.stderr.write("codebyr-space : préparation réservée au compte d'un Espace.\n")
+        return 2
+    try:
+        charge = json.loads(brut)
+        if not isinstance(charge, dict):
+            raise ValueError("charge illisible")
+    except ValueError as exc:
+        sys.stderr.write("codebyr-space : %s\n" % exc)
+        return 2
+    # Le dossier du COMPTE, pas celui que l'environnement annonce.
+    home = compte.pw_dir
+    try:
+        _preparer_ouverture(home)
+        modeles.installer(home)
+        if charge.get("firefox"):
+            if charge.get("filtre_reseau"):
+                _preparer_profil_firefox(home, PORT_FILTRE_INTERNE)
+            doms = [d for d in (charge.get("domaines_proteges") or [])
+                    if isinstance(d, str) and d]
+            _installer_bouclier_pour(home, doms)
+    except OSError as exc:
+        sys.stderr.write("codebyr-space : préparation du dossier impossible (%s)\n" % exc)
+        return 1
+    return 0
 
 
 def _rundir():
@@ -775,6 +962,25 @@ def _nettoyer_marqueurs():
 
 def cmd_close(espaces, esp_id):
     """Ferme toutes les fenêtres/processus ouverts d'un Espace."""
+    esp = espaces.get(esp_id)
+    if compte_dedie.demande(esp):
+        # Ses processus tournent sous un autre compte : le bureau n'a pas le
+        # droit de leur envoyer un signal, et l'essai échouait sans un mot en
+        # annonçant « 0 fenêtre fermée ». C'est au service de refermer.
+        try:
+            complet = compte_dedie.fermer(esp_id)
+        except compte_dedie.Indisponible as exc:
+            sys.stderr.write("codebyr-space : %s\n" % exc)
+            return 1
+        _nettoyer_marqueurs()
+        if not complet:
+            sys.stderr.write("Espace %s refermé, mais pas entièrement rangé "
+                             "(voir « journalctl -t codebyr-uid »).\n" % esp_id)
+            journal("Espace %s : fermeture incomplète" % esp_id)
+            return 1
+        print("Espace %s refermé." % esp_id)
+        journal("Espace %s : fermeture (compte dédié)" % esp_id)
+        return 0
     rundir = _rundir()
     ferme = 0
     try:
@@ -1193,6 +1399,12 @@ def relever_envois(espaces):
             for dest in destinations:
                 if dest not in espaces or espaces[dest].get("ephemere"):
                     continue
+                if compte_dedie.demande(espaces[dest]):
+                    # Son dossier n'est plus ici, et le bureau n'y a pas accès.
+                    # Les fichiers ATTENDENT dans la boîte — ils ne sont ni
+                    # perdus ni remis au mauvais endroit — jusqu'à la
+                    # migration des données.
+                    continue
                 dossier = os.path.join(racine, dest)
                 try:
                     with fichiers_surs.dossier(dossier) as source_fd:
@@ -1269,6 +1481,17 @@ def nom_libre(dossier, nom, existe=os.path.exists):
 
 def _deposer_pour_envoi(esp, depart, source):
     """Dépose un fichier dans la boîte d'envoi, vue de l'INTÉRIEUR d'un Espace."""
+    if os.environ.get("CODEBYR_COMPTE_DEDIE") == "1":
+        # Aucune boîte n'est montée dans un Espace à compte dédié pour
+        # l'instant. Sans ce refus, le dépôt atterrirait dans un dossier
+        # ordinaire, « Déposé » s'afficherait, et le fichier ne partirait
+        # jamais — l'erreur exacte corrigée le 24/08/2026.
+        sys.stderr.write("La boîte d'envoi n'est pas encore disponible dans un "
+                         "Espace à compte dédié : rien n'a été envoyé.\n")
+        _prevenir("Envoi impossible depuis cet Espace",
+                  "La boîte d'envoi n'est pas encore disponible dans un Espace "
+                  "à compte dédié. Rien n'a été envoyé.")
+        return 1
     dossier = os.path.join(ENVOI_INTERNE, esp["id"])
     try:
         fichiers_surs.mkdir(dossier)
@@ -1550,6 +1773,10 @@ def main(argv):
         print(_aide())
         return 0
     action, args = argv[1], argv[2:]
+    if action == INTERNE_PREPARER and len(args) == 1:
+        # Hors de la table ACTIONS, donc hors de l'aide : ce n'est pas un geste
+        # d'utilisateur, c'est le lanceur qui le demande à un Espace.
+        return cmd_interne_preparer(args[0])
     if action not in ACTIONS:
         sys.stderr.write("Action inconnue : %s\n" % action)
         sys.stderr.write("Actions : %s\n" % ", ".join(sorted(ACTIONS)))
@@ -1559,7 +1786,16 @@ def main(argv):
         sys.stderr.write("Usage : codebyr-space %s\n" % usage)
         return 2
     try:
-        return executer(load_espaces(), args)
+        espaces = load_espaces()
+        # Un seul contrôle pour tous les gestes pas encore prêts sous compte
+        # dédié : un contrôle par commande finirait par en oublier une.
+        if args and action in compte_dedie.GESTES_PAS_ENCORE_PRETS:
+            refus = compte_dedie.refus_de_geste(action, espaces.get(args[0]))
+            if refus:
+                sys.stderr.write("codebyr-space : %s\n" % refus)
+                _prevenir("Geste pas encore disponible", refus)
+                return 1
+        return executer(espaces, args)
     except (OSError, ValueError) as exc:
         sys.stderr.write("codebyr-space : opération refusée (%s)\n" % exc)
         _prevenir("Opération interrompue", "Un accès sûr aux données n'a pas pu être établi. Consultez le terminal pour le détail.")

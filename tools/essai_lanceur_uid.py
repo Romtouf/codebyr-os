@@ -21,7 +21,12 @@ depuis un menu, s'en sert correctement :
      écrit par l'Espace, un site autorisé passe par le filtre, un autre non ;
   6. réglage « compte » retiré : les données reviennent sous le compte du
      bureau, avec ce qui a été fait entre-temps, et l'état d'avant est gardé ;
-  7. service absent : l'Espace NE S'OUVRE PAS — surtout pas sous le compte du
+  7. envois dans les deux sens, par les boîtes de l'Espace, sans l'ouvrir ;
+  8. une pièce jointe examinée dans l'Espace, au chemin annoncé ;
+  9. sauvegarde, restauration et analyse, faites PAR l'Espace ;
+ 10. un Espace jetable : son dossier est en mémoire, et vide à la réouverture ;
+ 11. effacer puis supprimer un Espace dédié : son compte part avec lui ;
+ 12. service absent : l'Espace NE S'OUVRE PAS — surtout pas sous le compte du
      bureau « en attendant ».
 
 Avant l'étape 1, l'Espace d'essai reçoit des données comme s'il avait déjà
@@ -57,6 +62,18 @@ ESPACE = "essai-uid"
 ENTREE = {"id": ESPACE, "nom": "Essai UID", "couleur": "#8E44AD",
           "compte": "dedie", "app": "org.gnome.Nautilus.desktop"}
 PERSONNE = 65534
+# Un jeton par essai, pour ne jamais confondre ses fichiers avec de vrais.
+JETON = "%d" % os.getpid()
+JETABLE = {"id": "essai-jet", "nom": "Essai jetable", "couleur": "#C0392B",
+           "compte": "dedie", "ephemere": True, "app": "org.gnome.Nautilus.desktop"}
+# Exécuté DANS l'Espace : retrouve la pièce jointe dans son lot, là où le
+# lanceur l'a annoncée, et en garde le contenu comme preuve.
+LECTURE_PIECE = r'''
+import glob, os
+trouves = glob.glob(os.path.expanduser("~/Partagé/Pièce jointe du */%s"))
+with open(os.path.expanduser("~/piece-lue.txt"), "w") as f:
+    f.write(open(trouves[0]).read() if trouves else "")
+'''
 # Réglages de Banque, tels qu'ils sont livrés, avec un domaine autorisé.
 DOMAINE_AUTORISE = "example.org"
 DOMAINE_REFUSE = "example.com"
@@ -185,15 +202,15 @@ def lanceur(bureau, *args, attendre=True):
                            attendre=attendre)
 
 
-def registre(bureau, geste, entree=None):
+def registre(bureau, geste, entree=None, esp_id=ESPACE):
     """Pose (« ajouter ») ou retire l'Espace d'essai du registre de l'utilisateur."""
     code = ("import sys; sys.path.insert(0, %r); import registre, json; "
             % COPIE_LIB)
     if geste == "ajouter":
         code += "registre.supprimer_espace(%r); registre.ajouter_espace(json.loads(%r))" % (
-            ESPACE, json.dumps(entree or ENTREE))
+            esp_id, json.dumps(entree or ENTREE))
     else:
-        code += "registre.supprimer_espace(%r)" % ESPACE
+        code += "registre.supprimer_espace(%r)" % esp_id
     return comme_le_bureau(bureau, ["/usr/bin/python3", "-c", code]).returncode == 0
 
 
@@ -323,6 +340,8 @@ def main():
     if not dire("Espace « Essai UID » ajouté au registre", registre(bureau, "ajouter")):
         reussi = False
     enfants = []
+    a_nettoyer = []
+    a_supprimer = []
     donnees_bureau = os.path.join(bureau.pw_dir, ".local", "share", "codebyr",
                                   "espaces", ESPACE)
     try:
@@ -526,7 +545,116 @@ def main():
                        bool(glob.glob(os.path.join(donnees_bureau, "avant-retour-*"))))
         registre(bureau, "ajouter", dict(ENTREE, **COMME_BANQUE))
 
-        titre("7. Service absent : l'Espace ne s'ouvre pas")
+        titre("7. Envois : du bureau vers l'Espace, et de l'Espace vers Personnel")
+        a_envoyer = os.path.join("/tmp", "codebyr-essai-%s.txt" % JETON)
+        with open(a_envoyer, "w", encoding="utf-8") as f:
+            f.write("envoyé depuis le bureau")
+        os.chmod(a_envoyer, 0o644)
+        a_nettoyer.append(a_envoyer)
+        envoi = lanceur(bureau, "envoyer", ESPACE, a_envoyer)
+        arrivee = os.path.join(comptes.chemin_arrivees(uid, ESPACE), os.path.basename(a_envoyer))
+        reussi &= dire("envoi accepté sans ouvrir l'Espace", envoi.returncode == 0
+                       and not espace_ouvert(nom), (envoi.stderr or "").strip()[-60:])
+        reussi &= dire("déposé dans sa boîte d'arrivée, lisible par lui",
+                       os.path.exists(arrivee) and os.stat(arrivee).st_mode & 0o004)
+        nom_depart = "essai-depart-%s.txt" % JETON
+        sortant = lanceur(bureau, "launch", ESPACE, "--", "/bin/sh", "-c",
+                          "echo depuis-l-espace > ~/%s && /usr/bin/python3 %s envoyer "
+                          "personnel ~/%s" % (nom_depart, COPIE_BIN, nom_depart))
+        recu = os.path.join(home, "Partagé", os.path.basename(a_envoyer))
+        espace = compte_espace(nom)
+        reussi &= dire("recueilli dans « Partagé » à l'ouverture, au compte de l'Espace",
+                       os.path.exists(recu) and bool(espace)
+                       and os.stat(recu).st_uid == espace.pw_uid, recu)
+        reussi &= dire("boîte d'arrivée vidée", not os.path.exists(arrivee))
+        reussi &= dire("envoi depuis l'Espace accepté", sortant.returncode == 0,
+                       (sortant.stderr or "").strip()[-60:])
+        depart = os.path.join(comptes.chemin_envois(uid, ESPACE), "personnel", nom_depart)
+        reussi &= dire("déposé dans sa boîte de départ", os.path.exists(depart), depart)
+        # La relève se fait à l'ouverture de n'importe quel Espace.
+        lanceur(bureau, "launch", ESPACE, "--", "/bin/true")
+        chez_personnel = os.path.join(bureau.pw_dir, ".local", "share", "codebyr", "espaces",
+                                      "personnel", "home", "Partagé", nom_depart)
+        a_nettoyer.append(chez_personnel)
+        reussi &= dire("relevé et remis à Personnel", os.path.exists(chez_personnel),
+                       chez_personnel)
+
+        titre("8. Pièce jointe examinée dans l'Espace")
+        piece = os.path.join("/tmp", "facture-%s.txt" % JETON)
+        with open(piece, "w", encoding="utf-8") as f:
+            f.write("contenu de la pièce jointe")
+        os.chmod(piece, 0o644)
+        a_nettoyer.append(piece)
+        examen = lanceur(bureau, "launch", ESPACE, "--fichier", piece, "--",
+                         "/usr/bin/python3", "-c", LECTURE_PIECE % os.path.basename(piece))
+        lu = ""
+        try:
+            with open(os.path.join(home, "piece-lue.txt"), encoding="utf-8") as f:
+                lu = f.read()
+        except OSError:
+            pass
+        reussi &= dire("pièce jointe lue dans l'Espace, au chemin prévu",
+                       examen.returncode == 0 and lu == "contenu de la pièce jointe",
+                       lu or (examen.stderr or "").strip()[-60:])
+
+        titre("9. Sauvegarde, restauration, analyse")
+        sauvegardes = os.path.join(bureau.pw_dir, "Espaces-Codebyr")
+        avant = set(os.listdir(sauvegardes)) if os.path.isdir(sauvegardes) else set()
+        export = lanceur(bureau, "export", ESPACE)
+        nouvelles = sorted(set(os.listdir(sauvegardes)) - avant) if os.path.isdir(sauvegardes) else []
+        a_nettoyer.extend(os.path.join(sauvegardes, n) for n in nouvelles)
+        reussi &= dire("sauvegarde produite par l'Espace", export.returncode == 0
+                       and len(nouvelles) == 1 and nouvelles[0].endswith(".tar.gz"),
+                       ", ".join(nouvelles) or (export.stderr or "").strip()[-60:])
+        if nouvelles:
+            restauration = lanceur(bureau, "import", ESPACE,
+                                   os.path.join(sauvegardes, nouvelles[0]))
+            reussi &= dire("restauration acceptée", restauration.returncode == 0,
+                           (restauration.stderr or "").strip()[-60:])
+            reussi &= dire("données présentes après restauration",
+                           os.path.exists(os.path.join(home, "Documents", "note.txt")))
+        analyse = lanceur(bureau, "contagion", ESPACE)
+        reussi &= dire("analyse de la contagion faite par l'Espace", analyse.returncode == 0,
+                       (analyse.stdout or analyse.stderr).strip().splitlines()[0][:60]
+                       if (analyse.stdout or analyse.stderr).strip() else "")
+
+        titre("10. Espace jetable : en mémoire, et vide à la réouverture")
+        registre(bureau, "ajouter", JETABLE, JETABLE["id"])
+        nom_jet = comptes.nom_compte(uid, JETABLE["id"])
+        home_jet = comptes.chemin_home(uid, JETABLE["id"])
+        a_supprimer.append(JETABLE["id"])
+        jet = lanceur(bureau, "launch", JETABLE["id"], "--", "/usr/bin/python3", "-c",
+                      "import os,time; open(os.environ['HOME']+'/trace.txt','w').write('x'); "
+                      "time.sleep(10)", attendre=False)
+        enfants.append(jet)
+        attendre_que(lambda: os.path.exists(os.path.join(home_jet, "trace.txt")), 30)
+        type_fs = subprocess.run(["/usr/bin/findmnt", "-n", "-o", "FSTYPE,OPTIONS",
+                                  "--mountpoint", home_jet],
+                                 capture_output=True, text=True).stdout.strip()
+        reussi &= dire("son dossier est un tmpfs, sans exécution", type_fs.startswith("tmpfs")
+                       and "noexec" in type_fs, type_fs[:70] or "pas de montage")
+        reussi &= dire("il y écrit pendant qu'il vit",
+                       os.path.exists(os.path.join(home_jet, "trace.txt")))
+        jet.communicate(timeout=60)
+        reussi &= dire("à sa fermeture, le tmpfs est démonté",
+                       attendre_que(lambda: not os.path.ismount(home_jet), 15))
+        reussi &= dire("et ce qu'il contenait a disparu",
+                       not os.path.exists(os.path.join(home_jet, "trace.txt")))
+
+        titre("11. Effacer, puis supprimer un Espace dédié")
+        purge = lanceur(bureau, "purge", JETABLE["id"])
+        reussi &= dire("effacement accepté", purge.returncode == 0,
+                       (purge.stderr or "").strip()[-60:])
+        suppression = lanceur(bureau, "delete", JETABLE["id"])
+        reussi &= dire("suppression acceptée", suppression.returncode == 0,
+                       (suppression.stderr or "").strip()[-60:])
+        reussi &= dire("son compte est retiré", compte_espace(nom_jet) is None)
+        reussi &= dire("son dossier et ses boîtes aussi",
+                       not os.path.exists(home_jet)
+                       and not os.path.exists(comptes.chemin_envois(uid, JETABLE["id"]))
+                       and not os.path.exists(comptes.chemin_arrivees(uid, JETABLE["id"])))
+
+        titre("12. Service absent : l'Espace ne s'ouvre pas")
         service.terminate()
         service.wait(timeout=10)
         avant = set(marqueurs(uid))
@@ -553,6 +681,22 @@ def main():
         service.wait(timeout=10)
         subprocess.run(["/usr/bin/systemctl", "stop", "--quiet",
                         comptes.unite_de_l_espace(nom)], capture_output=True)
+        for chemin in a_nettoyer:
+            try:
+                os.unlink(chemin)
+            except OSError:
+                pass
+        for autre in a_supprimer:
+            autre_nom = comptes.nom_compte(uid, autre)
+            subprocess.run(["/usr/bin/umount", comptes.chemin_home(uid, autre)],
+                           capture_output=True)
+            registre(bureau, "retirer", esp_id=autre)
+            subprocess.run(["/usr/sbin/userdel", autre_nom], capture_output=True)
+            for chemin in (comptes.chemin_home(uid, autre), comptes.chemin_envois(uid, autre),
+                           comptes.chemin_arrivees(uid, autre)):
+                shutil.rmtree(chemin, ignore_errors=True)
+        for chemin in (comptes.chemin_envois(uid, ESPACE), comptes.chemin_arrivees(uid, ESPACE)):
+            shutil.rmtree(chemin, ignore_errors=True)
         registre(bureau, "retirer")
         subprocess.run(["/usr/sbin/userdel", nom], capture_output=True)
         shutil.rmtree(home, ignore_errors=True)

@@ -50,6 +50,12 @@ Une demande JSON par connexion, une réponse JSON :
       → {"ok": true}, ou {"ok": false, "erreur": "incomplet"} si une étape
         du rangement a échoué (le détail est au journal).
 
+  {"action": "supprimer", "espace": "banque"}
+      → ferme, retire le dossier de l'Espace et ses boîtes, puis son compte.
+
+  « ephemere »: true dans « ouvrir » : le dossier de l'Espace est un tmpfs,
+  monté à l'ouverture et démonté à la fermeture (Espace jetable).
+
 Lancement : par systemd, sur activation de socket (codebyr-uid.socket).
 Pour l'essai sur une machine de test : codebyr-uid --essai /chemin/socket
 """
@@ -57,6 +63,7 @@ import json
 import os
 import pwd
 import select
+import shutil
 import socket
 import struct
 import subprocess
@@ -179,6 +186,33 @@ def dossier_depot(compte, uid_bureau, uid_espace):
          "u::rwx,g::---,o::---,u:%d:rwx,u:%d:x,m::rwx" % (uid_bureau, uid_espace),
          chemin], check=True, capture_output=True)
     return chemin
+
+
+def monter_jetable(home, utilisateur, memoire):
+    """Le dossier d'un Espace jetable devient un tmpfs : en mémoire, rien sur disque.
+
+    C'est la promesse du Jetable, tenue sous compte dédié comme elle l'était
+    sous le compte du bureau (/tmp). Monté à l'ouverture, démonté à la
+    fermeture : son contenu disparaît avec lui.
+
+    · taille bornée par le plafond mémoire de l'Espace, déjà validé (« 2G »,
+      « 75% ») — une taille qui ne vient donc jamais du client telle quelle ;
+    · noexec : ce qu'on télécharge dans un Jetable ne s'y exécute pas ;
+    · un montage déjà là — laissé par une ouverture interrompue — est retiré
+      d'abord : on n'empile pas, et on ne rouvre pas sur un contenu ancien.
+    """
+    for _ in range(8):
+        if not os.path.ismount(home):
+            break
+        subprocess.run(["/usr/bin/umount", home], check=True, capture_output=True)
+    else:
+        raise OSError("montages empilés impossibles à retirer : %s" % home)
+    subprocess.run(
+        ["/usr/bin/mount", "-t", "tmpfs", "-o",
+         "size=%s,mode=0700,uid=%d,gid=%d,nosuid,nodev,noexec"
+         % (memoire, utilisateur.pw_uid, utilisateur.pw_gid),
+         "codebyr-jetable", home], check=True, capture_output=True)
+    journal("Espace jetable %s monté en mémoire (%s)" % (utilisateur.pw_name, memoire))
 
 
 def _dossier_de_boite(chemin, proprietaire_uid, proprietaire_gid, mode):
@@ -385,7 +419,8 @@ def arreter_portee(compte):
                     comptes.unite_de_l_espace(compte)], capture_output=True)
 
 
-def preparer(uid_demandeur, espace, affichage, son, memoire=None, taches=None):
+def preparer(uid_demandeur, espace, affichage, son, memoire=None, taches=None,
+             ephemere=False):
     """Tout ou rien : une préparation qui échoue défait ce qu'elle a posé.
 
     Constaté le 14/09/2026 : le premier processus refusait de démarrer, alors
@@ -401,7 +436,7 @@ def preparer(uid_demandeur, espace, affichage, son, memoire=None, taches=None):
     ouvert = OUVERTS.get(nom)
     deja_ouvert = bool(ouvert) and ouvert[0].poll() is None
     try:
-        return _preparer(uid_demandeur, espace, affichage, son, memoire, taches)
+        return _preparer(uid_demandeur, espace, affichage, son, memoire, taches, ephemere)
     except Exception:
         if not deja_ouvert:
             try:
@@ -413,7 +448,7 @@ def preparer(uid_demandeur, espace, affichage, son, memoire=None, taches=None):
         raise
 
 
-def _preparer(uid_demandeur, espace, affichage, son, memoire, taches):
+def _preparer(uid_demandeur, espace, affichage, son, memoire, taches, ephemere=False):
     nom = comptes.nom_compte(uid_demandeur, espace)
     home = comptes.chemin_home(uid_demandeur, espace)
     utilisateur = compte_systeme(nom, home)
@@ -441,8 +476,10 @@ def _preparer(uid_demandeur, espace, affichage, son, memoire, taches):
         # Portée laissée par un service qui a redémarré : elle ne contient plus
         # rien que nous sachions suivre, et son nom est pris.
         arreter_portee(nom)
-        srv = socket_d_ordres(depot)
         memoire, taches = comptes.plafonds_valides(memoire, taches)
+        if ephemere:
+            monter_jetable(home, utilisateur, memoire)
+        srv = socket_d_ordres(depot)
         try:
             OUVERTS[nom] = (premier_processus(utilisateur, uid_demandeur, srv,
                                               memoire, taches), srv)
@@ -481,6 +518,16 @@ def fermer(uid_demandeur, espace):
     # récalcitrant ne doit pas empêcher de retirer le droit sur le socket, qui
     # est la vraie barrière — mais aucun échec n'est tu.
     echecs = []
+    # Un Espace jetable : son tmpfs part maintenant, et son contenu avec lui.
+    home = comptes.chemin_home(uid_demandeur, espace)
+    if os.path.ismount(home):
+        demontage = subprocess.run(["/usr/bin/umount", home], capture_output=True, text=True)
+        if demontage.returncode != 0:
+            # Encore utilisé par un processus qu'on n'a pas su arrêter : on le
+            # détache quand même — le contenu disparaîtra avec lui — mais on
+            # le dit.
+            subprocess.run(["/usr/bin/umount", "--lazy", home], capture_output=True)
+            echecs.append("jetable détaché en différé : %s" % demontage.stderr.strip())
     passerelle = comptes.chemin_passerelle(nom)
     if os.path.isdir(passerelle):
         for fichier in sorted(os.listdir(passerelle)):
@@ -509,6 +556,52 @@ def fermer(uid_demandeur, espace):
     return {"ok": True}
 
 
+def supprimer(uid_demandeur, espace):
+    """Retire le compte d'un Espace supprimé, et ce que root lui avait préparé.
+
+    Le lanceur a fait effacer les données PAR l'Espace avant de demander ceci :
+    root ne devrait trouver que des dossiers vides. S'il en reste, shutil.rmtree
+    les retire sans jamais suivre un lien — et on refuse d'y aller si Python ne
+    le garantit pas sur ce système.
+
+    Le compte part en DERNIER : un compte supprimé avant ses fichiers les
+    laisserait sans propriétaire, et le prochain compte créé avec le même
+    numéro les retrouverait.
+    """
+    nom = comptes.nom_compte(uid_demandeur, espace)
+    reponse = fermer(uid_demandeur, espace)
+    TENUES.oublier(nom)
+    echecs = [] if reponse.get("ok") else ["fermeture incomplète"]
+    if not shutil.rmtree.avoids_symlink_attacks:
+        return {"ok": False, "erreur": "impossible"}
+    for chemin in (comptes.chemin_home(uid_demandeur, espace),
+                   comptes.chemin_envois(uid_demandeur, espace),
+                   comptes.chemin_arrivees(uid_demandeur, espace)):
+        if os.path.islink(chemin):
+            echecs.append("lien refusé : %s" % chemin)
+        elif os.path.isdir(chemin):
+            try:
+                shutil.rmtree(chemin)
+            except OSError as exc:
+                echecs.append("%s : %s" % (chemin, exc))
+    if not echecs:
+        try:
+            pwd.getpwnam(nom)
+        except KeyError:
+            pass
+        else:
+            retrait = subprocess.run(["/usr/sbin/userdel", nom],
+                                     capture_output=True, text=True)
+            if retrait.returncode != 0:
+                echecs.append("compte non retiré : %s" % retrait.stderr.strip())
+    for echec in echecs:
+        journal("suppression incomplète de %s : %s" % (nom, echec))
+    if echecs:
+        return {"ok": False, "erreur": "incomplet"}
+    journal("Espace %s supprimé, compte retiré" % nom)
+    return {"ok": True}
+
+
 def traiter(demande, uid, nom_demandeur):
     """Décide, puis agit. Toute erreur devient un refus sans détail.
 
@@ -528,11 +621,16 @@ def traiter(demande, uid, nom_demandeur):
         if action in ("preparer", "ouvrir"):
             return preparer(uid, espace, demande.get("affichage", "wayland-0"),
                             bool(demande.get("son")),
-                            demande.get("memoire"), demande.get("taches"))
+                            demande.get("memoire"), demande.get("taches"),
+                            # « is True » : seul un vrai booléen JSON monte un
+                            # tmpfs, pas une chaîne ni un nombre.
+                            demande.get("ephemere") is True)
         if action == "fermer":
             reponse = fermer(uid, espace)
             TENUES.oublier(comptes.nom_compte(uid, espace))
             return reponse
+        if action == "supprimer":
+            return supprimer(uid, espace)
     except (ValueError, OSError, subprocess.CalledProcessError) as exc:
         journal("échec pour l'UID %d (%s) : %s" % (uid, action, exc))
         return {"ok": False, "erreur": "impossible"}

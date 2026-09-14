@@ -533,7 +533,10 @@ def cmd_launch(espaces, esp_id, extra, fichier=None):
             esp["id"],
             os.path.basename(os.environ.get("WAYLAND_DISPLAY") or "wayland-0"),
             esp.get("audio", True) is not False and not hors_ligne,
-            *bac_a_sable.plafonds_de(esp))
+            *bac_a_sable.plafonds_de(esp),
+            # Jetable : son dossier est un tmpfs, monté par le service à
+            # l'ouverture et démonté à la fermeture — rien n'atteint le disque.
+            ephemere=bool(esp.get("ephemere")))
     except compte_dedie.Indisponible as exc:
         return _refuser_compte_dedie(esp, str(exc))
     try:
@@ -1026,6 +1029,71 @@ def _taille_sans_suivre(chemin):
     return total
 
 
+def _ordre_interne(session, action, produire=None, consommer=None):
+    """Fait exécuter un ordre interne par l'Espace, avec un flux si besoin.
+
+    `produire(flux)` écrit ce que l'Espace lira sur son entrée standard ;
+    `consommer(flux)` lit ce qu'il écrit sur sa sortie. L'un ou l'autre, dans
+    un fil à part : un tuyau plein bloquerait sinon les deux bouts.
+
+    Renvoie (code, erreurs). Le bout transmis est TOUJOURS refermé ici, même
+    si l'ordre échoue : sans cela, le fil attendait à jamais un correspondant
+    disparu (vu dans le WSL le 14/09/2026).
+    """
+    erreurs = []
+    options = {}
+    a_fermer = None
+    fil = None
+    if produire or consommer:
+        lecture, ecriture = os.pipe()
+        if produire:
+            options["entree"], a_fermer, mien, sens = lecture, lecture, ecriture, "wb"
+        else:
+            options["sortie"], a_fermer, mien, sens = ecriture, ecriture, lecture, "rb"
+        travail = produire or consommer
+
+        def dans_un_fil():
+            try:
+                with os.fdopen(mien, sens) as flux:
+                    travail(flux)
+            except BrokenPipeError:
+                erreurs.append("l'Espace a cessé de lire")
+            except (OSError, tarfile.TarError, ValueError) as exc:
+                erreurs.append(str(exc))
+
+        fil = threading.Thread(target=dans_un_fil, daemon=True)
+        fil.start()
+    try:
+        code = compte_dedie.executer(session.ordres, _commande_interne(action),
+                                     _env_interne(session), **options)
+    except compte_dedie.Indisponible as exc:
+        code = None
+        erreurs.append(str(exc))
+    finally:
+        if a_fermer is not None:
+            os.close(a_fermer)
+    if fil:
+        fil.join()
+    return code, erreurs
+
+
+def _session_pour_un_geste(esp):
+    """Ouvre l'Espace le temps d'un geste sur ses données (sans son)."""
+    return compte_dedie.Session(
+        esp["id"], os.path.basename(os.environ.get("WAYLAND_DISPLAY") or "wayland-0"),
+        False, *bac_a_sable.plafonds_de(esp), ephemere=bool(esp.get("ephemere")))
+
+
+def _emballer(dossier, noms):
+    """Fabrique qui écrit l'archive d'un dossier dans un flux, sans suivre de lien."""
+    def produire(flux):
+        with tarfile.open(fileobj=flux, mode="w|") as tar:
+            for nom in noms:
+                tar.add(os.path.join(dossier, nom), arcname="./" + nom,
+                        filter=_entree_archivable)
+    return produire
+
+
 def _demenager_vers_compte_dedie(esp, session):
     """Première ouverture sous compte dédié : les données de l'Espace le suivent.
 
@@ -1035,6 +1103,8 @@ def _demenager_vers_compte_dedie(esp, session):
     Ce que ce déménagement garantit :
     · root ne lit rien : le BUREAU emballe ce qu'il a le droit de lire, et
       l'ESPACE déballe chez lui, par un tuyau (voir codebyr-espace-init) ;
+      tarfile ne suit pas les liens : un lien posé dans l'Espace part comme
+      lien, jamais comme le fichier qu'il désigne ;
     · il COPIE, n'efface rien : les anciennes données restent en place, et
       retirer le réglage « compte » les fait revenir, à jour (voir
       _rapatrier_depuis_compte_dedie) ;
@@ -1062,36 +1132,8 @@ def _demenager_vers_compte_dedie(esp, session):
     _prevenir("Espace %s : déménagement de ses données" % esp["nom"],
               "Première ouverture sous son propre compte : ses fichiers le "
               "suivent. Rien n'est effacé. Cela peut prendre un moment.")
-    lecture, ecriture = os.pipe()
-    erreurs = []
-
-    def emballer():
-        try:
-            with os.fdopen(ecriture, "wb") as flux, \
-                    tarfile.open(fileobj=flux, mode="w|") as tar:
-                for nom in noms:
-                    # tarfile ne suit pas les liens : un lien posé dans l'Espace
-                    # part comme lien, jamais comme le fichier qu'il désigne.
-                    tar.add(os.path.join(ancien, nom), arcname="./" + nom,
-                            filter=_entree_archivable)
-        except BrokenPipeError:
-            erreurs.append("l'Espace a cessé de lire")
-        except (OSError, tarfile.TarError) as exc:
-            erreurs.append(str(exc))
-
-    fil = threading.Thread(target=emballer, daemon=True)
-    fil.start()
-    try:
-        code = compte_dedie.executer(session.ordres, _commande_interne(INTERNE_IMPORTER),
-                                     _env_interne(session), entree=lecture)
-    except compte_dedie.Indisponible as exc:
-        code = None
-        erreurs.append(str(exc))
-    finally:
-        # Toujours : sans cela, si l'ordre échoue, l'emballeur attend à jamais
-        # un lecteur qui n'existe plus (vu dans le WSL le 14/09/2026).
-        os.close(lecture)
-    fil.join()
+    code, erreurs = _ordre_interne(session, INTERNE_IMPORTER,
+                                   produire=_emballer(ancien, noms))
     if code == MIGRATION_FAITE:
         erreurs = []                # l'Espace avait déjà reçu ses données
     elif code != 0 or erreurs:
@@ -1113,8 +1155,7 @@ def _rapatrier_depuis_compte_dedie(esp):
     déménagement. Rouvrir l'Espace dessus ferait disparaître, sans un mot, tout
     ce qui a été fait depuis sous son compte. On rapatrie donc d'abord ce que
     l'Espace détient — c'est lui qui emballe, le bureau qui déballe, selon la
-    même règle que toute restauration — et l'état figé est mis de côté, pas
-    effacé.
+    règle des données d'Espace — et l'état figé est mis de côté, pas effacé.
 
     Sans le service des comptes, impossible de demander ses données à l'Espace :
     l'ouverture est refusée plutôt que de montrer l'état figé comme s'il était
@@ -1123,43 +1164,27 @@ def _rapatrier_depuis_compte_dedie(esp):
     if not os.path.exists(_marqueur_demenagement(esp["id"])):
         return True
     try:
-        session = compte_dedie.Session(
-            esp["id"], os.path.basename(os.environ.get("WAYLAND_DISPLAY") or "wayland-0"),
-            False, *bac_a_sable.plafonds_de(esp))
+        session = _session_pour_un_geste(esp)
     except compte_dedie.Indisponible as exc:
         sys.stderr.write("codebyr-space : les données récentes de %s sont restées "
                          "dans son compte dédié, et %s.\n" % (esp["nom"], exc))
         return False
     parent = os.path.join(DATA_ROOT, esp["id"])
     home = os.path.join(parent, "home")
+    sauvegarde = None
     try:
         with tempfile.TemporaryDirectory(prefix=".retour-", dir=parent) as stage:
             neuf = os.path.join(stage, "home")
             os.mkdir(neuf, 0o700)
-            lecture, ecriture = os.pipe()
-            erreurs = []
 
-            def deballer():
-                try:
-                    with os.fdopen(lecture, "rb") as flux, \
-                            tarfile.open(fileobj=flux, mode="r|") as tar:
-                        _extraire_archive(tar, neuf, _filtre_dossier_d_espace)
-                except (OSError, tarfile.TarError, ValueError) as exc:
-                    erreurs.append(str(exc))
+            def deballer(flux):
+                with tarfile.open(fileobj=flux, mode="r|") as tar:
+                    _extraire_archive(tar, neuf, _filtre_dossier_d_espace)
 
-            fil = threading.Thread(target=deballer, daemon=True)
-            fil.start()
-            try:
-                code = compte_dedie.executer(session.ordres,
-                                             _commande_interne(INTERNE_EXPORTER),
-                                             _env_interne(session), sortie=ecriture)
-            finally:
-                os.close(ecriture)
-            fil.join()
+            code, erreurs = _ordre_interne(session, INTERNE_EXPORTER, consommer=deballer)
             if code != 0 or erreurs:
                 raise ValueError("; ".join(erreurs) or "export refusé (code %s)" % code)
             with fichiers_surs.dossier(parent):
-                sauvegarde = None
                 if os.path.lexists(home):
                     if os.path.islink(home):
                         raise ValueError("Dossier personnel symbolique refusé")
@@ -1172,11 +1197,11 @@ def _rapatrier_depuis_compte_dedie(esp):
                     if sauvegarde:
                         os.rename(sauvegarde, home)
                     raise
-        if compte_dedie.executer(session.ordres, _commande_interne(INTERNE_RENDU),
-                                 _env_interne(session)) != 0:
+        code, erreurs = _ordre_interne(session, INTERNE_RENDU)
+        if code != 0:
             raise ValueError("l'Espace n'a pas pu noter le retour de ses données")
         os.unlink(_marqueur_demenagement(esp["id"]))
-    except (OSError, ValueError, compte_dedie.Indisponible) as exc:
+    except (OSError, ValueError) as exc:
         sys.stderr.write("codebyr-space : retour des données de %s interrompu (%s) ; "
                          "rien n'a été effacé.\n" % (esp["nom"], exc))
         return False
@@ -1185,6 +1210,92 @@ def _rapatrier_depuis_compte_dedie(esp):
     journal("Espace %s : données revenues de son compte dédié" % esp["id"])
     print("Données de %s revenues de son compte dédié%s." % (
         esp["nom"], " ; état précédent conservé : %s" % sauvegarde if sauvegarde else ""))
+    return True
+
+
+def _geste_dans_l_espace(esp, action, produire=None, consommer=None):
+    """Ouvre l'Espace, fait exécuter un ordre interne, le rend. Renvoie (code, erreurs)."""
+    try:
+        session = _session_pour_un_geste(esp)
+    except compte_dedie.Indisponible as exc:
+        return None, [str(exc)]
+    try:
+        return _ordre_interne(session, action, produire=produire, consommer=consommer)
+    finally:
+        session.rendre()
+
+
+def _exporter_compte_dedie(esp, dest=None):
+    """Sauvegarde d'un Espace dédié : c'est lui qui emballe, le bureau compresse.
+
+    Même archive que pour un Espace ordinaire (.tar.gz), donc restaurable de la
+    même façon. Écrite d'abord sous un nom provisoire : une sauvegarde
+    interrompue ne doit jamais passer pour une sauvegarde complète.
+    """
+    os.makedirs(BACKUP_DIR, exist_ok=True)
+    chemin = dest or os.path.join(
+        BACKUP_DIR, "%s-%s.tar.gz" % (esp["id"], time.strftime("%Y%m%d-%H%M")))
+    provisoire = chemin + ".partielle"
+
+    def compresser(flux):
+        import gzip
+        with gzip.open(provisoire, "wb") as gz:
+            shutil.copyfileobj(flux, gz)
+
+    code, erreurs = _geste_dans_l_espace(esp, INTERNE_EXPORTER, consommer=compresser)
+    if code != 0 or erreurs:
+        try:
+            os.unlink(provisoire)
+        except OSError:
+            pass
+        sys.stderr.write("codebyr-space : sauvegarde de %s interrompue (%s).\n"
+                         % (esp["nom"], "; ".join(erreurs) or "code %s" % code))
+        return 1
+    os.replace(provisoire, chemin)
+    print("Espace %s sauvegardé : %s" % (esp["nom"], chemin))
+    return 0
+
+
+def _restaurer_compte_dedie(espaces, esp, source):
+    """Restauration d'un Espace dédié : le bureau lit l'archive, l'Espace remet.
+
+    L'Espace est fermé d'abord, comme pour un Espace ordinaire. L'archive est
+    entièrement déballée avant qu'on touche à quoi que ce soit, et l'état
+    d'avant est mis de côté dans l'Espace (.codebyr/avant-restauration-…).
+    """
+    if _espace_courant() == esp["id"]:
+        sys.stderr.write("Fermez cet Espace puis restaurez depuis le bureau.\n")
+        return 1
+    cmd_close(espaces, esp["id"])
+
+    def decompresser(flux):
+        import gzip
+        with gzip.open(source, "rb") as gz:
+            shutil.copyfileobj(gz, flux)
+
+    code, erreurs = _geste_dans_l_espace(esp, INTERNE_RESTAURER, produire=decompresser)
+    if code != 0 or erreurs:
+        sys.stderr.write("Restauration refusée, anciennes données conservées : %s\n"
+                         % ("; ".join(erreurs) or "code %s" % code))
+        return 1
+    print("Espace %s restauré. L'état précédent est conservé dans l'Espace." % esp["nom"])
+    return 0
+
+
+def _effacer_compte_dedie(espaces, esp):
+    """Efface les données d'un Espace dédié, des deux côtés. Renvoie True si fait.
+
+    Chez l'Espace, c'est lui qui efface (voir cmd_interne_effacer). Côté bureau,
+    l'état figé du déménagement part aussi : sans cela, la prochaine ouverture
+    ferait déménager à nouveau les données qu'on vient d'effacer.
+    """
+    cmd_close(espaces, esp["id"])
+    code, erreurs = _geste_dans_l_espace(esp, INTERNE_EFFACER)
+    if code != 0 or erreurs:
+        sys.stderr.write("codebyr-space : effacement de %s incomplet (%s).\n"
+                         % (esp["nom"], "; ".join(erreurs) or "code %s" % code))
+        return False
+    shutil.rmtree(os.path.join(DATA_ROOT, esp["id"]), ignore_errors=True)
     return True
 
 
@@ -1298,6 +1409,115 @@ def cmd_interne_importer():
         return 1
     finally:
         shutil.rmtree(stage, ignore_errors=True)
+    return 0
+
+
+INTERNE_RESTAURER = "interne-restaurer"
+INTERNE_EFFACER = "interne-effacer"
+INTERNE_CONTAGION = "interne-contagion"
+
+
+def cmd_interne_restaurer():
+    """Remplace le contenu de l'Espace par l'archive reçue sur l'entrée standard.
+
+    Exécuté PAR l'Espace. Même garantie que la restauration d'un Espace
+    ordinaire : l'archive est entièrement déballée AVANT de toucher à quoi que
+    ce soit, et l'état d'avant est mis de côté, pas effacé — dans
+    .codebyr/avant-restauration-<date>.
+    """
+    compte = _compte_d_espace_courant()
+    if not compte:
+        sys.stderr.write("codebyr-space : réservé au compte d'un Espace.\n")
+        return 2
+    home = compte.pw_dir
+    interne = os.path.join(home, DOSSIER_INTERNE)
+    fichiers_surs.mkdir(interne)
+    stage = tempfile.mkdtemp(prefix="restauration-", dir=interne)
+    try:
+        with tarfile.open(fileobj=sys.stdin.buffer, mode="r|*") as tar:
+            _extraire_archive(tar, stage, _filtre_dossier_d_espace)
+        cote = os.path.join(interne, "avant-restauration-%s" % time.strftime("%Y%m%d-%H%M%S"))
+        os.makedirs(cote, mode=0o700)
+        mis_de_cote, poses = [], []
+        try:
+            for nom in sorted(os.listdir(home)):
+                if nom != DOSSIER_INTERNE:
+                    os.rename(os.path.join(home, nom), os.path.join(cote, nom))
+                    mis_de_cote.append(nom)
+            for nom in sorted(os.listdir(stage)):
+                if nom != DOSSIER_INTERNE:
+                    os.rename(os.path.join(stage, nom), os.path.join(home, nom))
+                    poses.append(nom)
+        except OSError:
+            # Remettre ce qu'on a déjà bougé : un Espace à moitié restauré
+            # serait pire que pas restauré du tout.
+            for nom in reversed(poses):
+                os.rename(os.path.join(home, nom), os.path.join(stage, nom))
+            for nom in reversed(mis_de_cote):
+                os.rename(os.path.join(cote, nom), os.path.join(home, nom))
+            raise
+    except (OSError, tarfile.TarError, ValueError) as exc:
+        sys.stderr.write("codebyr-space : restauration refusée, données conservées (%s)\n" % exc)
+        return 1
+    finally:
+        shutil.rmtree(stage, ignore_errors=True)
+    sys.stdout.write(cote + "\n")
+    return 0
+
+
+def cmd_interne_effacer():
+    """Efface les données de l'Espace, et ses deux boîtes. Exécuté PAR l'Espace.
+
+    C'est l'Espace qui efface chez lui : root n'a pas à parcourir un dossier
+    qu'un Espace compromis aurait pu garnir de liens. Les boîtes sont vidées
+    aussi — un fichier en route est une donnée de l'Espace comme une autre.
+    """
+    compte = _compte_d_espace_courant()
+    if not compte:
+        sys.stderr.write("codebyr-space : réservé au compte d'un Espace.\n")
+        return 2
+    proprietaire, esp_id = comptes.decomposer(compte.pw_name)
+    restes = []
+    for dossier in (compte.pw_dir, comptes.chemin_envois(proprietaire, esp_id),
+                    comptes.chemin_arrivees(proprietaire, esp_id)):
+        try:
+            noms = os.listdir(dossier)
+        except FileNotFoundError:
+            continue
+        for nom in noms:
+            chemin = os.path.join(dossier, nom)
+            try:
+                if os.path.isdir(chemin) and not os.path.islink(chemin):
+                    shutil.rmtree(chemin)
+                else:
+                    os.unlink(chemin)
+            except OSError as exc:
+                restes.append("%s (%s)" % (nom, exc))
+    if restes:
+        sys.stderr.write("codebyr-space : non effacé : %s\n" % "; ".join(restes[:5]))
+        return 1
+    return 0
+
+
+def cmd_interne_contagion():
+    """Écrit, en JSON, la provenance de chaque fichier de l'Espace. Exécuté PAR lui.
+
+    Seul l'attribut étendu compte ici : c'est lui qui a suivi un fichier venu
+    d'ailleurs. L'emplacement ne dit rien, puisque tout est chez l'Espace.
+    """
+    compte = _compte_d_espace_courant()
+    if not compte:
+        sys.stderr.write("codebyr-space : réservé au compte d'un Espace.\n")
+        return 2
+    origines = []
+    total = 0
+    for dossier, sous, fichiers in os.walk(compte.pw_dir):
+        if dossier == compte.pw_dir and DOSSIER_INTERNE in sous:
+            sous.remove(DOSSIER_INTERNE)
+        for nom in fichiers:
+            total += 1
+            origines.append(provenance.origine(os.path.join(dossier, nom)))
+    json.dump({"total": total, "origines": origines}, sys.stdout)
     return 0
 
 
@@ -1471,6 +1691,12 @@ def cmd_purge(espaces, esp_id):
     if not esp:
         sys.stderr.write("Espace inconnu : %s\n" % esp_id)
         return 2
+    if compte_dedie.demande(esp):
+        if not _effacer_compte_dedie(espaces, esp):
+            return 1
+        print("Données de l'Espace %s effacées." % esp["nom"])
+        journal("Espace %s : données effacées (compte dédié)" % esp_id)
+        return 0
     cmd_close(espaces, esp_id)   # on ferme d'abord les fenêtres ouvertes
     d = os.path.join(DATA_ROOT, esp_id)
     if os.path.isdir(d):
@@ -1491,6 +1717,8 @@ def cmd_export(espaces, esp_id, dest=None):
     if not esp:
         sys.stderr.write("Espace inconnu : %s\n" % esp_id)
         return 2
+    if compte_dedie.demande(esp):
+        return _exporter_compte_dedie(esp, dest)
     home = os.path.join(DATA_ROOT, esp_id, "home")
     if not os.path.isdir(home):
         print("L'Espace %s est vide — rien à sauvegarder." % esp["nom"])
@@ -1594,6 +1822,8 @@ def cmd_import(espaces, esp_id, source=None):
     if not os.path.exists(source):
         sys.stderr.write("Archive introuvable : %s\n" % source)
         return 1
+    if compte_dedie.demande(esp):
+        return _restaurer_compte_dedie(espaces, esp, source)
     # Extraire avant de fermer ou toucher aux données existantes. Le dossier
     # temporaire est un frère du home, inaccessible depuis le bac à sable.
     parent = os.path.join(DATA_ROOT, esp_id)
@@ -1807,6 +2037,23 @@ def cmd_delete(esp_id):
         sys.stderr.write("L'Espace intégré « %s » ne peut pas être supprimé.\n" % esp_id)
         return 2
     espaces = load_espaces()
+    esp = espaces.get(esp_id)
+    if compte_dedie.demande(esp):
+        # Ses données d'abord, effacées par lui ; puis son compte, retiré par
+        # le service. Dans l'autre ordre, un compte supprimé laisserait des
+        # fichiers sans propriétaire, que le prochain compte créé avec le même
+        # numéro retrouverait.
+        if not _effacer_compte_dedie(espaces, esp):
+            return 1
+        try:
+            complet = compte_dedie.supprimer(esp_id)
+        except compte_dedie.Indisponible as exc:
+            sys.stderr.write("codebyr-space : %s\n" % exc)
+            return 1
+        if not complet:
+            sys.stderr.write("Compte de l'Espace %s pas entièrement retiré "
+                             "(voir « journalctl -t codebyr-uid »).\n" % esp_id)
+            return 1
     cmd_close(espaces, esp_id)
     if not registre.supprimer_espace(esp_id):
         print("Espace introuvable : %s" % esp_id)
@@ -2235,13 +2482,27 @@ def cmd_contagion(espaces, esp_id):
     if not esp:
         sys.stderr.write("Espace inconnu : %s\n" % esp_id)
         return 2
-    racine = os.path.join(DATA_ROOT, esp_id, "home")
     origines = []
     total = 0
-    for dossier, _, fichiers in os.walk(racine):
-        for nom in fichiers:
-            total += 1
-            origines.append(provenance.origine(os.path.join(dossier, nom), DATA_ROOT))
+    if compte_dedie.demande(esp):
+        # Le bureau ne lit pas chez un Espace dédié : c'est lui qui relève la
+        # provenance de ses fichiers, et le bureau qui fait le compte.
+        lu = []
+        code, erreurs = _geste_dans_l_espace(esp, INTERNE_CONTAGION,
+                                             consommer=lambda flux: lu.append(json.load(flux)))
+        if code != 0 or erreurs or not lu or not isinstance(lu[0], dict):
+            sys.stderr.write("codebyr-space : analyse impossible (%s)\n"
+                             % ("; ".join(erreurs) or "code %s" % code))
+            return 1
+        total = int(lu[0].get("total", 0))
+        origines = [o for o in lu[0].get("origines", [])
+                    if o is None or provenance.identifiant_valide(o)]
+    else:
+        racine = os.path.join(DATA_ROOT, esp_id, "home")
+        for dossier, _, fichiers in os.walk(racine):
+            for nom in fichiers:
+                total += 1
+                origines.append(provenance.origine(os.path.join(dossier, nom), DATA_ROOT))
     compte = provenance.resumer(origines, esp_id)
     print("Espace %s — %d fichier(s) au total." % (esp["nom"], total))
     if not compte:
@@ -2324,6 +2585,12 @@ def main(argv):
         return cmd_interne_exporter()
     if action == INTERNE_RENDU and not args:
         return cmd_interne_rendu()
+    if action == INTERNE_RESTAURER and not args:
+        return cmd_interne_restaurer()
+    if action == INTERNE_EFFACER and not args:
+        return cmd_interne_effacer()
+    if action == INTERNE_CONTAGION and not args:
+        return cmd_interne_contagion()
     if action not in ACTIONS:
         sys.stderr.write("Action inconnue : %s\n" % action)
         sys.stderr.write("Actions : %s\n" % ", ".join(sorted(ACTIONS)))

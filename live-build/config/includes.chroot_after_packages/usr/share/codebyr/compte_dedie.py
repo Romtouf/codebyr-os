@@ -49,9 +49,6 @@ def incompatibilites(esp, fichier=None, est_flatpak=False):
     raisons = []
     if not demande(esp):
         return raisons
-    if esp.get("ephemere"):
-        raisons.append("un Espace jetable ne peut pas encore tourner sous son "
-                       "propre compte")
     if est_flatpak:
         raisons.append("les applications Flatpak ne sont pas encore prises en "
                        "charge dans un Espace à compte dédié")
@@ -63,11 +60,6 @@ def incompatibilites(esp, fichier=None, est_flatpak=False):
 # données sont ailleurs, et le bureau ne peut pas les lire : les laisser faire
 # afficherait « données effacées » ou « exporté » sur un dossier vide.
 GESTES_PAS_ENCORE_PRETS = {
-    "purge": "effacer ses données",
-    "delete": "le supprimer",
-    "export": "l'exporter",
-    "import": "y importer une sauvegarde",
-    "contagion": "analyser son contenu",
     "install": "y installer une application Flatpak",
     "add-app": "y ajouter une application",
 }
@@ -123,11 +115,12 @@ class Session:
     """
 
     def __init__(self, esp_id, affichage, son, memoire, taches,
-                 chemin=SOCKET_SERVICE):
+                 chemin=SOCKET_SERVICE, ephemere=False):
         try:
             reponse, self._client, _ = _parler(chemin, {
                 "action": "ouvrir", "espace": esp_id, "affichage": affichage,
-                "son": bool(son), "memoire": memoire, "taches": taches},
+                "son": bool(son), "memoire": memoire, "taches": taches,
+                "ephemere": bool(ephemere)},
                 garder=True)
         except FileNotFoundError:
             raise Indisponible("le service des comptes d'Espaces n'est pas "
@@ -159,6 +152,21 @@ def fermer(esp_id, chemin=SOCKET_SERVICE):
     """Referme un Espace d'un geste : toutes ses applications s'arrêtent."""
     try:
         reponse, _, _ = _parler(chemin, {"action": "fermer", "espace": esp_id})
+    except FileNotFoundError:
+        raise Indisponible("le service des comptes d'Espaces n'est pas installé")
+    except (OSError, ValueError) as exc:
+        raise Indisponible("le service des comptes d'Espaces ne répond pas (%s)" % exc)
+    return bool(reponse.get("ok"))
+
+
+def supprimer(esp_id, chemin=SOCKET_SERVICE):
+    """Retire le compte d'un Espace supprimé, et ce que root lui avait préparé.
+
+    À n'appeler qu'après avoir fait effacer ses données PAR l'Espace : root ne
+    devrait trouver que des dossiers vides.
+    """
+    try:
+        reponse, _, _ = _parler(chemin, {"action": "supprimer", "espace": esp_id})
     except FileNotFoundError:
         raise Indisponible("le service des comptes d'Espaces n'est pas installé")
     except (OSError, ValueError) as exc:

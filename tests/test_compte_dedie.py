@@ -61,26 +61,27 @@ class CeQuiNEstPasEncorePret(unittest.TestCase):
         self.assertEqual(compte_dedie.incompatibilites(
             dict(ORDINAIRE, ephemere=True), fichier="/tmp/x", est_flatpak=True), [])
 
-    def test_jetable_et_flatpak_sont_refuses(self):
-        for options in ({"esp": dict(DEDIE, ephemere=True)},
-                        {"esp": DEDIE, "est_flatpak": True}):
-            esp = options.pop("esp")
-            self.assertTrue(compte_dedie.incompatibilites(esp, **options), options)
+    def test_flatpak_est_refuse(self):
+        self.assertTrue(compte_dedie.incompatibilites(DEDIE, est_flatpak=True))
+
+    def test_un_espace_jetable_est_accepte(self):
+        # Son dossier devient un tmpfs sous son compte (voir codebyr-uid).
+        self.assertEqual(compte_dedie.incompatibilites(dict(DEDIE, ephemere=True)), [])
 
     def test_une_piece_jointe_est_acceptee(self):
         # Elle passe par la boîte d'arrivée de l'Espace (voir _lancer).
         self.assertEqual(compte_dedie.incompatibilites(DEDIE, fichier="/tmp/facture.pdf"), [])
 
     def test_les_gestes_sur_les_donnees_sont_refuses_avec_une_explication(self):
-        for geste in ("purge", "delete", "export", "import",
-                      "contagion", "install", "add-app"):
+        for geste in ("install", "add-app"):
             message = compte_dedie.refus_de_geste(geste, DEDIE)
             self.assertIsNotNone(message, geste)
             self.assertIn("Travail", message)
             self.assertIn("dedie", message, "le message doit dire comment revenir")
 
     def test_ouvrir_et_fermer_restent_possibles(self):
-        for geste in ("launch", "close", "list", "apps"):
+        for geste in ("launch", "close", "list", "apps", "envoyer", "purge", "delete",
+                      "export", "import", "contagion"):
             self.assertIsNone(compte_dedie.refus_de_geste(geste, DEDIE), geste)
 
     def test_les_gestes_refuses_existent_bien_dans_le_lanceur(self):
@@ -90,11 +91,11 @@ class CeQuiNEstPasEncorePret(unittest.TestCase):
 
     def test_le_lanceur_refuse_avant_d_agir(self):
         with mock.patch.object(space, "load_espaces", return_value={"travail": DEDIE}), \
-                mock.patch.object(space, "cmd_purge") as purge, \
+                mock.patch.object(space, "cmd_install") as installer, \
                 mock.patch.object(space, "_prevenir"):
-            code = space.main(["codebyr-space", "purge", "travail"])
+            code = space.main(["codebyr-space", "install", "travail", "org.exemple.App"])
         self.assertEqual(code, 1)
-        purge.assert_not_called()
+        installer.assert_not_called()
 
 
 class JamaisDeReplieSousLeCompteDuBureau(unittest.TestCase):
@@ -556,10 +557,14 @@ class LeDemenagement(unittest.TestCase):
     def test_le_bout_du_tuyau_est_toujours_ferme(self):
         # Sans cela, un ordre qui échoue laissait l'emballeur attendre à jamais
         # un lecteur disparu (vu dans le WSL le 14/09/2026).
-        demenager = _fonction(self.source, "_demenager_vers_compte_dedie",
-                              "_rapatrier_depuis_compte_dedie")
-        self.assertIn("finally:", demenager)
-        self.assertIn("os.close(lecture)", demenager.split("finally:")[1][:400])
+        ordre = _fonction(self.source, "_ordre_interne", "_session_pour_un_geste")
+        self.assertIn("finally:", ordre)
+        self.assertIn("os.close(a_fermer)", ordre.split("finally:")[1][:200])
+        # Et les gestes passent par là, sans recopier le motif du tuyau.
+        for geste in ("_demenager_vers_compte_dedie", "_rapatrier_depuis_compte_dedie",
+                      "_geste_dans_l_espace"):
+            corps = self.source.split("def %s(" % geste)[1].split("\ndef ")[0]
+            self.assertNotIn("os.pipe()", corps, geste)
 
     @unittest.skipUnless(POSIX, "fichiers_surs est réservé à Linux")
     def test_un_demenagement_rate_n_ouvre_pas_l_espace(self):
@@ -618,3 +623,36 @@ class LesFluxDuPremierProcessus(unittest.TestCase):
     def test_les_descripteurs_recus_sont_refermes(self):
         servir = self.source.split("def servir_un(")[1].split("def attendre(")[0]
         self.assertIn("for fd in descripteurs:", servir.split("finally:")[1])
+
+
+class LesGestesSurLesDonnees(unittest.TestCase):
+
+    def setUp(self):
+        self.source = _source()
+
+    def test_une_sauvegarde_interrompue_ne_prend_jamais_son_vrai_nom(self):
+        exporter = _fonction(self.source, "_exporter_compte_dedie", "_restaurer_compte_dedie")
+        self.assertIn(".partielle", exporter)
+        self.assertLess(exporter.index("if code != 0 or erreurs:"),
+                        exporter.index("os.replace(provisoire, chemin)"))
+
+    def test_la_restauration_ferme_l_espace_d_abord(self):
+        restaurer = _fonction(self.source, "_restaurer_compte_dedie", "_effacer_compte_dedie")
+        self.assertLess(restaurer.index("cmd_close("), restaurer.index("_geste_dans_l_espace("))
+
+    def test_l_effacement_emporte_aussi_l_etat_fige_du_demenagement(self):
+        # Sinon la prochaine ouverture ferait déménager à nouveau ce qu'on vient
+        # d'effacer.
+        effacer = _fonction(self.source, "_effacer_compte_dedie", "cmd_interne_preparer")
+        self.assertLess(effacer.index("_geste_dans_l_espace("),
+                        effacer.index("shutil.rmtree(os.path.join(DATA_ROOT"))
+
+    def test_la_suppression_efface_avant_de_retirer_le_compte(self):
+        supprimer = _fonction(self.source, "cmd_delete", "cmd_nettoyer_registre")
+        self.assertLess(supprimer.index("_effacer_compte_dedie("),
+                        supprimer.index("compte_dedie.supprimer("))
+
+    def test_une_restauration_a_moitie_faite_est_defaite(self):
+        restaurer = _fonction(self.source, "cmd_interne_restaurer", "cmd_interne_effacer")
+        self.assertIn("reversed(mis_de_cote)", restaurer)
+        self.assertIn("reversed(poses)", restaurer)

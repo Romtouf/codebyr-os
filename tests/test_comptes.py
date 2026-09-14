@@ -438,13 +438,13 @@ class RienNeSurvitAUnEchec(unittest.TestCase):
         self.assertLess(presenter.index("umount"), presenter.index("--bind"))
 
     def test_la_fermeture_ne_se_dit_pas_reussie_quand_elle_ne_l_est_pas(self):
-        fermer = self.code.split("def fermer(")[1].split("def traiter(")[0]
+        fermer = self.code.split("def fermer(")[1].split("def supprimer(")[0]
         self.assertIn("'incomplet'", fermer)
         # Plus aucun échec avalé en silence dans le rangement.
         self.assertIsNone(re.search(r"^\s*pass$", fermer, re.M))
 
     def test_le_retrait_du_droit_ne_peut_pas_echouer_en_silence(self):
-        fermer = self.code.split("def fermer(")[1].split("def traiter(")[0]
+        fermer = self.code.split("def fermer(")[1].split("def supprimer(")[0]
         bloc = fermer.split("except subprocess.CalledProcessError")[1][:200]
         self.assertIn("echecs.append", bloc)
 
@@ -491,3 +491,56 @@ class SonNomDeCompte(unittest.TestCase):
         for espace in ("../x", "", "Banque"):
             with self.assertRaises(ValueError):
                 comptes.chemin_arrivees(1000, espace)
+
+
+class LEspaceJetable(unittest.TestCase):
+    """Sous compte dédié, le Jetable garde sa promesse : rien sur le disque."""
+
+    def setUp(self):
+        self.code = _code(SERVICE)
+        self.monter = self.code.split("def monter_jetable(")[1].split("\ndef ")[0]
+
+    def test_son_dossier_est_un_tmpfs_borne_et_sans_execution(self):
+        self.assertIn("'tmpfs'", self.monter)
+        for option in ("size=%s", "mode=0700", "nosuid", "nodev", "noexec"):
+            self.assertIn(option, self.monter, option)
+
+    def test_la_taille_vient_du_plafond_valide(self):
+        preparer = self.code.split("def _preparer(")[1].split("\ndef ")[0]
+        self.assertLess(preparer.index("comptes.plafonds_valides("),
+                        preparer.index("monter_jetable("))
+
+    def test_seul_un_vrai_booleen_monte_un_tmpfs(self):
+        traiter = self.code.split("def traiter(")[1].split("\ndef ")[0]
+        self.assertIn("demande.get('ephemere') is True", traiter)
+
+    def test_un_montage_laisse_la_n_est_pas_empile(self):
+        self.assertLess(self.monter.index("umount"), self.monter.index("'/usr/bin/mount'"))
+
+    def test_la_fermeture_le_demonte(self):
+        fermer = self.code.split("def fermer(")[1].split("def supprimer(")[0]
+        self.assertIn("os.path.ismount(home)", fermer)
+        self.assertIn("umount", fermer)
+
+
+class LaSuppressionDUnCompte(unittest.TestCase):
+
+    def setUp(self):
+        self.supprimer = _code(SERVICE).split("def supprimer(")[1].split("\ndef ")[0]
+
+    def test_les_fichiers_partent_avant_le_compte(self):
+        # Un compte supprimé avant ses fichiers les laisserait sans
+        # propriétaire, et le prochain compte au même numéro les retrouverait.
+        self.assertLess(self.supprimer.index("shutil.rmtree("),
+                        self.supprimer.index("userdel"))
+
+    def test_root_ne_parcourt_rien_sans_garantie_contre_les_liens(self):
+        self.assertIn("shutil.rmtree.avoids_symlink_attacks", self.supprimer)
+        self.assertLess(self.supprimer.index("avoids_symlink_attacks"),
+                        self.supprimer.index("shutil.rmtree(chemin)"))
+
+    def test_seuls_les_chemins_construits_sont_retires(self):
+        for chemin in ("comptes.chemin_home(", "comptes.chemin_envois(",
+                       "comptes.chemin_arrivees("):
+            self.assertIn(chemin, self.supprimer)
+        self.assertNotIn("demande.get(", self.supprimer)

@@ -21,6 +21,7 @@ qui puisse voir ce qu'un essai « à la main » ne verra jamais :
 import json
 import os
 import pwd
+import re
 import shutil
 import subprocess
 import sys
@@ -113,11 +114,24 @@ def registre(bureau, geste):
 
 
 def refus_apparmor(depuis):
-    """Ce qu'AppArmor a refusé au service depuis le début de l'essai."""
+    """Ce qu'AppArmor a refusé au service : l'opération et le CHEMIN, rien d'autre.
+
+    La ligne brute du noyau est longue, et le chemin s'y trouve au milieu : en
+    la tronquant, on perdait exactement l'information qui sert (14/09/2026).
+    """
     noyau = subprocess.run(["/usr/bin/journalctl", "-k", "--no-pager", "-o", "cat",
                             "--since", "@%d" % int(depuis)],
                            capture_output=True, text=True).stdout.splitlines()
-    return [l for l in noyau if "apparmor=" in l and "DENIED" in l and "codebyr" in l]
+    refus = []
+    for ligne in noyau:
+        if "apparmor=" not in ligne or "DENIED" not in ligne or "codebyr" not in ligne:
+            continue
+        champs = dict(re.findall(r'(\w+)="([^"]*)"', ligne))
+        resume = "%s %s (%s)" % (champs.get("operation", "?"), champs.get("name", "?"),
+                                 champs.get("profile", "?"))
+        if resume not in refus:
+            refus.append(resume)
+    return refus
 
 
 def main():

@@ -50,9 +50,15 @@ profile codebyr-uid /usr/lib/codebyr/codebyr-uid {
   /usr/lib/python3.[0-9]*/ r,
   /usr/lib/python3.[0-9]*/** r,
   /usr/lib/python3.[0-9]*/lib-dynload/*.so mr,
-  /usr/share/codebyr/*.py r,
+  # Le DOSSIER, et pas seulement les fichiers : avant d'importer un module,
+  # Python liste le dossier où il le cherche, puis tente d'y lire un fichier
+  # compilé. Sans ces deux règles, le service ne démarrait pas du tout — et
+  # AppArmor refusait en silence, sans autre trace qu'une ligne du journal du
+  # noyau. Constaté sur la machine d'essai le 14/09/2026.
+  /usr/share/codebyr/ r,
+  /usr/share/codebyr/** r,
   deny /usr/lib/python3.[0-9]*/**/__pycache__/{,*} w,
-  deny /usr/share/codebyr/**/__pycache__/{,*} w,
+  deny /usr/share/codebyr/{,**/}__pycache__/{,**} w,
 
   # ── Les seuls dossiers que ce service écrit ─────────────────────────────
   # Dossiers des Espaces, leurs boîtes (départ, arrivée) : créés, donnés à

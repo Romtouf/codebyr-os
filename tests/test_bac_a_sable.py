@@ -86,6 +86,65 @@ class Cloisonnement(unittest.TestCase):
         self.assertEqual(inscriptibles, ["/tmp/espace-home"])
 
 
+class SousSonPropreCompte(unittest.TestCase):
+    """Espace tournant sous son propre compte Unix : ce qu'il voit change.
+
+    Le compte d'un Espace n'a aucun droit sur /run/user/<uid du bureau>. Si
+    un seul chemin y menait encore, l'Espace ne s'ouvrirait pas — ou pire,
+    s'ouvrirait sans affichage et sans que personne sache pourquoi.
+    """
+
+    PASSERELLE = "/run/codebyr/passerelles/cbyr-1000-banque"
+
+    def _argv(self, **kw):
+        env = {"XDG_RUNTIME_DIR": "/run/user/1000"}
+        kw.setdefault("passerelle", self.PASSERELLE)
+        kw.setdefault("chez", "/var/lib/codebyr/espaces/1000/banque")
+        return bac_a_sable.wrap_bwrap("/var/lib/codebyr/espaces/1000/banque",
+                                      ["firefox"], env, **kw)
+
+    def test_plus_rien_ne_mene_au_dossier_d_execution_du_bureau(self):
+        for options in ({}, {"renforce": True}, {"audio": True},
+                        {"audio": True, "renforce": True}):
+            for argument in self._argv(**options):
+                self.assertNotIn("/run/user/1000", argument,
+                                 "chemin du bureau exposé (%s)" % options)
+
+    def test_les_sockets_viennent_de_la_passerelle(self):
+        argv = self._argv(audio=True)
+        self.assertIn(self.PASSERELLE + "/wayland-0", argv)
+        self.assertIn(self.PASSERELLE + "/pipewire-0", argv)
+
+    def test_le_dossier_d_execution_vu_dans_l_espace_est_annonce(self):
+        # Sans --setenv, l'application chercherait ses sockets dans le dossier
+        # du bureau hérité de l'environnement : échec muet.
+        argv = self._argv()
+        self.assertIn(bac_a_sable.RUNTIME_ESPACE + "/wayland-0", argv)
+        i = argv.index("XDG_RUNTIME_DIR")
+        self.assertEqual(argv[i - 1], "--setenv")
+        self.assertEqual(argv[i + 1], bac_a_sable.RUNTIME_ESPACE)
+
+    def test_le_dossier_personnel_apparait_ou_on_le_demande(self):
+        argv = self._argv(envoi="/tmp/envoi-banque")
+        i = argv.index("/var/lib/codebyr/espaces/1000/banque", 1)
+        self.assertEqual(argv[i - 1], "--bind")
+        self.assertEqual(argv[i + 1], "/var/lib/codebyr/espaces/1000/banque")
+        self.assertIn("/var/lib/codebyr/espaces/1000/banque/.codebyr-envoi", argv)
+
+    def test_le_bus_de_session_de_l_hote_reste_absent(self):
+        for argument in self._argv(audio=True):
+            self.assertFalse(argument.endswith("/bus"), argument)
+
+    def test_sans_passerelle_rien_ne_change(self):
+        # Le chantier est progressif : tant qu'un Espace tourne sous le compte
+        # du bureau, sa ligne de commande doit être exactement celle d'avant.
+        env = {"XDG_RUNTIME_DIR": "/run/user/1000"}
+        argv = bac_a_sable.wrap_bwrap("/tmp/espace-home", ["firefox"], env)
+        self.assertIn("/run/user/1000/wayland-0", argv)
+        self.assertNotIn("XDG_RUNTIME_DIR", argv)
+        self.assertNotIn(bac_a_sable.RUNTIME_ESPACE, argv)
+
+
 class SondeIsolation(unittest.TestCase):
     """« codebyr-space verifier-isolation » — le contrôle rejouable.
 

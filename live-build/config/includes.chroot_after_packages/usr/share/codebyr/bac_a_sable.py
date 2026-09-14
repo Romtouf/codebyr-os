@@ -16,8 +16,15 @@ import sys
 import tempfile
 
 
+# Dossier d'exécution vu DANS un Espace qui tourne sous son propre compte.
+# Ce n'est pas /run/user/<uid> : ce dossier appartient au BUREAU, et l'ouvrir
+# rendait joignable son bus de session — mesuré le 14/09/2026 (voir comptes.py).
+RUNTIME_ESPACE = "/run/codebyr-espace"
+
+
 def wrap_bwrap(home, cmd, env, renforce=False, hors_ligne=False, audio=True,
-               envoi=None, filtre=None, gpu=True, notifications=None):
+               envoi=None, filtre=None, gpu=True, notifications=None,
+               passerelle=None, chez=None):
     """Enveloppe avec bubblewrap : dossier personnel isolé, /tmp isolé,
     affichage (et éventuellement son) partagés. Repli géré par l'appelant si
     bwrap échoue.
@@ -56,6 +63,21 @@ def wrap_bwrap(home, cmd, env, renforce=False, hors_ligne=False, audio=True,
                  n'est partagé entre Espaces : c'est l'hôte qui relève et
                  distribue, jamais l'Espace qui écrit chez le voisin.
 
+    passerelle : dossier tenu par root où sont présentés les SEULS sockets
+                 auxquels cet Espace a droit, quand il tourne sous son propre
+                 compte Unix (voir comptes.py). Les sockets ne viennent alors
+                 plus du dossier d'exécution du bureau : ce compte n'y a aucun
+                 droit, et c'est précisément l'objet du chantier. Le dossier
+                 d'exécution vu dans le bac à sable devient RUNTIME_ESPACE —
+                 celui du bureau n'existe plus pour cet Espace, ce qui retire
+                 du même coup toute chance de retomber sur son bus de session.
+
+    chez       : chemin où le dossier personnel de l'Espace apparaît dans le
+                 bac à sable. Par défaut celui de l'appelant, ce qui convient
+                 tant que le lanceur tourne sous le compte du bureau ; sous un
+                 autre compte, il faut le dire, sinon les fichiers de l'Espace
+                 apparaîtraient au dossier personnel de ce compte-là.
+
     RÈGLE ABSOLUE — le bus de session de l'hôte n'entre JAMAIS ici.
     Un « --ro-bind » ne protège pas un socket : le noyau ne refuse l'écriture
     sur un montage en lecture seule que pour les fichiers, répertoires et liens
@@ -72,6 +94,13 @@ def wrap_bwrap(home, cmd, env, renforce=False, hors_ligne=False, audio=True,
     # « or » et non env.get(défaut) : le défaut ne doit être calculé que s'il
     # sert (os.getuid n'existe pas partout où l'on teste ce code).
     runtime = env.get("XDG_RUNTIME_DIR") or "/run/user/%d" % os.getuid()
+    # Sous compte dédié, les sockets viennent de la passerelle et non du
+    # dossier d'exécution du bureau, et le dossier vu dans le bac à sable
+    # change de nom : plus rien ne pointe vers /run/user/<uid du bureau>.
+    depuis = passerelle or runtime
+    if passerelle:
+        runtime = RUNTIME_ESPACE
+    chez = chez or os.path.expanduser("~")
     bwrap = [
         "bwrap",
         "--ro-bind", "/usr", "/usr",
@@ -83,13 +112,13 @@ def wrap_bwrap(home, cmd, env, renforce=False, hors_ligne=False, audio=True,
         "--proc", "/proc",
         "--dev", "/dev",
         "--tmpfs", "/tmp",
-        "--bind", home, os.path.expanduser("~"),
-        "--ro-bind-try", runtime + "/wayland-0", runtime + "/wayland-0",
+        "--bind", home, chez,
+        "--ro-bind-try", depuis + "/wayland-0", runtime + "/wayland-0",
         "--ro-bind-try", "/sys/dev/char", "/sys/dev/char",
         "--ro-bind-try", "/sys/devices", "/sys/devices",
         "--unshare-pid", "--unshare-uts", "--unshare-ipc",
         "--die-with-parent",
-        "--setenv", "HOME", os.path.expanduser("~"),
+        "--setenv", "HOME", chez,
         # Le chemin du bus de l'hôte hérité de l'environnement ne mène plus à
         # rien dans le bac à sable : on le retire pour éviter toute confusion
         # (dbus-run-session posera la bonne valeur juste après).
@@ -99,12 +128,19 @@ def wrap_bwrap(home, cmd, env, renforce=False, hors_ligne=False, audio=True,
         # Seul passage par lequel un fichier sort vers un autre Espace. Chaque
         # Espace ne voit QUE la sienne : rien n'est partagé, l'hôte relève et
         # distribue. Un Jetable n'en a pas — il ne conserve rien, par nature.
-        bwrap += ["--bind", envoi,
-                  os.path.join(os.path.expanduser("~"), ".codebyr-envoi")]
+        # Chemin composé à la main : ce sont des chemins DANS le bac à sable,
+        # donc toujours des chemins Linux, y compris quand les tests tournent
+        # sur une autre machine.
+        bwrap += ["--bind", envoi, chez.rstrip("/") + "/.codebyr-envoi"]
     if gpu:
         bwrap += ["--dev-bind-try", "/dev/dri", "/dev/dri"]
     if audio and not hors_ligne:
-        bwrap += ["--ro-bind-try", runtime + "/pipewire-0", runtime + "/pipewire-0"]
+        bwrap += ["--ro-bind-try", depuis + "/pipewire-0", runtime + "/pipewire-0"]
+    if passerelle:
+        # L'environnement hérité désigne encore le dossier du bureau : le
+        # laisser ferait chercher les sockets là où cet Espace n'a aucun droit,
+        # et l'échec serait muet.
+        bwrap += ["--setenv", "XDG_RUNTIME_DIR", runtime]
     if filtre:
         bwrap += ["--ro-bind", filtre, "/run/codebyr-proxy"]
     if notifications:

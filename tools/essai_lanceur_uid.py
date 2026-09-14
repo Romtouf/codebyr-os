@@ -181,8 +181,13 @@ def registre(bureau, geste):
     return comme_le_bureau(bureau, ["/usr/bin/python3", "-c", code]).returncode == 0
 
 
-def marqueurs(uid_bureau):
-    """PID notés par le lanceur pour l'extension GNOME, pour l'Espace d'essai."""
+def marqueurs(uid_bureau, vivants=True):
+    """PID notés par le lanceur pour l'extension GNOME, pour l'Espace d'essai.
+
+    Vivants seulement, par défaut : un lanceur tué pendant un essai précédent
+    ne range pas son marqueur, et le prendre pour celui de l'essai en cours
+    a fait chercher le compte de l'Espace avant qu'il existe (14/09/2026).
+    """
     rundir = "/run/user/%d/codebyr" % uid_bureau
     trouves = []
     try:
@@ -194,11 +199,35 @@ def marqueurs(uid_bureau):
             continue
         try:
             with open(os.path.join(rundir, nom), encoding="utf-8") as f:
-                if f.read().strip() == ESPACE:
-                    trouves.append(int(nom[4:]))
+                if f.read().strip() != ESPACE:
+                    continue
+            pid = int(nom[4:])
         except (OSError, ValueError):
             continue
+        if not vivants or os.path.exists("/proc/%d" % pid):
+            trouves.append(pid)
     return trouves
+
+
+def retirer_marqueurs_morts(uid_bureau):
+    """Retire les marqueurs de l'Espace d'essai dont le processus n'existe plus."""
+    rundir = "/run/user/%d/codebyr" % uid_bureau
+    morts = [pid for pid in marqueurs(uid_bureau, vivants=False)
+             if not os.path.exists("/proc/%d" % pid)]
+    for pid in morts:
+        for prefixe in ("pid-", "birth-"):
+            try:
+                os.unlink(os.path.join(rundir, "%s%d" % (prefixe, pid)))
+            except OSError:
+                pass
+    return len(morts)
+
+
+def compte_espace(nom):
+    try:
+        return pwd.getpwnam(nom)
+    except KeyError:
+        return None
 
 
 def proprietaire(pid):
@@ -256,6 +285,11 @@ def main():
         shutil.rmtree(COPIE, ignore_errors=True)
         return 1
     service = lancer_service()
+    morts = retirer_marqueurs_morts(uid)
+    # Informatif : ne compte pas dans le verdict, mais dit si un essai
+    # précédent a laissé des marqueurs qui auraient pu tromper celui-ci.
+    dire("aucun marqueur laissé par un essai précédent", morts == 0,
+         "%d retiré(s)" % morts if morts else "")
     if not dire("Espace « Essai UID » ajouté au registre", registre(bureau, "ajouter")):
         reussi = False
     enfants = []
@@ -268,16 +302,15 @@ def main():
         vus = attendre_que(lambda: marqueurs(uid), 20) and marqueurs(uid)
         reussi &= dire("marqueur posé pour l'extension GNOME", bool(vus),
                        "PID %s" % (vus[0] if vus else "aucun"))
-        espace = None
-        try:
-            espace = pwd.getpwnam(nom)
-        except KeyError:
-            pass
-        if vus and espace:
-            reussi &= dire("processus lancé sous le compte de l'Espace",
-                           proprietaire(vus[0]) == espace.pw_uid,
-                           "UID %s (Espace : %d)" % (proprietaire(vus[0]), espace.pw_uid))
+        espace = compte_espace(nom)
+        # Chaque contrôle dit ce qu'il a vu, même quand il ne peut pas conclure :
+        # une ligne qui disparaît de la sortie est un échec qu'on ne voit pas.
+        reussi &= dire("processus lancé sous le compte de l'Espace",
+                       bool(vus and espace) and proprietaire(vus[0]) == espace.pw_uid,
+                       "UID %s (Espace : %s)" % (proprietaire(vus[0]) if vus else "?",
+                                                 espace.pw_uid if espace else "compte absent"))
         sortie, erreurs = app.communicate(timeout=90)
+        espace = compte_espace(nom)
         reussi &= dire("fin de l'application rapportée au lanceur", app.returncode == 0,
                        "code %s en %.0f s" % (app.returncode, time.time() - debut))
         if app.returncode != 0:
@@ -289,19 +322,22 @@ def main():
                 preuves = json.load(f)
         except (OSError, ValueError):
             pass
-        if espace:
-            reussi &= dire("l'application s'est vue sous le compte de l'Espace",
-                           preuves.get("uid") == espace.pw_uid, "UID %s" % preuves.get("uid"))
+        reussi &= dire("l'application s'est vue sous le compte de l'Espace",
+                       bool(espace) and preuves.get("uid") == espace.pw_uid,
+                       "UID %s" % preuves.get("uid"))
         reussi &= dire("fenêtre affichée", preuves.get("fenetre") == "affichée",
                        preuves.get("fenetre", "aucune preuve"))
         reussi &= dire("notification transmise au bureau",
                        preuves.get("notification") == "envoyée",
                        preuves.get("notification", "aucune preuve"))
         mimeapps = os.path.join(home, ".config", "mimeapps.list")
-        prepare = os.path.exists(mimeapps) and espace and \
-            os.stat(mimeapps).st_uid == espace.pw_uid
+        present = os.path.exists(mimeapps)
+        prepare = present and bool(espace) and os.stat(mimeapps).st_uid == espace.pw_uid
         reussi &= dire("dossier préparé PAR l'Espace (associations)", prepare,
-                       mimeapps if prepare else "absent ou à un autre compte")
+                       mimeapps if prepare else
+                       "compte de l'Espace introuvable" if not espace else
+                       "à l'UID %d, pas à l'Espace" % os.stat(mimeapps).st_uid if present else
+                       "absent")
         reussi &= dire("Espace refermé après sa dernière application",
                        attendre_que(lambda: not espace_ouvert(nom), 15),
                        comptes.chemin_passerelle(nom))
@@ -371,7 +407,7 @@ def main():
                 contenu = f.read()
         except OSError:
             pass
-        espace = pwd.getpwnam(nom) if os.path.exists(home) else None
+        espace = compte_espace(nom)
         reussi &= dire("profil pointé vers le filtre, écrit PAR l'Espace",
                        "network.proxy.ssl_port\", %d" % 17890 in contenu and espace
                        and os.stat(profil).st_uid == espace.pw_uid,

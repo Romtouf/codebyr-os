@@ -136,6 +136,26 @@ def main():
     print("Essai du compte dédié tel qu'il est installé\n")
     dire("session du bureau", True, "%s (UID %d)" % (bureau.pw_name, uid))
 
+    # La version D'ABORD : sans elle, un paquet non installé donne une liste de
+    # « absent » sans dire ce qu'il faut faire — et le premier lecteur croit à
+    # un paquet cassé plutôt qu'à un paquet pas encore installé.
+    attendue = ""
+    try:
+        with open(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                               "VERSION"), encoding="utf-8") as f:
+            attendue = f.read().strip()
+    except OSError:
+        pass
+    installee = subprocess.run(["/usr/bin/dpkg-query", "-W", "-f=${Version}", "codebyr-tools"],
+                               capture_output=True, text=True).stdout.strip()
+    if attendue and installee != attendue:
+        dire("paquet codebyr-tools à la version éprouvée", False,
+             "installé : %s — attendu : %s" % (installee or "aucun", attendue))
+        print("\nCet essai éprouve ce qui est INSTALLÉ. Installez d'abord le paquet :")
+        print("  sudo apt install -y /tmp/codebyr.deb")
+        return 2
+    dire("paquet codebyr-tools à la version éprouvée", True, installee)
+
     titre("1. Ce que le paquet a livré")
     for chemin in ("/usr/lib/codebyr/codebyr-uid",
                    "/usr/lib/codebyr/codebyr-espace-init",
@@ -149,7 +169,8 @@ def main():
                        "" if existe and executable else
                        "absent" if not existe else "pas exécutable")
     if comptes is None:
-        dire("modules Codebyr installés", False, "%s introuvable" % LIB)
+        dire("modules du compte dédié installés", False,
+             "%s/comptes.py introuvable (le dossier, lui, existe)" % LIB)
         return 1
 
     titre("2. Le service : activé, mais rien ne tourne")

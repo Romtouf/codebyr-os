@@ -36,6 +36,12 @@ SERVICE = os.path.join(LIVRE, "usr", "lib", "codebyr", "codebyr-uid")
 LIB = os.path.join(LIVRE, "usr", "share", "codebyr")
 SOCKET = "/run/codebyr-uid-essai.sock"
 ESPACE = "essai"
+# Le premier processus d'un Espace tourne sous un compte système, qui ne peut
+# pas traverser un dossier personnel : lancé depuis un dépôt cloné dans « ~ »,
+# il échouerait avec « Permission denied ». On en pose donc une copie dans
+# /run, que tout le monde traverse.
+INIT_SOURCE = os.path.join(LIVRE, "usr", "lib", "codebyr", "codebyr-espace-init")
+INIT_ESSAI = "/run/codebyr-espace-init-essai"
 
 sys.path.insert(0, LIB)
 import bac_a_sable  # noqa: E402
@@ -62,11 +68,17 @@ def dire(quoi, bon, detail=""):
     return bon
 
 
-def sous(uid, gid, args, entree=None):
-    return subprocess.run(
-        ["/usr/bin/setpriv", "--reuid", str(uid), "--regid", str(gid),
-         "--clear-groups", "--no-new-privs"] + args,
-        capture_output=True, text=True, timeout=60, input=entree)
+def sous(uid, gid, args, entree=None, delai=30):
+    try:
+        return subprocess.run(
+            ["/usr/bin/setpriv", "--reuid", str(uid), "--regid", str(gid),
+             "--clear-groups", "--no-new-privs"] + args,
+            capture_output=True, text=True, timeout=delai, input=entree)
+    except subprocess.TimeoutExpired:
+        # Une attente sans fin est un résultat, pas un incident : elle doit
+        # donner une ligne « NON » et laisser l'essai aller au nettoyage.
+        return subprocess.CompletedProcess(args, 124, "",
+                                           "aucune réponse après %ds" % delai)
 
 
 def demander(uid, gid, demande):
@@ -92,7 +104,7 @@ def ordonner(uid, gid, socket_ordres, demande):
     """
     code = (
         "import json,socket,sys\n"
-        "s=socket.socket(socket.AF_UNIX, socket.SOCK_STREAM); s.settimeout(60)\n"
+        "s=socket.socket(socket.AF_UNIX, socket.SOCK_STREAM); s.settimeout(20)\n"
         "s.connect(%r)\n"
         "s.sendall(sys.stdin.read().encode())\n"
         "d=b''\n"
@@ -129,8 +141,11 @@ def main():
     dire("session du bureau", True, "%s (UID %d), affichage %s"
          % (bureau.pw_name, bureau.pw_uid, affichage))
 
+    shutil.copyfile(INIT_SOURCE, INIT_ESSAI)
+    os.chmod(INIT_ESSAI, 0o755)
     service = subprocess.Popen([sys.executable, SERVICE, "--essai", SOCKET],
-                               env=dict(os.environ, CODEBYR_LIB=LIB))
+                               env=dict(os.environ, CODEBYR_LIB=LIB,
+                                        CODEBYR_INIT=INIT_ESSAI))
     time.sleep(1.5)
     perso = tempfile.mkdtemp(prefix="codebyr-essai-")
     script = os.path.join(perso, "fenetre.py")
@@ -256,7 +271,7 @@ def main():
         subprocess.run(["/usr/sbin/userdel", nom], capture_output=True)
         shutil.rmtree(comptes.chemin_home(bureau.pw_uid, ESPACE), ignore_errors=True)
         shutil.rmtree(perso, ignore_errors=True)
-        for reste in (SOCKET,):
+        for reste in (SOCKET, INIT_ESSAI):
             if os.path.exists(reste):
                 os.unlink(reste)
         print("\nNettoyage : compte d'essai, dossier et socket de service supprimés.")

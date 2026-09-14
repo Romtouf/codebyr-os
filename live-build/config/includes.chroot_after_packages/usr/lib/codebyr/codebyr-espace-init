@@ -36,7 +36,11 @@ processus lancé : c'est elle qui en rapporte la fin.
       → {"fin": 0}                       (à la sortie du processus)
 
 Lancement : par codebyr-uid, jamais à la main.
-    codebyr-espace-init <uid du bureau> <fd de la socket en écoute>
+    codebyr-espace-init <uid du bureau> <fd de la socket> <fd du tuyau d'annonce>
+
+Le tuyau d'annonce sert à dire « j'écoute ». Sans lui, un échec au lancement
+serait invisible : la socket d'ordres est créée et mise en écoute par root, et
+accepte donc les connexions même si personne n'y répond jamais.
 """
 import json
 import os
@@ -128,8 +132,9 @@ def servir(srv, uid_bureau):
 
 
 def main(argv):
-    if len(argv) != 3:
-        sys.stderr.write("codebyr-espace-init : lancé par codebyr-uid.\n")
+    if len(argv) != 4:
+        sys.stderr.write("codebyr-espace-init : lancé par le service des "
+                         "comptes d'Espaces, jamais à la main.\n")
         return 2
     if os.geteuid() == 0:
         # Root n'a rien à faire ici : ce programme n'existe que pour exécuter
@@ -141,6 +146,12 @@ def main(argv):
     srv = socket.socket(fileno=int(argv[2]))
     journal("Espace prêt sous l'UID %d, aux ordres du bureau %d"
             % (os.getuid(), uid_bureau))
+    # L'annonce vient APRÈS tout ce qui peut échouer : elle ne veut dire
+    # « j'écoute » que si c'est vrai. Si ce processus meurt avant, le tuyau se
+    # ferme et celui qui l'a lancé le sait tout de suite.
+    annonce = int(argv[3])
+    os.write(annonce, b"1")
+    os.close(annonce)
     return servir(srv, uid_bureau)
 
 

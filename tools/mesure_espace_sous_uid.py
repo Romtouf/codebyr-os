@@ -35,6 +35,10 @@ SERVICE = os.path.join(LIVRE, "usr", "lib", "codebyr", "codebyr-uid")
 LIB = os.path.join(LIVRE, "usr", "share", "codebyr")
 SOCKET = "/run/codebyr-uid-mesure.sock"
 ESPACE = "mesure"
+# Voir essai_service_uid.py : un compte système ne traverse pas un dossier
+# personnel, donc le premier processus ne peut pas être lancé depuis « ~ ».
+INIT_SOURCE = os.path.join(LIVRE, "usr", "lib", "codebyr", "codebyr-espace-init")
+INIT_MESURE = "/run/codebyr-espace-init-mesure"
 
 sys.path.insert(0, LIB)
 import bac_a_sable  # noqa: E402
@@ -81,10 +85,16 @@ def consequence(texte):
 
 def sous(uid, gid, args, entree=None, delai=90):
     """Exécute sous l'identité voulue. C'est le noyau qui tranche, pas nous."""
-    return subprocess.run(
-        ["/usr/bin/setpriv", "--reuid", str(uid), "--regid", str(gid),
-         "--clear-groups", "--no-new-privs"] + args,
-        capture_output=True, text=True, timeout=delai, input=entree)
+    try:
+        return subprocess.run(
+            ["/usr/bin/setpriv", "--reuid", str(uid), "--regid", str(gid),
+             "--clear-groups", "--no-new-privs"] + args,
+            capture_output=True, text=True, timeout=delai, input=entree)
+    except subprocess.TimeoutExpired:
+        # Une attente sans fin est une mesure, pas un incident : elle doit
+        # donner une ligne « NON » et laisser l'outil aller au nettoyage.
+        return subprocess.CompletedProcess(args, 124, "",
+                                           "aucune réponse après %ds" % delai)
 
 
 def demander(uid, gid, demande):
@@ -165,8 +175,11 @@ def main():
     dire("session du bureau", True, "%s (UID %d), affichage %s"
          % (bureau.pw_name, bureau.pw_uid, affichage))
 
+    shutil.copyfile(INIT_SOURCE, INIT_MESURE)
+    os.chmod(INIT_MESURE, 0o755)
     service = subprocess.Popen([sys.executable, SERVICE, "--essai", SOCKET],
-                               env=dict(os.environ, CODEBYR_LIB=LIB))
+                               env=dict(os.environ, CODEBYR_LIB=LIB,
+                                        CODEBYR_INIT=INIT_MESURE))
     time.sleep(1.5)
     nom = comptes.nom_compte(bureau.pw_uid, ESPACE)
     sockets_hote = []
@@ -320,8 +333,11 @@ def main():
         shutil.rmtree(comptes.chemin_home(bureau.pw_uid, ESPACE), ignore_errors=True)
         shutil.rmtree(coin_hote, ignore_errors=True)
         shutil.rmtree(comptes.chemin_passerelle(nom), ignore_errors=True)
-        if os.path.exists(SOCKET):
-            os.unlink(SOCKET)
+        subprocess.run(["/usr/bin/systemctl", "stop", "--quiet",
+                        comptes.unite_de_l_espace(nom)], capture_output=True)
+        for reste in (SOCKET, INIT_MESURE):
+            if os.path.exists(reste):
+                os.unlink(reste)
         acl = subprocess.run(["/usr/bin/getfacl", "-p",
                               "/run/user/%d/%s" % (uid, affichage)],
                              capture_output=True, text=True)

@@ -288,6 +288,22 @@ class LePremierProcessus(unittest.TestCase):
                          'demande.get("programme")'):
             self.assertNotIn(interdit, self.service, interdit)
 
+    def test_le_service_attend_qu_il_ecoute_avant_de_dire_l_espace_pret(self):
+        # Vu le 14/09/2026 : le premier processus ne démarrait pas, le service
+        # répondait « ok » quand même, et le bureau attendait indéfiniment une
+        # réponse sur la socket d'ordres — que ROOT avait créée et mise en
+        # écoute, si bien qu'elle acceptait les connexions sans personne
+        # derrière. Un échec de lancement doit être un échec, pas une attente.
+        self.assertIn("os.pipe()", self.service)
+        self.assertIn("select.select", self.service)
+
+    def test_il_n_annonce_qu_apres_ce_qui_peut_echouer(self):
+        # Une annonce faite trop tôt ne dirait plus « j'écoute » mais
+        # « j'ai démarré », ce qui n'est pas la même promesse.
+        code = _code(INIT)
+        self.assertLess(code.index("socket.socket(fileno="),
+                        code.index("os.write("))
+
     def test_il_refuse_de_tourner_en_root(self):
         # S'il y tournait, tout le chantier serait vide de sens : il exécute
         # justement ce que le bureau lui envoie.

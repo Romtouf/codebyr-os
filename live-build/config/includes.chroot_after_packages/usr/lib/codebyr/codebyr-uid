@@ -49,6 +49,7 @@ Pour l'essai sur une machine de test : codebyr-uid --essai /chemin/socket
 import json
 import os
 import pwd
+import select
 import socket
 import struct
 import subprocess
@@ -69,6 +70,11 @@ INIT = os.environ.get("CODEBYR_INIT", "/usr/lib/codebyr/codebyr-espace-init")
 # Rien n'est persisté : si ce service redémarre, il ne prétend pas savoir ce
 # qu'il ne sait plus, et refuse de tuer une portée qu'il n'a pas ouverte.
 OUVERTS = {}
+
+# Temps laissé au premier processus pour annoncer qu'il écoute. Large : il n'y
+# a rien à y gagner à être impatient, et l'attente réelle est de l'ordre de la
+# milliseconde puisqu'il le dit lui-même.
+DELAI_DEMARRAGE = 10.0
 
 
 def journal(message):
@@ -240,16 +246,44 @@ def premier_processus(utilisateur, uid_demandeur, srv, memoire, taches):
     projet.
     """
     fd = srv.fileno()
-    return subprocess.Popen(
-        ["/usr/bin/systemd-run", "--scope", "--quiet",
-         "--unit", comptes.unite_de_l_espace(utilisateur.pw_name),
-         "-p", "MemoryMax=%s" % memoire, "-p", "MemorySwapMax=0",
-         "-p", "TasksMax=%d" % taches,
-         "--", "/usr/bin/setpriv",
-         "--reuid", str(utilisateur.pw_uid), "--regid", str(utilisateur.pw_gid),
-         "--clear-groups", "--no-new-privs",
-         INIT, str(uid_demandeur), str(fd)],
-        pass_fds=(fd,), stdin=subprocess.DEVNULL)
+    # Un tuyau pour que le premier processus dise « j'écoute ». Sans lui, un
+    # échec au lancement — programme absent, dossier intraversable, portée
+    # refusée — ne se verrait NULLE PART : la socket d'ordres, créée et mise
+    # en écoute par ROOT, accepte les connexions même si personne n'y répond.
+    # Le bureau attendrait alors indéfiniment une réponse qui ne viendrait
+    # jamais, et l'Espace resterait annoncé comme prêt. Constaté le 14/09/2026.
+    lecture, ecriture = os.pipe()
+    os.set_inheritable(ecriture, True)
+    try:
+        proc = subprocess.Popen(
+            ["/usr/bin/systemd-run", "--scope", "--quiet",
+             "--unit", comptes.unite_de_l_espace(utilisateur.pw_name),
+             "-p", "MemoryMax=%s" % memoire, "-p", "MemorySwapMax=0",
+             "-p", "TasksMax=%d" % taches,
+             "--", "/usr/bin/setpriv",
+             "--reuid", str(utilisateur.pw_uid), "--regid", str(utilisateur.pw_gid),
+             "--clear-groups", "--no-new-privs",
+             INIT, str(uid_demandeur), str(fd), str(ecriture)],
+            pass_fds=(fd, ecriture), stdin=subprocess.DEVNULL)
+    finally:
+        # Côté écriture fermé ici : sinon la fin du processus ne fermerait pas
+        # le tuyau, et l'attente ci-dessous irait jusqu'au bout du délai.
+        os.close(ecriture)
+    try:
+        pret, _, _ = select.select([lecture], [], [], DELAI_DEMARRAGE)
+        # Tuyau fermé sans un mot = le processus est mort avant d'écouter.
+        annonce = os.read(lecture, 1) if pret else b""
+    finally:
+        os.close(lecture)
+    if annonce != b"1":
+        proc.terminate()
+        try:
+            proc.wait(timeout=5)
+        except subprocess.TimeoutExpired:
+            proc.kill()
+        raise OSError("le premier processus de l'Espace n'a jamais écouté "
+                      "(code %s)" % proc.poll())
+    return proc
 
 
 def arreter_portee(compte):

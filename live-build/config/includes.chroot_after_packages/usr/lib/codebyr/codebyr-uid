@@ -24,7 +24,13 @@ Une demande JSON par connexion, une réponse JSON :
    "son": false}
       → {"ok": true, "compte": "cbyr-1000-banque", "uid": 997, "gid": 997,
          "home": "/var/lib/codebyr/espaces/1000/banque",
-         "passerelle": "/run/codebyr/passerelles/cbyr-1000-banque"}
+         "passerelle": "/run/codebyr/passerelles/cbyr-1000-banque",
+         "depot": "/run/codebyr/depots/cbyr-1000-banque"}
+
+  La « passerelle » va du bureau vers l'Espace : root y présente les sockets
+  du bureau auxquels l'Espace a droit. Le « dépôt » va dans l'autre sens :
+  c'est le bureau qui y crée les sockets qu'il sert lui-même (notifications,
+  filtre réseau), et l'Espace ne fait que les joindre.
 
   {"action": "fermer", "espace": "banque"}
       → {"ok": true}
@@ -110,6 +116,55 @@ def dossier_espace(home, utilisateur):
     return home
 
 
+def dossier_depot(compte, uid_bureau, uid_espace):
+    """Dossier où le bureau dépose les sockets qu'il sert à cet Espace.
+
+    Root le possède ; le bureau y écrit ; l'Espace ne fait que le traverser.
+    Les droits sont POSÉS EN ENTIER (« setfacl --set ») et non ajoutés : un
+    droit oublié d'une ouverture précédente ne survit pas à la suivante.
+
+    On ne passe pas par dossier_root() : sa règle « aucun bit d'écriture pour
+    autrui » désigne exactement ce qu'on accorde ici volontairement au bureau,
+    et le masque d'une ACL se lit comme un bit de groupe — la vérification
+    échouerait à la deuxième ouverture du même Espace.
+    """
+    chemin = comptes.chemin_depot(compte)
+    if os.path.islink(chemin):
+        raise ValueError("Lien symbolique refusé : %s" % chemin)
+    dossier_root(os.path.dirname(chemin))
+    os.makedirs(chemin, mode=0o710, exist_ok=True)
+    if os.stat(chemin).st_uid != 0:
+        raise ValueError("Dépôt déjà pris par un autre compte")
+    os.chmod(chemin, 0o710)
+    subprocess.run(
+        ["/usr/bin/setfacl", "--set",
+         "u::rwx,g::---,o::---,u:%d:rwx,u:%d:x,m::rwx" % (uid_bureau, uid_espace),
+         chemin], check=True, capture_output=True)
+    return chemin
+
+
+def vider_depot(chemin):
+    """Retire les sockets déposées, puis le dépôt. Ne descend dans rien.
+
+    Ce dossier n'est censé contenir que des sockets ; s'il contient autre
+    chose, on le laisse en place plutôt que d'effacer en aveugle depuis root.
+    """
+    if not os.path.isdir(chemin) or os.path.islink(chemin):
+        return
+    for nom in os.listdir(chemin):
+        fichier = os.path.join(chemin, nom)
+        if os.path.isdir(fichier) and not os.path.islink(fichier):
+            continue
+        try:
+            os.unlink(fichier)
+        except OSError:
+            pass
+    try:
+        os.rmdir(chemin)
+    except OSError:
+        journal("dépôt non vide, conservé : %s" % chemin)
+
+
 def droit_sur_socket(chemin, uid, accorder=True):
     """Accorde (ou retire) l'accès d'UN compte à UN socket. Jamais un dossier."""
     regle = ["-m", "u:%d:rw" % uid] if accorder else ["-x", "u:%d" % uid]
@@ -142,6 +197,7 @@ def preparer(uid_demandeur, espace, affichage, son):
     dossier_espace(home, utilisateur)
 
     passerelle = dossier_root(comptes.chemin_passerelle(nom))
+    depot = dossier_depot(nom, uid_demandeur, utilisateur.pw_uid)
     presentes = []
     for source_nom, fichier in comptes.passages(affichage, son):
         source = comptes.socket_du_bureau(uid_demandeur, source_nom)
@@ -155,7 +211,7 @@ def preparer(uid_demandeur, espace, affichage, son):
                                                    ", ".join(presentes) or "aucun socket"))
     return {"ok": True, "compte": nom, "uid": utilisateur.pw_uid,
             "gid": utilisateur.pw_gid, "home": home,
-            "passerelle": passerelle, "presentes": presentes}
+            "passerelle": passerelle, "depot": depot, "presentes": presentes}
 
 
 def fermer(uid_demandeur, espace):
@@ -178,6 +234,7 @@ def fermer(uid_demandeur, espace):
             os.rmdir(passerelle)
         except OSError:
             pass
+    vider_depot(comptes.chemin_depot(nom))
     journal("Espace %s refermé" % nom)
     return {"ok": True}
 

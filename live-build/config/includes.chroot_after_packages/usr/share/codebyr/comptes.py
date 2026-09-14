@@ -49,6 +49,24 @@ RACINE_ESPACES = "/var/lib/codebyr/espaces"
 # faille fermée en 1.1.0.
 RACINE_PASSERELLES = "/run/codebyr/passerelles"
 
+# Dépôt : un dossier par Espace où le BUREAU dépose les sockets qu'il sert
+# lui-même — notifications, filtre réseau. Root le tient, le bureau y écrit,
+# l'Espace ne fait que le TRAVERSER.
+#
+# Ce n'est PAS le dossier d'exécution du bureau, et la différence est toute la
+# leçon du 14/09/2026 : celui-là contient le bus de session, qu'aucun Espace ne
+# doit joindre. Un dépôt ne contient que les sockets de CET Espace, déposées
+# pour lui. L'Espace n'y reçoit ni lecture ni écriture : il ne peut donc ni
+# découvrir ce qui s'y trouve, ni y fabriquer une socket pour se faire passer
+# pour l'hôte auprès d'un autre.
+RACINE_DEPOTS = "/run/codebyr/depots"
+
+# Les sockets que le bureau dépose, et le chemin où chacune apparaît DANS
+# l'Espace. Écrits ici parce que deux moitiés du système doivent s'accorder
+# dessus : celle qui les crée (codebyr-space) et celle qui les monte
+# (bac_a_sable.wrap_bwrap).
+SOCKETS_DU_BUREAU = {"notif": "/run/codebyr-notif", "proxy": "/run/codebyr-proxy"}
+
 # En deçà, ce sont les comptes du système. Un utilisateur de bureau a un UID
 # d'au moins 1000 sur Debian.
 UID_MINIMAL = 1000
@@ -112,6 +130,13 @@ def chemin_passerelle(compte):
     if not est_compte_d_espace(compte):
         raise ValueError("Passerelle demandée pour un compte qui n'est pas un Espace")
     return "%s/%s" % (RACINE_PASSERELLES, compte)
+
+
+def chemin_depot(compte):
+    """Dossier où le bureau dépose les sockets qu'il sert à CET Espace."""
+    if not est_compte_d_espace(compte):
+        raise ValueError("Dépôt demandé pour un compte qui n'est pas un Espace")
+    return "%s/%s" % (RACINE_DEPOTS, compte)
 
 
 def socket_du_bureau(uid_proprietaire, nom):

@@ -249,7 +249,49 @@ def main():
                 manques.append("socket « %s » à republier pour le compte dédié" % quoi)
                 consequence(pourquoi)
 
-        titre("7. Les plafonds mémoire tiennent-ils ?")
+        titre("7. Et déposées dans le dépôt, le sont-elles ?")
+        depot = r.get("depot")
+        if not depot:
+            dire("dépôt préparé par le service", False,
+                 "réponse sans « depot » — service trop ancien")
+            manques.append("le service ne prépare pas encore de dépôt")
+        else:
+            dire("dépôt préparé par le service", True, depot)
+            chemin = os.path.join(depot, "notif")
+            # Le bureau dépose et sert la socket lui-même, sous SON compte :
+            # c'est exactement ce que fera codebyr-space.
+            serveur = subprocess.Popen(
+                ["/usr/bin/setpriv", "--reuid", str(bureau.pw_uid),
+                 "--regid", str(bureau.pw_gid), "--clear-groups",
+                 "--no-new-privs", "/usr/bin/python3", "-c",
+                 "import os,socket\n"
+                 "s=socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)\n"
+                 "s.bind(%r); os.chmod(%r, 0o666); s.listen(4)\n"
+                 "c,_=s.accept(); c.sendall(b'SERVI'); c.close()\n"
+                 % (chemin, chemin)])
+            time.sleep(1.0)
+            depose = os.path.exists(chemin)
+            if not dire("le bureau peut déposer une socket", depose,
+                        "" if depose else "écriture refusée dans le dépôt"):
+                manques.append("le bureau ne peut pas écrire dans le dépôt")
+            if depose:
+                # Le trajet complet d'une notification : de l'application, dans
+                # le bac à sable, jusqu'au service qui écoute sur le bureau.
+                dedans = dans_le_bac(
+                    espace, home, passerelle,
+                    ["/usr/bin/python3", "-c",
+                     "import socket\n"
+                     "s=socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)\n"
+                     "s.settimeout(5); s.connect('/run/codebyr-notif')\n"
+                     "print(s.recv(16).decode())\n"],
+                    audio=False, notifications=chemin)
+                if not dire("socket du dépôt jointe DEPUIS le bac à sable",
+                            "SERVI" in dedans.stdout, derniere_erreur(dedans)):
+                    manques.append("le dépôt ne traverse pas le bac à sable")
+            serveur.terminate()
+            serveur.wait(timeout=5)
+
+        titre("8. Les plafonds mémoire tiennent-ils ?")
         plafond = subprocess.run(
             ["/usr/bin/systemd-run", "--scope", "--quiet",
              "--uid=%d" % espace.pw_uid, "--gid=%d" % espace.pw_gid,

@@ -96,6 +96,26 @@ class Chemins(unittest.TestCase):
             with self.assertRaises(ValueError, msg=compte):
                 comptes.chemin_passerelle(compte)
 
+    def test_le_depot_n_existe_que_pour_un_espace(self):
+        self.assertEqual(comptes.chemin_depot("cbyr-1000-banque"),
+                         "/run/codebyr/depots/cbyr-1000-banque")
+        for compte in ("romtouf", "root", "", "cbyr", "../etc"):
+            with self.assertRaises(ValueError, msg=compte):
+                comptes.chemin_depot(compte)
+
+    def test_depot_et_passerelle_ne_se_confondent_pas(self):
+        # Les deux vont dans des sens opposés : l'un porte les sockets du
+        # bureau vers l'Espace, l'autre ceux que le bureau sert à l'Espace.
+        # Les mélanger reviendrait à laisser un Espace écrire là où root
+        # présente les sockets du bureau.
+        self.assertNotEqual(comptes.chemin_depot("cbyr-1000-banque"),
+                            comptes.chemin_passerelle("cbyr-1000-banque"))
+
+    def test_un_depot_ne_contient_jamais_le_bus_de_session(self):
+        self.assertNotIn("bus", comptes.SOCKETS_DU_BUREAU)
+        for arrivee in comptes.SOCKETS_DU_BUREAU.values():
+            self.assertFalse(arrivee.startswith("/run/user/"), arrivee)
+
     def test_le_socket_du_bureau_est_construit_jamais_recu(self):
         self.assertEqual(comptes.socket_du_bureau(1000, "wayland-0"),
                          "/run/user/1000/wayland-0")
@@ -154,6 +174,19 @@ class LeService(unittest.TestCase):
     def test_les_droits_sont_poses_sur_un_socket_jamais_sur_un_dossier(self):
         self.assertIn("Accorde (ou retire) l'accès d'UN compte à UN socket",
                       self.source)
+
+    def test_l_espace_ne_fait_que_traverser_le_depot(self):
+        # « x » et rien d'autre. Avec « r », l'Espace découvrirait les sockets
+        # que le bureau y dépose ; avec « w », il en fabriquerait une pour se
+        # faire passer pour l'hôte auprès d'un autre Espace.
+        self.assertIn("u:%d:rwx,u:%d:x,m::rwx", self.source)
+        self.assertNotIn("u:%d:rwx,u:%d:rx", self.source)
+        self.assertNotIn("u:%d:rwx,u:%d:rwx", self.source)
+
+    def test_les_droits_du_depot_sont_poses_en_entier(self):
+        # « --set » et non « -m » : un droit oublié d'une ouverture précédente
+        # ne doit pas survivre à la suivante.
+        self.assertIn('"--set"', self.source)
 
     def test_le_dossier_d_execution_du_bureau_n_est_jamais_ouvert(self):
         # setfacl sur /run/user/<uid> rendrait joignables tous les sockets

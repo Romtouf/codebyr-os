@@ -120,6 +120,9 @@ def main():
         espace = pwd.getpwnam(r["compte"])
         dire("compte dédié", True, "%s (UID %d)" % (r["compte"], espace.pw_uid))
         st = os.stat(r["home"])
+        # Sans dépôt, les contrôles qui suivent passeraient à vide : mieux vaut
+        # le dire ici que conclure « conforme » sur une absence.
+        reussi &= dire("dépôt préparé", bool(r.get("depot")), r.get("depot", ""))
         reussi &= dire("dossier à lui seul (0700)",
                        st.st_uid == espace.pw_uid and not st.st_mode & 0o077,
                        "%s, mode %s" % (r["home"], oct(st.st_mode & 0o777)))
@@ -151,6 +154,12 @@ def main():
             joint = sous(espace.pw_uid, espace.pw_gid, ["/usr/bin/test", "-r", chemin])
             reussi &= dire(quoi, joint.returncode != 0,
                            "hors d'atteinte" if joint.returncode else "à refuser")
+        # Le dépôt se traverse, il ne se lit pas : sinon l'Espace découvrirait
+        # les sockets que le bureau y place, et pourrait en fabriquer une.
+        lu = sous(espace.pw_uid, espace.pw_gid,
+                  ["/usr/bin/test", "-r", r.get("depot", "/nonexistant")])
+        reussi &= dire("contenu du dépôt lisible par l'Espace", lu.returncode != 0,
+                       "hors d'atteinte" if lu.returncode else "à refuser")
 
         print("\n── 5. Un Espace ne demande rien ──────────────────────────────────")
         r2 = demander(espace.pw_uid, espace.pw_gid,
@@ -164,6 +173,8 @@ def main():
         dire("réponse du service", r3.get("ok"), r3.get("erreur", ""))
         reussi &= dire("passerelle retirée", not os.path.exists(r["passerelle"]),
                        r["passerelle"])
+        reussi &= dire("dépôt retiré", not os.path.exists(r.get("depot", "")),
+                       r.get("depot", ""))
         acl = subprocess.run(["/usr/bin/getfacl", "-p",
                               "/run/user/%d/%s" % (uid, affichage)],
                              capture_output=True, text=True)

@@ -35,6 +35,11 @@ processus lancé : c'est elle qui en rapporte la fin.
       → {"ok": true, "pid": 1234}        (dès le lancement)
       → {"fin": 0}                       (à la sortie du processus)
 
+  {"argv": [...], "env": {...}, "flux": ["entree"]}  + un descripteur joint
+      → la commande lit ce descripteur comme entrée standard (« sortie » :
+        comme sortie standard). C'est ainsi que les données d'un Espace
+        entrent et sortent, par un tuyau du bureau, sans passer par root.
+
 Lancement : par codebyr-uid, jamais à la main.
     codebyr-espace-init <uid du bureau> <fd de la socket> <fd du tuyau d'annonce>
 
@@ -66,11 +71,22 @@ def demandeur(client):
     return uid
 
 
-def lancer(demande):
+# Les seuls flux qu'un ordre peut transmettre, et où ils arrivent. Pas de
+# numéro de descripteur libre : l'entrée et la sortie standard, rien d'autre.
+FLUX = ("entree", "sortie")
+
+
+def lancer(demande, descripteurs=()):
     """Exécute ce que le bureau demande, sous l'identité qui est déjà la nôtre.
 
     Aucun shell : la liste d'arguments est passée telle quelle au noyau. Un
     `shell=True` ferait de chaque espace et de chaque guillemet une commande.
+
+    `descripteurs` : reçus avec la demande (SCM_RIGHTS), dans l'ordre annoncé
+    par « flux ». C'est par là que passent les données d'un Espace — un tuyau
+    ouvert par le bureau — sans que root les lise jamais : s'il copiait
+    lui-même depuis le dossier personnel, un lien symbolique posé là lui ferait
+    copier n'importe quel fichier du système dans un Espace que le bureau lit.
     """
     argv = demande.get("argv")
     if not isinstance(argv, list) or not argv or not all(
@@ -80,7 +96,14 @@ def lancer(demande):
     if not isinstance(env, dict) or not all(
             isinstance(c, str) and isinstance(v, str) for c, v in env.items()):
         raise ValueError("environnement mal formé")
-    return subprocess.Popen(argv, env=env, cwd="/")
+    flux = demande.get("flux", [])
+    if (not isinstance(flux, list) or len(flux) != len(descripteurs)
+            or len(set(flux)) != len(flux) or not all(f in FLUX for f in flux)):
+        raise ValueError("flux annoncés et descripteurs reçus ne concordent pas")
+    recus = dict(zip(flux, descripteurs))
+    return subprocess.Popen(argv, env=env, cwd="/",
+                            stdin=recus.get("entree", subprocess.DEVNULL),
+                            stdout=recus.get("sortie"))
 
 
 def servir_un(client, uid_bureau, uid_propre):
@@ -91,11 +114,14 @@ def servir_un(client, uid_bureau, uid_propre):
             journal("ordre refusé : UID %d" % uid)
             client.sendall(b'{"ok": false, "erreur": "refuse"}\n')
             return
+        descripteurs = []
         try:
-            demande = json.loads(client.recv(TAILLE_MAX).decode("utf-8", "replace"))
+            brut, descripteurs, _drapeaux, _adresse = socket.recv_fds(
+                client, TAILLE_MAX, len(FLUX))
+            demande = json.loads(brut.decode("utf-8", "replace"))
             if not isinstance(demande, dict):
                 raise ValueError("demande illisible")
-            proc = lancer(demande)
+            proc = lancer(demande, descripteurs)
         except (ValueError, OSError) as exc:
             journal("lancement impossible : %s" % exc)
             try:
@@ -103,6 +129,15 @@ def servir_un(client, uid_bureau, uid_propre):
             except OSError:
                 pass
             return
+        finally:
+            # Nos copies des descripteurs reçus : le processus lancé a les
+            # siennes. Les garder ouvertes empêcherait la fin d'un tuyau de se
+            # voir — l'autre bout attendrait une fin de flux qui ne vient pas.
+            for fd in descripteurs:
+                try:
+                    os.close(fd)
+                except OSError:
+                    pass
         try:
             client.sendall((json.dumps({"ok": True, "pid": proc.pid}) + "\n")
                            .encode("utf-8"))

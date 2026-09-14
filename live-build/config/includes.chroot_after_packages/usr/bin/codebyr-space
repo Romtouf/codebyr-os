@@ -504,6 +504,11 @@ def cmd_launch(espaces, esp_id, extra, fichier=None):
         sys.stderr.write("Fichier introuvable : lancement refusé.\n")
         return 2
     if not compte_dedie.demande(esp):
+        # Réglage « compte » retiré après un passage sous compte dédié : les
+        # données récentes sont chez l'Espace, on les rapatrie d'abord.
+        if not _rapatrier_depuis_compte_dedie(esp):
+            return _refuser_compte_dedie(
+                esp, "ses données récentes n'ont pas pu revenir de son compte dédié")
         return _lancer(espaces, esp, extra, fichier, None)
 
     # Tout ce qui peut refuser l'ouverture se décide AVANT de demander le
@@ -642,6 +647,13 @@ def _lancer(espaces, esp, extra, fichier, session):
     liste_blanche = (esp.get("reseau") or {}).get("mode") == "liste-blanche"
     if session:
         env["CODEBYR_COMPTE_DEDIE"] = "1"
+        # Le déménagement passe AVANT la préparation : celle-ci complète les
+        # associations de fichiers de l'Espace, elle doit donc trouver celles
+        # qu'il avait déjà.
+        if not _demenager_vers_compte_dedie(esp, session):
+            return _refuser_compte_dedie(
+                esp, "ses données n'ont pas pu le suivre sous son propre compte "
+                "(elles sont intactes à leur ancien emplacement)")
         # AVANT le filtre réseau, et c'est voulu : le profil du navigateur doit
         # pointer vers le filtre avant que celui-ci existe. Dans l'ordre
         # inverse, un filtre absent laissait Banque avec Internet en entier.
@@ -734,8 +746,12 @@ def _lancer(espaces, esp, extra, fichier, session):
         run = bac_a_sable.wrap_bwrap(home, cmd, env, renforce=renforce, hors_ligne=hors_ligne,
                          audio=audio, envoi=envoi, filtre=filtre, gpu=gpu,
                          notifications=notif,
-                         passerelle=session.passerelle if session else None,
-                         chez=session.home if session else None)
+                         # Le dossier d'un Espace dédié apparaît au MÊME chemin
+                         # qu'avant (celui du bureau) : les applications gardent
+                         # des chemins absolus — dossier de téléchargement de
+                         # Firefox, fichiers récents, signets. Déménagés vers un
+                         # autre chemin, ils pointeraient dans le vide.
+                         passerelle=session.passerelle if session else None)
         if renforce:
             if not session:
                 # Sous compte dédié, les plafonds sont déjà posés par le service
@@ -893,6 +909,201 @@ def _ouvreur_associe(home):
         return False
 
 
+MARQUEUR_DEMENAGEMENT = "compte-dedie.json"
+# Marge exigée en plus de la taille des données avant de déménager : le
+# déménagement COPIE, et un disque plein au milieu laisserait l'Espace sans
+# rien d'utilisable des deux côtés.
+MARGE_DEMENAGEMENT = 200 * 1024 * 1024
+
+
+def _marqueur_demenagement(esp_id):
+    """Côté bureau : « les données de cet Espace sont parties vers son compte »."""
+    return os.path.join(DATA_ROOT, esp_id, MARQUEUR_DEMENAGEMENT)
+
+
+def _commande_interne(action, *args):
+    return ["/usr/bin/python3", os.path.realpath(__file__), action] + list(args)
+
+
+def _env_interne(session):
+    return {"PATH": "/usr/bin:/bin", "LANG": os.environ.get("LANG", "C.UTF-8"),
+            "HOME": session.home,
+            "CODEBYR_LIB": os.environ.get("CODEBYR_LIB", "/usr/share/codebyr")}
+
+
+def _taille_sans_suivre(chemin):
+    total = 0
+    for dossier, _sous, fichiers in os.walk(chemin):
+        for nom in fichiers:
+            try:
+                total += os.lstat(os.path.join(dossier, nom)).st_size
+            except OSError:
+                pass
+    return total
+
+
+def _demenager_vers_compte_dedie(esp, session):
+    """Première ouverture sous compte dédié : les données de l'Espace le suivent.
+
+    Sans cela, l'Espace s'ouvrirait VIDE, et l'utilisateur croirait avoir tout
+    perdu — ses documents, son profil de navigateur, ses téléchargements.
+
+    Ce que ce déménagement garantit :
+    · root ne lit rien : le BUREAU emballe ce qu'il a le droit de lire, et
+      l'ESPACE déballe chez lui, par un tuyau (voir codebyr-espace-init) ;
+    · il COPIE, n'efface rien : les anciennes données restent en place, et
+      retirer le réglage « compte » les fait revenir, à jour (voir
+      _rapatrier_depuis_compte_dedie) ;
+    · il ne se fait qu'une fois, et un échec empêche l'ouverture — un Espace
+      qui s'ouvrirait vide après un déménagement raté serait le pire résultat.
+
+    Renvoie True si l'Espace peut s'ouvrir.
+    """
+    ancien = os.path.join(DATA_ROOT, esp["id"], "home")
+    if os.path.exists(_marqueur_demenagement(esp["id"])):
+        return True
+    try:
+        noms = sorted(os.listdir(ancien))
+    except FileNotFoundError:
+        return True                 # Espace jamais ouvert : rien à emporter
+    if not noms:
+        return True
+    taille = _taille_sans_suivre(ancien)
+    libre = shutil.disk_usage(os.path.dirname(os.path.dirname(session.home))).free
+    if libre < taille + MARGE_DEMENAGEMENT:
+        sys.stderr.write("codebyr-space : place insuffisante pour déménager %s "
+                         "(%d Mo à copier, %d Mo libres).\n"
+                         % (esp["nom"], taille // 2**20, libre // 2**20))
+        return False
+    _prevenir("Espace %s : déménagement de ses données" % esp["nom"],
+              "Première ouverture sous son propre compte : ses fichiers le "
+              "suivent. Rien n'est effacé. Cela peut prendre un moment.")
+    lecture, ecriture = os.pipe()
+    erreurs = []
+
+    def emballer():
+        try:
+            with os.fdopen(ecriture, "wb") as flux, \
+                    tarfile.open(fileobj=flux, mode="w|") as tar:
+                for nom in noms:
+                    # tarfile ne suit pas les liens : un lien posé dans l'Espace
+                    # part comme lien, jamais comme le fichier qu'il désigne.
+                    tar.add(os.path.join(ancien, nom), arcname="./" + nom,
+                            filter=_entree_archivable)
+        except BrokenPipeError:
+            erreurs.append("l'Espace a cessé de lire")
+        except (OSError, tarfile.TarError) as exc:
+            erreurs.append(str(exc))
+
+    fil = threading.Thread(target=emballer, daemon=True)
+    fil.start()
+    try:
+        code = compte_dedie.executer(session.ordres, _commande_interne(INTERNE_IMPORTER),
+                                     _env_interne(session), entree=lecture)
+    except compte_dedie.Indisponible as exc:
+        code = None
+        erreurs.append(str(exc))
+    finally:
+        # Toujours : sans cela, si l'ordre échoue, l'emballeur attend à jamais
+        # un lecteur qui n'existe plus (vu dans le WSL le 14/09/2026).
+        os.close(lecture)
+    fil.join()
+    if code == MIGRATION_FAITE:
+        erreurs = []                # l'Espace avait déjà reçu ses données
+    elif code != 0 or erreurs:
+        sys.stderr.write("codebyr-space : déménagement de %s interrompu (%s) — "
+                         "les données sont intactes à leur ancien emplacement.\n"
+                         % (esp["nom"], "; ".join(erreurs) or "code %s" % code))
+        journal("Espace %s : déménagement vers le compte dédié échoué" % esp["id"])
+        return False
+    with fichiers_surs.ouvrir(_marqueur_demenagement(esp["id"]), "w", encoding="utf-8") as f:
+        json.dump({"compte": session.compte, "date": time.strftime("%Y-%m-%d %H:%M:%S")}, f)
+    journal("Espace %s : données déménagées vers son compte dédié" % esp["id"])
+    return True
+
+
+def _rapatrier_depuis_compte_dedie(esp):
+    """Le réglage « compte » a été retiré : les données reviennent, à jour.
+
+    Les anciennes données étaient restées en place, mais figées au jour du
+    déménagement. Rouvrir l'Espace dessus ferait disparaître, sans un mot, tout
+    ce qui a été fait depuis sous son compte. On rapatrie donc d'abord ce que
+    l'Espace détient — c'est lui qui emballe, le bureau qui déballe, selon la
+    même règle que toute restauration — et l'état figé est mis de côté, pas
+    effacé.
+
+    Sans le service des comptes, impossible de demander ses données à l'Espace :
+    l'ouverture est refusée plutôt que de montrer l'état figé comme s'il était
+    le bon. Renvoie True si l'Espace peut s'ouvrir.
+    """
+    if not os.path.exists(_marqueur_demenagement(esp["id"])):
+        return True
+    try:
+        session = compte_dedie.Session(
+            esp["id"], os.path.basename(os.environ.get("WAYLAND_DISPLAY") or "wayland-0"),
+            False, *bac_a_sable.plafonds_de(esp))
+    except compte_dedie.Indisponible as exc:
+        sys.stderr.write("codebyr-space : les données récentes de %s sont restées "
+                         "dans son compte dédié, et %s.\n" % (esp["nom"], exc))
+        return False
+    parent = os.path.join(DATA_ROOT, esp["id"])
+    home = os.path.join(parent, "home")
+    try:
+        with tempfile.TemporaryDirectory(prefix=".retour-", dir=parent) as stage:
+            neuf = os.path.join(stage, "home")
+            os.mkdir(neuf, 0o700)
+            lecture, ecriture = os.pipe()
+            erreurs = []
+
+            def deballer():
+                try:
+                    with os.fdopen(lecture, "rb") as flux, \
+                            tarfile.open(fileobj=flux, mode="r|") as tar:
+                        _extraire_archive(tar, neuf, _filtre_dossier_d_espace)
+                except (OSError, tarfile.TarError, ValueError) as exc:
+                    erreurs.append(str(exc))
+
+            fil = threading.Thread(target=deballer, daemon=True)
+            fil.start()
+            try:
+                code = compte_dedie.executer(session.ordres,
+                                             _commande_interne(INTERNE_EXPORTER),
+                                             _env_interne(session), sortie=ecriture)
+            finally:
+                os.close(ecriture)
+            fil.join()
+            if code != 0 or erreurs:
+                raise ValueError("; ".join(erreurs) or "export refusé (code %s)" % code)
+            with fichiers_surs.dossier(parent):
+                sauvegarde = None
+                if os.path.lexists(home):
+                    if os.path.islink(home):
+                        raise ValueError("Dossier personnel symbolique refusé")
+                    sauvegarde = tempfile.mkdtemp(prefix="avant-retour-", dir=parent)
+                    os.rmdir(sauvegarde)
+                    os.rename(home, sauvegarde)
+                try:
+                    os.rename(neuf, home)
+                except OSError:
+                    if sauvegarde:
+                        os.rename(sauvegarde, home)
+                    raise
+        if compte_dedie.executer(session.ordres, _commande_interne(INTERNE_RENDU),
+                                 _env_interne(session)) != 0:
+            raise ValueError("l'Espace n'a pas pu noter le retour de ses données")
+        os.unlink(_marqueur_demenagement(esp["id"]))
+    except (OSError, ValueError, compte_dedie.Indisponible) as exc:
+        sys.stderr.write("codebyr-space : retour des données de %s interrompu (%s) ; "
+                         "rien n'a été effacé.\n" % (esp["nom"], exc))
+        return False
+    finally:
+        session.rendre()
+    journal("Espace %s : données revenues de son compte dédié" % esp["id"])
+    print("Données de %s revenues de son compte dédié%s." % (
+        esp["nom"], " ; état précédent conservé : %s" % sauvegarde if sauvegarde else ""))
+    return True
+
+
 def cmd_interne_preparer(brut):
     """Prépare le dossier d'un Espace, depuis l'Espace, sous son propre compte.
 
@@ -935,6 +1146,118 @@ def cmd_interne_preparer(brut):
             _installer_bouclier_pour(home, doms)
     except OSError as exc:
         sys.stderr.write("codebyr-space : préparation du dossier impossible (%s)\n" % exc)
+        return 1
+    return 0
+
+
+INTERNE_IMPORTER = "interne-importer"
+INTERNE_EXPORTER = "interne-exporter"
+# Dans le dossier d'un Espace à compte dédié : ce que Codebyr y tient pour
+# lui-même, jamais emporté dans un déménagement ni une sauvegarde.
+DOSSIER_INTERNE = ".codebyr"
+MIGRATION_FAITE = 3
+
+
+def _compte_d_espace_courant():
+    """Le compte sous lequel on tourne, s'il est celui d'un Espace ; sinon None."""
+    import pwd
+    import comptes
+    compte = pwd.getpwuid(os.getuid())
+    return compte if comptes.est_compte_d_espace(compte.pw_name) else None
+
+
+def cmd_interne_importer():
+    """Reçoit sur l'entrée standard les données d'un Espace, et les pose chez lui.
+
+    Exécuté PAR l'Espace, sous son compte : il n'écrit que dans son propre
+    dossier, et ce qu'il reçoit passe par la même règle que toute restauration
+    (voir _extraire_archive).
+
+    Une seule fois : un second déménagement écraserait ce que l'Espace a fait
+    depuis le premier. Code MIGRATION_FAITE si c'est déjà fait. Rien de ce qui
+    se trouve déjà là n'est effacé — un nom déjà pris est mis de côté dans
+    .codebyr/avant-migration-<date>.
+    """
+    compte = _compte_d_espace_courant()
+    if not compte:
+        sys.stderr.write("codebyr-space : réservé au compte d'un Espace.\n")
+        return 2
+    home = compte.pw_dir
+    interne = os.path.join(home, DOSSIER_INTERNE)
+    marqueur = os.path.join(interne, "migration.json")
+    if os.path.exists(marqueur):
+        sys.stderr.write("codebyr-space : données déjà déménagées dans cet Espace.\n")
+        return MIGRATION_FAITE
+    fichiers_surs.mkdir(interne)
+    stage = tempfile.mkdtemp(prefix="import-", dir=interne)
+    try:
+        with tarfile.open(fileobj=sys.stdin.buffer, mode="r|*") as tar:
+            _extraire_archive(tar, stage, _filtre_dossier_d_espace)
+        mis_de_cote = os.path.join(interne, "avant-migration-%s" % time.strftime("%Y%m%d-%H%M%S"))
+        for nom in sorted(os.listdir(stage)):
+            if nom == DOSSIER_INTERNE:
+                continue
+            cible = os.path.join(home, nom)
+            if os.path.lexists(cible):
+                os.makedirs(mis_de_cote, mode=0o700, exist_ok=True)
+                os.rename(cible, os.path.join(mis_de_cote, nom))
+            os.rename(os.path.join(stage, nom), cible)
+        with fichiers_surs.ouvrir(marqueur, "w", encoding="utf-8") as f:
+            json.dump({"date": time.strftime("%Y-%m-%d %H:%M:%S")}, f)
+    except (OSError, tarfile.TarError, ValueError) as exc:
+        sys.stderr.write("codebyr-space : déménagement refusé (%s)\n" % exc)
+        return 1
+    finally:
+        shutil.rmtree(stage, ignore_errors=True)
+    return 0
+
+
+INTERNE_RENDU = "interne-rendu"
+
+
+def cmd_interne_rendu():
+    """L'Espace oublie qu'il a reçu un déménagement : ses données sont reparties.
+
+    Sans cela, réactiver le compte dédié plus tard ferait répondre « déjà
+    déménagé » à l'Espace, et tout ce que l'utilisateur aurait fait entre-temps
+    sous le compte du bureau serait ignoré, sans un mot. Le marqueur est mis de
+    côté, pas effacé.
+    """
+    compte = _compte_d_espace_courant()
+    if not compte:
+        sys.stderr.write("codebyr-space : réservé au compte d'un Espace.\n")
+        return 2
+    marqueur = os.path.join(compte.pw_dir, DOSSIER_INTERNE, "migration.json")
+    try:
+        if os.path.exists(marqueur):
+            os.rename(marqueur, marqueur.replace(
+                "migration.json", "migration-rendue-%s.json" % time.strftime("%Y%m%d-%H%M%S")))
+    except OSError as exc:
+        sys.stderr.write("codebyr-space : %s\n" % exc)
+        return 1
+    return 0
+
+
+def cmd_interne_exporter():
+    """Écrit sur la sortie standard les données de l'Espace, en archive.
+
+    Exécuté PAR l'Espace : il ne peut emporter que ce que son compte peut lire.
+    Le dossier interne de Codebyr reste là où il est.
+    """
+    compte = _compte_d_espace_courant()
+    if not compte:
+        sys.stderr.write("codebyr-space : réservé au compte d'un Espace.\n")
+        return 2
+    home = compte.pw_dir
+    try:
+        with tarfile.open(fileobj=sys.stdout.buffer, mode="w|") as tar:
+            for nom in sorted(os.listdir(home)):
+                if nom == DOSSIER_INTERNE:
+                    continue
+                tar.add(os.path.join(home, nom), arcname="./" + nom,
+                        filter=_entree_archivable)
+    except (OSError, tarfile.TarError) as exc:
+        sys.stderr.write("codebyr-space : export refusé (%s)\n" % exc)
         return 1
     return 0
 
@@ -1092,6 +1415,81 @@ def cmd_export(espaces, esp_id, dest=None):
     return 0
 
 
+ARCHIVE_ENTREES_MAX = 100000
+ARCHIVE_TAILLE_MAX = 20 * 1024**3
+
+
+def _filtre_dossier_d_espace(membre, destination):
+    """Règle d'extraction pour les données d'un Espace qui changent de compte.
+
+    La règle « data » de tarfile refuse tout lien vers un chemin absolu. Les
+    applications en posent pourtant dans un dossier personnel, et un seul
+    d'entre eux faisait échouer le déménagement entier : l'Espace ne se serait
+    plus ouvert.
+
+    Le lien SYMBOLIQUE est donc accepté quelle que soit sa cible : ce n'est
+    qu'un nom, et tarfile refuse ensuite d'écrire À TRAVERS lui (il résout le
+    chemin de chaque entrée suivante). Dans le bac à sable, une cible absolue
+    se résout dans la vue de l'Espace, jamais sur le système.
+
+    Le lien DUR, lui, reste tenu à l'intérieur : il donne accès au fichier
+    lui-même. Une archive produite par un Espace compromis pourrait sinon
+    poser, au retour vers le bureau, un lien dur vers la clé SSH de
+    l'utilisateur — que l'Espace relirait à sa prochaine ouverture.
+    """
+    if membre.issym():
+        return tarfile.tar_filter(membre, destination)
+    return tarfile.data_filter(membre, destination)
+
+
+def _extraire_archive(tar, destination, filtre="data"):
+    """Extrait une archive d'Espace, entrée par entrée, selon UNE règle.
+
+    Partagée par la restauration et par le déménagement vers un compte dédié :
+    deux copies de cette règle finiraient par diverger, et c'est précisément
+    le genre de règle qu'on ne veut voir diverger nulle part.
+
+    Entrée par entrée plutôt que d'un bloc : cela fonctionne aussi sur un
+    FLUX, qu'on ne peut pas relire. Une archive refusée en cours de route
+    laisse une extraction partielle — l'appelant extrait donc toujours dans un
+    dossier de préparation qu'il jette en cas d'erreur.
+    """
+    entrees = 0
+    taille = 0
+    for membre in tar:
+        entrees += 1
+        taille += membre.size
+        if entrees > ARCHIVE_ENTREES_MAX or taille > ARCHIVE_TAILLE_MAX:
+            raise ValueError("Archive trop volumineuse (100 000 entrées / 20 Gio maximum)")
+        # Les liens sont ACCEPTÉS, les fichiers spéciaux refusés.
+        #
+        # Refuser tout lien paraissait prudent ; cela rendait la restauration
+        # impossible sur un vrai Espace. Un dossier personnel avec un profil
+        # Firefox contient des liens symboliques : « Revenir à un instantané »
+        # échouait donc toujours, sur une archive produite par Codebyr
+        # lui-même. On pouvait sauvegarder, jamais restaurer. Constaté le
+        # 12/09/2026 sur une VM.
+        #
+        # Ce qu'il fallait refuser n'est pas le lien, c'est le lien qui SORT de
+        # l'Espace. « filter="data" » s'en charge : chemins absolus, traversées
+        # par « .. » et cibles hors destination sont rejetés par tarfile
+        # lui-même, et lèvent une erreur que l'on attrape.
+        if not (membre.isfile() or membre.isdir() or membre.issym() or membre.islnk()):
+            raise ValueError("Archive contenant un fichier spécial")
+        tar.extract(membre, destination, filter=filtre)
+
+
+def _entree_archivable(info):
+    """Filtre d'archivage : les fichiers spéciaux ne partent pas.
+
+    Un tube nommé dans un dossier d'Espace ferait refuser l'archive entière à
+    l'arrivée, et le déménagement avec : on ne l'emporte pas.
+    """
+    if info.isfile() or info.isdir() or info.issym() or info.islnk():
+        return info
+    return None
+
+
 def cmd_import(espaces, esp_id, source=None):
     """Restaure un Espace depuis une archive (portabilité entre machines)."""
     esp = espaces.get(esp_id)
@@ -1118,32 +1516,7 @@ def cmd_import(espaces, esp_id, source=None):
             neuf = os.path.join(stage, "home")
             os.mkdir(neuf, 0o700)
             with tarfile.open(source, "r:gz") as tar:
-                membres = []
-                taille = 0
-                for membre in tar:
-                    taille += membre.size
-                    if len(membres) >= 100000 or taille > 20 * 1024**3:
-                        raise ValueError("Archive trop volumineuse (100 000 entrées / 20 Gio maximum)")
-                    # Les liens sont ACCEPTÉS, les fichiers spéciaux refusés.
-                    #
-                    # Refuser tout lien paraissait prudent ; cela rendait la
-                    # restauration impossible sur un vrai Espace. Un dossier
-                    # personnel avec un profil Firefox contient des liens
-                    # symboliques : « Revenir à un instantané » échouait donc
-                    # toujours, sur une archive produite par Codebyr lui-même.
-                    # On pouvait sauvegarder, jamais restaurer. Constaté le
-                    # 12/09/2026 sur une VM.
-                    #
-                    # Ce qu'il fallait refuser n'est pas le lien, c'est le lien
-                    # qui SORT de l'Espace. « filter="data" » ci-dessous s'en
-                    # charge : chemins absolus, traversées par « .. » et cibles
-                    # hors destination sont rejetés par tarfile lui-même, et
-                    # lèvent une erreur que l'on attrape.
-                    if not (membre.isfile() or membre.isdir()
-                            or membre.issym() or membre.islnk()):
-                        raise ValueError("Archive contenant un fichier spécial")
-                    membres.append(membre)
-                tar.extractall(neuf, members=membres, filter="data")
+                _extraire_archive(tar, neuf)
             cmd_close(espaces, esp_id)
             # Ne pas remplacer le dossier d'un Espace encore en activité.
             if _espace_courant() == esp_id:
@@ -1804,10 +2177,16 @@ def main(argv):
         print(_aide())
         return 0
     action, args = argv[1], argv[2:]
+    # Hors de la table ACTIONS, donc hors de l'aide : ce ne sont pas des gestes
+    # d'utilisateur, c'est le lanceur qui les demande à un Espace.
     if action == INTERNE_PREPARER and len(args) == 1:
-        # Hors de la table ACTIONS, donc hors de l'aide : ce n'est pas un geste
-        # d'utilisateur, c'est le lanceur qui le demande à un Espace.
         return cmd_interne_preparer(args[0])
+    if action == INTERNE_IMPORTER and not args:
+        return cmd_interne_importer()
+    if action == INTERNE_EXPORTER and not args:
+        return cmd_interne_exporter()
+    if action == INTERNE_RENDU and not args:
+        return cmd_interne_rendu()
     if action not in ACTIONS:
         sys.stderr.write("Action inconnue : %s\n" % action)
         sys.stderr.write("Actions : %s\n" % ", ".join(sorted(ACTIONS)))

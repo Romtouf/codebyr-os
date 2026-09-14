@@ -19,8 +19,13 @@ depuis un menu, s'en sert correctement :
   4. un geste pas encore prêt sous compte dédié est refusé, et ne touche à rien ;
   5. réglé comme Banque — navigateur, liste blanche, blindage — le profil est
      écrit par l'Espace, un site autorisé passe par le filtre, un autre non ;
-  6. service absent : l'Espace NE S'OUVRE PAS — surtout pas sous le compte du
+  6. réglage « compte » retiré : les données reviennent sous le compte du
+     bureau, avec ce qui a été fait entre-temps, et l'état d'avant est gardé ;
+  7. service absent : l'Espace NE S'OUVRE PAS — surtout pas sous le compte du
      bureau « en attendant ».
+
+Avant l'étape 1, l'Espace d'essai reçoit des données comme s'il avait déjà
+servi : sa première ouverture sous compte dédié doit les emmener.
 
 Pendant l'étape 1, une petite fenêtre « Essai compte dédié » reste ouverte six
 secondes : regardez son liseré (violet) et la notification « Essai UID ».
@@ -180,15 +185,30 @@ def lanceur(bureau, *args, attendre=True):
                            attendre=attendre)
 
 
-def registre(bureau, geste):
+def registre(bureau, geste, entree=None):
+    """Pose (« ajouter ») ou retire l'Espace d'essai du registre de l'utilisateur."""
     code = ("import sys; sys.path.insert(0, %r); import registre, json; "
             % COPIE_LIB)
     if geste == "ajouter":
         code += "registre.supprimer_espace(%r); registre.ajouter_espace(json.loads(%r))" % (
-            ESPACE, json.dumps(ENTREE))
+            ESPACE, json.dumps(entree or ENTREE))
     else:
         code += "registre.supprimer_espace(%r)" % ESPACE
     return comme_le_bureau(bureau, ["/usr/bin/python3", "-c", code]).returncode == 0
+
+
+# Des données comme en a un Espace déjà utilisé : un document, et un lien vers
+# un chemin absolu — de ceux que posent les applications, et qui faisaient
+# échouer tout le déménagement sous la règle stricte des restaurations.
+ANCIENNES_DONNEES = r'''
+import os, sys
+home = sys.argv[1]
+os.makedirs(os.path.join(home, "Documents"), exist_ok=True)
+with open(os.path.join(home, "Documents", "note.txt"), "w") as f:
+    f.write("écrit avant le compte dédié")
+if not os.path.lexists(os.path.join(home, "applications")):
+    os.symlink("/usr/share/applications", os.path.join(home, "applications"))
+'''
 
 
 def marqueurs(uid_bureau, vivants=True):
@@ -303,7 +323,15 @@ def main():
     if not dire("Espace « Essai UID » ajouté au registre", registre(bureau, "ajouter")):
         reussi = False
     enfants = []
+    donnees_bureau = os.path.join(bureau.pw_dir, ".local", "share", "codebyr",
+                                  "espaces", ESPACE)
     try:
+        # Comme un Espace déjà utilisé sous le compte du bureau : sa première
+        # ouverture sous compte dédié doit emmener ses données.
+        shutil.rmtree(donnees_bureau, ignore_errors=True)
+        comme_le_bureau(bureau, ["/usr/bin/python3", "-c", ANCIENNES_DONNEES,
+                                 os.path.join(donnees_bureau, "home")])
+
         titre("1. Une application, sous le compte de l'Espace")
         debut = time.time()
         app = lanceur(bureau, "launch", ESPACE, "--", "/usr/bin/python3", FENETRE,
@@ -351,6 +379,16 @@ def main():
         reussi &= dire("Espace refermé après sa dernière application",
                        attendre_que(lambda: not espace_ouvert(nom), 15),
                        comptes.chemin_passerelle(nom))
+        note = os.path.join(home, "Documents", "note.txt")
+        reussi &= dire("ses données l'ont suivi, au compte de l'Espace",
+                       os.path.exists(note) and bool(espace)
+                       and os.stat(note).st_uid == espace.pw_uid,
+                       note if os.path.exists(note) else "document absent")
+        reussi &= dire("lien vers un chemin absolu emporté aussi",
+                       os.path.islink(os.path.join(home, "applications")))
+        reussi &= dire("anciennes données laissées intactes",
+                       os.path.exists(os.path.join(donnees_bureau, "home", "Documents",
+                                                   "note.txt")))
 
         titre("2. Deux applications : fermer l'une ne ferme pas l'autre")
         courte = lanceur(bureau, "launch", ESPACE, "--", "/usr/bin/python3", "-c",
@@ -402,8 +440,11 @@ def main():
                                      "espaces", ESPACE, "domaines-refuses.txt")
         capture = os.path.join(home, "capture.png")
         debut = time.time()
+        # Le chemin tel que l'Espace le voit : son dossier y apparaît à celui
+        # du bureau, pas à son emplacement sur le disque.
         autorise = lanceur(bureau, "launch", ESPACE, "--", "firefox-esr", "--headless",
-                           "--screenshot", capture, "https://" + DOMAINE_AUTORISE + "/")
+                           "--screenshot", os.path.join(bureau.pw_dir, "capture.png"),
+                           "https://" + DOMAINE_AUTORISE + "/")
         reussi &= dire("navigateur ouvert sous compte dédié et blindage",
                        autorise.returncode == 0,
                        "code %s en %.0f s" % (autorise.returncode, time.time() - debut))
@@ -469,7 +510,23 @@ def main():
         reussi &= dire("Espace refermé après le navigateur",
                        attendre_que(lambda: not espace_ouvert(nom), 15))
 
-        titre("6. Service absent : l'Espace ne s'ouvre pas")
+        titre("6. Réglage retiré : les données reviennent, à jour")
+        sans_compte = {k: v for k, v in dict(ENTREE, **COMME_BANQUE).items() if k != "compte"}
+        registre(bureau, "ajouter", sans_compte)
+        retour = lanceur(bureau, "launch", ESPACE, "--", "/usr/bin/python3", "-c", "pass")
+        reussi &= dire("ouverture sous le compte du bureau acceptée", retour.returncode == 0,
+                       (retour.stderr or "").strip().splitlines()[-1][:70]
+                       if retour.returncode and (retour.stderr or "").strip() else "")
+        # preuves.json a été écrit à l'étape 1, SOUS compte dédié : s'il est
+        # là, c'est que le travail fait depuis le déménagement est revenu.
+        reussi &= dire("le travail fait sous compte dédié est revenu",
+                       os.path.exists(os.path.join(donnees_bureau, "home", "preuves.json")))
+        import glob
+        reussi &= dire("l'état d'avant est mis de côté, pas effacé",
+                       bool(glob.glob(os.path.join(donnees_bureau, "avant-retour-*"))))
+        registre(bureau, "ajouter", dict(ENTREE, **COMME_BANQUE))
+
+        titre("7. Service absent : l'Espace ne s'ouvre pas")
         service.terminate()
         service.wait(timeout=10)
         avant = set(marqueurs(uid))

@@ -84,13 +84,21 @@ def refus_de_geste(action, esp):
                                      GESTES_PAS_ENCORE_PRETS[action]))
 
 
-def _parler(chemin, demande_, garder=False):
+def _parler(chemin, demande_, garder=False, descripteurs=()):
     """Envoie une demande, lit la première réponse. Garde la connexion si demandé."""
     client = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
     client.settimeout(30)
     try:
         client.connect(chemin)
-        client.sendall(json.dumps(demande_).encode("utf-8"))
+        donnees = json.dumps(demande_).encode("utf-8")
+        if descripteurs:
+            # Joints au même message : le premier processus les reçoit avec la
+            # demande, jamais séparément.
+            envoye = socket.send_fds(client, [donnees], list(descripteurs))
+            if envoye < len(donnees):
+                client.sendall(donnees[envoye:])
+        else:
+            client.sendall(donnees)
         brut = b""
         while b"\n" not in brut:
             morceau = client.recv(TAILLE_MAX)
@@ -157,19 +165,31 @@ def fermer(esp_id, chemin=SOCKET_SERVICE):
     return bool(reponse.get("ok"))
 
 
-def executer(ordres, argv, env, au_lancement=None):
+def executer(ordres, argv, env, au_lancement=None, entree=None, sortie=None):
     """Fait exécuter argv DANS l'Espace, et attend sa fin. Renvoie le code.
 
     `au_lancement(pid)` est appelé dès que le processus existe : c'est là que
     le lanceur pose les marqueurs qui permettent à l'extension GNOME de colorer
     ses fenêtres, avant qu'elles n'apparaissent.
 
+    `entree` / `sortie` : descripteurs donnés à la commande comme entrée ou
+    sortie standard — le bout d'un tuyau, typiquement. L'appelant garde les
+    siens et doit fermer, de son côté, le bout qu'il a transmis.
+
     Tant que cette fonction attend, la connexion tient l'application : si le
     lanceur meurt, le premier processus de l'Espace l'arrête.
     """
+    demande_ = {"argv": argv, "env": env}
+    descripteurs = []
+    if entree is not None or sortie is not None:
+        demande_["flux"] = []
+        for nom, fd in (("entree", entree), ("sortie", sortie)):
+            if fd is not None:
+                demande_["flux"].append(nom)
+                descripteurs.append(fd)
     try:
-        reponse, client, reste = _parler(ordres, {"argv": argv, "env": env},
-                                         garder=True)
+        reponse, client, reste = _parler(ordres, demande_, garder=True,
+                                         descripteurs=descripteurs)
     except (OSError, ValueError) as exc:
         raise Indisponible("l'Espace ne répond pas (%s)" % exc)
     if not reponse.get("ok"):

@@ -101,10 +101,13 @@ class JamaisDeReplieSousLeCompteDuBureau(unittest.TestCase):
 
     def test_un_service_absent_ne_fait_pas_ouvrir_l_espace_autrement(self):
         lancer = _fonction(self.source, "cmd_launch", "_lancer")
-        # Le seul chemin vers le lancement ordinaire est l'absence de demande.
-        self.assertIn("if not compte_dedie.demande(esp):\n        return _lancer(espaces, esp, extra, fichier, None)", lancer)
-        self.assertIn("except compte_dedie.Indisponible as exc:\n        return _refuser_compte_dedie(esp, str(exc))", lancer)
+        # Le seul chemin vers le lancement ordinaire est l'absence de demande :
+        # il n'apparaît qu'une fois, DANS le bloc « pas de compte dédié ».
         self.assertEqual(lancer.count("_lancer(espaces, esp, extra, fichier, None)"), 1)
+        bloc_ordinaire = lancer.split("if not compte_dedie.demande(esp):")[1].split(
+            "compte_dedie.Session(")[0]
+        self.assertIn("_lancer(espaces, esp, extra, fichier, None)", bloc_ordinaire)
+        self.assertIn("except compte_dedie.Indisponible as exc:\n        return _refuser_compte_dedie(esp, str(exc))", lancer)
 
     def test_le_service_absent_refuse_vraiment(self):
         with mock.patch.object(compte_dedie, "Session",
@@ -326,3 +329,186 @@ class LeJournalDesRefus(unittest.TestCase):
         messages = [c.args[0] for c in sortie.write.call_args_list]
         self.assertEqual(len(messages), 1, messages)
         self.assertIn("journal des refus", messages[0])
+
+
+class LaRegleDesDonneesDEspace(unittest.TestCase):
+    """Ce qu'une archive d'Espace peut poser en changeant de compte.
+
+    De vraies archives, piégées comme le ferait un Espace compromis au retour
+    vers le bureau.
+    """
+
+    def _archive(self, construire):
+        import io
+        import tarfile
+        tampon = io.BytesIO()
+        with tarfile.open(fileobj=tampon, mode="w") as tar:
+            construire(tar)
+        tampon.seek(0)
+        return tarfile.open(fileobj=tampon, mode="r")
+
+    def _extraire(self, construire):
+        import tarfile
+        destination = tempfile.mkdtemp()
+        self.addCleanup(__import__("shutil").rmtree, destination, True)
+        with self._archive(construire) as tar:
+            try:
+                space._extraire_archive(tar, destination, space._filtre_dossier_d_espace)
+            except (tarfile.TarError, ValueError, OSError) as exc:
+                return destination, exc
+        return destination, None
+
+    @staticmethod
+    def _entree(tar, nom, genre, cible="", contenu=b""):
+        import io
+        import tarfile
+        info = tarfile.TarInfo(nom)
+        info.type = genre
+        info.linkname = cible
+        info.size = len(contenu)
+        tar.addfile(info, io.BytesIO(contenu) if contenu else None)
+
+    @unittest.skipUnless(POSIX, "liens Unix")
+    def test_un_lien_symbolique_vers_un_chemin_absolu_passe(self):
+        # Sans cela, un seul lien de ce genre bloquait tout le déménagement.
+        import tarfile
+        destination, erreur = self._extraire(
+            lambda tar: self._entree(tar, "./applications", tarfile.SYMTYPE,
+                                     "/usr/share/applications"))
+        self.assertIsNone(erreur)
+        self.assertEqual(os.readlink(os.path.join(destination, "applications")),
+                         "/usr/share/applications")
+
+    def test_un_lien_dur_vers_l_exterieur_est_refuse(self):
+        # Au retour vers le bureau, il donnerait à l'Espace un fichier du
+        # bureau — sa clé SSH, par exemple.
+        import tarfile
+        _, erreur = self._extraire(
+            lambda tar: self._entree(tar, "./cle", tarfile.LNKTYPE, "/etc/passwd"))
+        self.assertIsNotNone(erreur)
+
+    def test_un_nom_qui_sort_du_dossier_est_refuse(self):
+        import tarfile
+        _, erreur = self._extraire(
+            lambda tar: self._entree(tar, "../dehors", tarfile.REGTYPE, contenu=b"x"))
+        self.assertIsNotNone(erreur)
+
+    @unittest.skipUnless(POSIX, "liens Unix")
+    def test_on_n_ecrit_jamais_a_travers_un_lien_pose_par_l_archive(self):
+        import tarfile
+        dehors = tempfile.mkdtemp()
+        self.addCleanup(__import__("shutil").rmtree, dehors, True)
+
+        def piege(tar):
+            self._entree(tar, "./passage", tarfile.SYMTYPE, dehors)
+            self._entree(tar, "./passage/intrus", tarfile.REGTYPE, contenu=b"x")
+
+        _, erreur = self._extraire(piege)
+        self.assertIsNotNone(erreur)
+        self.assertFalse(os.path.exists(os.path.join(dehors, "intrus")))
+
+    def test_un_fichier_special_est_refuse(self):
+        import tarfile
+        _, erreur = self._extraire(
+            lambda tar: self._entree(tar, "./tube", tarfile.FIFOTYPE))
+        self.assertIsNotNone(erreur)
+
+    def test_la_restauration_ordinaire_garde_sa_regle_stricte(self):
+        # Seul ce qui change de compte bénéficie de la règle d'Espace.
+        source = _source()
+        importer = source.split("def cmd_import(")[1].split("\nFLATHUB_REPO")[0]
+        self.assertIn("_extraire_archive(tar, neuf)\n", importer)
+
+
+class LeDemenagement(unittest.TestCase):
+    """Les données suivent l'Espace sous son compte, et reviennent si on l'en retire."""
+
+    def setUp(self):
+        self.source = _source()
+
+    def test_il_passe_avant_la_preparation_du_dossier(self):
+        # La préparation complète les associations de l'Espace : elle doit
+        # trouver celles qu'il avait déjà, donc arriver après ses données.
+        lancer = _fonction(self.source, "_lancer", "_rundir")
+        self.assertLess(lancer.index("_demenager_vers_compte_dedie("),
+                        lancer.index("_preparer_depuis_l_espace("))
+
+    def test_le_retour_passe_avant_toute_ouverture_ordinaire(self):
+        launch = _fonction(self.source, "cmd_launch", "_lancer")
+        bloc = launch.split("if not compte_dedie.demande(esp):")[1]
+        self.assertLess(bloc.index("_rapatrier_depuis_compte_dedie("),
+                        bloc.index("_lancer(espaces, esp, extra, fichier, None)"))
+
+    def test_le_dossier_dedie_apparait_au_meme_chemin_qu_avant(self):
+        # Les applications gardent des chemins absolus (téléchargements de
+        # Firefox, fichiers récents) : un autre chemin les laisserait pointer
+        # dans le vide après le déménagement.
+        lancer = _fonction(self.source, "_lancer", "_rundir")
+        appel = lancer.split("bac_a_sable.wrap_bwrap(")[1].split("if renforce:")[0]
+        self.assertNotIn("chez=", appel)
+
+    def test_le_bout_du_tuyau_est_toujours_ferme(self):
+        # Sans cela, un ordre qui échoue laissait l'emballeur attendre à jamais
+        # un lecteur disparu (vu dans le WSL le 14/09/2026).
+        demenager = _fonction(self.source, "_demenager_vers_compte_dedie",
+                              "_rapatrier_depuis_compte_dedie")
+        self.assertIn("finally:", demenager)
+        self.assertIn("os.close(lecture)", demenager.split("finally:")[1][:400])
+
+    @unittest.skipUnless(POSIX, "fichiers_surs est réservé à Linux")
+    def test_un_demenagement_rate_n_ouvre_pas_l_espace(self):
+        with tempfile.TemporaryDirectory() as t:
+            ancien = os.path.join(t, "espaces", "travail", "home")
+            os.makedirs(ancien)
+            with open(os.path.join(ancien, "note.txt"), "w") as f:
+                f.write("précieux")
+            session = mock.Mock(ordres="/nulle-part", home=os.path.join(t, "dedie", "1000", "travail"),
+                                compte="cbyr-1000-travail")
+            os.makedirs(session.home)
+            with mock.patch.object(space, "DATA_ROOT", os.path.join(t, "espaces")), \
+                    mock.patch.object(space, "_prevenir"), \
+                    mock.patch.object(compte_dedie, "executer", return_value=1):
+                ouvert = space._demenager_vers_compte_dedie(DEDIE, session)
+            self.assertFalse(ouvert)
+            self.assertFalse(os.path.exists(os.path.join(t, "espaces", "travail",
+                                                         space.MARQUEUR_DEMENAGEMENT)))
+            with open(os.path.join(ancien, "note.txt")) as f:
+                self.assertEqual(f.read(), "précieux")
+
+    def test_un_espace_jamais_ouvert_n_a_rien_a_demenager(self):
+        with tempfile.TemporaryDirectory() as t, \
+                mock.patch.object(space, "DATA_ROOT", t), \
+                mock.patch.object(compte_dedie, "executer") as executer:
+            self.assertTrue(space._demenager_vers_compte_dedie(DEDIE, mock.Mock()))
+        executer.assert_not_called()
+
+    def test_sans_service_le_retour_refuse_plutot_que_de_montrer_l_etat_fige(self):
+        with tempfile.TemporaryDirectory() as t:
+            os.makedirs(os.path.join(t, "travail"))
+            with open(os.path.join(t, "travail", space.MARQUEUR_DEMENAGEMENT), "w") as f:
+                f.write("{}")
+            with mock.patch.object(space, "DATA_ROOT", t), \
+                    mock.patch.object(compte_dedie, "Session",
+                                      side_effect=compte_dedie.Indisponible("absent")):
+                self.assertFalse(space._rapatrier_depuis_compte_dedie(ORDINAIRE | {"id": "travail"}))
+
+
+class LesFluxDuPremierProcessus(unittest.TestCase):
+
+    def setUp(self):
+        with open(os.path.join(outils.RACINE, "live-build", "config",
+                               "includes.chroot_after_packages", "usr", "lib", "codebyr",
+                               "codebyr-espace-init"), encoding="utf-8") as f:
+            self.source = f.read()
+
+    def test_seules_l_entree_et_la_sortie_standard_peuvent_etre_transmises(self):
+        self.assertIn('FLUX = ("entree", "sortie")', self.source)
+
+    def test_sans_flux_la_commande_ne_lit_rien(self):
+        # Une application lancée dans un Espace ne doit pas hériter d'une
+        # entrée standard ouverte vers on ne sait quoi.
+        self.assertIn('stdin=recus.get("entree", subprocess.DEVNULL)', self.source)
+
+    def test_les_descripteurs_recus_sont_refermes(self):
+        servir = self.source.split("def servir_un(")[1].split("def attendre(")[0]
+        self.assertIn("for fd in descripteurs:", servir.split("finally:")[1])

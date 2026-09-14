@@ -21,7 +21,19 @@ Ce script essaie, puis remet tout en état :
   3. le son (PipeWire), même question ;
   4. une socket Unix créée par le bureau, comme celles de Codebyr
      (notifications, filtre réseau) ;
-  5. ce qu'un client Wayland d'un autre compte peut ATTEINDRE une fois connecté.
+  5. ce qu'un client Wayland d'un autre compte peut ATTEINDRE une fois connecté ;
+  6. la PASSERELLE : le socket présenté par un autre chemin, sans jamais ouvrir
+     le dossier d'exécution du bureau.
+
+── CE QUE LA MESURE DU 14/09/2026 A MONTRÉ ─────────────────────────────────
+Sur GNOME 48, un client Wayland d'un AUTRE compte s'affiche : l'architecture
+légère tient. Mais la façon évidente d'y parvenir — ouvrir la traversée de
+/run/user/<vous> — rend joignable tout ce que ce dossier protégeait, à
+commencer par le BUS DE SESSION : exactement la faille fermée en 1.1.0.
+
+D'où l'étape 6 : root prépare un dossier à part, y présente le seul socket
+Wayland (montage lié), et n'accorde le droit qu'à ce socket. Le dossier du
+bureau reste fermé, et le bus de session inatteignable.
 
 À la fin, les listes de contrôle sont retirées et le compte d'essai supprimé.
 
@@ -135,6 +147,40 @@ def liste_de_controle(chemin, essai, droits):
     return True
 
 
+def passerelle(socket_wl, essai, dossier="/run/codebyr-mesure"):
+    """Présente le SEUL socket Wayland par un chemin que root contrôle.
+
+    C'est la forme que prendra le service privilégié : l'Espace ne traverse
+    jamais le dossier d'exécution du bureau, donc n'atteint aucun des autres
+    sockets qui s'y trouvent — bus de session en tête.
+    """
+    os.makedirs(dossier, mode=0o711, exist_ok=True)
+    os.chmod(dossier, 0o711)
+    lien = os.path.join(dossier, "wayland-0")
+    if not os.path.exists(lien):
+        open(lien, "w").close()
+    r = commande(["mount", "--bind", socket_wl, lien])
+    if r.returncode != 0:
+        return None, (r.stderr or "").strip()[:90]
+    # Le droit est posé sur le socket lui-même, jamais sur un dossier.
+    liste_de_controle(socket_wl, essai, "rw")
+    return lien, ""
+
+
+def fermer_passerelle(dossier="/run/codebyr-mesure"):
+    lien = os.path.join(dossier, "wayland-0")
+    if os.path.exists(lien):
+        commande(["umount", lien])
+        try:
+            os.unlink(lien)
+        except OSError:
+            pass
+    try:
+        os.rmdir(dossier)
+    except OSError:
+        pass
+
+
 def retirer_controle(chemins, essai):
     for chemin in chemins:
         if shutil.which("setfacl") and os.path.exists(chemin):
@@ -210,7 +256,7 @@ def main():
                 dire("son (PipeWire)", "info", "socket absente sur cette machine")
         print()
 
-        print("── 3. Ce que ce compte atteint par ailleurs ──────────────────────")
+        print("── 3. Ce que l'ouverture du DOSSIER rend joignable ───────────────")
         for chemin, quoi in ((os.path.join(runtime, "bus"), "bus de session du bureau"),
                              (os.path.join(runtime, "systemd", "private"), "systemd --user"),
                              ("/run/dbus/system_bus_socket", "bus système")):
@@ -220,6 +266,26 @@ def main():
                      "à refuser" if joint else "")
             else:
                 dire(quoi, "info", "absent")
+        print()
+        print("── 4. La passerelle : le socket seul, sans ouvrir le dossier ─────")
+        retirer_controle(poses, essai)   # on repart d'un dossier d'exécution FERMÉ
+        poses = []
+        lien, detail = passerelle(socket_wl, essai)
+        if not lien:
+            dire("montage de la passerelle", "non", detail)
+        else:
+            poses.append(socket_wl)
+            ok, detail = essayer_fenetre(essai, runtime_perso, lien, script)
+            dire("fenêtre affichée par la passerelle", "ok" if ok else "non", detail)
+            joint, _ = peut_joindre(essai, os.path.join(runtime, "bus"))
+            dire("bus de session du bureau", "ok" if joint else "non",
+                 "à refuser" if joint else "hors d'atteinte — c'est le but")
+            joint, _ = peut_joindre(essai, pipewire) if os.path.exists(pipewire) else (False, "")
+            dire("son (PipeWire) par le dossier du bureau", "ok" if joint else "non",
+                 "à refuser" if joint else "hors d'atteinte")
+
+        print()
+        print("── 5. Ce que ce compte atteint par ailleurs ──────────────────────")
         lisible = os.access(utilisateur.pw_dir, os.R_OK)
         r = commande(["/usr/bin/setpriv", "--reuid", str(essai.pw_uid),
                       "--regid", str(essai.pw_gid), "--clear-groups", "--no-new-privs",
@@ -228,6 +294,7 @@ def main():
              "à refuser" if r.returncode == 0 else "c'est le but recherché")
         print("       (%s, lisible par root : %s)" % (utilisateur.pw_dir, lisible))
     finally:
+        fermer_passerelle()
         retirer_controle(poses, essai)
         srv.close()
         shutil.rmtree(dossier_socket, ignore_errors=True)

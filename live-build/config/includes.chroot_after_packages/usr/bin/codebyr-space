@@ -871,6 +871,16 @@ def _preparer_depuis_l_espace(session, espaces, app_cmd, filtre_reseau):
     return code == 0
 
 
+def _ouvreur_associe(home):
+    """L'ouvreur Codebyr est-il bien le gestionnaire déclaré dans ce dossier ?"""
+    try:
+        with fichiers_surs.ouvrir(os.path.join(home, ".config", "mimeapps.list"),
+                                  encoding="utf-8") as f:
+            return OUVREUR in f.read()
+    except OSError:
+        return False
+
+
 def cmd_interne_preparer(brut):
     """Prépare le dossier d'un Espace, depuis l'Espace, sous son propre compte.
 
@@ -895,6 +905,15 @@ def cmd_interne_preparer(brut):
     home = compte.pw_dir
     try:
         _preparer_ouverture(home)
+        # _preparer_ouverture se tait sur ses échecs, et c'est juste pour un
+        # réglage de confort. Mais ces associations sont ce qui ouvre SOUS
+        # CLOCHE un fichier venu d'ailleurs : leur absence est une protection
+        # perdue. Constaté le 14/09/2026 — elles n'étaient pas posées, et la
+        # préparation se disait réussie. On vérifie donc le résultat, pas
+        # l'absence d'erreur.
+        if types_ouvreur(os.path.join("/usr/share/applications", OUVREUR)) \
+                and not _ouvreur_associe(home):
+            raise OSError("associations de fichiers non posées dans %s" % home)
         modeles.installer(home)
         if charge.get("firefox"):
             if charge.get("filtre_reseau"):

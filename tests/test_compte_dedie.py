@@ -167,12 +167,26 @@ class LaPreparationDepuisLEspace(unittest.TestCase):
             faux = mock.Mock(pw_name="cbyr-1000-travail", pw_dir=vrai)
             with mock.patch("pwd.getpwuid", return_value=faux), \
                     mock.patch.dict(os.environ, {"HOME": leurre}), \
+                    mock.patch.object(space, "types_ouvreur", return_value=["application/pdf"]), \
+                    mock.patch.object(space, "_ouvreur_associe", return_value=True), \
                     mock.patch.object(space, "_preparer_ouverture") as ouverture, \
                     mock.patch.object(space.modeles, "installer") as modeles:
                 code = space.cmd_interne_preparer(json.dumps({"firefox": False}))
         self.assertEqual(code, 0)
         ouverture.assert_called_once_with(vrai)
         modeles.assert_called_once_with(vrai)
+
+    def test_des_associations_non_posees_ne_passent_pas_pour_une_reussite(self):
+        # Constaté le 14/09/2026 : elles n'étaient pas écrites, et la
+        # préparation se disait réussie. Ce sont elles qui ouvrent sous cloche.
+        faux = mock.Mock(pw_name="cbyr-1000-travail", pw_dir="/var/lib/x")
+        with mock.patch("pwd.getpwuid", return_value=faux), \
+                mock.patch.object(space, "types_ouvreur", return_value=["application/pdf"]), \
+                mock.patch.object(space, "_ouvreur_associe", return_value=False), \
+                mock.patch.object(space, "_preparer_ouverture"), \
+                mock.patch.object(space.modeles, "installer"):
+            code = space.cmd_interne_preparer(json.dumps({"firefox": False}))
+        self.assertEqual(code, 1)
 
     def test_n_apparait_pas_dans_l_aide(self):
         self.assertNotIn(space.INTERNE_PREPARER, space.ACTIONS)

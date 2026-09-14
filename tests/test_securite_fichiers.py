@@ -193,3 +193,62 @@ class EchecFerme(unittest.TestCase):
             self.assertEqual(space.cmd_launch(
                 {"jetable": {"id": "jetable", "nom": "Jetable"}}, "jetable", []), 1)
             lancement.assert_not_called()
+
+
+# Exécuté sous un compte sans privilège : root ignore les droits de lecture,
+# et le test passerait à vide sans jamais reproduire le défaut.
+_TRAVERSEE = r'''
+import os, sys
+sys.path.insert(0, sys.argv[2])
+import fichiers_surs
+espace = os.path.join(sys.argv[1], "1002", "espace")
+fichiers_surs.mkdir(os.path.join(espace, ".config"))
+with fichiers_surs.ouvrir(os.path.join(espace, ".config", "mimeapps.list"), "w",
+                          encoding="utf-8") as f:
+    f.write("ok")
+os.symlink("/etc", os.path.join(espace, "piege"))
+try:
+    fichiers_surs.mkdir(os.path.join(espace, "piege", "x"))
+    print("LIEN-SUIVI")
+except OSError:
+    print("LIEN-REFUSE")
+print("ECRIT")
+'''
+
+
+@unittest.skipUnless(os.name == "posix", "Descripteurs et comptes Linux")
+class DossiersSeulementTraverses(unittest.TestCase):
+    """Un compte d'Espace écrit chez lui, sans pouvoir LIRE les dossiers au-dessus.
+
+    Constaté le 14/09/2026 sur la VM : /var/lib/codebyr/espaces/<uid> est tenu
+    par root en 0711. fichiers_surs ouvrait chaque dossier du chemin en lecture,
+    donc toute écriture dans le dossier d'un Espace à compte dédié échouait —
+    et les associations qui ouvrent sous cloche n'étaient pas posées.
+    """
+
+    def test_ecrit_sous_un_dossier_intraversable_en_lecture(self):
+        import subprocess
+        import sys
+        with tempfile.TemporaryDirectory() as t:
+            proprietaire = os.path.join(t, "1002")
+            espace = os.path.join(proprietaire, "espace")
+            os.makedirs(espace)
+            options = {}
+            if os.geteuid() == 0:
+                # Tenu par root en 0711, comme sur la machine ; l'Espace est
+                # un autre compte, sans aucun privilège.
+                os.chown(espace, 65534, 65534)
+                os.chmod(espace, 0o700)
+                for dossier in (t, proprietaire):
+                    os.chmod(dossier, 0o711)
+                options = {"user": 65534, "group": 65534, "extra_groups": []}
+            else:
+                # Sans root : on se retire à soi-même la lecture du dossier
+                # intermédiaire, ce qui reproduit la même situation.
+                os.chmod(proprietaire, 0o311)
+                self.addCleanup(os.chmod, proprietaire, 0o755)
+            r = subprocess.run([sys.executable, "-B", "-c", _TRAVERSEE, t, outils.LIB],
+                               capture_output=True, text=True, timeout=30, **options)
+            self.assertIn("ECRIT", r.stdout, r.stderr)
+            self.assertIn("LIEN-REFUSE", r.stdout,
+                          "O_PATH ne doit pas faire suivre un lien symbolique")

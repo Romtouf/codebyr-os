@@ -17,7 +17,9 @@ depuis un menu, s'en sert correctement :
      seconde ;
   3. « Fermer l'Espace » d'un geste arrête vraiment ce qui tourne ;
   4. un geste pas encore prêt sous compte dédié est refusé, et ne touche à rien ;
-  5. service absent : l'Espace NE S'OUVRE PAS — surtout pas sous le compte du
+  5. réglé comme Banque — navigateur, liste blanche, blindage — le profil est
+     écrit par l'Espace, un site autorisé passe par le filtre, un autre non ;
+  6. service absent : l'Espace NE S'OUVRE PAS — surtout pas sous le compte du
      bureau « en attendant ».
 
 Pendant l'étape 1, une petite fenêtre « Essai compte dédié » reste ouverte six
@@ -50,6 +52,12 @@ ESPACE = "essai-uid"
 ENTREE = {"id": ESPACE, "nom": "Essai UID", "couleur": "#8E44AD",
           "compte": "dedie", "app": "org.gnome.Nautilus.desktop"}
 PERSONNE = 65534
+# Réglages de Banque, tels qu'ils sont livrés, avec un domaine autorisé.
+DOMAINE_AUTORISE = "example.org"
+DOMAINE_REFUSE = "example.com"
+COMME_BANQUE = {"app": "firefox-esr.desktop", "blindage": "renforce",
+                "audio": False, "gpu": False,
+                "reseau": {"mode": "liste-blanche", "domaines": [DOMAINE_AUTORISE]}}
 
 sys.path.insert(0, os.path.join(LIVRE, "usr", "share", "codebyr"))
 import comptes  # noqa: E402
@@ -335,7 +343,58 @@ def main():
                        (purge.stderr or "").strip()[:60])
         reussi &= dire("données de l'Espace intactes", os.path.isdir(home))
 
-        titre("5. Service absent : l'Espace ne s'ouvre pas")
+        titre("5. Comme Banque : navigateur, réseau restreint, blindage")
+        # Ajouté après un défaut que les étapes précédentes ne pouvaient pas
+        # voir : aucune écriture ne passait dans le dossier d'un Espace à compte
+        # dédié, et la préparation du profil de Firefox aurait empêché TOUT
+        # Espace à navigateur de s'ouvrir.
+        comme_le_bureau(bureau, ["/usr/bin/python3", "-c",
+                                 "import sys; sys.path.insert(0, %r); import registre, json; "
+                                 "registre.modifier_espace(%r, json.loads(%r))"
+                                 % (COPIE_LIB, ESPACE, json.dumps(COMME_BANQUE))])
+        journal_refus = os.path.join(bureau.pw_dir, ".local", "share", "codebyr",
+                                     "espaces", ESPACE, "domaines-refuses.txt")
+        capture = os.path.join(home, "capture.png")
+        debut = time.time()
+        autorise = lanceur(bureau, "launch", ESPACE, "--", "firefox-esr", "--headless",
+                           "--screenshot", capture, "https://" + DOMAINE_AUTORISE + "/")
+        reussi &= dire("navigateur ouvert sous compte dédié et blindage",
+                       autorise.returncode == 0,
+                       "code %s en %.0f s" % (autorise.returncode, time.time() - debut))
+        if autorise.returncode != 0:
+            for ligne in (autorise.stderr or "").strip().splitlines()[-4:]:
+                print("       │ %s" % ligne)
+        profil = os.path.join(home, ".mozilla", "firefox", "codebyr.default", "user.js")
+        contenu = ""
+        try:
+            with open(profil, encoding="utf-8") as f:
+                contenu = f.read()
+        except OSError:
+            pass
+        espace = pwd.getpwnam(nom) if os.path.exists(home) else None
+        reussi &= dire("profil pointé vers le filtre, écrit PAR l'Espace",
+                       "network.proxy.ssl_port\", %d" % 17890 in contenu and espace
+                       and os.stat(profil).st_uid == espace.pw_uid,
+                       profil if contenu else "profil absent")
+        taille = os.path.getsize(capture) if os.path.exists(capture) else 0
+        reussi &= dire("site autorisé atteint à travers le dépôt",
+                       taille > 4000, "capture de %d octets" % taille)
+        lanceur(bureau, "launch", ESPACE, "--", "firefox-esr", "--headless",
+                "--screenshot", os.path.join(home, "refus.png"),
+                "https://" + DOMAINE_REFUSE + "/")
+        refuses = ""
+        try:
+            with open(journal_refus, encoding="utf-8") as f:
+                refuses = f.read()
+        except OSError:
+            pass
+        reussi &= dire("site hors liste refusé par le filtre", DOMAINE_REFUSE in refuses,
+                       "noté au journal des refus" if DOMAINE_REFUSE in refuses
+                       else "absent du journal des refus")
+        reussi &= dire("Espace refermé après le navigateur",
+                       attendre_que(lambda: not espace_ouvert(nom), 15))
+
+        titre("6. Service absent : l'Espace ne s'ouvre pas")
         service.terminate()
         service.wait(timeout=10)
         avant = set(marqueurs(uid))
@@ -365,6 +424,9 @@ def main():
         registre(bureau, "retirer")
         subprocess.run(["/usr/sbin/userdel", nom], capture_output=True)
         shutil.rmtree(home, ignore_errors=True)
+        # Côté bureau, le filtre réseau y a tenu son journal des refus.
+        shutil.rmtree(os.path.join(bureau.pw_dir, ".local", "share", "codebyr",
+                                   "espaces", ESPACE), ignore_errors=True)
         shutil.rmtree(COPIE, ignore_errors=True)
         if os.path.exists(SOCKET):
             os.unlink(SOCKET)

@@ -16,18 +16,28 @@ def dossier(chemin, creer=False):
     if os.name != "posix":
         raise OSError("Accès sécurisé disponible uniquement sous Linux")
     absolu = os.path.abspath(chemin)
-    fd = os.open("/", os.O_RDONLY | os.O_DIRECTORY)
+    morceaux = [m for m in absolu.split("/")[1:] if m]
+    fd = os.open("/", (os.O_RDONLY if not morceaux else os.O_PATH) | os.O_DIRECTORY)
     try:
-        for morceau in absolu.split("/")[1:]:
-            if not morceau:
-                continue
+        for rang, morceau in enumerate(morceaux):
             if creer:
                 try:
                     os.mkdir(morceau, 0o700, dir_fd=fd)
                 except FileExistsError:
                     pass
-            suivant = os.open(morceau, os.O_RDONLY | os.O_DIRECTORY |
-                              os.O_NOFOLLOW, dir_fd=fd)
+            # Les dossiers du chemin ne sont que TRAVERSÉS : O_PATH suffit, et
+            # n'exige que le droit de traverser. O_RDONLY exigeait de pouvoir
+            # LIRE chacun d'eux — ce qu'un compte d'Espace ne peut pas faire
+            # sur /var/lib/codebyr/espaces/<uid>, que root tient en 0711.
+            # Constaté le 14/09/2026 : toute écriture dans le dossier d'un
+            # Espace à compte dédié échouait. Seul le dernier dossier, dont on
+            # lit ou dans lequel on écrit, est ouvert en lecture.
+            #
+            # O_NOFOLLOW garde son effet avec O_PATH : sur un lien symbolique,
+            # il ouvre le lien lui-même, qu'O_DIRECTORY refuse aussitôt.
+            dernier = rang == len(morceaux) - 1
+            suivant = os.open(morceau, (os.O_RDONLY if dernier else os.O_PATH) |
+                              os.O_DIRECTORY | os.O_NOFOLLOW, dir_fd=fd)
             os.close(fd)
             fd = suivant
         yield fd

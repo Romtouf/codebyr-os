@@ -35,10 +35,12 @@ SERVICE = os.path.join(LIVRE, "usr", "lib", "codebyr", "codebyr-uid")
 LIB = os.path.join(LIVRE, "usr", "share", "codebyr")
 SOCKET = "/run/codebyr-uid-mesure.sock"
 ESPACE = "mesure"
-# Voir essai_service_uid.py : un compte système ne traverse pas un dossier
-# personnel, donc le premier processus ne peut pas être lancé depuis « ~ ».
+# Voir essai_service_uid.py : le premier processus ne peut être lancé ni depuis
+# un dossier personnel — un compte système ne le traverse pas — ni depuis un
+# système de fichiers monté « noexec », comme /run sur la machine d'essai.
 INIT_SOURCE = os.path.join(LIVRE, "usr", "lib", "codebyr", "codebyr-espace-init")
-INIT_MESURE = "/run/codebyr-espace-init-mesure"
+INIT_MESURE = "/usr/local/lib/codebyr-espace-init-mesure"
+PERSONNE = 65534
 
 sys.path.insert(0, LIB)
 import bac_a_sable  # noqa: E402
@@ -175,8 +177,16 @@ def main():
     dire("session du bureau", True, "%s (UID %d), affichage %s"
          % (bureau.pw_name, bureau.pw_uid, affichage))
 
+    os.makedirs(os.path.dirname(INIT_MESURE), exist_ok=True)
     shutil.copyfile(INIT_SOURCE, INIT_MESURE)
     os.chmod(INIT_MESURE, 0o755)
+    # Sans argument, il refuse et sort avec 2 : c'est LUI qui a répondu, donc
+    # il s'est exécuté. Tout autre code vient d'avant son premier octet.
+    if sous(PERSONNE, PERSONNE, [INIT_MESURE], delai=20).returncode != 2:
+        dire("le premier processus est exécutable par un autre compte", False,
+             "%s n'est pas exécutable ici" % INIT_MESURE)
+        os.unlink(INIT_MESURE)
+        return 2
     service = subprocess.Popen([sys.executable, SERVICE, "--essai", SOCKET],
                                env=dict(os.environ, CODEBYR_LIB=LIB,
                                         CODEBYR_INIT=INIT_MESURE))

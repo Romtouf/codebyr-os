@@ -36,12 +36,20 @@ SERVICE = os.path.join(LIVRE, "usr", "lib", "codebyr", "codebyr-uid")
 LIB = os.path.join(LIVRE, "usr", "share", "codebyr")
 SOCKET = "/run/codebyr-uid-essai.sock"
 ESPACE = "essai"
-# Le premier processus d'un Espace tourne sous un compte système, qui ne peut
-# pas traverser un dossier personnel : lancé depuis un dépôt cloné dans « ~ »,
-# il échouerait avec « Permission denied ». On en pose donc une copie dans
-# /run, que tout le monde traverse.
+# Le premier processus d'un Espace tourne sous un compte système : il ne peut
+# ni traverser un dossier personnel — lancé depuis un dépôt cloné dans « ~ »,
+# il échoue avec « Permission denied » — ni s'exécuter depuis un système de
+# fichiers monté « noexec », comme /run sur la machine d'essai. Deviner le bon
+# emplacement a coûté deux allers-retours : l'outil en essaie plusieurs, dans
+# l'ordre, et dit ce qu'il a trouvé. En production la question ne se pose
+# pas : le paquet l'installe sous /usr/lib.
 INIT_SOURCE = os.path.join(LIVRE, "usr", "lib", "codebyr", "codebyr-espace-init")
-INIT_ESSAI = "/run/codebyr-espace-init-essai"
+INITS_POSSIBLES = ("/usr/local/lib/codebyr-espace-init-essai",
+                   "/usr/lib/codebyr-espace-init-essai",
+                   "/opt/codebyr-espace-init-essai")
+# Compte présent partout, sans rien à lui : de quoi vérifier qu'un autre que
+# root peut exécuter cette copie, avant de bâtir quoi que ce soit dessus.
+PERSONNE = 65534
 
 sys.path.insert(0, LIB)
 import bac_a_sable  # noqa: E402
@@ -96,6 +104,41 @@ def demander(uid, gid, demande):
         return {"ok": False, "brut": (r.stdout + r.stderr)[:200]}
 
 
+def poser_le_premier_processus():
+    """Pose une copie du premier processus là où un AUTRE compte peut l'exécuter.
+
+    Ce contrôle existe parce que son absence a coûté deux allers-retours : le
+    programme était bien là, bien en 0755, et refusait pourtant de démarrer —
+    dans un dossier personnel une fois, sur un /run monté « noexec » l'autre.
+    On essaie donc plusieurs emplacements, et l'échec se nomme lui-même au
+    lieu de ressortir en « impossible ».
+
+    Renvoie le chemin retenu, ou None.
+    """
+    for chemin in INITS_POSSIBLES:
+        dossier = os.path.dirname(chemin)
+        try:
+            os.makedirs(dossier, exist_ok=True)
+            shutil.copyfile(INIT_SOURCE, chemin)
+            os.chmod(chemin, 0o755)
+        except OSError as exc:
+            dire("copie possible dans %s" % dossier, False, str(exc)[:60])
+            continue
+        # Sans argument, il refuse et sort avec 2 : c'est LUI qui a répondu,
+        # donc il s'est bien exécuté. Tout autre code vient d'avant.
+        r = sous(PERSONNE, PERSONNE, [chemin], delai=20)
+        if r.returncode == 2:
+            dire("premier processus exécutable par un autre compte", True, chemin)
+            return chemin
+        options = subprocess.run(
+            ["/usr/bin/findmnt", "-no", "OPTIONS", "--target", dossier],
+            capture_output=True, text=True).stdout.strip()
+        dire("exécutable depuis %s" % dossier, False,
+             "monté : %s" % (options or "?"))
+        os.unlink(chemin)
+    return None
+
+
 def ordonner(uid, gid, socket_ordres, demande):
     """Fait exécuter une commande DANS l'Espace, comme le fera le lanceur.
 
@@ -141,11 +184,14 @@ def main():
     dire("session du bureau", True, "%s (UID %d), affichage %s"
          % (bureau.pw_name, bureau.pw_uid, affichage))
 
-    shutil.copyfile(INIT_SOURCE, INIT_ESSAI)
-    os.chmod(INIT_ESSAI, 0o755)
+    init_essai = poser_le_premier_processus()
+    if not init_essai:
+        print()
+        print("Aucun emplacement exécutable trouvé pour le premier processus.")
+        return 2
     service = subprocess.Popen([sys.executable, SERVICE, "--essai", SOCKET],
                                env=dict(os.environ, CODEBYR_LIB=LIB,
-                                        CODEBYR_INIT=INIT_ESSAI))
+                                        CODEBYR_INIT=init_essai))
     time.sleep(1.5)
     perso = tempfile.mkdtemp(prefix="codebyr-essai-")
     script = os.path.join(perso, "fenetre.py")
@@ -271,7 +317,7 @@ def main():
         subprocess.run(["/usr/sbin/userdel", nom], capture_output=True)
         shutil.rmtree(comptes.chemin_home(bureau.pw_uid, ESPACE), ignore_errors=True)
         shutil.rmtree(perso, ignore_errors=True)
-        for reste in (SOCKET, INIT_ESSAI):
+        for reste in (SOCKET, init_essai):
             if os.path.exists(reste):
                 os.unlink(reste)
         print("\nNettoyage : compte d'essai, dossier et socket de service supprimés.")

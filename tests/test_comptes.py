@@ -349,6 +349,67 @@ class DroitsDExecution(unittest.TestCase):
                             "non exécutable dans le dépôt : %s" % ligne)
 
 
+class LesTenues(unittest.TestCase):
+    """Combien de lanceurs tiennent un Espace ouvert, et quand le refermer."""
+
+    def test_fermer_une_fenetre_ne_ferme_pas_les_autres(self):
+        t = comptes.Tenues()
+        premiere = t.prendre("cbyr-1000-travail")
+        seconde = t.prendre("cbyr-1000-travail")
+        self.assertFalse(t.rendre(premiere), "l'autre fenêtre est encore ouverte")
+        self.assertTrue(t.rendre(seconde), "c'était la dernière")
+
+    def test_les_espaces_se_comptent_separement(self):
+        t = comptes.Tenues()
+        travail = t.prendre("cbyr-1000-travail")
+        t.prendre("cbyr-1000-banque")
+        self.assertTrue(t.rendre(travail))
+
+    def test_une_tenue_en_retard_ne_referme_pas_l_espace_rouvert(self):
+        # L'utilisateur ferme l'Espace d'un geste, puis le rouvre aussitôt.
+        # Le lanceur de la première ouverture rend sa tenue en retard : il ne
+        # doit pas refermer l'Espace qui vient d'être rouvert.
+        t = comptes.Tenues()
+        ancienne = t.prendre("cbyr-1000-travail")
+        t.oublier("cbyr-1000-travail")
+        nouvelle = t.prendre("cbyr-1000-travail")
+        self.assertFalse(t.rendre(ancienne))
+        self.assertTrue(t.rendre(nouvelle))
+
+    def test_root_ne_se_laisse_pas_noyer(self):
+        t = comptes.Tenues(maximum=3)
+        for _ in range(3):
+            self.assertIsNotNone(t.prendre("cbyr-1000-travail"))
+        self.assertIsNone(t.prendre("cbyr-1000-banque"))
+
+    def test_le_service_tient_par_la_connexion_pas_par_un_message(self):
+        # Un compteur tenu par des messages « j'ai fini » fuirait au premier
+        # plantage du lanceur : l'Espace resterait ouvert, et son compte
+        # garderait l'accès à l'affichage jusqu'au redémarrage.
+        code = _code(SERVICE)
+        tenir = code.split("def tenir(")[1].split("def servir_client(")[0]
+        self.assertIn("client.recv(", tenir)
+        self.assertIn("TENUES.rendre(", tenir)
+
+    def test_la_tenue_est_prise_sous_le_verrou_de_la_preparation(self):
+        code = _code(SERVICE)
+        client = code.split("def servir_client(")[1].split("def servir(")[0]
+        bloc = client.split("with VERROU:")[1]
+        self.assertLess(bloc.index("traiter("), bloc.index("TENUES.prendre("))
+        self.assertLess(bloc.index("TENUES.prendre("), bloc.index("client.sendall("))
+
+
+class LApplicationNeSurvitPasASonLanceur(unittest.TestCase):
+
+    def test_le_premier_processus_guette_aussi_le_depart_du_lanceur(self):
+        # Un proc.wait() seul ne voyait le départ du lanceur qu'après la fin de
+        # l'application : un navigateur de Banque restait ouvert, filtre mort.
+        code = _code(INIT)
+        attendre = code.split("def attendre(")[1].split("def arreter(")[0]
+        self.assertIn("os.pidfd_open(", attendre)
+        self.assertIn("select.select(", attendre)
+
+
 class RienNeSurvitAUnEchec(unittest.TestCase):
     """Vu le 14/09/2026 sur la VM, dans cet ordre.
 

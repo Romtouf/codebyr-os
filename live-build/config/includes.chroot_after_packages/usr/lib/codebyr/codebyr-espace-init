@@ -44,6 +44,7 @@ accepte donc les connexions même si personne n'y répond jamais.
 """
 import json
 import os
+import select
 import socket
 import struct
 import subprocess
@@ -105,18 +106,54 @@ def servir_un(client, uid_bureau, uid_propre):
         try:
             client.sendall((json.dumps({"ok": True, "pid": proc.pid}) + "\n")
                            .encode("utf-8"))
-            # La connexion tient le processus : si le bureau la referme, c'est
-            # que l'Espace se ferme, et le processus n'a plus de raison de
-            # vivre. Sans cela, une application survivrait à son Espace.
             client.settimeout(None)
-            code = proc.wait()
+            code = attendre(proc, client)
+        except OSError:
+            code = None
+        if code is None:
+            arreter(proc)
+            return
+        try:
             client.sendall((json.dumps({"fin": code}) + "\n").encode("utf-8"))
         except OSError:
-            proc.terminate()
-            try:
-                proc.wait(timeout=5)
-            except subprocess.TimeoutExpired:
-                proc.kill()
+            pass
+
+
+def attendre(proc, client):
+    """Attend la fin du processus OU le départ du lanceur, le premier des deux.
+
+    La connexion tient le processus : si le lanceur la referme — ou meurt, ce
+    que le noyau signale de la même façon — l'application n'a plus de raison
+    de vivre. Sans cela, elle survivrait à son lanceur, donc à ses sockets de
+    notification et de filtre réseau : un navigateur de Banque resterait
+    ouvert avec un filtre mort. C'est l'équivalent, sous compte dédié, du
+    « --die-with-parent » de bubblewrap.
+
+    Un simple proc.wait() ne voyait le départ du lanceur qu'APRÈS la fin de
+    l'application. Renvoie le code de sortie, ou None si le lanceur est parti.
+    """
+    try:
+        pidfd = os.pidfd_open(proc.pid)
+    except ProcessLookupError:
+        return proc.wait()      # déjà terminé avant qu'on le guette
+    try:
+        while True:
+            prets, _, _ = select.select([client, pidfd], [], [])
+            if pidfd in prets:
+                return proc.wait()
+            if not client.recv(64):
+                return None     # fin de connexion : le lanceur est parti
+    finally:
+        os.close(pidfd)
+
+
+def arreter(proc):
+    proc.terminate()
+    try:
+        proc.wait(timeout=5)
+    except subprocess.TimeoutExpired:
+        proc.kill()
+        proc.wait()
 
 
 def servir(srv, uid_bureau):

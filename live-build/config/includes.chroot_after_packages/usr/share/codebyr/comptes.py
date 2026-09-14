@@ -209,3 +209,53 @@ def passages(affichage, son):
     if son:
         demandes.append(("pipewire", "pipewire-0"))
     return demandes
+
+
+class Tenues:
+    """Combien de lanceurs tiennent chaque Espace ouvert — et quand le refermer.
+
+    Chaque application ouverte dans un Espace est lancée par son propre
+    `codebyr-space`. Sans ce compte, fermer une fenêtre refermerait l'Espace
+    entier, et toutes les autres fenêtres avec.
+
+    Le JETON règle une course précise. L'utilisateur ferme l'Espace d'un geste
+    (tout s'arrête), puis le rouvre aussitôt. Les lanceurs de la première
+    ouverture rendent alors leur tenue un à un, en retard : sans jeton, le
+    dernier d'entre eux ferait tomber le compte à zéro et refermerait l'Espace
+    qui vient d'être rouvert, sous les yeux de l'utilisateur.
+
+    Aucun accès au disque, au réseau ni au temps : le service l'utilise sous
+    verrou, les tests l'éprouvent tel quel.
+    """
+
+    def __init__(self, maximum=256):
+        self.maximum = maximum
+        self._comptes = {}
+        self._generations = {}
+
+    def total(self):
+        return sum(self._comptes.values())
+
+    def prendre(self, compte):
+        """Une tenue de plus. Renvoie le jeton à rendre, ou None si c'est trop."""
+        if self.total() >= self.maximum:
+            return None
+        self._comptes[compte] = self._comptes.get(compte, 0) + 1
+        return (compte, self._generations.get(compte, 0))
+
+    def rendre(self, jeton):
+        """Rend une tenue. Renvoie True s'il faut refermer l'Espace maintenant."""
+        compte, generation = jeton
+        if generation != self._generations.get(compte, 0):
+            return False        # tenue d'une ouverture déjà refermée
+        restant = self._comptes.get(compte, 0) - 1
+        if restant > 0:
+            self._comptes[compte] = restant
+            return False
+        self._comptes.pop(compte, None)
+        return True
+
+    def oublier(self, compte):
+        """L'Espace a été refermé d'un geste : les tenues en cours ne comptent plus."""
+        self._comptes.pop(compte, None)
+        self._generations[compte] = self._generations.get(compte, 0) + 1

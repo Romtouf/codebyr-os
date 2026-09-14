@@ -40,8 +40,15 @@ Une demande JSON par connexion, une réponse JSON :
   DANS l'Espace — non par root, mais par le premier processus de l'Espace,
   qui n'a déjà plus aucun privilège (voir codebyr-espace-init).
 
+  {"action": "ouvrir", ...mêmes champs que « preparer »...}
+      → même réponse, puis la connexion RESTE OUVERTE : c'est ainsi qu'un
+        lanceur dit « mon application vit ». Quand la dernière connexion d'un
+        Espace se ferme — fin normale, lanceur tué ou planté — l'Espace est
+        refermé. « preparer » reste pour les essais, qui ferment eux-mêmes.
+
   {"action": "fermer", "espace": "banque"}
-      → {"ok": true}
+      → {"ok": true}, ou {"ok": false, "erreur": "incomplet"} si une étape
+        du rangement a échoué (le détail est au journal).
 
 Lancement : par systemd, sur activation de socket (codebyr-uid.socket).
 Pour l'essai sur une machine de test : codebyr-uid --essai /chemin/socket
@@ -55,6 +62,7 @@ import struct
 import subprocess
 import sys
 import syslog
+import threading
 
 sys.path.insert(0, os.environ.get("CODEBYR_LIB", "/usr/share/codebyr"))
 import comptes  # noqa: E402
@@ -70,6 +78,13 @@ INIT = os.environ.get("CODEBYR_INIT", "/usr/lib/codebyr/codebyr-espace-init")
 # Rien n'est persisté : si ce service redémarre, il ne prétend pas savoir ce
 # qu'il ne sait plus, et refuse de tuer une portée qu'il n'a pas ouverte.
 OUVERTS = {}
+
+# Qui tient quel Espace ouvert (voir comptes.Tenues), et le verrou sous lequel
+# on prépare, ferme et compte. Un seul verrou pour tout : ces opérations sont
+# rares, courtes, et une course entre elles laisserait un montage ou un droit
+# derrière elle.
+TENUES = comptes.Tenues()
+VERROU = threading.Lock()
 
 # Temps laissé au premier processus pour annoncer qu'il écoute. Large : il n'y
 # a rien à y gagner à être impatient, et l'attente réelle est de l'ordre de la
@@ -438,7 +453,12 @@ def fermer(uid_demandeur, espace):
 
 
 def traiter(demande, uid, nom_demandeur):
-    """Décide, puis agit. Toute erreur devient un refus sans détail."""
+    """Décide, puis agit. Toute erreur devient un refus sans détail.
+
+    Appelé SOUS VERROU : préparer et fermer touchent des montages, des droits
+    et la table des Espaces ouverts, et deux lanceurs du même Espace arrivent
+    volontiers ensemble.
+    """
     autorise, raison = comptes.demandeur_autorise(uid, nom_demandeur)
     if not autorise:
         journal("demande refusée (%s) : %s" % (nom_demandeur or uid, raison))
@@ -446,16 +466,78 @@ def traiter(demande, uid, nom_demandeur):
     action = demande.get("action")
     espace = demande.get("espace")
     try:
-        if action == "preparer":
+        # « ouvrir » prépare comme « preparer », mais la connexion reste tenue
+        # par le lanceur tant que son application vit (voir servir_client).
+        if action in ("preparer", "ouvrir"):
             return preparer(uid, espace, demande.get("affichage", "wayland-0"),
                             bool(demande.get("son")),
                             demande.get("memoire"), demande.get("taches"))
         if action == "fermer":
-            return fermer(uid, espace)
+            reponse = fermer(uid, espace)
+            TENUES.oublier(comptes.nom_compte(uid, espace))
+            return reponse
     except (ValueError, OSError, subprocess.CalledProcessError) as exc:
         journal("échec pour l'UID %d (%s) : %s" % (uid, action, exc))
         return {"ok": False, "erreur": "impossible"}
     return {"ok": False, "erreur": "action inconnue"}
+
+
+def tenir(client, uid, espace, jeton):
+    """Garde l'Espace ouvert tant que le lanceur garde la connexion.
+
+    C'est le NOYAU qui ferme la connexion quand le lanceur s'arrête — qu'il
+    finisse proprement, soit tué, ou plante. Un compteur tenu par des messages
+    « j'ai fini » fuirait au premier plantage, et l'Espace resterait ouvert,
+    son compte gardant l'accès à l'affichage, jusqu'au redémarrage.
+    """
+    client.settimeout(None)
+    try:
+        while client.recv(64):
+            pass            # le lanceur n'a rien à dire ; seule la fin compte
+    except OSError:
+        pass
+    with VERROU:
+        if not TENUES.rendre(jeton):
+            return
+        try:
+            reponse = fermer(uid, espace)
+        except (ValueError, OSError, subprocess.CalledProcessError) as exc:
+            journal("fermeture de %s après la dernière application : %s"
+                    % (jeton[0], exc))
+            return
+        if not reponse.get("ok"):
+            journal("fermeture incomplète de %s après la dernière application"
+                    % jeton[0])
+
+
+def servir_client(client):
+    with client:
+        try:
+            client.settimeout(10)
+            uid, nom = demandeur(client)
+            brut = client.recv(TAILLE_MAX)
+            try:
+                demande = json.loads(brut.decode("utf-8", "replace"))
+                if not isinstance(demande, dict):
+                    raise ValueError
+            except ValueError:
+                client.sendall(b'{"ok": false, "erreur": "demande illisible"}\n')
+                return
+            jeton = None
+            with VERROU:
+                reponse = traiter(demande, uid, nom)
+                if demande.get("action") == "ouvrir" and reponse.get("ok"):
+                    # Pris sous le MÊME verrou que la préparation : aucune
+                    # fermeture ne peut se glisser entre les deux.
+                    jeton = TENUES.prendre(reponse["compte"])
+                    if jeton is None:
+                        journal("trop d'applications ouvertes : ouverture refusée")
+                        reponse = {"ok": False, "erreur": "trop"}
+            client.sendall((json.dumps(reponse) + "\n").encode("utf-8"))
+            if jeton is not None:
+                tenir(client, uid, demande.get("espace"), jeton)
+        except OSError:
+            pass
 
 
 def servir(srv):
@@ -464,22 +546,10 @@ def servir(srv):
             client, _ = srv.accept()
         except OSError:
             return 0
-        with client:
-            try:
-                client.settimeout(10)
-                uid, nom = demandeur(client)
-                brut = client.recv(TAILLE_MAX)
-                try:
-                    demande = json.loads(brut.decode("utf-8", "replace"))
-                    if not isinstance(demande, dict):
-                        raise ValueError
-                except ValueError:
-                    reponse = {"ok": False, "erreur": "demande illisible"}
-                else:
-                    reponse = traiter(demande, uid, nom)
-                client.sendall((json.dumps(reponse) + "\n").encode("utf-8"))
-            except OSError:
-                pass
+        if threading.active_count() > TENUES.maximum + 16:
+            client.close()          # garde-fou : root ne se laisse pas noyer
+            continue
+        threading.Thread(target=servir_client, args=(client,), daemon=True).start()
 
 
 def main(argv):

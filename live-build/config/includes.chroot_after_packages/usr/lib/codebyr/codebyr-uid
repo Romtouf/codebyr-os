@@ -181,6 +181,60 @@ def dossier_depot(compte, uid_bureau, uid_espace):
     return chemin
 
 
+def _dossier_de_boite(chemin, proprietaire_uid, proprietaire_gid, mode):
+    """Crée une boîte (persistante), sous un parent que root tient.
+
+    Le parent appartient à root : ni le bureau ni l'Espace ne peuvent
+    remplacer la boîte elle-même par un lien, seulement son contenu — que le
+    bureau manipule toujours sans suivre de lien (fichiers_surs).
+    """
+    parent = os.path.dirname(chemin)
+    dossier_root(os.path.dirname(parent))
+    dossier_root(parent)
+    if os.path.islink(chemin):
+        raise ValueError("Lien symbolique refusé : %s" % chemin)
+    os.makedirs(chemin, mode=mode, exist_ok=True)
+    st = os.stat(chemin)
+    if st.st_uid not in (0, proprietaire_uid):
+        raise ValueError("Boîte déjà prise par un autre compte : %s" % chemin)
+    os.chown(chemin, proprietaire_uid, proprietaire_gid)
+    os.chmod(chemin, mode)
+    return chemin
+
+
+def boite_de_depart(uid_bureau, espace, utilisateur):
+    """L'Espace y dépose ce qu'il envoie ; le bureau relève.
+
+    À l'Espace, avec un droit pour le bureau — posé aussi PAR DÉFAUT sur ce
+    qui y sera créé : sans lui, un fichier déposé en 0600 par l'Espace
+    resterait illisible au bureau et ne partirait jamais.
+    """
+    chemin = _dossier_de_boite(comptes.chemin_envois(uid_bureau, espace),
+                               utilisateur.pw_uid, utilisateur.pw_gid, 0o700)
+    subprocess.run(
+        ["/usr/bin/setfacl", "--set",
+         "u::rwx,g::---,o::---,u:%d:rwx,m::rwx,"
+         "d:u::rwx,d:g::---,d:o::---,d:u:%d:rwX,d:m::rwx" % (uid_bureau, uid_bureau),
+         chemin], check=True, capture_output=True)
+    return chemin
+
+
+def boite_d_arrivee(uid_bureau, espace, utilisateur):
+    """Le bureau y dépose ce qu'on envoie à l'Espace ; l'Espace le recueille.
+
+    À root, avec un droit pour chacun des deux : ni l'un ni l'autre ne peut la
+    retirer à l'autre. Le bureau y rend ses fichiers lisibles lui-même, au
+    moment de les écrire (une ACL par défaut n'y suffirait pas : son masque
+    suit le mode de création, 0600 pour une écriture sûre).
+    """
+    chemin = _dossier_de_boite(comptes.chemin_arrivees(uid_bureau, espace), 0, 0, 0o770)
+    subprocess.run(
+        ["/usr/bin/setfacl", "--set",
+         "u::rwx,g::---,o::---,u:%d:rwx,u:%d:rwx,m::rwx" % (uid_bureau, utilisateur.pw_uid),
+         chemin], check=True, capture_output=True)
+    return chemin
+
+
 def vider_depot(chemin):
     """Retire les sockets déposées, puis le dépôt. Ne descend dans rien.
 
@@ -364,6 +418,8 @@ def _preparer(uid_demandeur, espace, affichage, son, memoire, taches):
     home = comptes.chemin_home(uid_demandeur, espace)
     utilisateur = compte_systeme(nom, home)
     dossier_espace(home, utilisateur)
+    envois = boite_de_depart(uid_demandeur, espace, utilisateur)
+    arrivees = boite_d_arrivee(uid_demandeur, espace, utilisateur)
 
     passerelle = dossier_root(comptes.chemin_passerelle(nom))
     depot = dossier_depot(nom, uid_demandeur, utilisateur.pw_uid)
@@ -400,7 +456,8 @@ def _preparer(uid_demandeur, espace, affichage, son, memoire, taches):
     return {"ok": True, "compte": nom, "uid": utilisateur.pw_uid,
             "gid": utilisateur.pw_gid, "home": home,
             "passerelle": passerelle, "depot": depot, "presentes": presentes,
-            "ordres": os.path.join(depot, comptes.SOCKET_EXEC)}
+            "ordres": os.path.join(depot, comptes.SOCKET_EXEC),
+            "envois": envois, "arrivees": arrivees}
 
 
 def fermer(uid_demandeur, espace):

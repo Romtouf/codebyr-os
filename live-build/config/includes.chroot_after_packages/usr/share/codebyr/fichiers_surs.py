@@ -103,8 +103,14 @@ def copier(source, cible):
         shutil.copyfileobj(entree, sortie)
 
 
-def copier_unique(source, dossier_cible, nom, origine=None):
-    """Création exclusive : deux transferts concurrents ne s'écrasent pas."""
+def copier_unique(source, dossier_cible, nom, origine=None, mode=None):
+    """Création exclusive : deux transferts concurrents ne s'écrasent pas.
+
+    `mode` : droits posés sur la COPIE, par son descripteur, avant qu'elle ne
+    prenne son nom. Après coup, un chmod par le chemin suivrait un lien que
+    l'autre côté aurait glissé entre-temps — dans une boîte partagée avec un
+    Espace, cela pourrait rendre lisible un fichier du bureau.
+    """
     base, ext = os.path.splitext(nom)
     for n in range(1, 1000):
         candidat = nom if n == 1 else "%s (%d)%s" % (base, n, ext)
@@ -115,6 +121,8 @@ def copier_unique(source, dossier_cible, nom, origine=None):
                 if origine:
                     os.setxattr(sortie.fileno(), "user.codebyr.origine",
                                 origine.encode("ascii"))
+                if mode is not None:
+                    os.fchmod(sortie.fileno(), mode)
             return candidat
         except FileExistsError:
             continue

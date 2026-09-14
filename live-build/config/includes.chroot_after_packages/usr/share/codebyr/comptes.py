@@ -42,6 +42,24 @@ FORME_AFFICHAGE = re.compile(r"wayland-[0-9]{1,3}\Z")
 # ce qui appartient à un Espace, ni l'inverse.
 RACINE_ESPACES = "/var/lib/codebyr/espaces"
 
+# Les deux boîtes d'un Espace à compte dédié, PERSISTANTES — un fichier en
+# route ne doit pas disparaître au redémarrage.
+#
+# · Départ : l'Espace y dépose ce qu'il envoie ailleurs ; le bureau relève.
+#   Elle appartient à l'Espace ; le bureau y a un droit pour relever.
+# · Arrivée : le bureau y dépose ce qu'on envoie à l'Espace ; l'Espace le
+#   recueille à sa prochaine ouverture, en le RECOPIANT chez lui — un fichier
+#   resté au bureau ne serait pas modifiable par l'Espace.
+#
+# Pourquoi des boîtes, et non une ouverture de l'Espace à chaque envoi : le
+# lanceur relève les boîtes de TOUS les Espaces à chaque clic. S'il fallait
+# pour cela ouvrir chaque compte d'Espace, chaque clic en coûterait autant.
+#
+# Ni l'une ni l'autre n'est dans le dossier de l'Espace : le bureau ne voit
+# que ce que l'Espace a déposé exprès pour partir.
+RACINE_ENVOIS = "/var/lib/codebyr/envois"
+RACINE_ARRIVEES = "/var/lib/codebyr/arrivees"
+
 # Passerelle : un dossier par compte d'Espace, préparé par root, où sont
 # présentés les SEULS sockets auxquels cet Espace a droit. Le dossier
 # d'exécution du bureau (/run/user/<uid>) n'est jamais ouvert — mesuré le
@@ -113,6 +131,20 @@ def est_compte_d_espace(nom):
     return bool(re.match(r"%s-[0-9]+-" % PREFIXE, nom or ""))
 
 
+def decomposer(nom):
+    """(uid du propriétaire, identifiant d'Espace) d'un compte d'Espace, ou None.
+
+    Sert à l'Espace lui-même pour retrouver ses boîtes, à partir de son NOM DE
+    COMPTE — que le noyau garantit — plutôt que d'un chemin qu'on lui
+    transmettrait.
+    """
+    m = re.match(r"%s-([0-9]+)-(.+)\Z" % PREFIXE, nom or "")
+    if not m or not espace_valide(m.group(2)):
+        return None
+    uid = int(m.group(1))
+    return (uid, m.group(2)) if uid >= UID_MINIMAL else None
+
+
 def demandeur_autorise(uid, nom):
     """Le noyau dit que l'appelant est (uid, nom) : a-t-il le droit de demander ?
 
@@ -138,6 +170,24 @@ def chemin_home(uid_proprietaire, espace):
     if not isinstance(uid_proprietaire, int) or uid_proprietaire < UID_MINIMAL:
         raise ValueError("Propriétaire invalide")
     return "%s/%d/%s" % (RACINE_ESPACES, uid_proprietaire, espace)
+
+
+def _chemin_par_proprietaire(racine, uid_proprietaire, espace):
+    if not espace_valide(espace):
+        raise ValueError("Identifiant d'Espace invalide")
+    if not isinstance(uid_proprietaire, int) or uid_proprietaire < UID_MINIMAL:
+        raise ValueError("Propriétaire invalide")
+    return "%s/%d/%s" % (racine, uid_proprietaire, espace)
+
+
+def chemin_envois(uid_proprietaire, espace):
+    """Boîte de départ d'un Espace dédié. Le bureau la calcule sans le service."""
+    return _chemin_par_proprietaire(RACINE_ENVOIS, uid_proprietaire, espace)
+
+
+def chemin_arrivees(uid_proprietaire, espace):
+    """Boîte d'arrivée d'un Espace dédié. Le bureau la calcule sans le service."""
+    return _chemin_par_proprietaire(RACINE_ARRIVEES, uid_proprietaire, espace)
 
 
 def chemin_passerelle(compte):

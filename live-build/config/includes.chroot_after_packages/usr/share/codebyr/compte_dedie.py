@@ -10,10 +10,13 @@ Un Espace tourne sous son propre compte quand le registre le demande :
 
     {"id": "travail", ..., "compte": "dedie"}
 
-Rien ne le demande par défaut. Tant que ce chantier n'est pas terminé — données
-existantes à migrer, boîte d'envoi, pièces jointes, suppression d'un Espace —
-c'est un réglage d'essai, et chaque geste qui n'est pas encore prêt est REFUSÉ
-avec une explication, jamais tenté à moitié.
+Rien ne le demande par défaut. Tant que ce chantier n'est pas terminé, c'est un
+réglage d'essai, et chaque geste qui n'est pas encore prêt est REFUSÉ avec une
+explication, jamais tenté à moitié (voir GESTES_PAS_ENCORE_PRETS).
+
+Ce qui fonctionne : ouvrir et fermer, déménagement des données et retour,
+envoi de fichiers dans les deux sens par les boîtes de l'Espace, examen d'une
+pièce jointe.
 
 ── ÉCHEC FERMÉ ─────────────────────────────────────────────────────────────
 Un Espace qui demande un compte dédié et ne peut pas l'obtenir ne s'ouvre pas
@@ -49,9 +52,6 @@ def incompatibilites(esp, fichier=None, est_flatpak=False):
     if esp.get("ephemere"):
         raisons.append("un Espace jetable ne peut pas encore tourner sous son "
                        "propre compte")
-    if fichier:
-        raisons.append("l'examen d'une pièce jointe n'est pas encore possible "
-                       "dans un Espace à compte dédié")
     if est_flatpak:
         raisons.append("les applications Flatpak ne sont pas encore prises en "
                        "charge dans un Espace à compte dédié")
@@ -67,7 +67,6 @@ GESTES_PAS_ENCORE_PRETS = {
     "delete": "le supprimer",
     "export": "l'exporter",
     "import": "y importer une sauvegarde",
-    "envoyer": "lui envoyer un fichier",
     "contagion": "analyser son contenu",
     "install": "y installer une application Flatpak",
     "add-app": "y ajouter une application",
@@ -147,6 +146,8 @@ class Session:
         self.passerelle = reponse["passerelle"]
         self.depot = reponse["depot"]
         self.ordres = reponse["ordres"]
+        self.envois = reponse.get("envois")
+        self.arrivees = reponse.get("arrivees")
 
     def rendre(self):
         if self._client is not None:

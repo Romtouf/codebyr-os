@@ -255,9 +255,10 @@ class LeService(unittest.TestCase):
         # « x » et rien d'autre. Avec « r », l'Espace découvrirait les sockets
         # que le bureau y dépose ; avec « w », il en fabriquerait une pour se
         # faire passer pour l'hôte auprès d'un autre Espace.
-        self.assertIn("u:%d:rwx,u:%d:x,m::rwx", self.source)
-        self.assertNotIn("u:%d:rwx,u:%d:rx", self.source)
-        self.assertNotIn("u:%d:rwx,u:%d:rwx", self.source)
+        depot = self.source.split("def dossier_depot(")[1].split("\ndef ")[0]
+        self.assertIn("u:%d:rwx,u:%d:x,m::rwx", depot)
+        self.assertNotIn("u:%d:rwx,u:%d:rx", depot)
+        self.assertNotIn("u:%d:rwx,u:%d:rwx", depot)
 
     def test_les_droits_du_depot_sont_poses_en_entier(self):
         # « --set » et non « -m » : un droit oublié d'une ouverture précédente
@@ -468,3 +469,25 @@ class LesUnites(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class SonNomDeCompte(unittest.TestCase):
+    """Un Espace retrouve ses boîtes à partir du nom que le noyau lui garantit."""
+
+    def test_le_nom_se_decompose(self):
+        self.assertEqual(comptes.decomposer("cbyr-1000-banque"), (1000, "banque"))
+        self.assertEqual(comptes.decomposer("cbyr-1002-essai-uid"), (1002, "essai-uid"))
+
+    def test_un_nom_qui_n_est_pas_celui_d_un_espace_ne_donne_rien(self):
+        for nom in ("romtouf", "cbyr", "cbyr-999-banque", "cbyr-1000-", "cbyr-1000-../x",
+                    "cbyr-abc-banque", "", None):
+            self.assertIsNone(comptes.decomposer(nom), repr(nom))
+
+    def test_les_boites_sont_rangees_par_proprietaire(self):
+        self.assertEqual(comptes.chemin_envois(1000, "banque"),
+                         "/var/lib/codebyr/envois/1000/banque")
+        self.assertEqual(comptes.chemin_arrivees(1000, "banque"),
+                         "/var/lib/codebyr/arrivees/1000/banque")
+        for espace in ("../x", "", "Banque"):
+            with self.assertRaises(ValueError):
+                comptes.chemin_arrivees(1000, espace)

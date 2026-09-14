@@ -61,15 +61,18 @@ class CeQuiNEstPasEncorePret(unittest.TestCase):
         self.assertEqual(compte_dedie.incompatibilites(
             dict(ORDINAIRE, ephemere=True), fichier="/tmp/x", est_flatpak=True), [])
 
-    def test_jetable_piece_jointe_et_flatpak_sont_refuses(self):
+    def test_jetable_et_flatpak_sont_refuses(self):
         for options in ({"esp": dict(DEDIE, ephemere=True)},
-                        {"esp": DEDIE, "fichier": "/tmp/facture.pdf"},
                         {"esp": DEDIE, "est_flatpak": True}):
             esp = options.pop("esp")
             self.assertTrue(compte_dedie.incompatibilites(esp, **options), options)
 
+    def test_une_piece_jointe_est_acceptee(self):
+        # Elle passe par la boîte d'arrivée de l'Espace (voir _lancer).
+        self.assertEqual(compte_dedie.incompatibilites(DEDIE, fichier="/tmp/facture.pdf"), [])
+
     def test_les_gestes_sur_les_donnees_sont_refuses_avec_une_explication(self):
-        for geste in ("purge", "delete", "export", "import", "envoyer",
+        for geste in ("purge", "delete", "export", "import",
                       "contagion", "install", "add-app"):
             message = compte_dedie.refus_de_geste(geste, DEDIE)
             self.assertIsNotNone(message, geste)
@@ -195,27 +198,130 @@ class LaPreparationDepuisLEspace(unittest.TestCase):
         self.assertNotIn(space.INTERNE_PREPARER, space.ACTIONS)
 
 
-class LaBoiteDEnvoi(unittest.TestCase):
+class LesBoites(unittest.TestCase):
+    """Les fichiers entrent et sortent d'un Espace dédié sans que root les lise.
 
-    def test_un_envoi_depuis_un_espace_dedie_est_refuse_sans_rien_deposer(self):
-        # Aucune boîte n'y est montée : sans ce refus, « Déposé » s'afficherait
-        # et le fichier ne partirait jamais (erreur corrigée le 24/08/2026).
+    La boîte de départ appartient à l'Espace, la boîte d'arrivée à root ; le
+    bureau relève l'une et remplit l'autre SANS ouvrir l'Espace.
+    """
+
+    def test_la_boite_de_depart_est_montee_dans_l_espace(self):
+        # Sans elle, « envoyer » depuis l'Espace écrirait dans un dossier
+        # ordinaire : « Déposé », et le fichier ne partirait jamais.
+        lancer = _fonction(_source(), "_lancer", "_rundir")
+        bloc = lancer.split("if session:")[1].split("elif not esp.get(\"ephemere\"):")[0]
+        self.assertIn("envoi = session.envois", bloc)
+
+    def test_le_bureau_releve_un_espace_dedie_hors_de_son_dossier(self):
+        with mock.patch.object(space.comptes, "chemin_envois",
+                               return_value="/var/lib/codebyr/envois/1000/travail"):
+            self.assertEqual(space._boite_de_depart(DEDIE, "travail"),
+                             "/var/lib/codebyr/envois/1000/travail")
+        self.assertTrue(space._boite_de_depart(ORDINAIRE, "perso").startswith(space.DATA_ROOT))
+
+    @unittest.skipUnless(POSIX, "fichiers_surs est réservé à Linux")
+    def test_la_releve_depose_dans_la_boite_d_arrivee_lisible_par_l_espace(self):
         with tempfile.TemporaryDirectory() as t:
-            source = os.path.join(t, "note.txt")
-            with open(source, "w") as f:
-                f.write("x")
-            boite = os.path.join(t, "boite")
-            with mock.patch.object(space, "ENVOI_INTERNE", boite), \
-                    mock.patch.dict(os.environ, {"CODEBYR_COMPTE_DEDIE": "1"}), \
-                    mock.patch.object(space, "_prevenir"):
-                code = space._deposer_pour_envoi(DEDIE, "travail", source)
-            self.assertEqual(code, 1)
-            self.assertFalse(os.path.exists(boite))
+            donnees = os.path.join(t, "donnees")
+            depart = os.path.join(donnees, "perso", "envoi", "travail")
+            os.makedirs(depart)
+            with open(os.path.join(depart, "rapport.txt"), "w") as f:
+                f.write("pour Travail")
+            arrivee = os.path.join(t, "arrivees", "travail")
+            os.makedirs(arrivee)
+            espaces = {"perso": ORDINAIRE, "travail": DEDIE}
+            with mock.patch.object(space, "DATA_ROOT", donnees), \
+                    mock.patch.object(space.comptes, "chemin_arrivees", return_value=arrivee):
+                remis = space.relever_envois(espaces)
+            self.assertEqual(remis, 1)
+            depose = os.path.join(arrivee, "rapport.txt")
+            self.assertTrue(os.path.exists(depose))
+            self.assertEqual(os.stat(depose).st_mode & 0o777, 0o644,
+                             "illisible par le compte de l'Espace")
+            self.assertFalse(os.path.exists(os.path.join(donnees, "travail", "home")),
+                             "rien ne doit arriver à l'ancien emplacement")
 
-    def test_la_releve_laisse_attendre_les_fichiers_d_un_espace_dedie(self):
-        source = _fonction(_source(), "relever_envois", "_espace_courant")
-        garde = source.index("compte_dedie.demande(espaces[dest])")
-        self.assertLess(garde, source.index("cible = os.path.join(DATA_ROOT, dest"))
+    @unittest.skipUnless(POSIX, "fichiers_surs est réservé à Linux")
+    def test_un_espace_jamais_ouvert_sous_son_compte_laisse_attendre(self):
+        with tempfile.TemporaryDirectory() as t:
+            depart = os.path.join(t, "perso", "envoi", "travail")
+            os.makedirs(depart)
+            with open(os.path.join(depart, "rapport.txt"), "w") as f:
+                f.write("x")
+            with mock.patch.object(space, "DATA_ROOT", t), \
+                    mock.patch.object(space.comptes, "chemin_arrivees",
+                                      return_value=os.path.join(t, "absente")):
+                self.assertEqual(space.relever_envois({"perso": ORDINAIRE, "travail": DEDIE}), 0)
+            self.assertTrue(os.path.exists(os.path.join(depart, "rapport.txt")),
+                            "le fichier doit attendre, pas disparaître")
+
+    @unittest.skipUnless(POSIX, "fichiers_surs est réservé à Linux")
+    def test_envoyer_depuis_le_bureau_depose_sans_ouvrir_l_espace(self):
+        with tempfile.TemporaryDirectory() as t:
+            source = os.path.join(t, "facture.pdf")
+            with open(source, "w") as f:
+                f.write("%PDF")
+            arrivee = os.path.join(t, "arrivee")
+            os.makedirs(arrivee)
+            with mock.patch.object(space.comptes, "chemin_arrivees", return_value=arrivee), \
+                    mock.patch.object(space, "_prevenir"), \
+                    mock.patch.object(compte_dedie, "Session") as session:
+                code = space._envoyer_vers_compte_dedie(DEDIE, source)
+            self.assertEqual(code, 0)
+            session.assert_not_called()
+            self.assertEqual(os.stat(os.path.join(arrivee, "facture.pdf")).st_mode & 0o777, 0o644)
+
+    @unittest.skipUnless(POSIX, "fichiers_surs est réservé à Linux")
+    def test_l_espace_recueille_en_recopiant_et_garde_la_provenance(self):
+        with tempfile.TemporaryDirectory() as t:
+            home = os.path.join(t, "home")
+            arrivee = os.path.join(t, "arrivee")
+            lot = os.path.join(arrivee, "Pièce jointe du 2026-09-14 12h00-ab12")
+            os.makedirs(home)
+            os.makedirs(lot)
+            simple = os.path.join(arrivee, "note.txt")
+            with open(simple, "w") as f:
+                f.write("simple")
+            with open(os.path.join(lot, "piece.pdf"), "w") as f:
+                f.write("%PDF")
+            try:
+                os.setxattr(simple, "user.codebyr.origine", b"navigation")
+                xattr = True
+            except OSError:
+                xattr = False
+            recus = space._recueillir_arrivees(home, arrivee)
+            self.assertEqual(recus, 2)
+            partage = os.path.join(home, space.PARTAGE)
+            self.assertTrue(os.path.exists(os.path.join(partage, "note.txt")))
+            # Le lot arrive sous le même nom : le lanceur ouvre la pièce jointe
+            # à un chemin qu'il connaît d'avance.
+            self.assertTrue(os.path.exists(os.path.join(
+                partage, "Pièce jointe du 2026-09-14 12h00-ab12", "piece.pdf")))
+            self.assertEqual(os.listdir(arrivee), [], "la boîte doit être vidée")
+            if xattr:
+                self.assertEqual(os.getxattr(os.path.join(partage, "note.txt"),
+                                             "user.codebyr.origine"), b"navigation")
+
+    @unittest.skipUnless(POSIX, "liens Unix")
+    def test_un_lien_glisse_dans_la_boite_n_est_pas_suivi(self):
+        with tempfile.TemporaryDirectory() as t:
+            home = os.path.join(t, "home")
+            arrivee = os.path.join(t, "arrivee")
+            secret = os.path.join(t, "secret")
+            os.makedirs(home)
+            os.makedirs(arrivee)
+            with open(secret, "w") as f:
+                f.write("secret")
+            os.symlink(secret, os.path.join(arrivee, "piege.txt"))
+            space._recueillir_arrivees(home, arrivee)
+            self.assertFalse(os.path.exists(os.path.join(home, space.PARTAGE, "piege.txt")))
+
+    def test_la_piece_jointe_passe_par_la_boite_d_arrivee(self):
+        lancer = _fonction(_source(), "_lancer", "_rundir")
+        bloc = lancer.split("if fichier and os.path.isfile(fichier):")[1].split("app_cmd = ")[0]
+        self.assertIn("session.arrivees", bloc)
+        self.assertIn("mode=0o644", bloc)
+        self.assertIn("secrets.token_hex", bloc)
 
 
 @unittest.skipUnless(POSIX, "sockets Unix")

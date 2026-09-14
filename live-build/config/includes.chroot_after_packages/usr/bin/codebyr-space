@@ -19,6 +19,7 @@ import glob
 import json
 import os
 import re
+import secrets
 import shlex
 import shutil
 import signal
@@ -38,6 +39,7 @@ import applications  # noqa: E402
 import autotest  # noqa: E402
 import bac_a_sable  # noqa: E402
 import compte_dedie  # noqa: E402
+import comptes  # noqa: E402
 import fichiers_surs
 import modeles  # noqa: E402
 import provenance  # noqa: E402
@@ -49,6 +51,9 @@ DATA_ROOT = os.path.expanduser("~/.local/share/codebyr/espaces")
 # écrit à un seul endroit — il l'était à deux, ce qui est la façon habituelle
 # dont deux moitiés d'un même système finissent par ne plus se parler.
 PARTAGE = "Partagé"
+# Sous-dossier de « Partagé » où arrive une pièce jointe examinée dans un Espace
+# à compte dédié (voir _lancer).
+PIECE_JOINTE = "Pièce jointe du"
 
 
 def journal(message):
@@ -519,7 +524,10 @@ def cmd_launch(espaces, esp_id, extra, fichier=None):
         esp, fichier, est_flatpak=os.path.basename(app_prevue[0]) == "flatpak")
     if refus:
         return _refuser_compte_dedie(esp, refus[0])
-    hors_ligne = (esp.get("reseau") or {}).get("mode") in ("coupe", "hors-ligne")
+    # Une pièce jointe s'examine sans réseau, donc sans son (voir _lancer) : le
+    # compte doit être préparé en conséquence, sans socket PipeWire.
+    hors_ligne = (esp.get("reseau") or {}).get("mode") in ("coupe", "hors-ligne") \
+        or bool(fichier)
     try:
         session = compte_dedie.Session(
             esp["id"],
@@ -547,8 +555,11 @@ def _lancer(espaces, esp, extra, fichier, session):
         # Le dossier de l'Espace n'est plus accessible au bureau — c'est tout
         # l'objet du compte dédié. Ce qui s'y prépare (associations, modèles,
         # profil de navigateur, bouclier) est donc fait PAR l'Espace, sur
-        # ordre, plus bas (voir cmd_interne_preparer). Pas de boîte d'envoi
-        # pour l'instant : elle suivra la migration des données.
+        # ordre, plus bas (voir cmd_interne_preparer).
+        #
+        # Sa boîte de départ, préparée par le service hors de son dossier,
+        # apparaît au même endroit que pour un Espace ordinaire.
+        envoi = session.envois
         if not _espace_courant():
             relever_envois(espaces)
     elif not esp.get("ephemere"):
@@ -585,16 +596,36 @@ def _lancer(espaces, esp, extra, fichier, session):
     # Fichier partagé dans l'Espace (ouverture jetable d'une pièce jointe) :
     # copié dans l'Espace pour être visible dans le bac à sable isolé.
     if fichier and os.path.isfile(fichier):
-        partage = os.path.join(home, PARTAGE)
-        fichiers_surs.mkdir(partage)
         nom = os.path.basename(fichier)
         try:
-            nom = fichiers_surs.copier_unique(fichier, partage, nom)
+            if session:
+                # Le bureau n'écrit pas chez l'Espace : la pièce jointe va dans
+                # sa boîte d'arrivée, dans un lot au nom choisi ici, que
+                # l'Espace recueillira tel quel dans « Partagé » juste avant
+                # l'ouverture. Le chemin final est donc connu d'avance.
+                # Horodaté ET tiré au sort : deux pièces jointes ouvertes dans la
+                # même seconde ne doivent pas se retrouver dans le même lot, où
+                # la seconde prendrait un autre nom que celui qu'on ouvrira.
+                dossier = "%s %s-%s" % (PIECE_JOINTE, time.strftime("%Y-%m-%d %Hh%M%S"),
+                                       secrets.token_hex(2))
+                lot = os.path.join(session.arrivees, dossier)
+                fichiers_surs.mkdir(lot)
+                with fichiers_surs.dossier(lot) as fd:
+                    # L'Espace doit pouvoir le vider ; seuls lui et le bureau
+                    # traversent la boîte d'arrivée.
+                    os.fchmod(fd, 0o777)
+                nom = fichiers_surs.copier_unique(fichier, lot, nom, mode=0o644)
+                relatif = os.path.join(PARTAGE, dossier, nom)
+            else:
+                partage = os.path.join(home, PARTAGE)
+                fichiers_surs.mkdir(partage)
+                nom = fichiers_surs.copier_unique(fichier, partage, nom)
+                relatif = os.path.join(PARTAGE, nom)
         except OSError as exc:
             sys.stderr.write("codebyr-space : copie du fichier impossible (%s)\n" % exc)
             return 1
         if not extra:
-            chemin = os.path.join(runtime_home, PARTAGE, nom)
+            chemin = os.path.join(runtime_home, relatif)
             extra = _visionneuse_pour(nom) + [chemin]
         # Sous cloche : une pièce jointe s'examine blindée ET sans réseau.
         renforce = True
@@ -899,6 +930,59 @@ def _preparer_depuis_l_espace(session, espaces, app_cmd, filtre_reseau):
     return code == 0
 
 
+def _recueillir_arrivees(home, arrivees):
+    """Recopie chez l'Espace ce que le bureau lui a envoyé, puis vide la boîte.
+
+    Exécuté PAR l'Espace. Il RECOPIE plutôt que de déplacer : un fichier
+    déplacé garderait le bureau pour propriétaire, et l'Espace ne pourrait pas
+    le modifier. La provenance suit la copie.
+
+    Un lot (sous-dossier, pour une pièce jointe) arrive sous le même nom dans
+    « Partagé » : c'est ce qui permet au lanceur d'ouvrir le fichier à un
+    chemin connu d'avance. Renvoie le nombre de fichiers recueillis.
+    """
+    import stat as stat_
+    try:
+        with fichiers_surs.dossier(arrivees) as fd:
+            noms = sorted(os.listdir(fd))
+    except FileNotFoundError:
+        return 0
+    partage = os.path.join(home, PARTAGE)
+    recus = 0
+
+    def recueillir(chemin, dossier_cible, nom):
+        origine = None
+        try:
+            origine = os.getxattr(chemin, provenance.ATTRIBUT,
+                                  follow_symlinks=False).decode("ascii")
+        except (OSError, UnicodeDecodeError):
+            pass
+        if origine and not provenance.identifiant_valide(origine):
+            origine = None
+        fichiers_surs.mkdir(dossier_cible)
+        fichiers_surs.copier_unique(chemin, dossier_cible, nom, origine)
+        os.unlink(chemin)
+        return 1
+
+    for nom in noms:
+        if nom.startswith(".codebyr-"):
+            continue        # écriture du bureau encore en cours
+        chemin = os.path.join(arrivees, nom)
+        st = os.lstat(chemin)
+        if stat_.S_ISREG(st.st_mode):
+            recus += recueillir(chemin, partage, nom)
+        elif stat_.S_ISDIR(st.st_mode):
+            for sous in sorted(os.listdir(chemin)):
+                interne = os.path.join(chemin, sous)
+                if not sous.startswith(".codebyr-") and stat_.S_ISREG(os.lstat(interne).st_mode):
+                    recus += recueillir(interne, os.path.join(partage, nom), sous)
+            try:
+                os.rmdir(chemin)
+            except OSError:
+                pass
+    return recus
+
+
 def _ouvreur_associe(home):
     """L'ouvreur Codebyr est-il bien le gestionnaire déclaré dans ce dossier ?"""
     try:
@@ -1112,9 +1196,8 @@ def cmd_interne_preparer(brut):
     bureau, il écrirait dans le mauvais dossier.
     """
     import pwd
-    import comptes
     compte = pwd.getpwuid(os.getuid())
-    if not comptes.est_compte_d_espace(compte.pw_name):
+    if not comptes.decomposer(compte.pw_name):
         sys.stderr.write("codebyr-space : préparation réservée au compte d'un Espace.\n")
         return 2
     try:
@@ -1127,6 +1210,12 @@ def cmd_interne_preparer(brut):
     # Le dossier du COMPTE, pas celui que l'environnement annonce.
     home = compte.pw_dir
     try:
+        # Sa boîte d'arrivée se déduit de son NOM DE COMPTE, que le noyau
+        # garantit — pas d'un chemin qu'on lui transmettrait.
+        proprietaire, esp_id = comptes.decomposer(compte.pw_name)
+        recus = _recueillir_arrivees(home, comptes.chemin_arrivees(proprietaire, esp_id))
+        if recus:
+            journal("Espace %s : %d fichier(s) recueilli(s)" % (esp_id, recus))
         _preparer_ouverture(home)
         # _preparer_ouverture se tait sur ses échecs, et c'est juste pour un
         # réglage de confort. Mais ces associations sont ce qui ouvre SOUS
@@ -1787,6 +1876,17 @@ def boite_envoi(esp_id):
     return os.path.join(DATA_ROOT, esp_id, "envoi")
 
 
+def _boite_de_depart(esp, esp_id):
+    """La boîte d'où partent les fichiers d'un Espace, selon son compte.
+
+    Sous compte dédié, elle est hors du dossier du bureau, tenue par root, et
+    le bureau peut la relever SANS ouvrir l'Espace (voir comptes.py).
+    """
+    if compte_dedie.demande(esp):
+        return comptes.chemin_envois(os.getuid(), esp_id)
+    return boite_envoi(esp_id)
+
+
 def relever_envois(espaces):
     """Distribue ce que les Espaces ont déposé. Renvoie le nombre remis.
 
@@ -1796,25 +1896,35 @@ def relever_envois(espaces):
     """
     remis = 0
     for source in list(espaces):
-        racine = boite_envoi(source)
+        try:
+            racine = _boite_de_depart(espaces[source], source)
+        except ValueError:
+            continue            # identifiant qu'un compte dédié ne peut pas porter
         try:
             with fichiers_surs.dossier(racine) as racine_fd:
                 destinations = os.listdir(racine_fd)
             for dest in destinations:
                 if dest not in espaces or espaces[dest].get("ephemere"):
                     continue
+                # Vers un Espace dédié : sa boîte d'arrivée, qu'il recueillera
+                # à sa prochaine ouverture. Lisible par lui — le mode est posé
+                # sur la copie avant qu'elle ne prenne son nom.
+                mode = None
                 if compte_dedie.demande(espaces[dest]):
-                    # Son dossier n'est plus ici, et le bureau n'y a pas accès.
-                    # Les fichiers ATTENDENT dans la boîte — ils ne sont ni
-                    # perdus ni remis au mauvais endroit — jusqu'à la
-                    # migration des données.
-                    continue
+                    try:
+                        cible = comptes.chemin_arrivees(os.getuid(), dest)
+                    except ValueError:
+                        continue
+                    if not os.path.isdir(cible):
+                        continue    # jamais ouvert sous son compte : ça attend
+                    mode = 0o644
                 dossier = os.path.join(racine, dest)
                 try:
                     with fichiers_surs.dossier(dossier) as source_fd:
                         noms = os.listdir(source_fd)
-                        cible = os.path.join(DATA_ROOT, dest, "home", PARTAGE)
-                        fichiers_surs.mkdir(cible)
+                        if mode is None:
+                            cible = os.path.join(DATA_ROOT, dest, "home", PARTAGE)
+                            fichiers_surs.mkdir(cible)
                         for nom in noms:
                             if nom.startswith(".codebyr-"):
                                 continue
@@ -1836,7 +1946,7 @@ def relever_envois(espaces):
                                         copie = os.path.join(t, "document")
                                         with os.fdopen(os.dup(entree), "rb") as src, open(copie, "wb") as dst:
                                             shutil.copyfileobj(src, dst)
-                                        fichiers_surs.copier_unique(copie, cible, nom, source)
+                                        fichiers_surs.copier_unique(copie, cible, nom, source, mode=mode)
                                     actuel = os.stat(nom, dir_fd=source_fd, follow_symlinks=False)
                                     if (actuel.st_dev, actuel.st_ino) == (st.st_dev, st.st_ino):
                                         os.unlink(nom, dir_fd=source_fd)
@@ -1885,17 +1995,6 @@ def nom_libre(dossier, nom, existe=os.path.exists):
 
 def _deposer_pour_envoi(esp, depart, source):
     """Dépose un fichier dans la boîte d'envoi, vue de l'INTÉRIEUR d'un Espace."""
-    if os.environ.get("CODEBYR_COMPTE_DEDIE") == "1":
-        # Aucune boîte n'est montée dans un Espace à compte dédié pour
-        # l'instant. Sans ce refus, le dépôt atterrirait dans un dossier
-        # ordinaire, « Déposé » s'afficherait, et le fichier ne partirait
-        # jamais — l'erreur exacte corrigée le 24/08/2026.
-        sys.stderr.write("La boîte d'envoi n'est pas encore disponible dans un "
-                         "Espace à compte dédié : rien n'a été envoyé.\n")
-        _prevenir("Envoi impossible depuis cet Espace",
-                  "La boîte d'envoi n'est pas encore disponible dans un Espace "
-                  "à compte dédié. Rien n'a été envoyé.")
-        return 1
     dossier = os.path.join(ENVOI_INTERNE, esp["id"])
     try:
         fichiers_surs.mkdir(dossier)
@@ -1918,6 +2017,41 @@ def _deposer_pour_envoi(esp, depart, source):
               "de cet Espace." % PARTAGE)
     print("Déposé pour %s — remis à la prochaine ouverture de cet Espace."
           % esp["nom"])
+    return 0
+
+
+def _envoyer_vers_compte_dedie(esp, source):
+    """Depuis le bureau, vers un Espace dédié : dans sa boîte d'arrivée.
+
+    Le bureau n'écrit pas chez l'Espace ; il dépose, lisible par lui, et
+    l'Espace recopie chez lui à sa prochaine ouverture — sans qu'il faille
+    l'ouvrir maintenant.
+    """
+    try:
+        boite = comptes.chemin_arrivees(os.getuid(), esp["id"])
+    except ValueError:
+        boite = None
+    if not boite or not os.path.isdir(boite):
+        sys.stderr.write("L'Espace %s n'a pas encore été ouvert sous son propre "
+                         "compte : ouvrez-le une première fois.\n" % esp["nom"])
+        _prevenir("Envoi impossible pour l'instant",
+                  "Ouvrez une première fois l'Espace %s, puis renvoyez le fichier."
+                  % esp["nom"])
+        return 1
+    try:
+        origine = provenance.origine(source, DATA_ROOT)
+        fichiers_surs.copier_unique(source, boite, os.path.basename(source), origine,
+                                    mode=0o644)
+    except OSError as exc:
+        sys.stderr.write("Copie impossible (%s)\n" % exc)
+        _prevenir("Envoi impossible",
+                  "Le fichier n'a pas pu être déposé pour %s." % esp["nom"])
+        return 1
+    journal("envoi vers l'Espace %s" % esp["id"])
+    _prevenir("En route vers %s" % esp["nom"],
+              "Le fichier sera dans le dossier « %s » à la prochaine ouverture "
+              "de cet Espace." % PARTAGE)
+    print("Déposé pour %s — dans « %s » à sa prochaine ouverture." % (esp["nom"], PARTAGE))
     return 0
 
 
@@ -1955,6 +2089,9 @@ def cmd_envoyer(espaces, esp_id, fichier):
         # d'envoi, que l'hôte relèvera. Sans ce chemin, la copie partait dans
         # un dossier fantôme et la commande annonçait un succès imaginaire.
         return _deposer_pour_envoi(esp, depart, source)
+
+    if compte_dedie.demande(esp):
+        return _envoyer_vers_compte_dedie(esp, source)
 
     partage = os.path.join(espace_home(esp), PARTAGE)
     try:

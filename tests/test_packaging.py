@@ -334,3 +334,48 @@ class LanceursGraphiques(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class LeServiceDesComptes(unittest.TestCase):
+    """Le service des comptes d'Espaces doit ARRIVER et être ACTIVÉ.
+
+    Livré sans ses unités systemd, il ne démarrerait jamais ; livré sans être
+    activé, le premier Espace à compte dédié répondrait « le service n'est pas
+    installé » sur une machine où il l'est.
+    """
+
+    def setUp(self):
+        with open(BUILD_DEB, encoding="utf-8") as f:
+            self.build = f.read()
+        with open(os.path.join(RACINE, "packaging", "codebyr-tools.postinst"),
+                  encoding="utf-8") as f:
+            self.postinst = f.read()
+
+    def test_le_service_et_le_premier_processus_sont_livres(self):
+        self.assertIn("usr/lib/codebyr", self.build)
+
+    def test_les_deux_unites_sont_livrees(self):
+        for unite in ("codebyr-uid.socket", "codebyr-uid.service"):
+            self.assertIn("usr/lib/systemd/system/%s" % unite, self.build, unite)
+
+    def test_ils_arrivent_executables(self):
+        # Sans le bit d'exécution, root ne peut pas lancer le service, et le
+        # premier processus d'un Espace ne démarre pas.
+        self.assertIn('find "$STAGE/usr/lib/codebyr" -type f -exec chmod 755', self.build)
+
+    def test_la_socket_est_activee_a_l_installation(self):
+        self.assertIn("systemctl enable --now codebyr-uid.socket", self.postinst)
+        # Chemin absolu, comme systemd-sysctl : « command -v » avait déjà
+        # laissé un réglage ne jamais s'appliquer, sans la moindre trace.
+        self.assertIn("/usr/bin/systemctl enable --now", self.postinst)
+        self.assertIn("/usr/bin/systemctl daemon-reload", self.postinst)
+
+    def test_rien_ne_tourne_tant_qu_aucun_espace_ne_le_demande(self):
+        # Activation par socket : le service démarre à la première connexion.
+        chemin = os.path.join(RACINE, "live-build", "config",
+                              "includes.chroot_after_packages", "usr", "lib",
+                              "systemd", "system", "codebyr-uid.service")
+        with open(chemin, encoding="utf-8") as f:
+            service = f.read()
+        self.assertIn("Requires=codebyr-uid.socket", service)
+        self.assertNotIn("WantedBy=multi-user.target\n[", service)

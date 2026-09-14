@@ -96,6 +96,24 @@ SOCKET_EXEC = "exec"
 # d'au moins 1000 sur Debian.
 UID_MINIMAL = 1000
 
+# Combien d'Espaces un utilisateur peut avoir sous compte dédié. Le service
+# écoute pour tout le monde : sans ce plafond, un utilisateur local pourrait
+# demander l'ouverture d'Espaces aux noms sans cesse différents et faire créer
+# des milliers de comptes système. Largement au-dessus d'un usage réel — cinq
+# Espaces sont livrés — et très en deçà de ce qui gênerait la machine.
+ESPACES_MAX_PAR_UTILISATEUR = 32
+
+
+def trop_d_espaces(comptes_existants, uid_proprietaire, nom_demande):
+    """Ce nouvel Espace dépasserait-il le plafond de son propriétaire ?
+
+    Un Espace DÉJÀ créé ne compte pas comme un dépassement : on ne veut pas
+    qu'un utilisateur arrivé au plafond ne puisse plus ouvrir ceux qu'il a.
+    """
+    prefixe = "%s-%d-" % (PREFIXE, uid_proprietaire)
+    siens = [n for n in comptes_existants if n.startswith(prefixe)]
+    return nom_demande not in siens and len(siens) >= ESPACES_MAX_PAR_UTILISATEUR
+
 
 # Plafonds d'un Espace. La règle vit ICI et non dans le bac à sable, parce que
 # c'est le service root qui les pose désormais : ce qui vient du client et

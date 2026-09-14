@@ -21,6 +21,10 @@ from outils import BIN, ETC, RACINE, charger
 
 PROFIL = os.path.join(ETC, "apparmor.d", "codebyr-net-proxy")
 FILTRE = os.path.join(BIN, "codebyr-net-proxy")
+PROFIL_SERVICE = os.path.join(ETC, "apparmor.d", "codebyr-uid")
+SERVICE = os.path.join(RACINE, "live-build", "config",
+                       "includes.chroot_after_packages", "usr", "lib", "codebyr",
+                       "codebyr-uid")
 PARSEUR = "/usr/sbin/apparmor_parser"
 
 
@@ -29,10 +33,10 @@ def _lire(chemin):
         return f.read()
 
 
-def _regles():
-    """Les lignes de règles du profil, sans commentaires ni lignes vides."""
+def _regles(profil=None):
+    """Les lignes de règles d'un profil, sans commentaires ni lignes vides."""
     regles = []
-    for ligne in _lire(PROFIL).splitlines():
+    for ligne in _lire(profil or PROFIL).splitlines():
         ligne = ligne.split("#", 1)[0].strip() if not ligne.lstrip().startswith("#") else ""
         if ligne:
             regles.append(ligne)
@@ -125,6 +129,74 @@ class Livraison(unittest.TestCase):
         self.assertIn("/usr/sbin/apparmor_parser --replace", postinst)
         self.assertIn("/usr/bin/aa-enabled", postinst)
         self.assertNotIn("command -v apparmor_parser", postinst)
+        self.assertIn("/etc/apparmor.d/codebyr-uid", postinst)
+
+
+class LeServiceDesComptes(unittest.TestCase):
+    """Le profil du service des comptes d'Espaces (codebyr-uid).
+
+    Un profil ne réduit pas le pouvoir d'un service qui crée des comptes et
+    monte des systèmes de fichiers. Ce qu'il tient, ce sont les CHEMINS qu'il
+    écrit et les PROGRAMMES qu'il lance — et c'est cela que ces tests gardent.
+    """
+
+    def test_le_profil_s_attache_au_service_installe(self):
+        self.assertRegex(_lire(PROFIL_SERVICE),
+                         r"(?m)^profile codebyr-uid /usr/lib/codebyr/codebyr-uid \{")
+
+    def test_le_service_demarre_en_mode_isole(self):
+        self.assertEqual(_lire(SERVICE).splitlines()[0], "#!/usr/bin/python3 -IS")
+        self.assertNotIn("abstractions/python", _lire(PROFIL_SERVICE))
+
+    def test_il_n_ecrit_que_dans_ses_propres_dossiers(self):
+        # Un défaut dans la construction d'un chemin ne doit rien pouvoir
+        # toucher ailleurs, même si la validation de comptes.py tombait.
+        permis = ("/var/lib/codebyr/", "/run/codebyr/", "/run/codebyr-uid",
+                  "/run/systemd/", "/dev/log", "owner /dev/pts/")
+        for regle in _regles(PROFIL_SERVICE):
+            if regle.startswith(("deny", "include", "unix", "network", "signal",
+                                 "ptrace", "profile", "abi", "capability")):
+                continue
+            if re.search(r"\s[rmkix]*[wa][rmkix]*,$", regle):
+                self.assertTrue(regle.startswith(permis), regle)
+
+    def test_le_dossier_personnel_du_bureau_lui_reste_fermé(self):
+        for regle in _regles(PROFIL_SERVICE):
+            self.assertNotIn("@{HOME}", regle, regle)
+
+    def test_du_bureau_il_ne_voit_que_les_sockets_qu_il_presente(self):
+        # Le bus de session n'y est pas, et n'y sera pas : c'est lui qui
+        # donnait accès à systemd --user, donc à l'exécution hors bac à sable.
+        vues = [r for r in _regles(PROFIL_SERVICE) if r.startswith("/run/user/")]
+        self.assertEqual(vues, ["/run/user/[0-9]*/wayland-[0-9]* r,",
+                                "/run/user/[0-9]*/pipewire-0 r,"])
+
+    def test_les_programmes_qu_il_lance_sont_nommes_un_par_un(self):
+        lances = [r.split()[0] for r in _regles(PROFIL_SERVICE)
+                  if re.search(r"\s[a-zA-Z]*[uUpPcCi]x,$", r)]
+        self.assertEqual(sorted(lances), [
+            "/usr/bin/mount", "/usr/bin/python3.[0-9]*", "/usr/bin/setfacl",
+            "/usr/bin/setpriv", "/usr/bin/systemctl", "/usr/bin/systemd-run",
+            "/usr/bin/umount", "/usr/sbin/useradd", "/usr/sbin/userdel"])
+
+    def test_un_espace_sort_du_confinement_en_abandonnant_ses_privileges(self):
+        # « Ux » à setpriv : tout ce qui suit — le premier processus,
+        # bubblewrap, le navigateur — tourne sous le compte de l'Espace, sans
+        # ce profil. Sans cette sortie, il faudrait décrire ici les besoins de
+        # toutes les applications que Codebyr peut ouvrir.
+        self.assertIn("/usr/bin/setpriv Ux,", _regles(PROFIL_SERVICE))
+        self.assertNotIn("/usr/lib/codebyr/codebyr-espace-init",
+                         _lire(PROFIL_SERVICE).split("profile codebyr-uid")[1])
+
+    def test_il_peut_arreter_le_premier_processus_d_un_espace(self):
+        # Il n'est pas confiné : sans cette règle, un Espace survivrait à sa
+        # fermeture (le même piège que pour le filtre réseau).
+        self.assertIn("signal (send) set=(term, kill) peer=unconfined,",
+                      _regles(PROFIL_SERVICE))
+
+    def test_livre_et_charge_par_le_paquet(self):
+        build = _lire(os.path.join(RACINE, "packaging", "build-deb.sh"))
+        self.assertIn("etc/apparmor.d/codebyr-uid", build)
 
 
 @unittest.skipUnless(os.path.exists(PARSEUR) and os.path.isdir("/etc/apparmor.d/abstractions"),
@@ -138,11 +210,12 @@ class Compilation(unittest.TestCase):
             [PARSEUR, "--skip-kernel-load", "--skip-cache", "-I", "/etc/apparmor.d", chemin],
             capture_output=True, text=True, timeout=60)
 
-    def test_le_profil_compile(self):
-        with tempfile.TemporaryDirectory() as d:
-            copie = shutil.copy(PROFIL, os.path.join(d, "codebyr-net-proxy"))
-            r = self._compiler(copie)
-        self.assertEqual(r.returncode, 0, r.stderr)
+    def test_les_profils_compilent(self):
+        for profil in (PROFIL, PROFIL_SERVICE):
+            with tempfile.TemporaryDirectory() as d:
+                copie = shutil.copy(profil, os.path.join(d, os.path.basename(profil)))
+                r = self._compiler(copie)
+            self.assertEqual(r.returncode, 0, "%s : %s" % (profil, r.stderr))
 
     def test_le_controle_detecte_un_profil_casse(self):
         with tempfile.TemporaryDirectory() as d:

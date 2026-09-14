@@ -124,6 +124,13 @@ def compte_systeme(nom, home):
     try:
         utilisateur = pwd.getpwnam(nom)
     except KeyError:
+        # Plafond par utilisateur, vérifié au moment de CRÉER : le service
+        # écoute pour tout le monde, et rien d'autre n'empêcherait un compte
+        # local de faire créer des milliers de comptes système.
+        proprietaire = comptes.decomposer(nom)
+        if comptes.trop_d_espaces([c.pw_name for c in pwd.getpwall()],
+                                  proprietaire[0], nom):
+            raise ValueError("trop d'Espaces pour cet utilisateur")
         subprocess.run(["/usr/sbin/useradd", "--system", "--user-group",
                         "--no-create-home", "--home-dir", home,
                         "--shell", "/usr/sbin/nologin", "--password", "!", nom],
@@ -145,6 +152,20 @@ def dossier_root(chemin, mode=0o711):
     if st.st_uid != 0 or st.st_mode & 0o022:
         raise ValueError("Dossier modifiable par un autre compte : %s" % chemin)
     return chemin
+
+
+def racines():
+    """Les deux dossiers que tout le reste suppose, avec des droits SÛRS.
+
+    Ils naissaient sinon des droits par défaut du service (umask). Un umask
+    plus strict — un durcissement de systemd, un jour — les aurait créés en
+    0700 : plus aucun Espace n'aurait pu traverser jusqu'au sien, et rien
+    n'aurait dit pourquoi. On ne laisse pas une protection dépendre d'un
+    réglage qu'on ne contrôle pas.
+    """
+    for chemin in (os.path.dirname(comptes.RACINE_ESPACES),
+                   os.path.dirname(comptes.RACINE_PASSERELLES)):
+        dossier_root(chemin)
 
 
 def dossier_espace(home, utilisateur):
@@ -712,6 +733,7 @@ def main(argv):
         sys.stderr.write("codebyr-uid : service réservé à l'administrateur.\n")
         return 2
     syslog.openlog("codebyr-uid", syslog.LOG_PID, syslog.LOG_DAEMON)
+    racines()
     if len(argv) >= 3 and argv[1] == "--essai":
         chemin = argv[2]
         if os.path.exists(chemin):

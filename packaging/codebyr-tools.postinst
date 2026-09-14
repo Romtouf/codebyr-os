@@ -72,10 +72,23 @@ case "$1" in
 		# Le filtre en cours (Espace Banque ouvert) reste tel quel ; le
 		# prochain lancement est confiné.
 		# Chemins absolus, pour la même raison que systemd-sysctl ci-dessus.
-		PROFIL_FILTRE=/etc/apparmor.d/codebyr-net-proxy
-		if [ -f "$PROFIL_FILTRE" ] && [ -x /usr/sbin/apparmor_parser ] \
-				&& /usr/bin/aa-enabled --quiet 2>/dev/null; then
-			/usr/sbin/apparmor_parser --replace --write-cache "$PROFIL_FILTRE" 2>/dev/null || true
+		if [ -x /usr/sbin/apparmor_parser ] && /usr/bin/aa-enabled --quiet 2>/dev/null; then
+			for PROFIL in /etc/apparmor.d/codebyr-net-proxy /etc/apparmor.d/codebyr-uid; do
+				[ -f "$PROFIL" ] || continue
+				/usr/sbin/apparmor_parser --replace --write-cache "$PROFIL" 2>/dev/null || true
+			done
+		fi
+
+		# Service des comptes d'Espaces. La socket est activée dès
+		# l'installation, mais RIEN ne tourne tant qu'aucun Espace ne demande
+		# un compte dédié : le service démarre à la première connexion, et
+		# aucun Espace livré ne le demande.
+		#
+		# L'activer maintenant plutôt qu'au premier besoin évite le pire des
+		# messages : « cet Espace ne s'ouvre pas, redémarrez ».
+		if [ -d /run/systemd/system ] && [ -x /usr/bin/systemctl ]; then
+			/usr/bin/systemctl daemon-reload 2>/dev/null || true
+			/usr/bin/systemctl enable --now codebyr-uid.socket 2>/dev/null || true
 		fi
 
 		# Rattrapage des machines DÉJÀ installées : dossiers personnels privés

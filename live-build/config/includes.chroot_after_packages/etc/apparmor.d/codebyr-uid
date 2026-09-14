@@ -1,0 +1,117 @@
+# Codebyr OS — confinement du service des comptes d'Espaces (codebyr-uid).
+#
+# CE QUE CE PROFIL PEUT, ET CE QU'IL NE PEUT PAS
+# Ce service tourne en root, et doit créer des comptes Unix et monter des
+# systèmes de fichiers. Un profil ne réduit donc PAS son pouvoir : qui peut
+# créer un compte possède déjà la machine. Ce qu'il apporte est plus modeste,
+# et bien réel :
+#
+#   · il BORNE LES CHEMINS qu'il écrit — /var/lib/codebyr et /run/codebyr, et
+#     rien d'autre. Un défaut dans la construction d'un chemin ne pourrait
+#     donc pas écrire ailleurs, même si la validation de comptes.py tombait ;
+#   · il BORNE CE QU'IL EXÉCUTE — six outils du système, nommés ici. Root ne
+#     lance qu'un seul programme (codebyr-espace-init) ; cette liste dit tout
+#     ce qu'il peut lancer d'autre.
+#
+# LES OUTILS DU SYSTÈME RESTENT NON CONFINÉS (« Ux »)
+# useradd, userdel, mount, setfacl… écrivent dans /etc/passwd, prennent des
+# verrous, tiennent des journaux. Les enfermer dans ce profil demanderait d'y
+# recopier leurs besoins, qui changent avec leurs versions — et un profil trop
+# serré ici n'échouerait pas bruyamment : il empêcherait un Espace de s'ouvrir.
+# Ils sont appelés avec des arguments construits, jamais reçus du client.
+#
+# LE PREMIER PROCESSUS D'UN ESPACE SORT DU CONFINEMENT
+# Il est lancé à travers setpriv, qui abandonne les privilèges. La sortie se
+# fait à CET exec précis : tout ce qui suit — le premier processus, bubblewrap,
+# le navigateur — tourne sous le compte de l'Espace, sans ce profil. L'enfermer
+# ici reviendrait à décrire dans ce fichier les besoins de toutes les
+# applications que Codebyr peut ouvrir.
+#
+# PYTHON SANS LE DOSSIER PERSONNEL — même raison que codebyr-net-proxy : un
+# fichier .pth déposé dans ~/.local/lib/python3.* serait exécuté au démarrage
+# de l'interpréteur. Le service est lancé en mode isolé (« python3 -IS ») et ce
+# profil ne lui ouvre que la bibliothèque du système.
+#
+# Personnalisation locale sans modifier ce fichier : /etc/apparmor.d/local/codebyr-uid
+
+abi <abi/4.0>,
+
+include <tunables/global>
+
+profile codebyr-uid /usr/lib/codebyr/codebyr-uid {
+  include <abstractions/base>
+  # Lecture de /etc/passwd et /etc/group : le service demande au NOYAU qui lui
+  # parle, puis traduit ce numéro en nom.
+  include <abstractions/nameservice>
+
+  # ── L'interpréteur, la bibliothèque standard, et les modules de Codebyr ──
+  /usr/bin/python3.[0-9]* rix,
+  /usr/lib/codebyr/codebyr-uid r,
+  /usr/lib/python3.[0-9]*/ r,
+  /usr/lib/python3.[0-9]*/** r,
+  /usr/lib/python3.[0-9]*/lib-dynload/*.so mr,
+  /usr/share/codebyr/*.py r,
+  deny /usr/lib/python3.[0-9]*/**/__pycache__/{,*} w,
+  deny /usr/share/codebyr/**/__pycache__/{,*} w,
+
+  # ── Les seuls dossiers que ce service écrit ─────────────────────────────
+  # Dossiers des Espaces, leurs boîtes (départ, arrivée) : créés, donnés à
+  # leur compte, effacés à la suppression de l'Espace.
+  /var/lib/codebyr/ rw,
+  /var/lib/codebyr/** rw,
+  # Passerelles et dépôts : le volatile, refait à chaque ouverture.
+  /run/codebyr/ rw,
+  /run/codebyr/** rw,
+  # La socket d'écoute, quand le service est lancé pour un essai plutôt que
+  # par systemd (qui la lui passe déjà ouverte).
+  /run/codebyr-uid*.sock rw,
+
+  # ── Ce qu'il LIT du bureau : les sockets qu'il présente, et rien d'autre ─
+  # Il les monte par « mount --bind » ; il vérifie seulement qu'elles existent.
+  # Le bus de session (/run/user/*/bus) n'est pas ici, et n'y sera pas.
+  /run/user/[0-9]*/wayland-[0-9]* r,
+  /run/user/[0-9]*/pipewire-0 r,
+
+  # ── Les six outils du système, nommés ────────────────────────────────────
+  /usr/sbin/useradd Ux,
+  /usr/sbin/userdel Ux,
+  /usr/bin/setfacl Ux,
+  /usr/bin/mount Ux,
+  /usr/bin/umount Ux,
+  /usr/bin/systemctl Ux,
+  /usr/bin/systemd-run Ux,
+  # L'abandon des privilèges, et la sortie du confinement avec lui.
+  /usr/bin/setpriv Ux,
+
+  # ── Ce qu'il faut pour poser les droits ─────────────────────────────────
+  capability chown,
+  capability fowner,
+  capability fsetid,
+  capability dac_override,
+  capability dac_read_search,
+  # Transmise aux outils ci-dessus : c'est setpriv qui change d'identité, et
+  # mount qui monte — le service, lui, ne fait ni l'un ni l'autre.
+  capability setuid,
+  capability setgid,
+  capability sys_admin,
+
+  # ── Sockets ──────────────────────────────────────────────────────────────
+  # Celle du service, celles qu'il crée pour les ordres d'un Espace.
+  unix (bind, listen, accept, receive, send, getattr, getopt, setopt, shutdown)
+       type=stream,
+  # Il joint le gestionnaire du système pour les portées (systemd-run passe
+  # par là), et le journal.
+  /run/systemd/** rw,
+  /dev/log w,
+
+  # ── Arrêt du premier processus d'un Espace, qui n'est pas confiné ────────
+  signal (send) set=(term, kill) peer=unconfined,
+  # systemd arrête ce service comme n'importe quel autre.
+  signal (receive) set=(term, kill, int, hup, cont) peer=unconfined,
+  ptrace (readby) peer=unconfined,
+
+  # Sortie d'erreur héritée quand le service est lancé depuis un terminal.
+  owner /dev/pts/[0-9]* rw,
+
+  include if exists <local/codebyr-uid>
+}

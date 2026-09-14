@@ -456,15 +456,39 @@ class LesUnites(unittest.TestCase):
         self.assertIn("ListenStream=/run/codebyr-uid.sock", socket_unite)
         self.assertIn("WantedBy=sockets.target", socket_unite)
 
-    def test_aucun_espace_de_noms_prive_ne_cache_les_montages(self):
-        # PrivateMounts, PrivateTmp ou ProtectHome enfermeraient les montages
-        # liés dans un espace de noms privé : les Espaces ne verraient plus
-        # rien, sans message d'erreur.
+    def test_rien_de_ce_que_les_espaces_heriteraient_n_est_impose_a_l_unite(self):
+        """Ce service n'est pas une feuille : ce qu'on lui impose se transmet.
+
+        · Un filtre seccomp survit au fork, à l'exec, et au passage dans la
+          portée de l'Espace. MemoryDenyWriteExecute= aurait interdit au
+          navigateur d'un Espace de compiler son JavaScript,
+          RestrictAddressFamilies= lui aurait coupé le réseau.
+        · Un espace de noms de montage cache les montages que ce service pose :
+          la passerelle serait montée pour lui seul, et l'Espace n'y verrait
+          rien, sans message d'erreur.
+        · NoNewPrivileges= n'interdit rien de réel à un service qui tourne en
+          root, et empêche la transition AppArmor par laquelle un Espace sort
+          du confinement.
+        """
         service = _lire(os.path.join(UNITES, "codebyr-uid.service"))
-        for interdit in ("PrivateMounts=yes", "PrivateTmp=yes", "ProtectHome=yes",
-                         "ProtectSystem=strict"):
-            self.assertNotIn(interdit, service, interdit)
-        self.assertIn("NoNewPrivileges=yes", service)
+        reglages = [l.split("=", 1)[0] for l in service.splitlines()
+                    if "=" in l and not l.lstrip().startswith("#")]
+        for interdit in ("PrivateMounts", "PrivateTmp", "ProtectHome", "ProtectSystem",
+                         "ProtectKernelTunables", "ProtectKernelModules",
+                         "ProtectControlGroups", "ProtectClock", "ProtectHostname",
+                         "MemoryDenyWriteExecute", "RestrictAddressFamilies",
+                         "RestrictNamespaces", "SystemCallFilter",
+                         "SystemCallArchitectures", "NoNewPrivileges"):
+            self.assertNotIn(interdit, reglages, interdit)
+
+    def test_le_service_est_confine_par_apparmor_a_la_place(self):
+        profil = _lire(os.path.join(RACINE, "live-build", "config",
+                                    "includes.chroot_after_packages", "etc",
+                                    "apparmor.d", "codebyr-uid"))
+        self.assertIn("profile codebyr-uid /usr/lib/codebyr/codebyr-uid {", profil)
+        # Et il n'impose rien aux applications de l'Espace : la sortie du
+        # confinement se fait à l'abandon des privilèges.
+        self.assertIn("/usr/bin/setpriv Ux,", profil)
 
 
 if __name__ == "__main__":
@@ -544,3 +568,35 @@ class LaSuppressionDUnCompte(unittest.TestCase):
                        "comptes.chemin_arrivees("):
             self.assertIn(chemin, self.supprimer)
         self.assertNotIn("demande.get(", self.supprimer)
+
+
+class LePlafondDEspaces(unittest.TestCase):
+    """La socket du service est ouverte à tous : le nombre de comptes ne l'est pas.
+
+    Sans ce plafond, un compte local pouvait demander l'ouverture d'Espaces aux
+    noms sans cesse différents et faire créer des milliers de comptes système.
+    """
+
+    def _siens(self, combien):
+        return ["cbyr-1000-espace%d" % n for n in range(combien)]
+
+    def test_un_utilisateur_ordinaire_n_est_jamais_gene(self):
+        self.assertFalse(comptes.trop_d_espaces(self._siens(5), 1000, "cbyr-1000-neuf"))
+
+    def test_au_dela_du_plafond_un_nouvel_espace_est_refuse(self):
+        pleins = self._siens(comptes.ESPACES_MAX_PAR_UTILISATEUR)
+        self.assertTrue(comptes.trop_d_espaces(pleins, 1000, "cbyr-1000-neuf"))
+
+    def test_ceux_qu_il_a_deja_s_ouvrent_encore(self):
+        # Sinon, arriver au plafond enfermerait l'utilisateur hors de ses
+        # propres Espaces.
+        pleins = self._siens(comptes.ESPACES_MAX_PAR_UTILISATEUR)
+        self.assertFalse(comptes.trop_d_espaces(pleins, 1000, pleins[0]))
+
+    def test_les_comptes_des_autres_ne_comptent_pas(self):
+        autres = ["cbyr-1001-espace%d" % n for n in range(50)] + ["romtouf", "root"]
+        self.assertFalse(comptes.trop_d_espaces(autres, 1000, "cbyr-1000-neuf"))
+
+    def test_le_service_verifie_au_moment_de_creer(self):
+        creation = _code(SERVICE).split("def compte_systeme(")[1].split("\ndef ")[0]
+        self.assertLess(creation.index("trop_d_espaces("), creation.index("useradd"))

@@ -37,6 +37,9 @@ for chemin in \
 	usr/bin/codebyr-bienvenue \
 	usr/bin/codebyr-verifier \
 	usr/bin/codebyr-durcir-poste \
+	usr/lib/codebyr \
+	usr/lib/systemd/system/codebyr-uid.socket \
+	usr/lib/systemd/system/codebyr-uid.service \
 	usr/share/gnome-shell/extensions/codebyr@codebyr.io \
 	usr/share/codebyr \
 	usr/share/nautilus-python \
@@ -47,7 +50,8 @@ for chemin in \
 	etc/skel \
 	etc/codebyr/espaces.json \
 	etc/sysctl.d/91-codebyr-noyau.conf \
-	etc/apparmor.d/codebyr-net-proxy
+	etc/apparmor.d/codebyr-net-proxy \
+	etc/apparmor.d/codebyr-uid
 do
 	if [ -e "$SRC/$chemin" ]; then
 		mkdir -p "$STAGE/$(dirname "$chemin")"
@@ -74,6 +78,11 @@ find "$STAGE" -type f \( -name 'codebyr-*' -o -name '*.py' -o -name '*.sh' \) \
 #    tous = faille. On normalise : dossiers 755, scripts 755, données 644.
 find "$STAGE/usr" "$STAGE/etc" -type d -exec chmod 755 {} + 2>/dev/null || true
 find "$STAGE/usr/bin" -type f -exec chmod 755 {} + 2>/dev/null || true
+# Le service des comptes d'Espaces et le premier processus d'un Espace : root
+# exécute l'un, et l'autre est exécuté sous le compte de l'Espace. Sans le bit
+# d'exécution, aucun Espace à compte dédié ne s'ouvre.
+find "$STAGE/usr/lib/codebyr" -type f -exec chmod 755 {} + 2>/dev/null || true
+find "$STAGE/usr/lib/systemd/system" -type f -exec chmod 644 {} + 2>/dev/null || true
 find "$STAGE/usr/share/codebyr" "$STAGE/usr/share/nautilus-python" \
 	-type f -exec chmod 644 {} + 2>/dev/null || true
 find "$STAGE/usr/share/gnome-shell" -type f -exec chmod 644 {} + 2>/dev/null || true

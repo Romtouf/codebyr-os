@@ -441,10 +441,16 @@ def main():
                        attendre_que(lambda: not espace_ouvert(nom), 15))
 
         titre("4. Un geste pas encore prêt est refusé")
-        purge = lanceur(bureau, "purge", ESPACE)
-        reussi &= dire("effacement des données refusé", purge.returncode == 1,
-                       (purge.stderr or "").strip()[:60])
-        reussi &= dire("données de l'Espace intactes", os.path.isdir(home))
+        # Installer une application : le seul geste encore refusé. L'étape
+        # testait l'effacement ; devenu un vrai geste, il a vidé l'Espace
+        # d'essai, et trois contrôles suivants sont tombés en cascade.
+        installation = lanceur(bureau, "install", ESPACE, "org.exemple.Essai")
+        reussi &= dire("installation d'application refusée", installation.returncode == 1,
+                       (installation.stderr or "").strip()[:60])
+        # Le document lui-même, pas seulement le dossier : un dossier vidé
+        # existe toujours, et c'est ce qui a laissé passer la cascade.
+        reussi &= dire("données de l'Espace intactes",
+                       os.path.exists(os.path.join(home, "Documents", "note.txt")))
 
         titre("5. Comme Banque : navigateur, réseau restreint, blindage")
         # Ajouté après un défaut que les étapes précédentes ne pouvaient pas

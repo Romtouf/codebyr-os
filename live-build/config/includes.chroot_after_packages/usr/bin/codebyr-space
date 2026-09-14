@@ -2202,7 +2202,12 @@ def relever_envois(espaces):
                                     os.close(entree)
                             except OSError:
                                 continue
-                except OSError:
+                except OSError as exc:
+                    # Une destination listée mais illisible n'est pas normale :
+                    # les fichiers y attendent, et quelqu'un doit pouvoir le
+                    # savoir. Ce silence a caché qu'aucun envoi ne partait d'un
+                    # Espace à compte dédié (14/09/2026).
+                    journal("relève impossible de %s vers %s : %s" % (source, dest, exc))
                     continue
         except OSError:
             continue
@@ -2245,6 +2250,17 @@ def _deposer_pour_envoi(esp, depart, source):
     dossier = os.path.join(ENVOI_INTERNE, esp["id"])
     try:
         fichiers_surs.mkdir(dossier)
+        # Les droits sont posés EXPLICITEMENT, par le descripteur. Dans la
+        # boîte de départ d'un Espace dédié, le droit du bureau est hérité
+        # d'une ACL par défaut — mais son masque suit le mode de création :
+        # 0700 pour un dossier, 0600 pour une écriture sûre. Le droit existait
+        # donc sur le papier, avec « effective: --- » : le bureau ne pouvait
+        # rien relever, et rien ne le disait. Reproduit dans le WSL avec deux
+        # comptes sans privilège, le 14/09/2026. Sur un objet qui porte une
+        # ACL, les bits de groupe SONT le masque ; ailleurs, ces modes ne
+        # donnent rien à personne d'autre que le propriétaire.
+        with fichiers_surs.dossier(dossier) as fd:
+            os.fchmod(fd, 0o770)
     except OSError:
         sys.stderr.write(
             "Boîte d'envoi indisponible : cet Espace a été ouvert par une "
@@ -2252,7 +2268,8 @@ def _deposer_pour_envoi(esp, depart, source):
         return 1
     try:
         origine = provenance.origine(source, DATA_ROOT) or depart
-        fichiers_surs.copier_unique(source, dossier, os.path.basename(source), origine)
+        fichiers_surs.copier_unique(source, dossier, os.path.basename(source), origine,
+                                    mode=0o640)
     except OSError as exc:
         sys.stderr.write("Copie impossible (%s)\n" % exc)
         _prevenir("Envoi impossible",

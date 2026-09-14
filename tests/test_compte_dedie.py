@@ -656,3 +656,42 @@ class LesGestesSurLesDonnees(unittest.TestCase):
         restaurer = _fonction(self.source, "cmd_interne_restaurer", "cmd_interne_effacer")
         self.assertIn("reversed(mis_de_cote)", restaurer)
         self.assertIn("reversed(poses)", restaurer)
+
+
+class LeMasqueDesACL(unittest.TestCase):
+    """Reproduit dans le WSL avec deux comptes sans privilège, le 14/09/2026.
+
+    Dans la boîte de départ d'un Espace dédié, le droit du bureau vient d'une
+    ACL par défaut, dont le masque suit le mode de création : un dossier en
+    0700 et un fichier en 0600 donnaient « user:bureau:rwx #effective:--- ».
+    Le bureau ne relevait rien, et rien ne le disait.
+    """
+
+    def setUp(self):
+        self.deposer = _fonction(_source(), "_deposer_pour_envoi", "_envoyer_vers_compte_dedie")
+
+    def test_le_depot_pose_les_droits_du_dossier_par_son_descripteur(self):
+        self.assertIn("os.fchmod(fd, 0o770)", self.deposer)
+        self.assertLess(self.deposer.index("fichiers_surs.mkdir(dossier)"),
+                        self.deposer.index("os.fchmod(fd, 0o770)"))
+
+    def test_le_fichier_depose_reste_lisible_par_le_bureau(self):
+        self.assertIn("mode=0o640", self.deposer)
+
+    @unittest.skipUnless(POSIX, "fichiers_surs est réservé à Linux")
+    def test_les_modes_sont_vraiment_poses(self):
+        with tempfile.TemporaryDirectory() as t:
+            source = os.path.join(t, "note.txt")
+            with open(source, "w") as f:
+                f.write("x")
+            boite = os.path.join(t, "boite")
+            with mock.patch.object(space, "ENVOI_INTERNE", boite), \
+                    mock.patch.object(space, "_prevenir"):
+                self.assertEqual(space._deposer_pour_envoi(ORDINAIRE, "travail", source), 0)
+            dossier = os.path.join(boite, "perso")
+            self.assertEqual(os.stat(dossier).st_mode & 0o777, 0o770)
+            self.assertEqual(os.stat(os.path.join(dossier, "note.txt")).st_mode & 0o777, 0o640)
+
+    def test_une_destination_illisible_se_dit_au_journal(self):
+        relever = _fonction(_source(), "relever_envois", "_espace_courant")
+        self.assertIn('journal("relève impossible de %s vers %s : %s"', relever)

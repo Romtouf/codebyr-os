@@ -286,3 +286,43 @@ class LeDialogue(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class LeJournalDesRefus(unittest.TestCase):
+    """Constaté le 14/09/2026 : sous compte dédié, aucun refus n'était noté."""
+
+    @unittest.skipUnless(POSIX, "fichiers_surs est réservé à Linux")
+    def test_son_dossier_existe_avant_que_le_filtre_demarre(self):
+        # Le profil AppArmor du filtre l'autorise à écrire ce fichier, pas à
+        # créer de dossier. C'est donc au lanceur de le créer, avant.
+        esp = dict(DEDIE, reseau={"mode": "liste-blanche", "domaines": ["banque.fr"]})
+        with tempfile.TemporaryDirectory() as t:
+            vu = {}
+
+            def demarrage(*args, **kwargs):
+                vu["dossier"] = os.path.isdir(os.path.join(t, "donnees", "travail"))
+                return mock.Mock()
+
+            with mock.patch.object(space, "DATA_ROOT", os.path.join(t, "donnees")), \
+                    mock.patch.object(space.subprocess, "Popen", side_effect=demarrage), \
+                    mock.patch.object(space, "_prevenir"):
+                space._demarrer_filtre_reseau(esp, os.path.join(t, "home"), ["firefox-esr"],
+                                              os.path.join(t, "proxy"), compte_dedie_=True)
+        self.assertTrue(vu.get("dossier"), "le filtre a démarré sans dossier de journal")
+
+    def test_un_journal_impossible_a_ecrire_se_signale_une_fois(self):
+        proxy = outils.charger("codebyr-net-proxy")
+        with tempfile.TemporaryDirectory() as t:
+            obstacle = os.path.join(t, "fichier")
+            with open(obstacle, "w") as f:
+                f.write("x")
+            with mock.patch.object(proxy, "JOURNAL", os.path.join(obstacle, "sous", "refus.txt")), \
+                    mock.patch.object(proxy, "_VERROU", threading.Lock()), \
+                    mock.patch.object(proxy, "_VUS", set()), \
+                    mock.patch.object(proxy, "_JOURNAL_SIGNALE", False), \
+                    mock.patch.object(proxy.sys, "stderr") as sortie:
+                proxy.journaliser("exemple.com")
+                proxy.journaliser("autre.com")
+        messages = [c.args[0] for c in sortie.write.call_args_list]
+        self.assertEqual(len(messages), 1, messages)
+        self.assertIn("journal des refus", messages[0])

@@ -379,18 +379,32 @@ def main():
         taille = os.path.getsize(capture) if os.path.exists(capture) else 0
         reussi &= dire("site autorisé atteint à travers le dépôt",
                        taille > 4000, "capture de %d octets" % taille)
-        lanceur(bureau, "launch", ESPACE, "--", "firefox-esr", "--headless",
-                "--screenshot", os.path.join(home, "refus.png"),
-                "https://" + DOMAINE_REFUSE + "/")
+        avant_refus = time.time()
+        tentative = lanceur(bureau, "launch", ESPACE, "--", "firefox-esr", "--headless",
+                            "--screenshot", os.path.join(home, "refus.png"),
+                            "https://" + DOMAINE_REFUSE + "/")
         refuses = ""
         try:
             with open(journal_refus, encoding="utf-8") as f:
                 refuses = f.read()
         except OSError:
             pass
-        reussi &= dire("site hors liste refusé par le filtre", DOMAINE_REFUSE in refuses,
-                       "noté au journal des refus" if DOMAINE_REFUSE in refuses
-                       else "absent du journal des refus")
+        if not dire("site hors liste refusé et noté au journal des refus",
+                    DOMAINE_REFUSE in refuses, journal_refus):
+            reussi = False
+            # Ce qu'il faut pour trancher sans renvoyer un essai de plus : ce
+            # que le filtre a dit, et ce qu'AppArmor lui a refusé.
+            for ligne in (tentative.stderr or "").splitlines():
+                if "codebyr-net-proxy" in ligne or "journal des refus" in ligne:
+                    print("       │ %s" % ligne.strip()[:100])
+            noyau = subprocess.run(
+                ["/usr/bin/journalctl", "-k", "--no-pager", "-o", "cat",
+                 "--since", "@%d" % int(avant_refus)],
+                capture_output=True, text=True).stdout.splitlines()
+            refus_apparmor = [l for l in noyau if "apparmor" in l and "DENIED" in l]
+            print("       │ refus AppArmor pendant la tentative : %d" % len(refus_apparmor))
+            for ligne in refus_apparmor[-6:]:
+                print("       │ %s" % ligne.strip()[:140])
         reussi &= dire("Espace refermé après le navigateur",
                        attendre_que(lambda: not espace_ouvert(nom), 15))
 

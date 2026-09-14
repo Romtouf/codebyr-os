@@ -286,6 +286,18 @@ def _demarrer_filtre_reseau(esp, home, app_cmd, chemin_socket=None, compte_dedie
         if "firefox" in os.path.basename(app_cmd[0]) and not compte_dedie_:
             _preparer_profil_firefox(home, port)
 
+        # Le dossier du journal des refus existe AVANT le filtre. Son profil
+        # AppArmor l'autorise à écrire ce fichier, pas à créer de dossier — et
+        # c'est voulu. Pour un Espace ordinaire le dossier existait déjà, créé
+        # avec ses données ; pour un Espace à compte dédié, personne ne le
+        # créait : les refus avaient bien lieu, mais n'étaient notés nulle part,
+        # et « Configuration Codebyr » ne pouvait plus proposer d'autoriser le
+        # domaine qui manque à la banque. Constaté le 14/09/2026.
+        try:
+            fichiers_surs.mkdir(os.path.dirname(journal_refus(esp["id"])))
+        except OSError as exc:
+            sys.stderr.write("codebyr-space : journal des refus indisponible (%s)\n" % exc)
+
         proc = subprocess.Popen(["codebyr-net-proxy", "--fd", str(srv.fileno()),
                                  "--journal", journal_refus(esp["id"])] + domaines,
                                 pass_fds=(srv.fileno(),))

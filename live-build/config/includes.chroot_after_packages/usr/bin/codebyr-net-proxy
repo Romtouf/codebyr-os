@@ -36,6 +36,7 @@ TAILLE = 65536
 JOURNAL = None
 _VUS = set()
 _VERROU = None
+_JOURNAL_SIGNALE = False
 
 
 def journaliser(host):
@@ -50,8 +51,15 @@ def journaliser(host):
         os.makedirs(os.path.dirname(JOURNAL), exist_ok=True)
         with open(JOURNAL, "a", encoding="utf-8") as f:
             f.write(host + "\n")
-    except OSError:
-        pass
+    except OSError as exc:
+        # Le refus a eu lieu, c'est l'essentiel : le filtre ne tombe pas pour
+        # un journal. Mais il le dit, une fois — ce silence a caché qu'aucun
+        # refus n'était noté pour un Espace à compte dédié.
+        global _JOURNAL_SIGNALE
+        if not _JOURNAL_SIGNALE:
+            _JOURNAL_SIGNALE = True
+            sys.stderr.write("codebyr-net-proxy : journal des refus impossible "
+                             "à écrire (%s)\n" % exc)
 
 
 def hote_propre(brut):

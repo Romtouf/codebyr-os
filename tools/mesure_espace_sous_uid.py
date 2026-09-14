@@ -236,18 +236,20 @@ def main():
                  os.stat(temoin).st_uid == espace.pw_uid,
                  "UID %d" % os.stat(temoin).st_uid)
 
-        titre("6. Ce que l'hôte crée aujourd'hui reste-t-il joignable ?")
-        for quoi, pourquoi in (
-                ("notifications", "l'Espace ne pourrait plus rien afficher sur le bureau"),
-                ("boîte d'envoi", "aucun fichier ne pourrait plus sortir d'un Espace"),
-                ("filtre réseau", "Banque ne pourrait plus atteindre sa liste blanche")):
+        titre("6. Là où l'hôte pose ses sockets AUJOURD'HUI")
+        # Dossier temporaire du bureau en 0700 : hors d'atteinte d'un compte
+        # dédié, et c'est normal. On le mesure pour garder la trace du pourquoi
+        # du dépôt — un « NON » ici est la situation d'avant, pas un manque.
+        ancien = 0
+        for quoi in ("notifications", "boîte d'envoi", "filtre réseau"):
             srv, chemin = socket_de_l_hote(coin_hote, bureau.pw_uid, bureau.pw_gid)
             sockets_hote.append(srv)
             ok, erreur = joignable(espace, chemin)
-            if not dire("socket « %s » du bureau" % quoi, ok,
-                        erreur if not ok else "joignable"):
-                manques.append("socket « %s » à republier pour le compte dédié" % quoi)
-                consequence(pourquoi)
+            ancien += 1 if ok else 0
+            dire("socket « %s » dans un dossier temporaire" % quoi, ok,
+                 "joignable" if ok else erreur)
+        if not ancien:
+            consequence("attendu : c'est précisément ce que le dépôt remplace")
 
         titre("7. Et déposées dans le dépôt, le sont-elles ?")
         depot = r.get("depot")

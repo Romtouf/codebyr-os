@@ -1,0 +1,148 @@
+#!/usr/bin/python3 -IS
+# -*- coding: utf-8 -*-
+"""Le premier processus d'un Espace : il tourne SOUS le compte de l'Espace.
+
+── POURQUOI CE PROGRAMME EXISTE ────────────────────────────────────────────
+Le compte du bureau ne peut pas devenir un autre compte : il n'a pas
+CAP_SETUID. Un Espace sous compte dédié ne peut donc être lancé que par root.
+
+Mais le service root n'exécute rien qui vienne d'un client, et cette règle ne
+se négocie pas : c'est elle qui fait qu'une faille du lanceur ne donne pas la
+machine. Root ne lance donc qu'UN programme, celui-ci, à un chemin fixe. C'est
+ensuite LUI — déjà dépouillé de tout privilège — qui exécute ce que le bureau
+demande.
+
+Le sens de circulation compte : le bureau dit à un compte MOINS privilégié que
+lui quoi exécuter. Il pouvait déjà tout exécuter sous sa propre identité ; lui
+laisser commander celle-ci ne lui donne rien de neuf. L'inverse serait une
+élévation de privilège ; celui-ci n'en est pas une.
+
+── CE QU'IL NE FAIT PAS ────────────────────────────────────────────────────
+· Il ne demande jamais rien à root. Sa vie se termine quand root le termine.
+· Il n'est PAS joignable depuis le bac à sable : sa socket vit dans le dépôt,
+  et seules « notif » et « proxy » y sont montées dans un Espace. Un programme
+  qui s'échapperait de bubblewrap retrouverait donc son propre compte, et rien
+  de plus — c'est tout l'intérêt du chantier.
+· Il n'accepte d'ordre que du compte du bureau ou du sien, d'après le NOYAU
+  (SO_PEERCRED). La vérification est bon marché ; elle dit surtout, à qui lira
+  ce fichier dans deux ans, que la liste était voulue.
+
+── PROTOCOLE ───────────────────────────────────────────────────────────────
+Une demande JSON par connexion. La connexion vit aussi longtemps que le
+processus lancé : c'est elle qui en rapporte la fin.
+
+  {"argv": ["bwrap", ...], "env": {...}}
+      → {"ok": true, "pid": 1234}        (dès le lancement)
+      → {"fin": 0}                       (à la sortie du processus)
+
+Lancement : par codebyr-uid, jamais à la main.
+    codebyr-espace-init <uid du bureau> <fd de la socket en écoute>
+"""
+import json
+import os
+import socket
+import struct
+import subprocess
+import sys
+import syslog
+import threading
+
+TAILLE_MAX = 65536
+
+
+def journal(message):
+    syslog.syslog(syslog.LOG_INFO, message)
+
+
+def demandeur(client):
+    donnees = client.getsockopt(socket.SOL_SOCKET, socket.SO_PEERCRED,
+                                struct.calcsize("3i"))
+    _pid, uid, _gid = struct.unpack("3i", donnees)
+    return uid
+
+
+def lancer(demande):
+    """Exécute ce que le bureau demande, sous l'identité qui est déjà la nôtre.
+
+    Aucun shell : la liste d'arguments est passée telle quelle au noyau. Un
+    `shell=True` ferait de chaque espace et de chaque guillemet une commande.
+    """
+    argv = demande.get("argv")
+    if not isinstance(argv, list) or not argv or not all(
+            isinstance(a, str) for a in argv):
+        raise ValueError("commande absente ou mal formée")
+    env = demande.get("env")
+    if not isinstance(env, dict) or not all(
+            isinstance(c, str) and isinstance(v, str) for c, v in env.items()):
+        raise ValueError("environnement mal formé")
+    return subprocess.Popen(argv, env=env, cwd="/")
+
+
+def servir_un(client, uid_bureau, uid_propre):
+    with client:
+        client.settimeout(30)
+        uid = demandeur(client)
+        if uid not in (uid_bureau, uid_propre):
+            journal("ordre refusé : UID %d" % uid)
+            client.sendall(b'{"ok": false, "erreur": "refuse"}\n')
+            return
+        try:
+            demande = json.loads(client.recv(TAILLE_MAX).decode("utf-8", "replace"))
+            if not isinstance(demande, dict):
+                raise ValueError("demande illisible")
+            proc = lancer(demande)
+        except (ValueError, OSError) as exc:
+            journal("lancement impossible : %s" % exc)
+            try:
+                client.sendall(b'{"ok": false, "erreur": "impossible"}\n')
+            except OSError:
+                pass
+            return
+        try:
+            client.sendall((json.dumps({"ok": True, "pid": proc.pid}) + "\n")
+                           .encode("utf-8"))
+            # La connexion tient le processus : si le bureau la referme, c'est
+            # que l'Espace se ferme, et le processus n'a plus de raison de
+            # vivre. Sans cela, une application survivrait à son Espace.
+            client.settimeout(None)
+            code = proc.wait()
+            client.sendall((json.dumps({"fin": code}) + "\n").encode("utf-8"))
+        except OSError:
+            proc.terminate()
+            try:
+                proc.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                proc.kill()
+
+
+def servir(srv, uid_bureau):
+    uid_propre = os.getuid()
+    while True:
+        try:
+            client, _ = srv.accept()
+        except OSError:
+            return 0
+        threading.Thread(target=servir_un,
+                         args=(client, uid_bureau, uid_propre),
+                         daemon=True).start()
+
+
+def main(argv):
+    if len(argv) != 3:
+        sys.stderr.write("codebyr-espace-init : lancé par codebyr-uid.\n")
+        return 2
+    if os.geteuid() == 0:
+        # Root n'a rien à faire ici : ce programme n'existe que pour exécuter
+        # sans privilège. S'il tourne en root, la protection a sauté en amont.
+        sys.stderr.write("codebyr-espace-init : refuse de tourner en root.\n")
+        return 2
+    syslog.openlog("codebyr-espace", syslog.LOG_PID, syslog.LOG_DAEMON)
+    uid_bureau = int(argv[1])
+    srv = socket.socket(fileno=int(argv[2]))
+    journal("Espace prêt sous l'UID %d, aux ordres du bureau %d"
+            % (os.getuid(), uid_bureau))
+    return servir(srv, uid_bureau)
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv))

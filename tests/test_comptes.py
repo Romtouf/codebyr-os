@@ -5,8 +5,10 @@ Ce service tourne en root. Une erreur ici ne coûte pas une fonctionnalité,
 elle donne la machine. Chaque règle est donc éprouvée séparément, et chaque
 test dit ce qui arriverait si elle tombait.
 """
+import ast
 import os
 import re
+import subprocess
 import unittest
 
 from outils import LIB, RACINE  # noqa: F401 — place les modules partagés
@@ -15,6 +17,9 @@ import comptes  # noqa: E402
 SERVICE = os.path.join(RACINE, "live-build", "config",
                        "includes.chroot_after_packages", "usr", "lib", "codebyr",
                        "codebyr-uid")
+INIT = os.path.join(RACINE, "live-build", "config",
+                    "includes.chroot_after_packages", "usr", "lib", "codebyr",
+                    "codebyr-espace-init")
 UNITES = os.path.join(RACINE, "live-build", "config",
                       "includes.chroot_after_packages", "usr", "lib", "systemd", "system")
 
@@ -22,6 +27,27 @@ UNITES = os.path.join(RACINE, "live-build", "config",
 def _lire(chemin):
     with open(chemin, encoding="utf-8") as f:
         return f.read()
+
+
+def _code(chemin):
+    """La source SANS les commentaires ni les docstrings — le code seul.
+
+    Un test qui cherche « shell=True » dans la source brute le trouve dans le
+    commentaire qui explique pourquoi on n'en veut pas, et passe au rouge pour
+    la meilleure des raisons. On lit donc le code, pas ce qui l'entoure.
+
+    Les chaînes, elles, RESTENT : un chemin écrit en dur est du code, et c'est
+    justement ce que plusieurs de ces tests cherchent.
+    """
+    arbre = ast.parse(_lire(chemin))
+    for noeud in ast.walk(arbre):
+        corps = getattr(noeud, "body", None)
+        if (isinstance(corps, list) and corps
+                and isinstance(corps[0], ast.Expr)
+                and isinstance(corps[0].value, ast.Constant)
+                and isinstance(corps[0].value.value, str)):
+            corps.pop(0)
+    return ast.unparse(arbre)
 
 
 class NomDuCompte(unittest.TestCase):
@@ -126,6 +152,56 @@ class Chemins(unittest.TestCase):
                 comptes.socket_du_bureau(1000, nom)
 
 
+class Plafonds(unittest.TestCase):
+    """Ce qui entre dans une commande lancée par root se valide ici."""
+
+    def test_les_valeurs_saines_passent(self):
+        self.assertEqual(comptes.plafonds_valides("75%", 4096), ("75%", 4096))
+        self.assertEqual(comptes.plafonds_valides("2G", 800), ("2G", 800))
+
+    def test_une_valeur_tordue_retombe_sur_le_defaut(self):
+        # Ni refus ni exception : un plafond incompris ne doit ni lever la
+        # protection, ni empêcher l'ouverture d'un Espace.
+        for memoire in ("; rm -rf /", "0G", "200%", "2 G", "", None, 42, True,
+                        "2G\n", "$(id)"):
+            valeur, _ = comptes.plafonds_valides(memoire, 800)
+            self.assertEqual(valeur, comptes.MEMOIRE_DEFAUT, repr(memoire))
+
+    def test_un_nombre_de_taches_tordu_retombe_sur_le_defaut(self):
+        for taches in (0, -1, 1, 99999, True, "800", None, 3.5):
+            _, valeur = comptes.plafonds_valides("2G", taches)
+            self.assertEqual(valeur, comptes.TACHES_DEFAUT, repr(taches))
+
+
+class LaPortee(unittest.TestCase):
+
+    def test_une_portee_par_espace(self):
+        self.assertEqual(comptes.unite_de_l_espace("cbyr-1000-banque"),
+                         "codebyr-espace-cbyr-1000-banque.scope")
+        self.assertNotEqual(comptes.unite_de_l_espace("cbyr-1000-banque"),
+                            comptes.unite_de_l_espace("cbyr-1001-banque"))
+
+    def test_aucun_compte_ordinaire_n_a_de_portee(self):
+        for compte in ("romtouf", "root", "", "cbyr", "../../etc"):
+            with self.assertRaises(ValueError, msg=compte):
+                comptes.unite_de_l_espace(compte)
+
+
+class LaSocketDOrdres(unittest.TestCase):
+    """Elle commande l'Espace : elle ne doit jamais entrer dans le bac à sable."""
+
+    def test_elle_n_est_pas_montee_dans_l_espace(self):
+        # Sinon un programme échappé de bubblewrap se relancerait hors du bac
+        # à sable — le chantier rendrait l'évasion plus confortable.
+        self.assertNotIn(comptes.SOCKET_EXEC, comptes.SOCKETS_DU_BUREAU)
+
+    def test_le_bac_a_sable_ne_la_monte_nulle_part(self):
+        with open(os.path.join(LIB, "bac_a_sable.py"), encoding="utf-8") as f:
+            source = f.read()
+        self.assertNotIn("SOCKET_EXEC", source)
+        self.assertNotIn("/exec", source)
+
+
 class CeQuiTraverse(unittest.TestCase):
     """La liste de ce qu'un Espace reçoit. Ce qui n'y est pas ne passe jamais."""
 
@@ -194,6 +270,67 @@ class LeService(unittest.TestCase):
         # 14/09/2026 sur la VM : c'est exactement ce qui arrivait.
         self.assertNotRegex(self.source, r"setfacl[^\n]*run/user")
         self.assertNotRegex(self.source, r"droit_sur_socket\([^)]*runtime")
+
+
+class LePremierProcessus(unittest.TestCase):
+    """codebyr-espace-init — ce que root lance, et lui seul."""
+
+    def setUp(self):
+        self.source = _lire(INIT)
+        self.code = _code(INIT)
+        self.service = _lire(SERVICE)
+
+    def test_root_ne_lance_qu_un_chemin_ecrit_en_clair(self):
+        # Le chemin est une constante du service. S'il pouvait venir de la
+        # demande, le client choisirait ce que root exécute.
+        self.assertIn('"/usr/lib/codebyr/codebyr-espace-init"', self.service)
+        for interdit in ('demande.get("init")', 'demande.get("argv")',
+                         'demande.get("programme")'):
+            self.assertNotIn(interdit, self.service, interdit)
+
+    def test_il_refuse_de_tourner_en_root(self):
+        # S'il y tournait, tout le chantier serait vide de sens : il exécute
+        # justement ce que le bureau lui envoie.
+        self.assertIn("os.geteuid() == 0", self.source)
+
+    def test_il_n_execute_jamais_par_un_shell(self):
+        self.assertNotIn("shell=True", self.code)
+        self.assertNotIn("os.system", self.code)
+
+    def test_il_verifie_qui_lui_parle_aupres_du_noyau(self):
+        self.assertIn("SO_PEERCRED", self.code)
+
+    def test_il_ne_demande_jamais_rien_a_root(self):
+        # Il est en bout de chaîne : rien ne doit remonter vers le service.
+        # Le chemin de la socket du service n'apparaît nulle part dans son
+        # code : il ne peut donc pas la joindre. (Son message d'usage cite le
+        # service par son nom, ce qui est un renseignement, pas un appel.)
+        self.assertNotIn("/run/codebyr-uid", self.code)
+        # Il n'ouvre aucune connexion : il ne fait qu'accepter, sur une socket
+        # qu'il a reçue déjà ouverte. Il ne peut donc joindre personne.
+        self.assertNotIn(".connect(", self.code)
+        self.assertIn("socket.socket(fileno=", self.code)
+
+
+class DroitsDExecution(unittest.TestCase):
+    """Root exécute ces deux fichiers : sans le bit, aucun Espace ne s'ouvre.
+
+    Le dépôt est consulté depuis Windows comme depuis Linux, et seul l'index
+    de git garde ce bit de façon fiable dans les deux cas. On le lit donc là.
+    """
+
+    def test_le_service_et_le_premier_processus_sont_executables(self):
+        try:
+            sortie = subprocess.run(
+                ["git", "ls-files", "-s", "--", SERVICE, INIT],
+                cwd=RACINE, capture_output=True, text=True, timeout=30)
+        except (OSError, subprocess.TimeoutExpired):
+            self.skipTest("git indisponible")
+        if sortie.returncode != 0 or not sortie.stdout.strip():
+            self.skipTest("dépôt git indisponible")
+        for ligne in sortie.stdout.splitlines():
+            self.assertTrue(ligne.startswith("100755"),
+                            "non exécutable dans le dépôt : %s" % ligne)
 
 
 class LesUnites(unittest.TestCase):

@@ -7,7 +7,10 @@ Tout ce qu'elle accepte de faire est décidé par comptes.py, écrit à part et
 éprouvé par des tests ; ce fichier ne fait qu'exécuter, et refuser.
 
 ── CE QU'IL NE FAIT PAS, VOLONTAIREMENT ────────────────────────────────────
-· Il n'exécute aucune commande fournie par le client. Il prépare, c'est tout.
+· Il n'exécute aucune commande fournie par le client. Il ne lance qu'UN
+  programme, à un chemin écrit ici en clair (codebyr-espace-init), sous le
+  compte de l'Espace. Ce que le bureau veut ouvrir, c'est ce programme-là qui
+  l'exécutera, sans aucun privilège — root ne le voit jamais.
 · Il ne prend aucun chemin du client : les chemins sont construits à partir de
   l'UID que le NOYAU lui donne (SO_PEERCRED) et d'identifiants validés.
 · Il n'ouvre jamais le dossier d'exécution du bureau. Mesuré le 14/09/2026 :
@@ -21,16 +24,21 @@ Tout ce qu'elle accepte de faire est décidé par comptes.py, écrit à part et
 Une demande JSON par connexion, une réponse JSON :
 
   {"action": "preparer", "espace": "banque", "affichage": "wayland-0",
-   "son": false}
+   "son": false, "memoire": "2G", "taches": 800}
       → {"ok": true, "compte": "cbyr-1000-banque", "uid": 997, "gid": 997,
          "home": "/var/lib/codebyr/espaces/1000/banque",
          "passerelle": "/run/codebyr/passerelles/cbyr-1000-banque",
-         "depot": "/run/codebyr/depots/cbyr-1000-banque"}
+         "depot": "/run/codebyr/depots/cbyr-1000-banque",
+         "ordres": "/run/codebyr/depots/cbyr-1000-banque/exec"}
 
   La « passerelle » va du bureau vers l'Espace : root y présente les sockets
   du bureau auxquels l'Espace a droit. Le « dépôt » va dans l'autre sens :
   c'est le bureau qui y crée les sockets qu'il sert lui-même (notifications,
   filtre réseau), et l'Espace ne fait que les joindre.
+
+  « ordres » est la socket par laquelle le bureau fait exécuter ses commandes
+  DANS l'Espace — non par root, mais par le premier processus de l'Espace,
+  qui n'a déjà plus aucun privilège (voir codebyr-espace-init).
 
   {"action": "fermer", "espace": "banque"}
       → {"ok": true}
@@ -52,6 +60,15 @@ import comptes  # noqa: E402
 
 SOCKET_SERVICE = "/run/codebyr-uid.sock"
 TAILLE_MAX = 4096
+# Le SEUL programme que root lance. Écrit en clair, jamais reçu du client.
+# Comme CODEBYR_LIB, la variable n'existe que pour les essais : systemd démarre
+# ce service avec un environnement propre, où elle est absente.
+INIT = os.environ.get("CODEBYR_INIT", "/usr/lib/codebyr/codebyr-espace-init")
+
+# Les Espaces ouverts : nom de compte → (processus initial, socket d'ordres).
+# Rien n'est persisté : si ce service redémarre, il ne prétend pas savoir ce
+# qu'il ne sait plus, et refuse de tuer une portée qu'il n'a pas ouverte.
+OUVERTS = {}
 
 
 def journal(message):
@@ -190,7 +207,57 @@ def retirer(destination):
         pass
 
 
-def preparer(uid_demandeur, espace, affichage, son):
+def socket_d_ordres(depot):
+    """Crée la socket par laquelle le bureau commandera l'Espace.
+
+    C'est ROOT qui la crée, pas l'Espace : ainsi l'Espace ne peut pas la
+    remplacer par la sienne pour intercepter ce que le bureau lui destine.
+    Le premier processus de l'Espace la reçoit déjà ouverte, en héritage — il
+    n'a donc besoin d'aucun droit sur le dossier pour y écouter.
+    """
+    chemin = os.path.join(depot, comptes.SOCKET_EXEC)
+    if os.path.exists(chemin):
+        os.unlink(chemin)
+    srv = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+    srv.bind(chemin)
+    # Le dossier fait le tri : seuls le bureau et cet Espace le traversent.
+    os.chmod(chemin, 0o666)
+    srv.listen(16)
+    srv.set_inheritable(True)
+    return srv
+
+
+def premier_processus(utilisateur, uid_demandeur, srv, memoire, taches):
+    """Lance le premier processus de l'Espace, sous son compte et sous plafond.
+
+    Root n'exécute qu'UN chemin, écrit ici en toutes lettres. Ce qui vient du
+    bureau — la ligne de commande d'une application — n'arrive jamais jusqu'à
+    root : c'est ce premier processus, déjà sans privilège, qui l'exécutera.
+
+    setpriv fait l'abandon d'identité (groupes vidés, plus aucun privilège à
+    acquérir) ; systemd-run ne sert qu'au cgroup. Séparer les deux laisse à
+    chacun un seul rôle, et à nous un seul mécanisme d'identité dans tout le
+    projet.
+    """
+    fd = srv.fileno()
+    return subprocess.Popen(
+        ["/usr/bin/systemd-run", "--scope", "--quiet",
+         "--unit", comptes.unite_de_l_espace(utilisateur.pw_name),
+         "-p", "MemoryMax=%s" % memoire, "-p", "MemorySwapMax=0",
+         "-p", "TasksMax=%d" % taches,
+         "--", "/usr/bin/setpriv",
+         "--reuid", str(utilisateur.pw_uid), "--regid", str(utilisateur.pw_gid),
+         "--clear-groups", "--no-new-privs",
+         INIT, str(uid_demandeur), str(fd)],
+        pass_fds=(fd,), stdin=subprocess.DEVNULL)
+
+
+def arreter_portee(compte):
+    subprocess.run(["/usr/bin/systemctl", "stop", "--quiet",
+                    comptes.unite_de_l_espace(compte)], capture_output=True)
+
+
+def preparer(uid_demandeur, espace, affichage, son, memoire=None, taches=None):
     nom = comptes.nom_compte(uid_demandeur, espace)
     home = comptes.chemin_home(uid_demandeur, espace)
     utilisateur = compte_systeme(nom, home)
@@ -207,11 +274,31 @@ def preparer(uid_demandeur, espace, affichage, son):
         presenter(source, destination)
         droit_sur_socket(source, utilisateur.pw_uid, accorder=True)
         presentes.append(fichier)
+    ouvert = OUVERTS.get(nom)
+    if ouvert and ouvert[0].poll() is None:
+        # Déjà ouvert : on ne relance rien. Redémarrer la portée ici fermerait
+        # les fenêtres que l'utilisateur a sous les yeux.
+        journal("Espace %s déjà ouvert : rien à relancer" % nom)
+    else:
+        # Portée laissée par un service qui a redémarré : elle ne contient plus
+        # rien que nous sachions suivre, et son nom est pris.
+        arreter_portee(nom)
+        srv = socket_d_ordres(depot)
+        memoire, taches = comptes.plafonds_valides(memoire, taches)
+        try:
+            OUVERTS[nom] = (premier_processus(utilisateur, uid_demandeur, srv,
+                                              memoire, taches), srv)
+        except OSError:
+            srv.close()
+            raise
+        journal("Espace %s lancé sous plafond (%s, %d tâches)"
+                % (nom, memoire, taches))
     journal("Espace %s prêt pour l'UID %d : %s" % (nom, uid_demandeur,
                                                    ", ".join(presentes) or "aucun socket"))
     return {"ok": True, "compte": nom, "uid": utilisateur.pw_uid,
             "gid": utilisateur.pw_gid, "home": home,
-            "passerelle": passerelle, "depot": depot, "presentes": presentes}
+            "passerelle": passerelle, "depot": depot, "presentes": presentes,
+            "ordres": os.path.join(depot, comptes.SOCKET_EXEC)}
 
 
 def fermer(uid_demandeur, espace):
@@ -220,6 +307,17 @@ def fermer(uid_demandeur, espace):
         utilisateur = pwd.getpwnam(nom)
     except KeyError:
         return {"ok": True}
+    # L'Espace s'arrête AVANT qu'on lui retire ses sockets : dans l'autre
+    # ordre, ses applications verraient l'affichage disparaître sous elles.
+    ouvert = OUVERTS.pop(nom, None)
+    if ouvert:
+        ouvert[1].close()
+        ouvert[0].terminate()
+        try:
+            ouvert[0].wait(timeout=10)
+        except subprocess.TimeoutExpired:
+            ouvert[0].kill()
+    arreter_portee(nom)
     passerelle = comptes.chemin_passerelle(nom)
     if os.path.isdir(passerelle):
         for fichier in os.listdir(passerelle):
@@ -250,7 +348,8 @@ def traiter(demande, uid, nom_demandeur):
     try:
         if action == "preparer":
             return preparer(uid, espace, demande.get("affichage", "wayland-0"),
-                            bool(demande.get("son")))
+                            bool(demande.get("son")),
+                            demande.get("memoire"), demande.get("taches"))
         if action == "fermer":
             return fermer(uid, espace)
     except (ValueError, OSError, subprocess.CalledProcessError) as exc:

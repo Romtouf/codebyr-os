@@ -67,9 +67,24 @@ RACINE_DEPOTS = "/run/codebyr/depots"
 # (bac_a_sable.wrap_bwrap).
 SOCKETS_DU_BUREAU = {"notif": "/run/codebyr-notif", "proxy": "/run/codebyr-proxy"}
 
+# La socket par laquelle le bureau commande le premier processus de l'Espace.
+# Elle vit dans le dépôt, mais n'est JAMAIS montée dans le bac à sable, et elle
+# ne figure donc pas ci-dessus. Un programme qui s'échapperait de bubblewrap ne
+# doit pas pouvoir se relancer hors du bac à sable, fût-ce sous son propre
+# compte : sans cela, le chantier rendrait l'évasion plus confortable.
+SOCKET_EXEC = "exec"
+
 # En deçà, ce sont les comptes du système. Un utilisateur de bureau a un UID
 # d'au moins 1000 sur Debian.
 UID_MINIMAL = 1000
+
+
+# Plafonds d'un Espace. La règle vit ICI et non dans le bac à sable, parce que
+# c'est le service root qui les pose désormais : ce qui vient du client et
+# entre dans une commande lancée par root se valide du côté des décisions.
+MEMOIRE_DEFAUT = "2G"
+TACHES_DEFAUT = 800
+FORME_MEMOIRE = re.compile(r"[1-9][0-9]*[KMGT]|[1-9][0-9]?%|100%")
 
 
 def espace_valide(espace):
@@ -139,6 +154,18 @@ def chemin_depot(compte):
     return "%s/%s" % (RACINE_DEPOTS, compte)
 
 
+def unite_de_l_espace(compte):
+    """Nom du cgroup où vit tout l'Espace : plafonds posés une fois pour toutes.
+
+    Une seule portée pour l'Espace entier, et non une par application lancée :
+    c'est l'Espace qu'on veut empêcher d'épuiser la machine, pas chacune de ses
+    fenêtres séparément.
+    """
+    if not est_compte_d_espace(compte):
+        raise ValueError("Portée demandée pour un compte qui n'est pas un Espace")
+    return "codebyr-espace-%s.scope" % compte
+
+
 def socket_du_bureau(uid_proprietaire, nom):
     """Chemin d'un socket DANS le dossier d'exécution du bureau.
 
@@ -151,6 +178,22 @@ def socket_du_bureau(uid_proprietaire, nom):
         raise ValueError("Socket inconnue")
     fichier = {"pipewire": "pipewire-0"}.get(nom, nom)
     return "/run/user/%d/%s" % (uid_proprietaire, fichier)
+
+
+def plafonds_valides(memoire, taches):
+    """Ramène un couple (mémoire, tâches) à des valeurs sûres.
+
+    Une valeur mal formée est remplacée par le défaut, jamais refusée : un
+    plafond qu'on ne comprend pas ne doit ni lever la protection, ni empêcher
+    l'ouverture d'un Espace. Mais rien de ce qui vient du client n'entre tel
+    quel dans une commande que root exécutera.
+    """
+    if not (isinstance(memoire, str) and FORME_MEMOIRE.fullmatch(memoire)):
+        memoire = MEMOIRE_DEFAUT
+    if not (isinstance(taches, int) and not isinstance(taches, bool)
+            and 64 <= taches <= 32768):
+        taches = TACHES_DEFAUT
+    return memoire, taches
 
 
 def passages(affichage, son):

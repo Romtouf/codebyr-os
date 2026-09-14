@@ -11,10 +11,12 @@ Ce que cet essai vérifie, dans l'ordre où ça compte :
   2. le compte du BUREAU ne peut pas lire ce dossier — c'est tout l'objet du
      chantier : aujourd'hui, ce qui s'échappe d'un Espace lit les autres ;
   3. une fenêtre s'affiche depuis ce compte, par la passerelle ;
-  4. depuis ce même compte, le bus de session du bureau reste hors d'atteinte ;
-  5. un compte d'ESPACE qui interroge le service est refusé (sinon « jetable »
+  4. ce que le BUREAU demande s'exécute sous le compte de l'ESPACE, dans le
+     bac à sable, sous plafond — sans que root ait vu la commande ;
+  5. depuis ce même compte, le bus de session du bureau reste hors d'atteinte ;
+  6. un compte d'ESPACE qui interroge le service est refusé (sinon « jetable »
      ferait ouvrir « banque ») ;
-  6. la fermeture retire tout : montages, droits, dossier de passerelle.
+  7. la fermeture retire tout : montages, droits, passerelle, dépôt, portée.
 
 À la fin, le compte d'essai et ses fichiers sont supprimés.
 """
@@ -36,6 +38,7 @@ SOCKET = "/run/codebyr-uid-essai.sock"
 ESPACE = "essai"
 
 sys.path.insert(0, LIB)
+import bac_a_sable  # noqa: E402
 import comptes  # noqa: E402
 
 FENETRE = """
@@ -79,6 +82,34 @@ def demander(uid, gid, demande):
         return json.loads(r.stdout.strip() or "{}")
     except ValueError:
         return {"ok": False, "brut": (r.stdout + r.stderr)[:200]}
+
+
+def ordonner(uid, gid, socket_ordres, demande):
+    """Fait exécuter une commande DANS l'Espace, comme le fera le lanceur.
+
+    La connexion reste ouverte jusqu'à la fin du processus : on récupère donc
+    la réponse de lancement puis le code de sortie.
+    """
+    code = (
+        "import json,socket,sys\n"
+        "s=socket.socket(socket.AF_UNIX, socket.SOCK_STREAM); s.settimeout(60)\n"
+        "s.connect(%r)\n"
+        "s.sendall(sys.stdin.read().encode())\n"
+        "d=b''\n"
+        "while True:\n"
+        "    m=s.recv(4096)\n"
+        "    if not m:\n"
+        "        break\n"
+        "    d+=m\n"
+        "sys.stdout.write(d.decode())\n" % socket_ordres)
+    r = sous(uid, gid, ["/usr/bin/python3", "-c", code], entree=json.dumps(demande))
+    reponses = []
+    for ligne in r.stdout.splitlines():
+        try:
+            reponses.append(json.loads(ligne))
+        except ValueError:
+            pass
+    return reponses
 
 
 def main():
@@ -147,7 +178,41 @@ def main():
                        "FENETRE-AFFICHEE" in fen.stdout,
                        derniere[-1][:80] if derniere and "FENETRE" not in fen.stdout else "")
 
-        print("\n── 4. Ce qui reste hors d'atteinte ───────────────────────────────")
+        print("\n── 4. Le bureau fait exécuter DANS l'Espace ──────────────────────")
+        reussi &= dire("socket d'ordres ouverte", bool(r.get("ordres")),
+                       r.get("ordres", ""))
+        preuve = os.path.join(r["home"], "preuve")
+        # La VRAIE ligne de commande du bac à sable, comme le lanceur la
+        # construira : on mesure la chaîne entière, pas un raccourci.
+        argv = bac_a_sable.wrap_bwrap(
+            r["home"], ["/bin/sh", "-c", "id -u > %s" % preuve], {},
+            passerelle=r["passerelle"], chez=r["home"], audio=False, gpu=False)
+        reponses = ordonner(bureau.pw_uid, bureau.pw_gid, r.get("ordres", ""),
+                            {"argv": argv,
+                             "env": {"PATH": "/usr/bin:/bin", "HOME": r["home"]}})
+        lance = reponses[0] if reponses else {}
+        reussi &= dire("ordre accepté", bool(lance.get("ok")),
+                       lance.get("erreur", "") or "PID %s" % lance.get("pid"))
+        fin = reponses[1].get("fin") if len(reponses) > 1 else None
+        reussi &= dire("fin du processus rapportée au bureau", fin == 0,
+                       "code %s" % fin)
+        vu = ""
+        if os.path.exists(preuve):
+            with open(preuve, encoding="ascii") as f:
+                vu = f.read().strip()
+        # Le cœur du chantier tient dans cette ligne : ce que le BUREAU a
+        # demandé s'est exécuté sous le compte de l'ESPACE, et non le sien.
+        reussi &= dire("exécuté sous le compte de l'Espace",
+                       vu == str(espace.pw_uid),
+                       "UID %s" % (vu or "aucune preuve écrite"))
+        plafond = subprocess.run(
+            ["/usr/bin/systemctl", "show", "-p", "MemoryMax", "--value",
+             comptes.unite_de_l_espace(r["compte"])],
+            capture_output=True, text=True).stdout.strip()
+        reussi &= dire("plafond mémoire posé sur tout l'Espace",
+                       plafond.isdigit() and int(plafond) > 0, plafond)
+
+        print("\n── 5. Ce qui reste hors d'atteinte ───────────────────────────────")
         for chemin, quoi in ((os.path.join("/run/user/%d" % uid, "bus"),
                               "bus de session du bureau"),
                              (bureau.pw_dir, "dossier personnel du bureau")):
@@ -161,14 +226,14 @@ def main():
         reussi &= dire("contenu du dépôt lisible par l'Espace", lu.returncode != 0,
                        "hors d'atteinte" if lu.returncode else "à refuser")
 
-        print("\n── 5. Un Espace ne demande rien ──────────────────────────────────")
+        print("\n── 6. Un Espace ne demande rien ──────────────────────────────────")
         r2 = demander(espace.pw_uid, espace.pw_gid,
                       {"action": "preparer", "espace": "banque",
                        "affichage": affichage, "son": False})
         reussi &= dire("demande venue d'un compte d'Espace refusée",
                        not r2.get("ok"), r2.get("erreur", ""))
 
-        print("\n── 6. La fermeture retire tout ───────────────────────────────────")
+        print("\n── 7. La fermeture retire tout ───────────────────────────────────")
         r3 = demander(bureau.pw_uid, bureau.pw_gid, {"action": "fermer", "espace": ESPACE})
         dire("réponse du service", r3.get("ok"), r3.get("erreur", ""))
         reussi &= dire("passerelle retirée", not os.path.exists(r["passerelle"]),
@@ -184,6 +249,10 @@ def main():
     finally:
         service.terminate()
         service.wait(timeout=5)
+        # Ceinture : si l'essai s'est arrêté avant la fermeture, la portée
+        # survivrait au service qui l'a ouverte, et le compte d'essai avec.
+        subprocess.run(["/usr/bin/systemctl", "stop", "--quiet",
+                        comptes.unite_de_l_espace(nom)], capture_output=True)
         subprocess.run(["/usr/sbin/userdel", nom], capture_output=True)
         shutil.rmtree(comptes.chemin_home(bureau.pw_uid, ESPACE), ignore_errors=True)
         shutil.rmtree(perso, ignore_errors=True)

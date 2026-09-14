@@ -9,11 +9,12 @@ qu'un Espace peut atteindre. Le sortir le rend lisible d'un seul tenant, et
 laisse dans la commande ce qui relève du cycle de vie des Espaces.
 """
 import os
-import re
 import shutil
 import subprocess
 import sys
 import tempfile
+
+import comptes
 
 
 # Dossier d'exécution vu DANS un Espace qui tourne sous son propre compte.
@@ -177,9 +178,13 @@ def systemd_scope_dispo():
     return _SCOPE_DISPO
 
 
-MEMOIRE_DEFAUT = "2G"
-TACHES_DEFAUT = 800
-FORME_MEMOIRE = re.compile(r"[1-9][0-9]*[KMGT]|[1-9][0-9]?%|100%")
+# La règle vit dans comptes.py : c'est désormais le service root qui pose les
+# plafonds, et ce qui entre dans une commande lancée par root se valide du côté
+# des décisions. Deux copies de la même règle finiraient par diverger, et c'est
+# celle du service qui compte.
+MEMOIRE_DEFAUT = comptes.MEMOIRE_DEFAUT
+TACHES_DEFAUT = comptes.TACHES_DEFAUT
+FORME_MEMOIRE = comptes.FORME_MEMOIRE
 
 
 def plafonds_de(esp):
@@ -196,14 +201,8 @@ def plafonds_de(esp):
     ne comprend pas ne doit ni lever la protection, ni empêcher l'ouverture.
     """
     reglages = esp.get("plafonds") if isinstance(esp.get("plafonds"), dict) else {}
-    memoire = reglages.get("memoire")
-    if not (isinstance(memoire, str) and FORME_MEMOIRE.fullmatch(memoire)):
-        memoire = MEMOIRE_DEFAUT
-    taches = reglages.get("taches")
-    if not (isinstance(taches, int) and not isinstance(taches, bool)
-            and 64 <= taches <= 32768):
-        taches = TACHES_DEFAUT
-    return memoire, taches
+    return comptes.plafonds_valides(reglages.get("memoire"),
+                                    reglages.get("taches"))
 
 
 def plafonner_ressources(run, memoire=MEMOIRE_DEFAUT, taches=TACHES_DEFAUT):

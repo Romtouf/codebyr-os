@@ -1,0 +1,253 @@
+#!/usr/bin/python3 -IS
+# -*- coding: utf-8 -*-
+"""Service privilégié : prépare le compte Unix et la passerelle d'un Espace.
+
+C'est la pièce sensible du chantier « un UID par Espace ». Elle tourne en root.
+Tout ce qu'elle accepte de faire est décidé par comptes.py, écrit à part et
+éprouvé par des tests ; ce fichier ne fait qu'exécuter, et refuser.
+
+── CE QU'IL NE FAIT PAS, VOLONTAIREMENT ────────────────────────────────────
+· Il n'exécute aucune commande fournie par le client. Il prépare, c'est tout.
+· Il ne prend aucun chemin du client : les chemins sont construits à partir de
+  l'UID que le NOYAU lui donne (SO_PEERCRED) et d'identifiants validés.
+· Il n'ouvre jamais le dossier d'exécution du bureau. Mesuré le 14/09/2026 :
+  l'ouvrir rend joignable le bus de session, donc systemd --user, donc
+  l'exécution hors du bac à sable — la faille fermée en 1.1.0. Seuls les
+  sockets autorisés sont présentés, un par un, dans un dossier que root tient.
+· Il ne répond à aucun compte d'Espace : sinon « jetable » ferait ouvrir
+  « banque » et lirait ses fichiers.
+
+── PROTOCOLE ───────────────────────────────────────────────────────────────
+Une demande JSON par connexion, une réponse JSON :
+
+  {"action": "preparer", "espace": "banque", "affichage": "wayland-0",
+   "son": false}
+      → {"ok": true, "compte": "cbyr-1000-banque", "uid": 997, "gid": 997,
+         "home": "/var/lib/codebyr/espaces/1000/banque",
+         "passerelle": "/run/codebyr/passerelles/cbyr-1000-banque"}
+
+  {"action": "fermer", "espace": "banque"}
+      → {"ok": true}
+
+Lancement : par systemd, sur activation de socket (codebyr-uid.socket).
+Pour l'essai sur une machine de test : codebyr-uid --essai /chemin/socket
+"""
+import json
+import os
+import pwd
+import socket
+import struct
+import subprocess
+import sys
+import syslog
+
+sys.path.insert(0, os.environ.get("CODEBYR_LIB", "/usr/share/codebyr"))
+import comptes  # noqa: E402
+
+SOCKET_SERVICE = "/run/codebyr-uid.sock"
+TAILLE_MAX = 4096
+
+
+def journal(message):
+    syslog.syslog(syslog.LOG_INFO, message)
+
+
+def demandeur(client):
+    """Qui parle, d'après le NOYAU. Jamais d'après ce que le client raconte."""
+    donnees = client.getsockopt(socket.SOL_SOCKET, socket.SO_PEERCRED,
+                                struct.calcsize("3i"))
+    _pid, uid, _gid = struct.unpack("3i", donnees)
+    try:
+        nom = pwd.getpwuid(uid).pw_name
+    except KeyError:
+        nom = ""
+    return uid, nom
+
+
+def compte_systeme(nom, home):
+    """Crée le compte de l'Espace s'il manque, et vérifie ce qui existe déjà.
+
+    Sans mot de passe utilisable ni shell de connexion : ce compte n'est pas
+    fait pour ouvrir une session, seulement pour posséder des fichiers.
+    """
+    try:
+        utilisateur = pwd.getpwnam(nom)
+    except KeyError:
+        subprocess.run(["/usr/sbin/useradd", "--system", "--user-group",
+                        "--no-create-home", "--home-dir", home,
+                        "--shell", "/usr/sbin/nologin", "--password", "!", nom],
+                       check=True, capture_output=True)
+        utilisateur = pwd.getpwnam(nom)
+        journal("compte créé : %s (UID %d)" % (nom, utilisateur.pw_uid))
+    if utilisateur.pw_uid == 0:
+        raise ValueError("Compte existant incompatible")
+    return utilisateur
+
+
+def dossier_root(chemin, mode=0o711):
+    """Un dossier appartenant à root, qu'aucun autre compte ne peut modifier."""
+    if os.path.islink(chemin):
+        raise ValueError("Lien symbolique refusé : %s" % chemin)
+    os.makedirs(chemin, mode=mode, exist_ok=True)
+    os.chmod(chemin, mode)
+    st = os.stat(chemin)
+    if st.st_uid != 0 or st.st_mode & 0o022:
+        raise ValueError("Dossier modifiable par un autre compte : %s" % chemin)
+    return chemin
+
+
+def dossier_espace(home, utilisateur):
+    """Le dossier personnel de l'Espace : à lui seul, 0700."""
+    dossier_root(os.path.dirname(home))
+    if os.path.islink(home):
+        raise ValueError("Lien symbolique refusé : %s" % home)
+    os.makedirs(home, mode=0o700, exist_ok=True)
+    st = os.stat(home)
+    if st.st_uid not in (0, utilisateur.pw_uid):
+        raise ValueError("Dossier déjà pris par un autre compte")
+    os.chown(home, utilisateur.pw_uid, utilisateur.pw_gid)
+    os.chmod(home, 0o700)
+    return home
+
+
+def droit_sur_socket(chemin, uid, accorder=True):
+    """Accorde (ou retire) l'accès d'UN compte à UN socket. Jamais un dossier."""
+    regle = ["-m", "u:%d:rw" % uid] if accorder else ["-x", "u:%d" % uid]
+    subprocess.run(["/usr/bin/setfacl"] + regle + [chemin],
+                   check=True, capture_output=True)
+
+
+def presenter(source, destination):
+    """Présente un socket du bureau dans la passerelle, par un montage lié."""
+    if not os.path.exists(destination):
+        with open(destination, "w"):
+            pass
+    subprocess.run(["/usr/bin/mount", "--bind", source, destination],
+                   check=True, capture_output=True)
+
+
+def retirer(destination):
+    if os.path.ismount(destination):
+        subprocess.run(["/usr/bin/umount", destination], capture_output=True)
+    try:
+        os.unlink(destination)
+    except OSError:
+        pass
+
+
+def preparer(uid_demandeur, espace, affichage, son):
+    nom = comptes.nom_compte(uid_demandeur, espace)
+    home = comptes.chemin_home(uid_demandeur, espace)
+    utilisateur = compte_systeme(nom, home)
+    dossier_espace(home, utilisateur)
+
+    passerelle = dossier_root(comptes.chemin_passerelle(nom))
+    presentes = []
+    for source_nom, fichier in comptes.passages(affichage, son):
+        source = comptes.socket_du_bureau(uid_demandeur, source_nom)
+        if not os.path.exists(source):
+            continue        # le son peut manquer : ce n'est pas une erreur
+        destination = os.path.join(passerelle, fichier)
+        presenter(source, destination)
+        droit_sur_socket(source, utilisateur.pw_uid, accorder=True)
+        presentes.append(fichier)
+    journal("Espace %s prêt pour l'UID %d : %s" % (nom, uid_demandeur,
+                                                   ", ".join(presentes) or "aucun socket"))
+    return {"ok": True, "compte": nom, "uid": utilisateur.pw_uid,
+            "gid": utilisateur.pw_gid, "home": home,
+            "passerelle": passerelle, "presentes": presentes}
+
+
+def fermer(uid_demandeur, espace):
+    nom = comptes.nom_compte(uid_demandeur, espace)
+    try:
+        utilisateur = pwd.getpwnam(nom)
+    except KeyError:
+        return {"ok": True}
+    passerelle = comptes.chemin_passerelle(nom)
+    if os.path.isdir(passerelle):
+        for fichier in os.listdir(passerelle):
+            retirer(os.path.join(passerelle, fichier))
+            source = os.path.join("/run/user/%d" % uid_demandeur, fichier)
+            if os.path.exists(source):
+                try:
+                    droit_sur_socket(source, utilisateur.pw_uid, accorder=False)
+                except subprocess.CalledProcessError:
+                    pass
+        try:
+            os.rmdir(passerelle)
+        except OSError:
+            pass
+    journal("Espace %s refermé" % nom)
+    return {"ok": True}
+
+
+def traiter(demande, uid, nom_demandeur):
+    """Décide, puis agit. Toute erreur devient un refus sans détail."""
+    autorise, raison = comptes.demandeur_autorise(uid, nom_demandeur)
+    if not autorise:
+        journal("demande refusée (%s) : %s" % (nom_demandeur or uid, raison))
+        return {"ok": False, "erreur": "refusé"}
+    action = demande.get("action")
+    espace = demande.get("espace")
+    try:
+        if action == "preparer":
+            return preparer(uid, espace, demande.get("affichage", "wayland-0"),
+                            bool(demande.get("son")))
+        if action == "fermer":
+            return fermer(uid, espace)
+    except (ValueError, OSError, subprocess.CalledProcessError) as exc:
+        journal("échec pour l'UID %d (%s) : %s" % (uid, action, exc))
+        return {"ok": False, "erreur": "impossible"}
+    return {"ok": False, "erreur": "action inconnue"}
+
+
+def servir(srv):
+    while True:
+        try:
+            client, _ = srv.accept()
+        except OSError:
+            return 0
+        with client:
+            try:
+                client.settimeout(10)
+                uid, nom = demandeur(client)
+                brut = client.recv(TAILLE_MAX)
+                try:
+                    demande = json.loads(brut.decode("utf-8", "replace"))
+                    if not isinstance(demande, dict):
+                        raise ValueError
+                except ValueError:
+                    reponse = {"ok": False, "erreur": "demande illisible"}
+                else:
+                    reponse = traiter(demande, uid, nom)
+                client.sendall((json.dumps(reponse) + "\n").encode("utf-8"))
+            except OSError:
+                pass
+
+
+def main(argv):
+    if os.geteuid() != 0:
+        sys.stderr.write("codebyr-uid : service réservé à l'administrateur.\n")
+        return 2
+    syslog.openlog("codebyr-uid", syslog.LOG_PID, syslog.LOG_DAEMON)
+    if len(argv) >= 3 and argv[1] == "--essai":
+        chemin = argv[2]
+        if os.path.exists(chemin):
+            os.unlink(chemin)
+        srv = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        srv.bind(chemin)
+        os.chmod(chemin, 0o666)
+        srv.listen(8)
+        journal("service d'essai sur %s" % chemin)
+    else:
+        # Activation par socket : systemd passe la socket déjà en écoute.
+        if os.environ.get("LISTEN_FDS") != "1":
+            sys.stderr.write("codebyr-uid : lancé par systemd (codebyr-uid.socket).\n")
+            return 2
+        srv = socket.socket(fileno=3)
+    return servir(srv)
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv))

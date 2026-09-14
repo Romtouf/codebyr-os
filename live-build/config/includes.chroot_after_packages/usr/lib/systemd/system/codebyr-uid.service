@@ -1,0 +1,31 @@
+[Unit]
+Description=Comptes d'Espaces Codebyr
+Documentation=file:/usr/share/codebyr/comptes.py
+Requires=codebyr-uid.socket
+After=codebyr-uid.socket
+
+[Service]
+ExecStart=/usr/lib/codebyr/codebyr-uid
+# Démarré à la demande, à la première ouverture d'Espace : rien ne tourne tant
+# que personne n'en ouvre.
+#
+# AUCUN durcissement d'espace de noms ici, et c'est délibéré : ce service
+# présente des sockets par des montages liés, qui doivent rester visibles du
+# reste du système. PrivateMounts, PrivateTmp ou ProtectHome les enfermeraient
+# dans un espace de noms privé — les Espaces ne verraient alors rien, sans le
+# moindre message d'erreur.
+#
+# Ce qui protège ce service n'est pas son confinement : c'est qu'il refuse tout
+# chemin et toute commande venant du client, et qu'il n'obéit qu'à un compte
+# d'utilisateur du bureau (voir comptes.py).
+NoNewPrivileges=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+MemoryDenyWriteExecute=yes
+SystemCallArchitectures=native
+
+[Install]
+WantedBy=multi-user.target

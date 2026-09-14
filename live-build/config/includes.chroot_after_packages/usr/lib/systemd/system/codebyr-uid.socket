@@ -1,0 +1,13 @@
+[Unit]
+Description=Comptes d'Espaces Codebyr (socket d'activation)
+Documentation=file:/usr/share/codebyr/comptes.py
+
+[Socket]
+ListenStream=/run/codebyr-uid.sock
+# Ouverte à tous : l'autorisation ne se joue pas sur les droits du fichier mais
+# sur l'identité que le NOYAU donne au service (SO_PEERCRED). Un compte
+# d'Espace qui se connecte est refusé, et c'est écrit dans le journal.
+SocketMode=0666
+
+[Install]
+WantedBy=sockets.target

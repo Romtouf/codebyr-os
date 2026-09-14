@@ -419,6 +419,12 @@ def main():
         tentative = lanceur(bureau, "launch", ESPACE, "--", "firefox-esr", "--headless",
                             "--screenshot", os.path.join(home, "refus.png"),
                             "https://" + DOMAINE_REFUSE + "/")
+        # Informatif : un lanceur arrêté au bout du délai est tué, et un
+        # lanceur tué ne range pas son marqueur — c'est ce qui a trompé
+        # l'étape 1 d'un essai suivant.
+        dire("tentative sur le site refusé terminée d'elle-même",
+             tentative.returncode != 124,
+             "code %s en %.0f s" % (tentative.returncode, time.time() - avant_refus))
         refuses = ""
         try:
             with open(journal_refus, encoding="utf-8") as f:

@@ -13,6 +13,9 @@ import St from 'gi://St';
 import Gio from 'gi://Gio';
 import GLib from 'gi://GLib';
 import Clutter from 'gi://Clutter';
+// Fourni par GJS lui-même, pas par l'introspection : c'est le module de
+// dessin, dont on n'a besoin que pour nommer les extrémités arrondies.
+import Cairo from 'cairo';
 
 import {Extension} from 'resource:///org/gnome/shell/extensions/extension.js';
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
@@ -214,6 +217,70 @@ function hexVersRGB(hex) {
         s = s.split('').map(c => c + c).join('');
     const n = parseInt(s, 16) || 0;
     return {r: ((n >> 16) & 255) / 255, g: ((n >> 8) & 255) / 255, b: (n & 255) / 255};
+}
+
+// ── Le Sceau de la barre du haut ────────────────────────────────────────────
+// Dessiné, et non chargé depuis un fichier. Trois tentatives ont échoué en
+// août 2026 avec une icône SVG, dont deux l'ont rendue invisible : le dessin
+// est fait de TRAITS, alors que la recoloration symbolique de GNOME agit sur le
+// REMPLISSAGE — passer en « fill » remplissait les arcs au lieu de les colorer.
+// La couleur restait donc écrite en dur (un gris moyen), terne sur un panneau
+// noir où tout le reste est blanc.
+//
+// Dessiné avec Cairo, comme le liseré, le Sceau prend la couleur du texte de la
+// barre : blanc sur thème sombre, sombre sur thème clair, sans réglage. Les
+// proportions sont choisies pour 16 points — la taille réelle d'une icône de
+// barre — et non héritées d'un fichier pensé pour l'affiche : c'est ce qui rend
+// le trait lisible à cette taille (variante retenue à l'aperçu du 15/09/2026,
+// tools/apercu_icone_sceau.py).
+const SCEAU_COTE = 16;          // taille d'une icône de barre
+const SCEAU_TRAIT = 2.3;        // épaisseur du trait, à cette taille
+const SCEAU_POINT = 1.7;        // rayon du point central
+const SCEAU_MARGE = 0.8;        // air autour : les icônes voisines en gardent
+// Les trois arcs du Sceau, en degrés, relevés sur le dessin d'origine.
+const SCEAU_ARCS = [[18, 108], [138, 228], [258, 348]];
+
+function sceauDeLaBarre() {
+    const zone = new St.DrawingArea({
+        style_class: 'system-status-icon',
+        width: SCEAU_COTE, height: SCEAU_COTE,
+        y_align: Clutter.ActorAlign.CENTER,
+    });
+    zone.connect('repaint', () => {
+        let cr = null;
+        try {
+            const [w, h] = zone.get_surface_size();
+            if (w < 4 || h < 4)
+                return;
+            cr = zone.get_context();
+            // La couleur du texte de la barre, telle que le thème la donne :
+            // c'est elle qui fait que l'icône reste visible partout.
+            const c = zone.get_theme_node().get_foreground_color();
+            cr.setSourceRGBA(c.red / 255, c.green / 255, c.blue / 255, c.alpha / 255);
+            // Le dessin suit la taille réellement allouée : sur un écran à forte
+            // densité, la barre demande plus de points, et le Sceau grandit avec.
+            const k = Math.min(w, h) / SCEAU_COTE;
+            const centre = Math.min(w, h) / 2;
+            const trait = SCEAU_TRAIT * k;
+            const rayon = centre - SCEAU_MARGE * k - trait / 2;
+            cr.setLineWidth(trait);
+            cr.setLineCap(Cairo.LineCap.ROUND);
+            for (const [depart, fin] of SCEAU_ARCS) {
+                cr.newSubPath();
+                cr.arc(centre, centre, rayon,
+                       depart * Math.PI / 180, fin * Math.PI / 180);
+                cr.stroke();
+            }
+            cr.arc(centre, centre, SCEAU_POINT * k, 0, 2 * Math.PI);
+            cr.fill();
+        } catch (e) {
+            logError(e, 'Codebyr: dessin du Sceau');
+        } finally {
+            if (cr)
+                cr.$dispose();
+        }
+    });
+    return zone;
 }
 
 // Chemin d'un rectangle à coins arrondis.
@@ -638,10 +705,7 @@ class Indicateur extends PanelMenu.Button {
         this._extension = extension;
 
         const boite = new St.BoxLayout({style_class: 'panel-status-menu-box'});
-        boite.add_child(new St.Icon({
-            gicon: Gio.icon_new_for_string(extension.path + '/icons/codebyr-symbolic.svg'),
-            style_class: 'system-status-icon',
-        }));
+        boite.add_child(sceauDeLaBarre());
         // L'Espace de la fenêtre active, écrit : toujours au même endroit, sans
         // jamais recouvrir une application. Masqué hors Espace.
         this._repere = new St.BoxLayout({visible: false, y_align: Clutter.ActorAlign.CENTER});

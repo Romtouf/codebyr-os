@@ -10,6 +10,20 @@ GNOME (menu du Sceau, liserés colorés) ne se recharge pas à chaud.
 
 ---
 
+## 1.16.1 — 15 septembre 2026
+
+**Le Sceau de la barre du haut se voit enfin.** L'icône était terne et trop
+petite : un petit anneau gris sur un panneau noir où tout le reste est blanc.
+
+Elle est désormais **dessinée** plutôt que chargée depuis un fichier, et prend
+la couleur du texte de la barre — claire sur un thème sombre, sombre sur un
+thème clair, sans réglage. Son trait a été épaissi pour la taille réelle d'une
+icône de barre.
+
+Trois tentatives avaient échoué en août, dont deux en rendant l'icône
+invisible. La cause est maintenant connue : le dessin était fait de traits, là
+où la recoloration de GNOME agit sur le remplissage.
+
 ## 1.16.0 — 15 septembre 2026
 
 **Les applications Flatpak s'ouvrent dans un Espace à compte séparé.** C'était

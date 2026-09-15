@@ -299,51 +299,57 @@ class EtiquetteDuNom(unittest.TestCase):
 
 
 class SceauDuPanneau(unittest.TestCase):
-    """Le Sceau du panneau : une tentative d'amélioration ABANDONNÉE.
+    """Le Sceau du panneau : dessiné, et à la couleur du thème.
 
-    Le 23/08/2026, trois essais successifs ont laissé l'icône invisible sur le
-    panneau, chacun plus sûr de lui que le précédent : recoloration symbolique
-    supposée, puis choix d'après « color-scheme », puis mesure de la couleur du
-    panneau. La troisième était juste sur le fond — le journal et les dates le
-    confirmaient — et l'icône ne se dessinait toujours pas.
+    Le 23/08/2026, trois essais successifs avaient laissé l'icône invisible,
+    chacun plus sûr de lui que le précédent. La cause n'a été comprise que le
+    15/09/2026 : l'icône était un fichier SVG dessiné en TRAITS, alors que la
+    recoloration symbolique de GNOME agit sur le REMPLISSAGE. La passer en
+    « fill » remplissait les arcs au lieu de les colorer — d'où les taches et
+    les disparitions.
 
-    Le mainteneur a demandé le retour à la version d'origine, et il a eu
-    raison : un défaut esthétique connu vaut mieux qu'une régression qu'on ne
-    sait pas expliquer. On garde donc l'icône historique, avec son gris
-    #5c5c5c, et ce test se contente de vérifier qu'elle est bien là et qu'elle
-    reste visible sur les deux panneaux — ce qui est exactement ce que ce gris
-    avait été choisi pour faire.
+    La couleur restait donc écrite en dur, un gris moyen choisi pour être
+    visible sur les deux panneaux sans être beau sur aucun. Le Sceau est
+    maintenant DESSINÉ avec Cairo, comme le liseré : il prend la couleur du
+    texte de la barre, donc il suit le thème par construction, et la question
+    du contraste ne se pose plus — c'est celle du texte voisin.
 
-    Ce qui reste à comprendre, si quelqu'un rouvre le sujet, est écrit dans
-    docs/chantiers.md.
+    Ces tests gardent cette propriété. S'ils tombent, on est en train de
+    revenir à une couleur figée.
     """
 
-    PANNEAU_CLAIR = "#fafafb"
-    PANNEAU_SOMBRE = "#000000"
-    ICONE = os.path.join(
-        RACINE, "live-build", "config", "includes.chroot_after_packages",
-        "usr", "share", "gnome-shell", "extensions", "codebyr@codebyr.io",
-        "icons", "codebyr-symbolic.svg")
+    def setUp(self):
+        chemin = os.path.join(RACINE, "live-build", "config",
+                              "includes.chroot_after_packages", "usr", "share",
+                              "gnome-shell", "extensions", "codebyr@codebyr.io",
+                              "extension.js")
+        with open(chemin, encoding="utf-8") as f:
+            self.code = f.read()
+        self.sceau = self.code.split("function sceauDeLaBarre(")[1].split("\n}")[0]
 
-    def test_l_icone_existe(self):
-        self.assertTrue(os.path.exists(self.ICONE))
+    def test_le_sceau_est_dessine_et_non_charge_d_un_fichier(self):
+        self.assertIn("St.DrawingArea", self.sceau)
+        self.assertNotIn("codebyr-symbolic.svg", self.code)
 
-    def test_elle_se_voit_sur_les_deux_panneaux(self):
-        """Le gris historique n'est beau nulle part, mais visible partout.
+    def test_il_prend_la_couleur_du_theme(self):
+        # C'est tout l'objet du changement : une couleur écrite en dur est
+        # terne sur un panneau noir, ou invisible sur un panneau clair.
+        self.assertIn("get_theme_node().get_foreground_color()", self.sceau)
+        self.assertNotIn("#5c5c5c", self.code)
+        for regle in re.findall(r"setSourceRGBA\(([^)]*)\)", self.sceau):
+            self.assertIn("c.", regle, "couleur figée dans le Sceau : " + regle)
 
-        Seuil 3.0, celui des éléments non textuels. C'est le compromis que la
-        contrainte impose : le panneau vaut #fafafb en clair et #000000 en
-        sombre, et une couleur unique doit tenir sur les deux.
-        """
-        with open(self.ICONE, encoding="utf-8") as f:
-            couleurs = set(re.findall(r'(?:fill|stroke)="(#[0-9A-Fa-f]{6})"', f.read()))
-        self.assertTrue(couleurs, "aucune couleur dans l'icône du Sceau")
-        for couleur in couleurs:
-            for panneau in (self.PANNEAU_CLAIR, self.PANNEAU_SOMBRE):
-                mesure = contraste(couleur, panneau)
-                self.assertGreaterEqual(
-                    mesure, 3.0,
-                    "%s ne ressort pas sur %s : %.2f" % (couleur, panneau, mesure))
+    def test_il_suit_la_taille_qu_on_lui_donne(self):
+        # Sur un écran à forte densité, la barre demande plus de points : un
+        # dessin calé sur 16 en dur y serait minuscule.
+        self.assertIn("get_surface_size()", self.sceau)
+        self.assertIn("SCEAU_COTE", self.sceau)
+
+    def test_le_dessin_libere_son_contexte(self):
+        # Même règle que le liseré : un contexte Cairo non libéré fuit dans le
+        # compositeur, qui redessine la barre en permanence.
+        self.assertIn("cr.$dispose()", self.sceau)
+        self.assertIn("finally", self.sceau)
 
 
 class AccentSentinelle(unittest.TestCase):

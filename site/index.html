@@ -199,6 +199,12 @@
         <p>Bac à sable bubblewrap, dossier personnel séparé, bus D-Bus <strong>privé</strong> — celui de votre session n'entre jamais dans un Espace, c'est ce qui empêche d'en sortir. Liserés colorés par fenêtre via une extension GNOME Shell dédiée.</p>
       </article>
       <article class="card reveal">
+        <div class="card__ico">⚿</div>
+        <h3>Un compte par Espace</h3>
+        <p>Un Espace peut tourner sous <strong>son propre compte système</strong> : son dossier lui appartient, et le noyau vérifie cette frontière à chaque ouverture de fichier. Ce qui s'échappe du bac à sable ne retrouve alors que cet Espace — ni les autres, ni votre dossier personnel.</p>
+        <p>Ses fichiers le suivent à la première ouverture, et <strong>reviennent</strong> si vous changez d'avis : rien n'est effacé. À activer Espace par Espace dans Configuration Codebyr&nbsp;; <em>désactivé par défaut</em>, le temps que les applications Flatpak et l'accélération graphique y fonctionnent.</p>
+      </article>
+      <article class="card reveal">
         <div class="card__ico">🛡</div>
         <h3>Le Blindage</h3>
         <p>Isolation renforcée : espace de noms utilisateur, zéro privilège (<code>--cap-drop ALL</code>), session neuve, filtre d'appels système, plafonds mémoire/processus anti fork-bomb. Actif par défaut sur Banque, Navigation et Jetable.</p>
@@ -312,6 +318,7 @@
           <li>La compromission d'un site ou d'une application qui tente d'accéder aux données des <strong>autres</strong> Espaces.</li>
           <li>Une pièce jointe piégée&nbsp;: elle explose dans une bulle jetable, sans réseau.</li>
           <li>Une extension de navigateur malveillante, cantonnée à son Espace.</li>
+          <li>L'évasion du bac à sable elle-même, pour un Espace dont vous avez activé le <strong>compte séparé</strong>&nbsp;: le programme échappé retrouve ce compte-là, et le noyau lui refuse les autres Espaces comme votre dossier personnel.</li>
           <li>Le vol de l'ordinateur, grâce au chiffrement LUKS2 du disque, <strong>coché d'avance à l'installation</strong> : vous choisissez une phrase de passe, demandée à chaque démarrage. Vous pouvez décocher la case, mais le choix sûr est celui qu'on fait sans rien toucher.</li>
         </ul>
       </div>
@@ -322,7 +329,7 @@
           <li>Protéger contre un attaquant physique avec accès répété à la machine.</li>
           <li>Protéger contre du matériel déjà compromis.</li>
           <li>Empêcher un Espace d'atteindre le <strong>micro</strong> : le serveur de son est partagé (Banque, elle, l'a coupé par défaut).</li>
-          <li>Séparer les Espaces par <strong>compte Unix</strong> : ils tournent tous sous le vôtre. Le bac à sable les cloisonne, mais un programme lancé hors Espace voit tout.</li>
+          <li>Séparer les Espaces par <strong>compte Unix d'office</strong> : le réglage existe et fonctionne, mais il reste désactivé par défaut. Tant qu'il ne l'est pas, les Espaces tournent sous votre compte, et un programme lancé hors Espace voit tout. Deux choses manquent pour l'activer partout : les applications Flatpak et l'accélération graphique n'y fonctionnent pas encore.</li>
           <li><strong>Avoir été audité.</strong> Aucun audit de sécurité externe n'a été réalisé à ce jour. Les correctifs passés sont détaillés publiquement, y compris ce qui était vulnérable et comment — mais personne d'extérieur n'a encore examiné l'ensemble.</li>
         </ul>
       </div>
@@ -379,7 +386,7 @@
     <header class="chap__head reveal">
       <span class="num">05</span>
       <h2>Feuille de route</h2>
-      <p class="lead">Où en est le projet, sans enjoliver&nbsp;: quatre phases livrées, deux à venir.</p>
+      <p class="lead">Où en est le projet, sans enjoliver&nbsp;: cinq phases livrées, une en cours.</p>
     </header>
 
     <ol class="road reveal">

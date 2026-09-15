@@ -26,6 +26,17 @@ import gi
 gi.require_version("Gtk", "4.0")
 from gi.repository import Gtk  # noqa: E402
 
+# Sans cet import, GTK ne sait pas convertir son contexte de dessin pour
+# Python : chaque dessin échoue sur « Couldn't find foreign struct converter
+# for 'cairo.Context' », et la fenêtre s'ouvre VIDE, sans rien dire de plus
+# qu'une ligne dans le terminal (constaté le 15/09/2026). Il ne sert à rien
+# d'autre qu'à établir ce pont.
+try:
+    import cairo  # noqa: F401
+except ImportError:
+    sys.exit("Il manque le pont Cairo de Python : "
+             "sudo apt install -y python3-gi-cairo")
+
 # Le Sceau : trois arcs d'un même cercle, séparés par des coupures, et un point
 # au centre. Les angles viennent du dessin d'origine (branding/le-sceau.svg),
 # relevés ici en degrés pour rester lisibles.

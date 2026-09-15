@@ -186,13 +186,24 @@ surface applicative minimale (`--apt-recommends false`).
   `~/.config/codebyr/presse-papiers-libre` désactive le vidage automatique.
 - **Applications Flatpak** : proviennent de Flathub — confiance déléguée à
   Flathub et à l'éditeur de chaque application.
-- **Compte séparé : ce qui n'y fonctionne pas encore.** Une application Flatpak
-  installée dans un Espace ne s'ouvre pas sous compte séparé (elle a son propre
-  bac à sable et ses propres données, que Codebyr ne déplace pas), et la carte
-  graphique n'est pas accessible au compte de l'Espace : l'affichage s'y fait en
-  rendu logiciel. Les deux sont annoncés dans la fenêtre de configuration, et
-  c'est pourquoi le réglage reste au choix de l'utilisateur plutôt qu'appliqué
-  d'office.
+- **Compte séparé : ce qui n'y fonctionne pas encore.** La carte graphique
+  n'est pas accessible au compte de l'Espace : l'affichage s'y fait en rendu
+  logiciel. C'est annoncé dans la fenêtre de configuration, et c'est pourquoi
+  le réglage reste au choix de l'utilisateur plutôt qu'appliqué d'office.
+- **Compte séparé : ouvrir un fichier depuis une application Flatpak.** Depuis
+  la 1.16.0, les applications Flatpak s'ouvrent sous compte séparé, avec leurs
+  portails — la fenêtre « Ouvrir un fichier » s'affiche, et elle ne montre que
+  les fichiers de l'Espace. Mais l'application ne **reçoit** pas le fichier
+  choisi : le passage se fait normalement par le « portail des documents », qui
+  monte un système de fichiers FUSE au moyen de `fusermount3`, un programme
+  setuid. Or un Espace tourne sous `no-new-privs`, qui interdit précisément
+  qu'un programme acquière des privilèges — la protection qui empêche ce qui
+  s'échapperait du bac à sable d'atteindre `sudo`, `pkexec` ou leurs failles.
+  Mesuré le 15/09/2026 : `Can't mount path /run/user/<uid>/doc`. Le choix est
+  assumé — garder la protection, et dire la limite — plutôt que de l'affaiblir
+  pour une commodité. Les applications qui déclarent un accès aux fichiers
+  (`--filesystem`) ne s'en tirent pas mieux : le passage par ce portail ne se
+  contourne pas côté application.
 - **Compte séparé : le bureau reste au-dessus.** Il dit à l'Espace quoi
   exécuter — il pouvait déjà tout exécuter sous sa propre identité, donc cela ne
   lui donne rien de neuf. L'inverse n'est pas vrai : un Espace ne commande rien

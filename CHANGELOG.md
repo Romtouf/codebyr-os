@@ -10,6 +10,50 @@ GNOME (menu du Sceau, liserés colorés) ne se recharge pas à chaud.
 
 ---
 
+## 1.16.0 — 15 septembre 2026
+
+**Les applications Flatpak s'ouvrent dans un Espace à compte séparé.** C'était
+la première des deux limites annoncées en 1.15.0 ; elle est levée.
+
+Chaque Espace sous compte séparé a désormais **son propre bus de session**, et
+donc ses propres « portails » — ces services par lesquels une application
+demande d'ouvrir un fichier ou d'imprimer. Celui du bureau n'y entre toujours
+pas, et n'y entrera pas : c'est lui qui donnait, en 1.1.0, un chemin hors du
+bac à sable.
+
+Ce que vous verrez :
+
+- **installer une application dans un Espace** fonctionne comme avant, depuis
+  « Configuration Codebyr ». La différence est invisible et elle compte : c'est
+  l'Espace qui télécharge, chez lui, sous son propre compte. Votre compte n'y
+  écrit rien ;
+- **l'application s'ouvre** avec le liseré de son Espace, et tourne sous le
+  compte de celui-ci ;
+- **sa fenêtre « Ouvrir un fichier » ne montre que les fichiers de l'Espace** —
+  ni les vôtres, ni ceux des autres Espaces.
+
+C'est aussi un gain d'isolation pour qui utilisait déjà des applications
+Flatpak : jusqu'ici, elles parlaient au bus de session du bureau, et ce qu'elles
+faisaient ouvrir par ce biais s'ouvrait sous **votre** compte.
+
+**Ce qui ne fonctionne pas, et pourquoi.** Une application Flatpak ne reçoit pas
+le fichier choisi dans « Ouvrir un fichier ». Ce passage se fait par un service
+qui monte un système de fichiers au moyen d'un programme à privilèges, ce qu'un
+Espace interdit à tout ce qui tourne en lui — la protection même qui empêche un
+programme échappé d'atteindre les outils d'administration. Nous gardons la
+protection et disons la limite, plutôt que de l'affaiblir pour une commodité.
+Le détail est dans [SECURITY.md](SECURITY.md).
+
+Les applications déjà installées dans un Espace avant l'activation du compte
+séparé sont **à réinstaller** dans l'Espace : leur installation vit dans un
+dossier de votre compte, auquel celui de l'Espace n'a pas accès. La fenêtre de
+configuration le dit.
+
+**Sous le capot** : le dossier d'exécution d'un Espace a pris sa place
+canonique, `/run/user/<son numéro de compte>`. Sans cela, aucune application
+Flatpak ne démarrait — son bac à sable interne butait sur un chemin de notre
+invention.
+
 ## 1.15.0 — 14 septembre 2026
 
 **Chaque Espace peut désormais avoir son propre compte sur la machine.** C'est

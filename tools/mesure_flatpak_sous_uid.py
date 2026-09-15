@@ -39,13 +39,19 @@ import sys
 
 RACINE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 LIVRE = os.path.join(RACINE, "live-build", "config", "includes.chroot_after_packages")
-LIB = os.path.join(LIVRE, "usr", "share", "codebyr")
+ARBRE = os.path.join(LIVRE, "usr", "share", "codebyr")
+# Sur la machine d'essai, il n'y a pas de dépôt : seulement Codebyr installé.
+# L'outil doit donc pouvoir y être déposé seul, sans rien d'autre.
+LIB = ARBRE if os.path.isdir(ARBRE) else "/usr/share/codebyr"
 
 # Importer depuis l'arbre livré y écrirait un « __pycache__ », qui partirait
 # tel quel dans l'image (test_packaging le refuse, à juste titre).
 sys.dont_write_bytecode = True
 sys.path.insert(0, LIB)
-import comptes  # noqa: E402
+try:
+    import comptes  # noqa: E402
+except ImportError:
+    sys.exit("Codebyr introuvable : ni %s, ni /usr/share/codebyr." % ARBRE)
 
 ESPACE = "mesureflat"
 # Petite, sans réseau, et son runtime est celui que GNOME installe de toute

@@ -368,8 +368,42 @@ def vider_depot(chemin):
         journal("dépôt non vide, conservé : %s" % chemin)
 
 
+def _retirer_les_cartes(utilisateur, echecs):
+    """Reprend à l'Espace l'accès aux cartes graphiques, à sa fermeture.
+
+    Le droit est retiré de TOUTES les cartes, qu'on le lui ait accordé ou non :
+    un Espace ouvert une fois avec la carte, refermé, puis rouvert sans elle ne
+    doit pas la garder. Un droit qui survit à l'Espace est un droit oublié.
+    """
+    for chemin_carte in cartes_presentes():
+        try:
+            droit_sur_socket(chemin_carte, utilisateur.pw_uid, accorder=False)
+        except subprocess.CalledProcessError as exc:
+            echecs.append("%s, DROIT NON RETIRÉ : %s" % (
+                chemin_carte, (exc.stderr or b"").decode("utf-8", "replace").strip()))
+
+
+def cartes_presentes():
+    """Les cartes graphiques que root peut accorder, lues sur le système.
+
+    Le dossier est lu ici — comptes.py ne décide que de la forme des noms —
+    et tout lien symbolique est écarté : un lien posé là ferait accorder un
+    droit sur autre chose qu'une carte.
+    """
+    try:
+        noms = os.listdir(comptes.RACINE_CARTES)
+    except OSError:
+        return []
+    return [c for c in comptes.cartes_de_rendu(noms) if not os.path.islink(c)]
+
+
 def droit_sur_socket(chemin, uid, accorder=True):
-    """Accorde (ou retire) l'accès d'UN compte à UN socket. Jamais un dossier."""
+    """Accorde (ou retire) l'accès d'UN compte à UN fichier. Jamais un dossier.
+
+    Sert aux sockets du bureau et aux cartes graphiques : dans les deux cas,
+    c'est un droit NOMINATIF, posé le temps d'un Espace et retiré après —
+    exactement ce que logind fait pour une session d'utilisateur.
+    """
     regle = ["-m", "u:%d:rw" % uid] if accorder else ["-x", "u:%d" % uid]
     subprocess.run(["/usr/bin/setfacl"] + regle + [chemin],
                    check=True, capture_output=True)
@@ -522,7 +556,7 @@ def arreter_portee(compte):
 
 
 def preparer(uid_demandeur, espace, affichage, son, memoire=None, taches=None,
-             ephemere=False):
+             ephemere=False, carte=False):
     """Tout ou rien : une préparation qui échoue défait ce qu'elle a posé.
 
     Constaté le 14/09/2026 : le premier processus refusait de démarrer, alors
@@ -538,7 +572,8 @@ def preparer(uid_demandeur, espace, affichage, son, memoire=None, taches=None,
     ouvert = OUVERTS.get(nom)
     deja_ouvert = bool(ouvert) and ouvert[0].poll() is None
     try:
-        return _preparer(uid_demandeur, espace, affichage, son, memoire, taches, ephemere)
+        return _preparer(uid_demandeur, espace, affichage, son, memoire, taches,
+                        ephemere, carte)
     except Exception:
         if not deja_ouvert:
             try:
@@ -550,7 +585,8 @@ def preparer(uid_demandeur, espace, affichage, son, memoire=None, taches=None,
         raise
 
 
-def _preparer(uid_demandeur, espace, affichage, son, memoire, taches, ephemere=False):
+def _preparer(uid_demandeur, espace, affichage, son, memoire, taches,
+              ephemere=False, carte=False):
     nom = comptes.nom_compte(uid_demandeur, espace)
     home = comptes.chemin_home(uid_demandeur, espace)
     utilisateur = compte_systeme(nom, home)
@@ -569,6 +605,14 @@ def _preparer(uid_demandeur, espace, affichage, son, memoire, taches, ephemere=F
         presenter(source, destination)
         droit_sur_socket(source, utilisateur.pw_uid, accorder=True)
         presentes.append(fichier)
+    # La carte graphique, quand l'Espace y a droit. Le droit est nominatif et
+    # temporaire, comme celui que logind donne à une session d'utilisateur :
+    # sans lui, l'Espace dessine avec le processeur (mesuré le 15/09/2026).
+    # Seuls les nœuds de RENDU sont accordés : « card0 » pilote l'écran, et
+    # une application n'a pas à changer les modes d'affichage.
+    for chemin_carte in (cartes_presentes() if carte else []):
+        droit_sur_socket(chemin_carte, utilisateur.pw_uid, accorder=True)
+        presentes.append(os.path.basename(chemin_carte))
     ouvert = OUVERTS.get(nom)
     if ouvert and ouvert[0].poll() is None:
         # Déjà ouvert : on ne relance rien. Redémarrer la portée ici fermerait
@@ -654,6 +698,7 @@ def fermer(uid_demandeur, espace):
         # rmtree sur un dossier écrit par un AUTRE compte : on ne s'y risque
         # que si Python garantit la traversée sans suivre les liens, comme
         # pour la suppression d'un Espace.
+        _retirer_les_cartes(utilisateur, echecs)
         st = os.lstat(runtime)
         if not shutil.rmtree.avoids_symlink_attacks:
             echecs.append("dossier d'exécution conservé : suppression sûre "
@@ -746,7 +791,11 @@ def traiter(demande, uid, nom_demandeur):
                             demande.get("memoire"), demande.get("taches"),
                             # « is True » : seul un vrai booléen JSON monte un
                             # tmpfs, pas une chaîne ni un nombre.
-                            demande.get("ephemere") is True)
+                            demande.get("ephemere") is True,
+                            # Pas de carte graphique par défaut : un Espace
+                            # qui n'en demande pas n'y touche jamais (Banque
+                            # et Jetable, par exemple).
+                            demande.get("carte") is True)
         if action == "fermer":
             reponse = fermer(uid, espace)
             TENUES.oublier(comptes.nom_compte(uid, espace))

@@ -536,7 +536,11 @@ def cmd_launch(espaces, esp_id, extra, fichier=None):
             *bac_a_sable.plafonds_de(esp),
             # Jetable : son dossier est un tmpfs, monté par le service à
             # l'ouverture et démonté à la fermeture — rien n'atteint le disque.
-            ephemere=bool(esp.get("ephemere")))
+            ephemere=bool(esp.get("ephemere")),
+            # Carte graphique : même règle que pour le bac à sable ordinaire
+            # (voir plus bas), et jamais pour une pièce jointe, qu'on examine
+            # sous cloche. Sans ce droit, l'Espace dessine avec le processeur.
+            carte=esp.get("gpu", True) is not False and not fichier)
     except compte_dedie.Indisponible as exc:
         return _refuser_compte_dedie(esp, str(exc))
     try:

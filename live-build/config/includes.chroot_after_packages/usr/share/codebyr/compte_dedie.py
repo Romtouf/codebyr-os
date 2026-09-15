@@ -118,12 +118,15 @@ class Session:
     """
 
     def __init__(self, esp_id, affichage, son, memoire, taches,
-                 chemin=SOCKET_SERVICE, ephemere=False):
+                 chemin=SOCKET_SERVICE, ephemere=False, carte=False):
         try:
             reponse, self._client, _ = _parler(chemin, {
                 "action": "ouvrir", "espace": esp_id, "affichage": affichage,
                 "son": bool(son), "memoire": memoire, "taches": taches,
-                "ephemere": bool(ephemere)},
+                "ephemere": bool(ephemere),
+                # La carte graphique se DEMANDE : un Espace qui ne la demande
+                # pas n'y touche jamais. Banque et Jetable, par exemple.
+                "carte": bool(carte)},
                 garder=True)
         except FileNotFoundError:
             raise Indisponible("le service des comptes d'Espaces n'est pas "

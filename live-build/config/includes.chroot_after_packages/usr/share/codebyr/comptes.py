@@ -288,6 +288,26 @@ def plafonds_valides(memoire, taches):
     return memoire, taches
 
 
+RACINE_CARTES = "/dev/dri"
+# Un nœud de RENDU, et rien d'autre. « card0 » pilote l'écran — modes,
+# sorties, curseur ; une application ne fait que dessiner. Mesuré le
+# 15/09/2026 : le nœud de rendu suffit à obtenir l'accélération matérielle,
+# et il est le seul que logind ouvre à une application ordinaire.
+FORME_CARTE = re.compile(r"renderD[0-9]{1,3}\Z")
+
+
+def cartes_de_rendu(noms):
+    """Les chemins de cartes qu'un Espace peut se voir accorder, parmi « noms ».
+
+    Décision pure, comme tout ce fichier : c'est l'appelant qui lit le dossier
+    du système et écarte les liens symboliques — un lien posé là ferait
+    accorder un droit sur autre chose qu'une carte. Ici on ne garde que ce qui
+    a la bonne forme, et on construit le chemin nous-mêmes.
+    """
+    return ["%s/%s" % (RACINE_CARTES, nom)
+            for nom in sorted(noms or ()) if FORME_CARTE.match(nom)]
+
+
 def passages(affichage, son):
     """Ce qu'un Espace reçoit : l'affichage toujours, le son s'il y a droit.
 

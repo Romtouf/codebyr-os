@@ -273,6 +273,19 @@ def main():
                    preuves.get("bus_visible") is False,
                    "" if preuves.get("bus_visible") is False else
                    "visible depuis le bac à sable : %s" % preuves.get("bus_visible"))
+    # ── Tranche « carte graphique » : le droit nominatif, posé puis repris ──
+    cartes = [c for c in comptes.cartes_de_rendu(os.listdir("/dev/dri"))
+              if not os.path.islink(c)] if os.path.isdir("/dev/dri") else []
+    if not cartes:
+        dire("carte graphique presente sur cette machine", False, "/dev/dri vide")
+    else:
+        accorde = bool(espace) and any(
+            ("user:%d:" % espace.pw_uid) in subprocess.run(
+                ["/usr/bin/getfacl", "-pn", c], capture_output=True, text=True).stdout
+            for c in cartes)
+        reussi &= dire("la carte graphique lui a ete accordee", accorde,
+                       "" if accorde else "aucun droit sur %s" % ", ".join(cartes))
+
     ancienne = os.path.exists("/run/codebyr/passerelles")
     reussi &= dire("plus aucune passerelle à l'ancienne", not ancienne,
                    "/run/codebyr/passerelles existe encore" if ancienne else "")
@@ -293,6 +306,11 @@ def main():
     reussi &= dire("…et son droit sur votre affichage retiré", not garde,
                    "le compte de l'Espace garde un droit sur %s" % affichage_bureau
                    if garde else "")
+    restes = [c for c in cartes
+              if bool(espace) and ("user:%d:" % espace.pw_uid) in subprocess.run(
+                  ["/usr/bin/getfacl", "-pn", c], capture_output=True, text=True).stdout]
+    reussi &= dire("…et la carte graphique reprise", not restes,
+                   "droit conserve sur %s" % ", ".join(restes) if restes else "")
     for sensible in ("/run/user/%d" % uid, affichage_bureau):
         st = os.stat(sensible)
         if st.st_uid != uid:

@@ -256,9 +256,42 @@ class LeService(unittest.TestCase):
         self.assertNotIn("shell=True", self.source)
         self.assertNotIn('demande.get("commande")', self.source)
 
-    def test_les_droits_sont_poses_sur_un_socket_jamais_sur_un_dossier(self):
-        self.assertIn("Accorde (ou retire) l'accès d'UN compte à UN socket",
-                      self.source)
+    def test_les_droits_nominatifs_ne_visent_jamais_un_dossier(self):
+        # Un droit posé sur un DOSSIER ouvrirait tout ce qu'il contient, et
+        # survivrait à ce qu'on y ajoute ensuite. Sockets et cartes seulement.
+        self.assertIn("Jamais un dossier", self.source)
+
+    def test_seuls_les_noeuds_de_rendu_peuvent_etre_accordes(self):
+        # « card0 » pilote l'écran — modes, sorties, curseur. Une application
+        # dessine : le nœud de rendu suffit (mesuré le 15/09/2026), et donner
+        # l'autre ouvrirait bien plus que nécessaire.
+        self.assertEqual(comptes.cartes_de_rendu(
+            ["card0", "renderD128", "renderD129", "by-path", "card1"]),
+            ["/dev/dri/renderD128", "/dev/dri/renderD129"])
+        for tordu in ("../../dev/sda", "renderD128/../card0", "renderD",
+                      "renderD1234", "", "renderD128\n"):
+            self.assertEqual(comptes.cartes_de_rendu([tordu]), [], repr(tordu))
+
+    def test_le_service_ecarte_les_liens_symboliques_parmi_les_cartes(self):
+        # Un lien posé dans /dev/dri ferait accorder un droit sur sa cible.
+        cartes = self.source.split("def cartes_presentes(")[1].split("\ndef ")[0]
+        self.assertIn("os.path.islink", cartes)
+
+    def test_la_carte_est_reprise_a_la_fermeture_meme_si_elle_n_a_pas_servi(self):
+        # Un Espace ouvert une fois avec la carte, refermé, puis rouvert sans
+        # elle ne doit pas la garder : on retire de toutes, sans condition.
+        reprise = self.source.split("def _retirer_les_cartes(")[1].split("\ndef ")[0]
+        self.assertIn("cartes_presentes()", reprise)
+        self.assertIn("accorder=False", reprise)
+        fermeture = self.source.split("def fermer(")[1].split("\ndef ")[0]
+        self.assertIn("_retirer_les_cartes(", fermeture)
+
+    def test_la_carte_ne_s_accorde_que_si_l_espace_la_demande(self):
+        # Banque et Jetable tournent sans : leur réglage « gpu » est faux, et
+        # rien ne doit leur ouvrir la carte au passage.
+        self.assertIn('demande.get("carte") is True', self.source)
+        prepare = self.source.split("def _preparer(")[1].split("\ndef ")[0]
+        self.assertIn("cartes_presentes() if carte else []", prepare)
 
     def test_l_espace_ne_fait_que_traverser_le_depot(self):
         # « x » et rien d'autre. Avec « r », l'Espace découvrirait les sockets

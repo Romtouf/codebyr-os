@@ -94,6 +94,13 @@ profile codebyr-uid /usr/lib/codebyr/codebyr-uid {
   /run/user/[0-9][0-9][0-9]/ rw,
   /run/user/[0-9][0-9][0-9]/** rw,
 
+  # Les cartes graphiques : il les LIT pour savoir lesquelles existent, et
+  # n'écrit jamais dedans. C'est setfacl — non confiné — qui pose le droit
+  # nominatif, et l'Espace qui s'en sert ensuite. Seuls les nœuds de rendu
+  # figurent ici : « card0 » pilote l'écran, et le service n'a pas à y toucher.
+  /dev/dri/ r,
+  /dev/dri/renderD[0-9]* r,
+
   # ── Ce qu'il LIT du bureau : les sockets qu'il présente, et rien d'autre ─
   # Il les monte par « mount --bind » ; il vérifie seulement qu'elles existent.
   # Lecture seule, et nommées une par une : le bus de session (/run/user/*/bus)

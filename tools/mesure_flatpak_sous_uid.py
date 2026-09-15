@@ -120,30 +120,55 @@ def sous(compte, args, env=None, delai=600, entree=None):
 
 
 def creer_compte(uid_bureau):
-    """Le compte d'essai, fait exactement comme le service le fait."""
+    """Le compte d'essai, fait exactement comme le service le fait.
+
+    Le dossier personnel est posé DANS TOUS LES CAS, compte neuf ou non.
+    Constaté le 15/09/2026 : au second passage, le compte survivait à un
+    « userdel » mais son dossier avait bien été effacé ; la fonction rendait
+    la main aussitôt, et Flatpak butait sur un « mkdir : Permission denied »
+    parfaitement exact — le compte n'a évidemment pas le droit d'écrire dans
+    /var/lib/codebyr/espaces/<uid>, qui appartient à root.
+    """
     nom = comptes.nom_compte(uid_bureau, ESPACE)
     home = comptes.chemin_home(uid_bureau, ESPACE)
     try:
-        return pwd.getpwnam(nom), home, False
+        compte = pwd.getpwnam(nom)
+        neuf = False
     except KeyError:
-        pass
+        os.makedirs(os.path.dirname(home), exist_ok=True)
+        os.chmod(os.path.dirname(os.path.dirname(home)), 0o711)
+        os.chmod(os.path.dirname(home), 0o711)
+        subprocess.run(["/usr/sbin/useradd", "--system", "--no-create-home",
+                        "--home-dir", home, "--shell", "/usr/sbin/nologin", nom],
+                       check=True, capture_output=True)
+        compte = pwd.getpwnam(nom)
+        neuf = True
     os.makedirs(os.path.dirname(home), exist_ok=True)
     os.chmod(os.path.dirname(os.path.dirname(home)), 0o711)
     os.chmod(os.path.dirname(home), 0o711)
-    subprocess.run(["/usr/sbin/useradd", "--system", "--no-create-home",
-                    "--home-dir", home, "--shell", "/usr/sbin/nologin", nom],
-                   check=True, capture_output=True)
-    compte = pwd.getpwnam(nom)
     os.makedirs(home, exist_ok=True)
     os.chown(home, compte.pw_uid, compte.pw_gid)
     os.chmod(home, 0o700)
-    return compte, home, True
+    return compte, home, neuf
 
 
 def supprimer_compte(compte, home):
+    """Nettoie, et DIT si le nettoyage n'a pas abouti.
+
+    Un userdel qui échoue en silence laisse un compte sans dossier : l'essai
+    suivant repart d'un état bâtard, et c'est lui qu'on croit mesurer.
+    """
     if os.path.isdir(home) and shutil.rmtree.avoids_symlink_attacks:
         shutil.rmtree(home, ignore_errors=True)
-    subprocess.run(["/usr/sbin/userdel", compte.pw_name], capture_output=True)
+    r = subprocess.run(["/usr/sbin/userdel", compte.pw_name],
+                       capture_output=True, text=True)
+    if r.returncode != 0:
+        print("  Compte %s NON supprimé : %s"
+              % (compte.pw_name, (r.stderr or "").strip()[:96]))
+        print("  (l'essai suivant le réutilisera ; « userdel -f %s » pour forcer)"
+              % compte.pw_name)
+        return False
+    return True
 
 
 def main():
@@ -170,18 +195,20 @@ def main():
 
     print("Mesure : une application Flatpak sous le compte d'un Espace\n")
     dire("session du bureau", True, "%s (UID %d), affichage %s"
-         % (bureau.pw_name, uid_bureau, affichage))
+         % (bureau.pw_name, uid_bureau, affichage), aussi_si_oui=True)
     if not shutil.which("flatpak"):
         dire("flatpak installé", False, "paquet « flatpak » absent")
         consequence("rien à mesurer ; installez flatpak sur cette machine.")
         return 1
     version = subprocess.run(["flatpak", "--version"], capture_output=True,
                              text=True).stdout.strip()
-    dire("flatpak installé", True, version)
+    dire("flatpak installé", True, version, aussi_si_oui=True)
 
     compte, home, cree = creer_compte(uid_bureau)
     dire("compte d'essai", True, "%s (UID %d)%s"
-         % (compte.pw_name, compte.pw_uid, "" if cree else " — déjà présent"))
+         % (compte.pw_name, compte.pw_uid,
+            "" if cree else " — déjà présent, dossier refait"),
+         aussi_si_oui=True)
     flatpak_dir = os.path.join(home, "flatpak")
     runtime_espace = "/run/codebyr/essai-runtime-%d" % compte.pw_uid
     code = 0
@@ -440,11 +467,20 @@ def main():
             print("\n  Le dossier d'exécution posé dans /run a suffi : Flatpak")
             print("  n'y exécute rien, le « noexec » de Debian ne gêne donc pas.")
     finally:
+        # Un montage lié survit à l'outil et fausse l'essai suivant : on le
+        # défait quoi qu'il arrive, y compris si une erreur a court-circuité
+        # le nettoyage plus haut. « umount » sur ce qui n'est pas monté est
+        # sans effet, et c'est ce qu'on veut.
+        socket_reste = os.path.join(runtime_espace, affichage)
+        if os.path.exists(socket_reste):
+            subprocess.run(["/usr/bin/umount", socket_reste], capture_output=True)
+        subprocess.run(["/usr/bin/setfacl", "-x", "u:%d" % compte.pw_uid,
+                        os.path.join(runtime_bureau, affichage)],
+                       capture_output=True)
         shutil.rmtree(runtime_espace, ignore_errors=True)
         if args.garder:
             print("\nCompte d'essai conservé : %s (%s)" % (compte.pw_name, home))
-        else:
-            supprimer_compte(compte, home)
+        elif supprimer_compte(compte, home):
             print("\nCompte d'essai supprimé.")
     return code
 

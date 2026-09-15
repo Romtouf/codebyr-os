@@ -11,8 +11,12 @@ proxy ; filtre seccomp ajouté au Blindage.
 code appliquait, relevés par une relecture du 12 septembre — détaillés dans
 l'historique ci-dessous, et validés sur un bureau GNOME réel.
 
-Le prototype UID reste réservé aux tests : le bureau utilise encore un
-seul compte Unix. Voir [le périmètre, les tests et les limites du lot](docs/securite-2026-09-12.md).
+**Publié en 1.15.0 et 1.16.0** : un Espace peut tourner sous **son propre
+compte Unix** — réglage « Compte séparé, par Espace », désactivé par défaut le
+temps d'être éprouvé. Depuis la 1.16.0, ses applications Flatpak et la carte
+graphique y fonctionnent. Ce qui n'était qu'un prototype en septembre est
+maintenant livré et éprouvé sur machine.
+
 Le modèle ci-dessous décrit aussi des versions antérieures ; ne pas déduire
 la protection d'un poste de la seule présence de ce document.
 
@@ -104,12 +108,15 @@ utilisateur non technique.
 - **Micro** : le socket PipeWire partagé vaut accès au microphone. Un Espace
   peut le refuser (`"audio": false` dans le registre) — c'est le cas de Banque
   par défaut. Partout ailleurs, le son fonctionne, donc le micro est joignable.
-- **Un seul compte Unix pour tous les Espaces.** Leurs données vivent sous
-  `~/.local/share/codebyr/espaces/`. Le bac à sable empêche une application
-  *lancée dans un Espace* d'en sortir, mais toute application lancée
-  normalement (hors Espace), ou tout code qui s'échapperait du bac à sable, lit
-  l'ensemble. La séparation par UID dédié est la suite logique ; elle n'est pas
-  encore faite.
+- **Un seul compte Unix pour tous les Espaces — sauf si vous l'activez.** Par
+  défaut, les données des Espaces vivent sous `~/.local/share/codebyr/espaces/`,
+  sous votre compte : le bac à sable empêche une application *lancée dans un
+  Espace* d'en sortir, mais toute application lancée normalement (hors Espace),
+  ou tout code qui s'échapperait du bac à sable, lit l'ensemble. Le réglage
+  « Compte séparé, par Espace » (1.15.0) lève cette limite, Espace par Espace :
+  le noyau vérifie alors la frontière à chaque ouverture de fichier. Il reste
+  **désactivé par défaut** le temps d'être éprouvé sur d'autres machines que
+  celles du projet.
 
 **Principe de communication** : Codebyr OS « réduit drastiquement les dégâts » —
 jamais « rend invulnérable ». Toute contribution qui gonflerait la promesse

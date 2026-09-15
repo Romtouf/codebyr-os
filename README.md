@@ -14,14 +14,17 @@ installée sur machine réelle. Voir la [feuille de route](#feuille-de-route).
 
 ![Bureau Codebyr OS — vue d'ensemble GNOME, fond d'écran au Sceau, dock des applications](captures_ecran/01-bureau.png)
 
-## Correctifs en cours de validation — septembre 2026
+## Où en est le projet — 15 septembre 2026
 
-Le dépôt contient un lot de corrections **non publié** : frontières des
-fichiers, restauration conservant l'ancien état, absence de repli sans
-isolation, réseau restreint dans un namespace et seccomp pour le Blindage.
-Le prototype UID par Espace est séparé du lanceur livré ; aucune migration
-n'est automatique. Voir le [rapport de travail et les validations restantes](docs/securite-2026-09-12.md).
-Les descriptions de versions publiées ci-dessous ne remplacent pas ce suivi.
+Version publiée : **1.16.1**. Le lot de sécurité de septembre est publié
+(frontières des fichiers, restauration non destructive, aucun repli sans
+isolation, réseau restreint par namespace, filtre d'appels système).
+
+Un Espace peut désormais tourner sous **son propre compte Unix** — réglage
+« Compte séparé, par Espace », avec ses applications Flatpak et la carte
+graphique depuis la 1.16.0. Il reste **désactivé par défaut** le temps d'être
+éprouvé ailleurs que sur les machines du projet. La carte du projet, avec ce
+qui reste ouvert, est dans [docs/chantiers.md](docs/chantiers.md).
 
 ## Le concept : les Espaces
 
@@ -58,6 +61,15 @@ depuis le menu du Sceau.
   D-Bus **privé** (celui de la session hôte n'entre jamais dans un Espace —
   c'est ce qui empêche d'en sortir), liserés colorés par fenêtre (extension
   GNOME Shell dédiée).
+- **Un compte Unix par Espace, au choix** (1.15.0, complété en 1.16.0) : un
+  Espace peut tourner sous **son propre compte système**. Ses fichiers lui
+  appartiennent, et le noyau vérifie cette frontière à chaque ouverture — ce
+  qui s'échappe du bac à sable ne retrouve alors que cet Espace, ni les autres,
+  ni votre dossier personnel. Ses données le suivent à la première ouverture et
+  reviennent si vous désactivez le réglage. Les applications Flatpak s'y
+  ouvrent, avec leurs propres fenêtres de fichiers, et la carte graphique y
+  fonctionne. **Désactivé par défaut** le temps d'être éprouvé ; une limite
+  connue est décrite dans [SECURITY.md](SECURITY.md).
 - **Le Blindage** : niveau d'isolation renforcé par Espace — espace de noms
   utilisateur, zéro privilège (`--cap-drop ALL`), session neuve, filtre
   d'appels système, plafonds mémoire/processus (anti fork-bomb). Actif par

@@ -1,15 +1,19 @@
 # Chantiers — Codebyr OS
 
-Mise à jour de lecture : **13 septembre 2026**, version publiée **1.13.0**.
-Les tableaux ci-dessous sont l'historique des chantiers et comportent des
-estimations anciennes. Le suivi du [lot de sécurité et du prototype UID](securite-2026-09-12.md)
-fait foi pour les changements locaux de septembre ; ils ne sont pas publiés.
+Mise à jour de lecture : **15 septembre 2026**, version publiée **1.16.1**.
 
-Le réseau par namespace et le filtre seccomp sont implémentés dans ce lot,
-avec tests Linux, mais attendent la validation des applications graphiques.
-Le manifeste source et le XPI embarqué sont tous deux en MV3 : les champs
-fonctionnels sont désormais comparés par les tests. La re-signature MV3
-n'est donc plus un chantier ouvert sur cette copie du dépôt.
+Ce document est la carte du projet : ce qui est fait, ce qui reste, et pourquoi.
+Les estimations d'effort des lignes anciennes n'ont pas été refaites.
+
+**Où en est le projet, en une phrase** : les chantiers structurants de sécurité
+sont rendus et publiés ; ce qui reste tient surtout à la diffusion — des
+testeurs, un second mainteneur, les posts de lancement.
+
+Le chantier « un UID Unix par Espace » est clos depuis la 1.16.0 : un Espace
+peut tourner sous son propre compte, avec ses applications Flatpak et la carte
+graphique. **Il reste une décision** : en faire le réglage par défaut. Elle
+n'est pas technique — le code est là et éprouvé — mais elle engage toutes les
+installations d'un coup.
 
 ## Comment lire
 
@@ -94,7 +98,7 @@ Voir `usr/share/codebyr/relais_notifications.py`.
 
 | | Chantier | Pourquoi | Effort |
 |---|---|---|---|
-| 🔴 | **Manifest V3 — converti, reste à FAIRE SIGNER** | Le manifeste est passé en MV3 et validé par `web-ext lint` : 0 erreur. Seul avertissement restant, sans objet ici, sur Firefox pour Android — plateforme hors périmètre. `strict_min_version` aligné sur l'ESR 140.14 que Codebyr livre réellement, ce qui permet de déclarer `data_collection_permissions: none` — une clé qu'AMO exigera bientôt de toutes les extensions. **Le bouclier installé sur les machines reste celui du `.xpi` signé** : tant qu'il n'est pas régénéré via AMO, cette conversion n'a aucun effet, et `tests/test_bouclier.py` reste rouge pour le rappeler. `AMO_KEY=… AMO_SECRET=… bash live-build/scripts/sign-extension.sh` | S |
+| ✅ | **Manifest V3 — converti ET signé par Mozilla** | Le manifeste est passé en MV3, validé par `web-ext lint`, et l'extension livrée dans l'image porte bien une signature Mozilla (COSE et RSA, vérifié le 15/09/2026 dans le XPI embarqué). C'est ce qui a permis de supprimer le repli « extension non signée + `xpinstall.signatures.required=false` », qui affaiblissait réellement le navigateur pour y installer une protection. **Reste** : automatiser la re-signature à chaque changement de `content.js`, aujourd'hui manuelle (voir docs/signer-le-bouclier.md) | S |
 | 🟠 | **Homographes internationaux (punycode)** | La détection gère quelques substitutions (`0`→`o`, `rn`→`m`…), pas les caractères Unicode ressemblants (cyrillique, grec). C'est une technique d'hameçonnage courante | M |
 
 ---

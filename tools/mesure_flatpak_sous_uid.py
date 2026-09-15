@@ -539,6 +539,83 @@ def main():
                 except subprocess.TimeoutExpired:
                     bus.kill()
 
+            # ── 6. Le dossier d'exécution à sa place canonique ─────────────
+            titre("6. Et si le dossier d'exécution était à sa place ?")
+            print("  bwrap a refusé de créer « .dbus-proxy » sous un chemin")
+            print("  exotique. Flatpak suppose /run/user/<uid>, là où logind")
+            print("  l'aurait mis. Même essai, à cette place-là.")
+
+            canonique = "/run/user/%d" % compte.pw_uid
+            deja = os.path.isdir(canonique)
+            bus2 = None
+            socket2 = os.path.join(canonique, affichage)
+            monte2 = False
+            try:
+                os.makedirs(canonique, exist_ok=True)
+                os.chown(canonique, compte.pw_uid, compte.pw_gid)
+                os.chmod(canonique, 0o700)
+                dire("préparer %s" % canonique, True,
+                     "déjà présent" if deja else "créé", aussi_si_oui=True)
+
+                if os.path.exists(socket_bureau):
+                    open(socket2, "a").close()
+                    m2 = subprocess.run(["/usr/bin/mount", "--bind",
+                                         socket_bureau, socket2],
+                                        capture_output=True, text=True)
+                    monte2 = m2.returncode == 0
+                    if monte2:
+                        subprocess.run(["/usr/bin/setfacl", "-m",
+                                        "u:%d:rw" % compte.pw_uid, socket_bureau],
+                                       capture_output=True)
+
+                chemin_bus2 = os.path.join(canonique, "bus")
+                adresse2 = "unix:path=" + chemin_bus2
+                bus2 = subprocess.Popen(
+                    ["/usr/bin/setpriv", "--reuid", str(compte.pw_uid),
+                     "--regid", str(compte.pw_gid), "--clear-groups",
+                     "--no-new-privs", "/usr/bin/dbus-daemon", "--session",
+                     "--nofork", "--address", adresse2],
+                    stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True)
+                attente = 0.0
+                while attente < 5.0 and not os.path.exists(chemin_bus2):
+                    time.sleep(0.1)
+                    attente += 0.1
+
+                env2 = {"FLATPAK_USER_DIR": flatpak_dir,
+                        "XDG_RUNTIME_DIR": canonique,
+                        "WAYLAND_DISPLAY": affichage,
+                        "GDK_BACKEND": "wayland",
+                        "XDG_SESSION_TYPE": "wayland",
+                        "DBUS_SESSION_BUS_ADDRESS": adresse2}
+                r = sous(compte, ["/usr/bin/flatpak", "run", "--die-with-parent",
+                                  "--command=/bin/sh", args.app, "-c",
+                                  "test -S $XDG_RUNTIME_DIR/bus && echo AVEC-BUS || echo SANS-BUS"],
+                         env=env2, delai=60)
+                sortie = (r.stdout or "").strip()
+                ok2 = dire("l'application voit son bus, à cette place",
+                           "AVEC-BUS" in sortie, sortie or derniere_erreur(r))
+                if ok2:
+                    consequence("c'était le chemin : le dossier d'exécution d'un "
+                                "Espace doit être /run/user/<uid de l'Espace>.")
+                else:
+                    for ligne in [l.strip() for l in (r.stderr or "").splitlines()
+                                  if l.strip()][-6:]:
+                        print("         %s" % ligne[:92])
+                    consequence("le chemin n'était pas la cause : chercher ailleurs.")
+            finally:
+                if bus2:
+                    bus2.terminate()
+                    try:
+                        bus2.wait(timeout=5)
+                    except subprocess.TimeoutExpired:
+                        bus2.kill()
+                if monte2:
+                    subprocess.run(["/usr/bin/umount", socket2], capture_output=True)
+                # Créé par nous : c'est à nous de le retirer. S'il était déjà
+                # là, il appartient au système et on n'y touche pas.
+                if not deja:
+                    shutil.rmtree(canonique, ignore_errors=True)
+
             if monte:
                 subprocess.run(["/usr/bin/umount", socket_espace], capture_output=True)
                 subprocess.run(["/usr/bin/setfacl", "-x", "u:%d" % compte.pw_uid,

@@ -51,6 +51,9 @@ INITS_POSSIBLES = ("/usr/local/lib/codebyr-espace-init-essai",
 # root peut exécuter cette copie, avant de bâtir quoi que ce soit dessus.
 PERSONNE = 65534
 
+# Importer depuis l'arbre livré y écrirait un « __pycache__ », qui partirait
+# tel quel dans l'image (test_packaging le refuse, à juste titre).
+sys.dont_write_bytecode = True
 sys.path.insert(0, LIB)
 import bac_a_sable  # noqa: E402
 import comptes  # noqa: E402

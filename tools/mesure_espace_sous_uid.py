@@ -42,6 +42,9 @@ INIT_SOURCE = os.path.join(LIVRE, "usr", "lib", "codebyr", "codebyr-espace-init"
 INIT_MESURE = "/usr/local/lib/codebyr-espace-init-mesure"
 PERSONNE = 65534
 
+# Importer depuis l'arbre livré y écrirait un « __pycache__ », qui partirait
+# tel quel dans l'image (test_packaging le refuse, à juste titre).
+sys.dont_write_bytecode = True
 sys.path.insert(0, LIB)
 import bac_a_sable  # noqa: E402
 import comptes  # noqa: E402

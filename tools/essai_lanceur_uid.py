@@ -91,6 +91,9 @@ COMME_BANQUE = {"app": "firefox-esr.desktop", "blindage": "renforce",
                 "audio": False, "gpu": False,
                 "reseau": {"mode": "liste-blanche", "domaines": [DOMAINE_AUTORISE]}}
 
+# Importer depuis l'arbre livré y écrirait un « __pycache__ », qui partirait
+# tel quel dans l'image (test_packaging le refuse, à juste titre).
+sys.dont_write_bytecode = True
 sys.path.insert(0, os.path.join(LIVRE, "usr", "share", "codebyr"))
 import comptes  # noqa: E402
 

@@ -35,6 +35,9 @@ LIB = "/usr/share/codebyr"
 COIN = "/usr/local/lib/codebyr-essai-installe"
 SOCKET = "/run/codebyr-uid.sock"
 
+# Importer depuis l'arbre livré y écrirait un « __pycache__ », qui partirait
+# tel quel dans l'image (test_packaging le refuse, à juste titre).
+sys.dont_write_bytecode = True
 sys.path.insert(0, LIB)
 try:
     import comptes

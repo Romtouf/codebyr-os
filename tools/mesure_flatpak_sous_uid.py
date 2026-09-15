@@ -34,6 +34,7 @@ import argparse
 import os
 import pwd
 import shutil
+import signal
 import subprocess
 import sys
 import time
@@ -152,12 +153,45 @@ def creer_compte(uid_bureau):
     return compte, home, neuf
 
 
+def tuer_les_processus(uid):
+    """Ce que le compte a laissé tourner, avant de le supprimer.
+
+    Constaté le 15/09/2026 : « userdel : l'utilisateur est actuellement
+    utilisé par le processus 4533 ». Le portail et le bus laissent des enfants
+    (backends, helpers) que terminer le père ne suffit pas à emporter. Sans ce
+    ménage, le compte survit et l'essai suivant repart d'un état bâtard.
+    """
+    restes = []
+    for entree in os.listdir("/proc"):
+        if not entree.isdigit():
+            continue
+        try:
+            if os.stat("/proc/" + entree).st_uid == uid:
+                restes.append(int(entree))
+        except OSError:
+            continue        # le processus est parti entre-temps : très bien
+    for sig in (signal.SIGTERM, signal.SIGKILL):
+        vivants = []
+        for pid in restes:
+            try:
+                os.kill(pid, sig)
+                vivants.append(pid)
+            except OSError:
+                pass
+        if not vivants:
+            break
+        time.sleep(1.0)
+        restes = vivants
+    return restes
+
+
 def supprimer_compte(compte, home):
     """Nettoie, et DIT si le nettoyage n'a pas abouti.
 
     Un userdel qui échoue en silence laisse un compte sans dossier : l'essai
     suivant repart d'un état bâtard, et c'est lui qu'on croit mesurer.
     """
+    tuer_les_processus(compte.pw_uid)
     if os.path.isdir(home) and shutil.rmtree.avoids_symlink_attacks:
         shutil.rmtree(home, ignore_errors=True)
     r = subprocess.run(["/usr/sbin/userdel", compte.pw_name],
@@ -406,6 +440,56 @@ def main():
                 if vu:
                     consequence("un bus par Espace suffit à Flatpak : c'est la "
                                 "pièce à poser.")
+                else:
+                    # « Failed to sync with dbus proxy » ne dit pas POURQUOI :
+                    # Flatpak interpose xdg-dbus-proxy entre l'application et
+                    # le bus, et ne rapporte que l'échec de la poignée de main.
+                    # Les lignes qui précèdent, elles, nomment la cause.
+                    for ligne in [l.strip() for l in (r.stderr or "").splitlines()
+                                  if l.strip()][-6:]:
+                        print("         %s" % ligne[:92])
+
+                    # Le proxy, lancé à la main : s'il démarre seul, l'échec
+                    # est dans la synchronisation ; s'il refuse, il le dit.
+                    proxy = shutil.which("xdg-dbus-proxy")
+                    if not proxy:
+                        dire("xdg-dbus-proxy installé", False, "introuvable")
+                    else:
+                        chemin_proxy = os.path.join(runtime_espace, "proxy-essai")
+                        pp = subprocess.Popen(
+                            ["/usr/bin/setpriv", "--reuid", str(compte.pw_uid),
+                             "--regid", str(compte.pw_gid), "--clear-groups",
+                             "--no-new-privs", proxy, adresse, chemin_proxy,
+                             "--filter", "--talk=org.freedesktop.portal.*"],
+                            stdout=subprocess.DEVNULL, stderr=subprocess.PIPE,
+                            text=True)
+                        attente = 0.0
+                        while attente < 5.0 and not os.path.exists(chemin_proxy):
+                            time.sleep(0.1)
+                            attente += 0.1
+                        debout = os.path.exists(chemin_proxy)
+                        erreur = ""
+                        if not debout:
+                            pp.terminate()
+                            try:
+                                _, erreur = pp.communicate(timeout=5)
+                            except subprocess.TimeoutExpired:
+                                pp.kill()
+                            erreur = (erreur or "").strip().splitlines()
+                            erreur = erreur[-1][:92] if erreur else "aucun message"
+                        dire("le proxy dbus démarre seul sous ce compte", debout,
+                             erreur)
+                        if debout:
+                            consequence("le proxy tient : l'échec est dans la "
+                                        "poignée de main avec Flatpak.")
+                            pp.terminate()
+                            try:
+                                pp.wait(timeout=5)
+                            except subprocess.TimeoutExpired:
+                                pp.kill()
+                        else:
+                            consequence("le proxy lui-même refuse : c'est là "
+                                        "qu'il faut chercher.")
 
                 # Les portails : c'est par eux que passe « ouvrir un fichier ».
                 # Debian les a déplacés de /usr/lib vers /usr/libexec ; on

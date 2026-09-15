@@ -256,6 +256,32 @@ class LeService(unittest.TestCase):
         self.assertNotIn("shell=True", self.source)
         self.assertNotIn('demande.get("commande")', self.source)
 
+    def test_un_espace_abandonne_finit_par_etre_referme(self):
+        # Constaté le 15/09/2026 : arrêter le service pendant qu'un Espace est
+        # ouvert l'abandonne pour toujours. Il vit dans sa propre portée
+        # systemd, donc il survit ; le lanceur qui le tenait s'en va ensuite
+        # sans que personne le sache. Il gardait ainsi l'accès à l'affichage du
+        # bureau et à la carte graphique, indéfiniment.
+        abandon = self.source.split("def fermer_les_espaces_abandonnes(")[1].split("\ndef ")[0]
+        self.assertIn("comptes.est_compte_d_espace(nom)", abandon)
+        self.assertIn("fermer(*decompose)", abandon)
+        # Au démarrage ET à chaque réveil sans rien à faire : un Espace dont la
+        # dernière fenêtre vient de se fermer n'a personne d'autre pour le voir.
+        self.assertIn("fermer_les_espaces_abandonnes)", self.source)
+        boucle = self.source.split("def servir(")[1].split("\ndef ")[0]
+        self.assertIn("fermer_les_espaces_abandonnes()", boucle)
+
+    def test_un_espace_abandonne_mais_encore_utilise_n_est_pas_tue(self):
+        # Fermer un Espace dont l'utilisateur a des fenêtres à l'écran serait
+        # pire que la fuite : on attend qu'il n'ait plus aucune application.
+        abandon = self.source.split("def fermer_les_espaces_abandonnes(")[1].split("\ndef ")[0]
+        self.assertIn("if _applications_de(", abandon)
+        self.assertIn("conservé", abandon)
+        applications = self.source.split("def _applications_de(")[1].split("\ndef ")[0]
+        # L'init et le bus ne comptent pas : seuls, ils ne sont que la coquille.
+        self.assertIn("INIT.encode", applications)
+        self.assertIn("dbus-daemon --session", applications)
+
     def test_les_droits_nominatifs_ne_visent_jamais_un_dossier(self):
         # Un droit posé sur un DOSSIER ouvrirait tout ce qu'il contient, et
         # survivrait à ce qu'on y ajoute ensuite. Sockets et cartes seulement.

@@ -186,6 +186,16 @@ surface applicative minimale (`--apt-recommends false`).
   `~/.config/codebyr/presse-papiers-libre` désactive le vidage automatique.
 - **Applications Flatpak** : proviennent de Flathub — confiance déléguée à
   Flathub et à l'éditeur de chaque application.
+- **Compte séparé : un Espace abandonné est refermé.** Un Espace vit dans sa
+  propre portée systemd : il survit donc à l'arrêt du service des comptes (mise
+  à jour, `systemctl stop`). Jusqu'en 1.16.0, le lanceur qui le tenait s'en
+  allait ensuite sans que personne le sache, et l'Espace restait ouvert
+  indéfiniment — avec l'accès à l'affichage du bureau, et à la carte graphique
+  depuis cette version. Constaté le 15/09/2026 sur une machine d'essai. Le
+  service referme désormais, à son démarrage et à chaque réveil, tout Espace
+  qu'aucun service ne suit plus et qui n'a plus aucune application ouverte. Un
+  Espace abandonné mais dont l'utilisateur a encore des fenêtres à l'écran
+  n'est pas tué : il est signalé au journal, et refermé dès la dernière.
 - **Compte séparé : la carte graphique.** Depuis la 1.16.0, un Espace qui y a
   droit reçoit un accès NOMINATIF et TEMPORAIRE aux nœuds de rendu de
   `/dev/dri`, posé à son ouverture et repris à sa fermeture — le même mécanisme

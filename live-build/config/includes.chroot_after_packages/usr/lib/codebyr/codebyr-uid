@@ -866,6 +866,67 @@ def servir_client(client):
             pass
 
 
+def _applications_de(uid):
+    """Les processus de ce compte, hors son premier processus et son bus.
+
+    Ce sont eux qui disent si l'Espace sert encore à quelque chose : l'init et
+    le bus, à eux seuls, ne sont que la coquille.
+    """
+    restants = []
+    for entree in os.listdir("/proc"):
+        if not entree.isdigit():
+            continue
+        try:
+            if os.stat("/proc/" + entree).st_uid != uid:
+                continue
+            with open("/proc/%s/cmdline" % entree, "rb") as f:
+                ligne = f.read().replace(b"\0", b" ")
+        except OSError:
+            continue        # parti entre-temps : tant mieux
+        if INIT.encode("utf-8") in ligne or b"dbus-daemon --session" in ligne:
+            continue
+        restants.append(int(entree))
+    return restants
+
+
+def fermer_les_espaces_abandonnes():
+    """Referme les Espaces que plus aucun service ne suit, et qui n'ont plus rien.
+
+    Un Espace vit dans sa PROPRE portée systemd : il survit donc à l'arrêt de
+    ce service. Si celui-ci s'arrête pendant qu'un Espace est ouvert — mise à
+    jour, « systemctl stop » —, le lanceur qui le tenait s'en va ensuite sans
+    que personne le sache, et l'Espace reste ouvert POUR TOUJOURS, avec ses
+    droits : l'affichage du bureau, et depuis la 1.16.0 la carte graphique.
+    Constaté le 15/09/2026 sur la machine d'essai — un Espace fermé depuis
+    longtemps gardait l'accès à /dev/dri/renderD128.
+
+    On ne referme QUE ce qui n'a plus aucune application : fermer un Espace
+    dont l'utilisateur a des fenêtres à l'écran serait pire que la fuite.
+    Celui-là est signalé au journal, et sera refermé dès sa dernière fenêtre.
+    """
+    for compte in pwd.getpwall():
+        nom = compte.pw_name
+        if not comptes.est_compte_d_espace(nom) or nom in OUVERTS:
+            continue
+        decompose = comptes.decomposer(nom)
+        if not decompose:
+            continue
+        try:
+            if not os.path.isdir(comptes.chemin_runtime(compte.pw_uid)):
+                continue        # pas ouvert : rien à refermer
+        except ValueError:
+            continue
+        if _applications_de(compte.pw_uid):
+            journal("Espace %s abandonné par un service arrêté, mais encore "
+                    "utilisé : conservé" % nom)
+            continue
+        journal("Espace %s laissé ouvert par un service arrêté : refermé" % nom)
+        try:
+            fermer(*decompose)
+        except Exception as exc:
+            journal("Espace %s : fermeture du reste impossible : %s" % (nom, exc))
+
+
 def au_repos():
     """Plus aucun Espace ouvert, et plus personne qui en tienne un.
 
@@ -888,6 +949,14 @@ def servir(srv, repos=None):
         except TimeoutError:
             # Sous-classe d'OSError : à attraper AVANT elle, sinon le service
             # s'arrêterait à chaque attente au lieu de se rendormir.
+            #
+            # C'est aussi le bon moment pour refermer un Espace qu'un service
+            # arrêté avait abandonné et dont la dernière fenêtre vient de se
+            # fermer : personne d'autre ne le fera.
+            try:
+                fermer_les_espaces_abandonnes()
+            except Exception as exc:
+                journal("rangement des Espaces abandonnés impossible : %s" % exc)
             if au_repos():
                 journal("plus aucun Espace ouvert : le service s'arrête")
                 return 0
@@ -906,12 +975,14 @@ def main(argv):
         return 2
     syslog.openlog("codebyr-uid", syslog.LOG_PID, syslog.LOG_DAEMON)
     racines()
-    try:
-        ranger_les_anciennes_passerelles()
-    except Exception as exc:
-        # Un rangement raté ne doit pas empêcher tout Espace de s'ouvrir :
-        # on le dit, et on sert quand même.
-        journal("rangement des anciennes passerelles impossible : %s" % exc)
+    for rangement in (ranger_les_anciennes_passerelles,
+                      fermer_les_espaces_abandonnes):
+        try:
+            rangement()
+        except Exception as exc:
+            # Un rangement raté ne doit pas empêcher tout Espace de s'ouvrir :
+            # on le dit, et on sert quand même.
+            journal("%s impossible : %s" % (rangement.__name__, exc))
     if len(argv) >= 3 and argv[1] == "--essai":
         chemin = argv[2]
         if os.path.exists(chemin):

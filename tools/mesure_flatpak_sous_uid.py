@@ -185,6 +185,23 @@ def tuer_les_processus(uid):
     return restes
 
 
+def tuer_les_processus_sauf(uid, garder):
+    """Comme tuer_les_processus, mais en épargnant le bus : la mesure continue.
+
+    Le bus a été lancé par setpriv, qui s'est remplacé par dbus-daemon : même
+    PID, donc c'est lui qu'on garde.
+    """
+    for entree in os.listdir("/proc"):
+        if not entree.isdigit() or int(entree) == garder:
+            continue
+        try:
+            if os.stat("/proc/" + entree).st_uid == uid:
+                os.kill(int(entree), signal.SIGTERM)
+        except OSError:
+            continue
+    time.sleep(1.0)
+
+
 def supprimer_compte(compte, home):
     """Nettoie, et DIT si le nettoyage n'a pas abouti.
 
@@ -247,7 +264,13 @@ print("REPONSE %s" % resultat.get("code"))
 
 
 def processus_du_compte(uid):
-    """Les noms des programmes qui tournent sous ce compte : qui a répondu."""
+    """Les noms des programmes qui tournent sous ce compte : qui a répondu.
+
+    Lu dans la ligne de commande, pas dans /proc/<pid>/comm : le noyau tronque
+    ce dernier à 15 caractères. « xdg-desktop-portal » y devient
+    « xdg-desktop-por », et chercher « portal » ne trouvait rien — la mesure
+    du 15/09/2026 a répondu « aucun » alors que la fenêtre venait de s'afficher.
+    """
     noms = set()
     for entree in os.listdir("/proc"):
         if not entree.isdigit():
@@ -255,11 +278,66 @@ def processus_du_compte(uid):
         try:
             if os.stat("/proc/" + entree).st_uid != uid:
                 continue
-            with open("/proc/%s/comm" % entree, encoding="utf-8") as f:
-                noms.add(f.read().strip())
+            with open("/proc/%s/cmdline" % entree, "rb") as f:
+                argv0 = f.read().split(b"\0", 1)[0].decode("utf-8", "replace")
         except OSError:
             continue
+        if argv0:
+            noms.add(os.path.basename(argv0))
     return noms
+
+
+def monte_sous(chemin):
+    """Ce chemin est-il un point de montage ? Lu dans la table des montages.
+
+    os.path.ismount ne convient pas ici : un système FUSE refuse l'accès à tout
+    autre compte que le sien, root compris, et le test répondrait « non » à un
+    montage parfaitement présent.
+    """
+    try:
+        with open("/proc/self/mountinfo", encoding="utf-8") as f:
+            return any(ligne.split()[4] == chemin for ligne in f)
+    except OSError:
+        return False
+
+
+def essayer_portail_documents(compte, env_appel, sans_privileges):
+    """Lance le portail des documents à la main, et rapporte ce qu'il en dit.
+
+    sans_privileges=True : exactement comme dans un Espace (no-new-privs).
+    sans_privileges=False : DIAGNOSTIC SEULEMENT, pour savoir si c'est cette
+    protection qui l'empêche de monter son système de fichiers. Ce n'est pas
+    une proposition de la retirer.
+    """
+    programme = next((c for c in ("/usr/libexec/xdg-document-portal",
+                                  "/usr/lib/xdg-document-portal")
+                      if os.path.exists(c)), None)
+    if not programme:
+        return None, False, ["xdg-document-portal introuvable"]
+    doc = os.path.join(env_appel["XDG_RUNTIME_DIR"], "doc")
+    commande = ["/usr/bin/setpriv", "--reuid", str(compte.pw_uid), "--regid",
+                str(compte.pw_gid), "--clear-groups"]
+    if sans_privileges:
+        commande.append("--no-new-privs")
+    commande += ["/usr/bin/env", "-i"] + \
+        ["%s=%s" % kv for kv in sorted(env_appel.items())] + [programme, "--verbose"]
+    p = subprocess.Popen(commande, stdout=subprocess.DEVNULL,
+                         stderr=subprocess.PIPE, text=True)
+    time.sleep(4)
+    vivant = p.poll() is None
+    monte = monte_sous(doc)
+    p.terminate()
+    try:
+        _, erreur = p.communicate(timeout=5)
+    except subprocess.TimeoutExpired:
+        p.kill()
+        _, erreur = p.communicate()
+    subprocess.run(["/usr/bin/umount", "--lazy", doc], capture_output=True)
+    lignes = [l.strip() for l in (erreur or "").splitlines() if l.strip()]
+    utiles = [l for l in lignes if any(m in l.lower() for m in
+              ("fuse", "mount", "permission", "error", "erreur", "denied",
+               "operation not permitted", "fatal"))]
+    return vivant, monte, (utiles or lignes)[-4:]
 
 
 def mesurer_portails(compte, home, affichage, runtime_bureau):
@@ -366,6 +444,29 @@ def mesurer_portails(compte, home, affichage, runtime_bureau):
         if r.returncode != 0:
             consequence("sans lui, une application Flatpak ne reçoit un fichier "
                         "que si ses permissions lui ouvrent déjà le dossier.")
+
+            # ── 8. Pourquoi le portail des documents meurt ─────────────────
+            titre("8. Pourquoi le portail des documents s'arrête-t-il ?")
+            print("  Il monte un système de fichiers FUSE par fusermount3, qui a")
+            print("  besoin d'un privilège (setuid). Un Espace tourne sous")
+            print("  « no-new-privs », qui l'interdit. On essaie avec, puis sans,")
+            print("  pour savoir si c'est la cause. Sans : DIAGNOSTIC seulement.")
+            tuer_les_processus_sauf(compte.pw_uid, bus.pid if bus else None)
+            for sans_privileges, libelle in ((True, "comme dans un Espace (no-new-privs)"),
+                                             (False, "sans no-new-privs (diagnostic)")):
+                vivant, monte, lignes = essayer_portail_documents(
+                    compte, env_appel, sans_privileges)
+                if vivant is None:
+                    dire("portail des documents installé", False, lignes[0])
+                    break
+                dire("%s : il tient" % libelle, bool(vivant and monte),
+                     "vivant, système de fichiers monté" if vivant and monte else
+                     "%s, %s" % ("vivant" if vivant else "arrêté",
+                                 "monté" if monte else "rien de monté"),
+                     aussi_si_oui=True)
+                for ligne in lignes:
+                    print("         %s" % ligne[:92])
+                tuer_les_processus_sauf(compte.pw_uid, bus.pid if bus else None)
         return code
     finally:
         if bus:

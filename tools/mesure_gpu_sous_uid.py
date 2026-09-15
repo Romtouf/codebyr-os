@@ -53,9 +53,10 @@ except ImportError:
 
 ESPACE = "mesuregpu"
 
-# Une fenêtre GTK4 qui dit QUI la dessine. GSK nomme son moteur de rendu quand
-# on le lui demande : « ngl » ou « vulkan » = la carte graphique ; « cairo » =
-# le processeur. C'est la seule réponse qui compte ici.
+# Une fenêtre GTK4, ouverte pour de vrai. Ce qu'elle DIT ne suffit pas : on
+# regardera surtout si son processus ouvre un fichier de /dev/dri. Le moteur
+# « gl » de GTK fonctionne aussi bien au-dessus d'un pilote logiciel — s'y
+# fier a produit une mesure fausse le 15/09/2026.
 FENETRE = r'''
 import os, sys
 import gi
@@ -87,8 +88,20 @@ def consequence(texte):
     print("       → %s" % texte)
 
 
+# Les pilotes de Mesa qui dessinent AVEC LE PROCESSEUR. Tout le reste passe
+# par une carte — virgl et zink comprises, qui traduisent vers l'hôte ou vers
+# Vulkan mais finissent sur du matériel.
+PILOTES_LOGICIELS = ("llvmpipe", "softpipe", "swrast", "lavapipe")
+
+
 def moteur_de_rendu(sortie):
-    """Le moteur que GSK a retenu, lu dans ce qu'il a écrit."""
+    """Le moteur que GSK a retenu — « gl », « ngl », « vulkan », « cairo ».
+
+    Ce n'est PAS une preuve d'accélération : le moteur « gl » tourne très bien
+    au-dessus d'un pilote logiciel. Mesuré le 15/09/2026 : il annonçait « gl »
+    pour un compte qui ne pouvait ouvrir aucun fichier de la carte graphique.
+    On le garde pour information, jamais pour conclure.
+    """
     for ligne in (sortie or "").splitlines():
         m = re.search(r"[Uu]sing (?:renderer )?['\"]?(\w+)", ligne)
         if m:
@@ -96,8 +109,71 @@ def moteur_de_rendu(sortie):
     return ""
 
 
-def accelere(moteur):
-    return moteur in ("ngl", "gl", "vulkan")
+def pilote_utilise(sortie):
+    """Le pilote nommé par Mesa dans ses traces, ou une chaîne vide."""
+    m = re.search(r"(llvmpipe|softpipe|swrast|lavapipe|virgl|virtio_gpu|zink|"
+                  r"radeonsi|amdgpu|iris|crocus|i915|nouveau|panfrost|v3d|vmwgfx)",
+                  sortie or "", re.I)
+    return m.group(1).lower() if m else ""
+
+
+def accelere(pilote, cartes_ouvertes):
+    """La seule conclusion qui tienne : un vrai pilote, ET le fichier ouvert.
+
+    Le fichier ouvert est le fait décisif — un rendu logiciel n'ouvre jamais
+    /dev/dri/renderD*. Le nom du pilote sert à le confirmer et à l'expliquer.
+    """
+    if pilote in PILOTES_LOGICIELS:
+        return False
+    return bool(cartes_ouvertes)
+
+
+def cartes_ouvertes_par(pid):
+    """Les fichiers de /dev/dri que ce processus tient ouverts, à l'instant T.
+
+    C'est le fait qui tranche : un rendu logiciel n'ouvre aucune carte. On lit
+    les descripteurs du processus, pas ce qu'il raconte.
+    """
+    trouves = set()
+    for arbre in (pid,):
+        try:
+            fds = os.listdir("/proc/%d/fd" % arbre)
+        except OSError:
+            continue
+        for fd in fds:
+            try:
+                cible = os.readlink("/proc/%d/fd/%s" % (arbre, fd))
+            except OSError:
+                continue
+            if cible.startswith("/dev/dri/"):
+                trouves.add(cible)
+    return sorted(trouves)
+
+
+def sonder(prefixe, env, sonde, delai=30):
+    """Ouvre la fenêtre d'essai et regarde ce qu'elle fait VRAIMENT.
+
+    Renvoie (moteur GSK, pilote Mesa, cartes ouvertes). Le processus est
+    observé pendant qu'il vit : une fois terminé, ses descripteurs ont disparu
+    avec lui.
+    """
+    proc = subprocess.Popen(list(prefixe) + ["/usr/bin/python3", sonde],
+                            stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    cartes = []
+    fin = time.monotonic() + delai
+    while time.monotonic() < fin and proc.poll() is None:
+        vues = cartes_ouvertes_par(proc.pid)
+        if vues:
+            cartes = vues
+            break
+        time.sleep(0.1)
+    try:
+        sortie, erreur = proc.communicate(timeout=delai)
+    except subprocess.TimeoutExpired:
+        proc.kill()
+        sortie, erreur = proc.communicate()
+    tout = (erreur or "") + (sortie or "")
+    return moteur_de_rendu(tout), pilote_utilise(tout), cartes, tout
 
 
 def sous(compte, args, env=None, delai=90):
@@ -206,15 +282,16 @@ def main():
     with open(sonde, "w", encoding="utf-8") as f:
         f.write(FENETRE)
     os.chmod(sonde, 0o644)
-    env_bureau = dict(os.environ)
-    env_bureau["GSK_DEBUG"] = "renderer"
-    chez_le_bureau = subprocess.run(
-        ["/usr/bin/setpriv", "--reuid", str(uid_bureau), "--regid", str(bureau.pw_gid),
-         "--init-groups", "/usr/bin/python3", sonde],
-        capture_output=True, text=True, timeout=90, env=env_bureau)
-    moteur_bureau = moteur_de_rendu(chez_le_bureau.stderr + chez_le_bureau.stdout)
+    os.environ["GSK_DEBUG"] = "renderer"
+    os.environ["GDK_DEBUG"] = "opengl"
+    moteur_bureau, pilote_bureau, cartes_bureau, _ = sonder(
+        ["/usr/bin/setpriv", "--reuid", str(uid_bureau),
+         "--regid", str(bureau.pw_gid), "--init-groups"], None, sonde)
     if not dire("votre session dessine avec la carte graphique",
-                accelere(moteur_bureau), moteur_bureau or "moteur inconnu",
+                accelere(pilote_bureau, cartes_bureau),
+                "moteur %s, pilote %s, ouvre %s"
+                % (moteur_bureau or "?", pilote_bureau or "?",
+                   ", ".join(cartes_bureau) or "aucune carte"),
                 aussi_si_oui=True):
         consequence("si votre propre session est déjà en rendu logiciel — c'est "
                     "fréquent en machine virtuelle — il n'y a rien à gagner pour "
@@ -240,19 +317,27 @@ def main():
             if monte:
                 subprocess.run(["/usr/bin/setfacl", "-m", "u:%d:rw" % compte.pw_uid,
                                 socket_bureau], capture_output=True)
-        env_espace = {"XDG_RUNTIME_DIR": runtime, "WAYLAND_DISPLAY": affichage,
-                      "GDK_BACKEND": "wayland", "XDG_SESSION_TYPE": "wayland",
-                      "GSK_DEBUG": "renderer"}
+        # La ligne exacte qui lance la sonde sous le compte de l'Espace :
+        # identité abandonnée, environnement construit, traces demandées.
+        prefixe_espace = [
+            "/usr/bin/setpriv", "--reuid", str(compte.pw_uid),
+            "--regid", str(compte.pw_gid), "--clear-groups", "--no-new-privs",
+            "/usr/bin/env", "-i", "PATH=/usr/bin:/bin", "LANG=C.UTF-8",
+            "HOME=" + home, "XDG_RUNTIME_DIR=" + runtime,
+            "WAYLAND_DISPLAY=" + affichage, "GDK_BACKEND=wayland",
+            "XDG_SESSION_TYPE=wayland", "GSK_DEBUG=renderer", "GDK_DEBUG=opengl"]
 
         # ── 2. Sans rien : l'état d'aujourd'hui ────────────────────────────
         titre("2. Aujourd'hui : ce que le compte d'un Espace peut atteindre")
         for chemin, rendu, _st in noeuds:
             r = sous(compte, ["/usr/bin/test", "-r", chemin, "-a", "-w", chemin], delai=20)
             dire("ouvrir %s" % chemin, r.returncode == 0)
-        avant = sous(compte, ["/usr/bin/python3", sonde], env=env_espace, delai=90)
-        moteur_avant = moteur_de_rendu(avant.stderr + avant.stdout)
+        moteur_av, pilote_av, cartes_av, _ = sonder(prefixe_espace, None, sonde)
         dire("sa fenêtre est dessinée par la carte graphique",
-             accelere(moteur_avant), moteur_avant or "aucune fenêtre", aussi_si_oui=True)
+             accelere(pilote_av, cartes_av),
+             "moteur %s, pilote %s, ouvre %s"
+             % (moteur_av or "?", pilote_av or "?",
+                ", ".join(cartes_av) or "aucune carte"), aussi_si_oui=True)
         consequence("c'est la limite annoncée en 1.15.0 : rendu logiciel.")
 
         # ── 3. Avec un droit nominatif, comme pour le socket Wayland ───────
@@ -271,22 +356,23 @@ def main():
         for chemin in accordes:
             r = sous(compte, ["/usr/bin/test", "-r", chemin, "-a", "-w", chemin], delai=20)
             dire("il peut maintenant ouvrir %s" % chemin, r.returncode == 0)
-        apres = sous(compte, ["/usr/bin/python3", sonde], env=env_espace, delai=90)
-        moteur_apres = moteur_de_rendu(apres.stderr + apres.stdout)
+        moteur_ap, pilote_ap, cartes_ap, brut = sonder(prefixe_espace, None, sonde)
         gagne = dire("sa fenêtre est dessinée par la carte graphique",
-                     accelere(moteur_apres), moteur_apres or "aucune fenêtre",
-                     aussi_si_oui=True)
+                     accelere(pilote_ap, cartes_ap),
+                     "moteur %s, pilote %s, ouvre %s"
+                     % (moteur_ap or "?", pilote_ap or "?",
+                        ", ".join(cartes_ap) or "aucune carte"), aussi_si_oui=True)
         if not gagne:
-            for ligne in [l.strip() for l in (apres.stderr or "").splitlines()
+            for ligne in [l.strip() for l in (brut or "").splitlines()
                           if l.strip()][-6:]:
                 print("         %s" % ligne[:92])
 
         titre("Ce qu'il faut retenir")
-        if accelere(moteur_bureau) and gagne:
+        if accelere(pilote_bureau, cartes_bureau) and gagne:
             print("  Un droit nominatif suffit : le chantier se résume à le poser")
             print("  à l'ouverture et à le retirer à la fermeture, comme pour")
             print("  l'affichage.")
-        elif not accelere(moteur_bureau):
+        elif not accelere(pilote_bureau, cartes_bureau):
             print("  Votre session elle-même n'utilise pas la carte graphique :")
             print("  cette machine ne peut pas répondre à la question. À rejouer")
             print("  sur une machine où le rendu matériel fonctionne.")

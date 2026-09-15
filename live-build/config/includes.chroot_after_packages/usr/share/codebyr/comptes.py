@@ -60,12 +60,26 @@ RACINE_ESPACES = "/var/lib/codebyr/espaces"
 RACINE_ENVOIS = "/var/lib/codebyr/envois"
 RACINE_ARRIVEES = "/var/lib/codebyr/arrivees"
 
-# Passerelle : un dossier par compte d'Espace, préparé par root, où sont
-# présentés les SEULS sockets auxquels cet Espace a droit. Le dossier
-# d'exécution du bureau (/run/user/<uid>) n'est jamais ouvert — mesuré le
-# 14/09/2026 : l'ouvrir rendait joignable le bus de session, c'est-à-dire la
-# faille fermée en 1.1.0.
-RACINE_PASSERELLES = "/run/codebyr/passerelles"
+# Dossier d'exécution d'un Espace : le sien, à la place où tout l'écosystème
+# l'attend — /run/user/<uid de l'Espace>, exactement là où logind le mettrait
+# s'il ouvrait une session pour ce compte. Root le crée, l'Espace le possède
+# (0700), et root y présente les SEULS sockets auxquels cet Espace a droit.
+#
+# Il a remplacé en 1.16.0 un dossier à nous, /run/codebyr/passerelles/<compte>.
+# Mesuré le 15/09/2026 : sous un chemin de notre invention, une application
+# Flatpak ne démarre pas. Son bac à sable tente de créer « .dbus-proxy » sous
+# ce chemin, remonte jusqu'à un dossier de root, et échoue — « Failed to sync
+# with dbus proxy ». À sa place canonique, tout fonctionne.
+#
+# L'Espace peut y écrire, et il le faut : Flatpak y pose ses sockets. Cela ne
+# lui donne aucune prise sur ce qu'on y présente — un montage lié ne peut être
+# ni supprimé, ni renommé, ni remplacé par un lien piégé, fût-ce par le
+# propriétaire du dossier (mesuré : « Device or resource busy » chaque fois).
+#
+# Le dossier d'exécution du BUREAU, lui, n'est jamais ouvert à un Espace —
+# mesuré le 14/09/2026 : l'ouvrir rendait joignable le bus de session,
+# c'est-à-dire la faille fermée en 1.1.0.
+RACINE_RUNTIME = "/run/user"
 
 # Dépôt : un dossier par Espace où le BUREAU dépose les sockets qu'il sert
 # lui-même — notifications, filtre réseau. Root le tient, le bureau y écrit,
@@ -208,11 +222,16 @@ def chemin_arrivees(uid_proprietaire, espace):
     return _chemin_par_proprietaire(RACINE_ARRIVEES, uid_proprietaire, espace)
 
 
-def chemin_passerelle(compte):
-    """Dossier où root présente les sockets autorisés à CET Espace."""
-    if not est_compte_d_espace(compte):
-        raise ValueError("Passerelle demandée pour un compte qui n'est pas un Espace")
-    return "%s/%s" % (RACINE_PASSERELLES, compte)
+def chemin_runtime(uid_espace):
+    """Dossier d'exécution d'un Espace, où root lui présente ses sockets.
+
+    Nommé par l'UID et non par le compte : c'est la place que logind aurait
+    donnée, et ce que Flatpak — comme le reste de l'écosystème — suppose.
+    """
+    if not isinstance(uid_espace, int) or isinstance(uid_espace, bool) \
+            or uid_espace <= 0:
+        raise ValueError("UID d'Espace invalide")
+    return "%s/%d" % (RACINE_RUNTIME, uid_espace)
 
 
 def chemin_depot(compte):

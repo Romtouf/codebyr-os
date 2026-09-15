@@ -10,13 +10,13 @@ Ce que cet essai vérifie, dans l'ordre où ça compte :
   1. le service prépare un Espace : compte dédié, dossier à lui seul ;
   2. le compte du BUREAU ne peut pas lire ce dossier — c'est tout l'objet du
      chantier : aujourd'hui, ce qui s'échappe d'un Espace lit les autres ;
-  3. une fenêtre s'affiche depuis ce compte, par la passerelle ;
+  3. une fenêtre s'affiche depuis ce compte, par son dossier d'exécution ;
   4. ce que le BUREAU demande s'exécute sous le compte de l'ESPACE, dans le
      bac à sable, sous plafond — sans que root ait vu la commande ;
   5. depuis ce même compte, le bus de session du bureau reste hors d'atteinte ;
   6. un compte d'ESPACE qui interroge le service est refusé (sinon « jetable »
      ferait ouvrir « banque ») ;
-  7. la fermeture retire tout : montages, droits, passerelle, dépôt, portée.
+  7. la fermeture retire tout : montages, droits, dossier d'exécution, dépôt, portée.
 
 À la fin, le compte d'essai et ses fichiers sont supprimés.
 """
@@ -156,7 +156,10 @@ def signaler_restes(nom, uid_bureau, affichage):
     c'est exactement ce qui s'est produit le 14/09/2026 : une préparation
     interrompue avait laissé un montage, et le suivant s'est empilé dessus.
     """
-    restes = montages_sous(comptes.chemin_passerelle(nom))
+    try:
+        restes = montages_sous(comptes.chemin_runtime(pwd.getpwnam(nom).pw_uid))
+    except KeyError:
+        restes = []     # pas de compte : pas de dossier d'exécution à lui
     acl = subprocess.run(["/usr/bin/getfacl", "-p",
                           "/run/user/%d/%s" % (uid_bureau, affichage)],
                          capture_output=True, text=True).stdout
@@ -173,17 +176,17 @@ def signaler_restes(nom, uid_bureau, affichage):
         print("       → %s" % ligne)
 
 
-def diagnostiquer_passerelle(passerelle, debut):
-    """Dit ce qui reste d'une passerelle, et pourquoi, sans qu'on ait à le demander.
+def diagnostiquer_runtime(runtime, debut):
+    """Dit ce qui reste du dossier d'exécution, et pourquoi, sans qu'on ait à le demander.
 
     Écrit après un « NON » dont la cause n'était pas lisible dans la sortie :
     plutôt que de deviner et de renvoyer un essai de plus, on montre ce qui
     est resté, comment c'est monté, et ce que le service en a dit.
     """
-    print("       ┌ ce qui reste dans la passerelle :")
+    print("       ┌ ce qui reste dans le dossier d'exécution :")
     try:
-        for nom in sorted(os.listdir(passerelle)):
-            chemin = os.path.join(passerelle, nom)
+        for nom in sorted(os.listdir(runtime)):
+            chemin = os.path.join(runtime, nom)
             print("       │   %s%s" % (nom, "  (point de montage)"
                                        if os.path.ismount(chemin) else ""))
     except OSError as exc:
@@ -191,9 +194,9 @@ def diagnostiquer_passerelle(passerelle, debut):
     montages = subprocess.run(
         ["/usr/bin/findmnt", "-rn", "-o", "TARGET,SOURCE,PROPAGATION"],
         capture_output=True, text=True).stdout.splitlines()
-    print("       ├ montages sous la passerelle :")
+    print("       ├ montages sous le dossier d'exécution :")
     for ligne in montages:
-        if ligne.startswith(passerelle):
+        if ligne.startswith(runtime):
             print("       │   %s" % ligne)
     journal = subprocess.run(
         ["/usr/bin/journalctl", "--no-pager", "-o", "cat", "-t", "codebyr-uid",
@@ -294,8 +297,8 @@ def main():
                        "hors d'atteinte — c'est le but" if lecture.returncode
                        else "à refuser")
 
-        print("\n── 3. L'affichage passe par la passerelle ────────────────────────")
-        lien = os.path.join(r["passerelle"], affichage)
+        print("\n── 3. L'affichage passe par le dossier de l'Espace ────────────────────────")
+        lien = os.path.join(r["runtime"], affichage)
         dire("socket présentée", os.path.ismount(lien), lien)
         fen = sous(espace.pw_uid, espace.pw_gid, [
             "/usr/bin/env", "-i", "PATH=/usr/bin:/bin", "LANG=C.UTF-8",
@@ -315,7 +318,7 @@ def main():
         # construira : on mesure la chaîne entière, pas un raccourci.
         argv = bac_a_sable.wrap_bwrap(
             r["home"], ["/bin/sh", "-c", "id -u > %s" % preuve], {},
-            passerelle=r["passerelle"], chez=r["home"], audio=False, gpu=False)
+            runtime_espace=r["runtime"], chez=r["home"], audio=False, gpu=False)
         reponses = ordonner(bureau.pw_uid, bureau.pw_gid, r.get("ordres", ""),
                             {"argv": argv,
                              "env": {"PATH": "/usr/bin:/bin", "HOME": r["home"]}})
@@ -368,10 +371,10 @@ def main():
         # Compté désormais : un service qui dit « fermé » sans l'avoir fait est
         # précisément ce que cet essai doit attraper.
         reussi &= dire("réponse du service", r3.get("ok"), r3.get("erreur", ""))
-        if not dire("passerelle retirée", not os.path.exists(r["passerelle"]),
-                    r["passerelle"]):
+        if not dire("dossier d'exécution retiré", not os.path.exists(r["runtime"]),
+                    r["runtime"]):
             reussi = False
-            diagnostiquer_passerelle(r["passerelle"], debut)
+            diagnostiquer_runtime(r["runtime"], debut)
         reussi &= dire("dépôt retiré", not os.path.exists(r.get("depot", "")),
                        r.get("depot", ""))
         acl = subprocess.run(["/usr/bin/getfacl", "-p",

@@ -785,7 +785,7 @@ def _lancer(espaces, esp, extra, fichier, session):
                          # des chemins absolus — dossier de téléchargement de
                          # Firefox, fichiers récents, signets. Déménagés vers un
                          # autre chemin, ils pointeraient dans le vide.
-                         passerelle=session.passerelle if session else None)
+                         runtime_espace=session.runtime if session else None)
         if renforce:
             if not session:
                 # Sous compte dédié, les plafonds sont déjà posés par le service

@@ -13,7 +13,7 @@ qui puisse voir ce qu'un essai « à la main » ne verra jamais :
 
   · un durcissement d'unité hérité par les applications de l'Espace — un
     filtre seccomp aurait empêché le navigateur de compiler son JavaScript ;
-  · un espace de noms de montage qui cacherait la passerelle à l'Espace ;
+  · un espace de noms de montage qui cacherait ses sockets à l'Espace ;
   · un profil AppArmor trop serré, qui refuserait en silence.
 
 À la fin, l'Espace d'essai est supprimé, compte compris.

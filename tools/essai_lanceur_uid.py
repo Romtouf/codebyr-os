@@ -300,8 +300,21 @@ def attendre_que(condition, delai):
     return condition()
 
 
+def _uid_de(nom):
+    try:
+        return pwd.getpwnam(nom).pw_uid
+    except KeyError:
+        return None
+
+
 def espace_ouvert(nom):
-    return os.path.exists(comptes.chemin_passerelle(nom))
+    """Un Espace est ouvert tant que son dossier d'exécution existe.
+
+    Il n'est plus nommé par le compte mais par son UID : /run/user/<uid>.
+    Compte disparu, dossier forcément parti.
+    """
+    uid = _uid_de(nom)
+    return uid is not None and os.path.exists(comptes.chemin_runtime(uid))
 
 
 def lancer_service():
@@ -400,7 +413,8 @@ def main():
                        "absent")
         reussi &= dire("Espace refermé après sa dernière application",
                        attendre_que(lambda: not espace_ouvert(nom), 15),
-                       comptes.chemin_passerelle(nom))
+                       comptes.chemin_runtime(espace.pw_uid) if espace
+                       else "compte déjà retiré")
         note = os.path.join(home, "Documents", "note.txt")
         reussi &= dire("ses données l'ont suivi, au compte de l'Espace",
                        os.path.exists(note) and bool(espace)

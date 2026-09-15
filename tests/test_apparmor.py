@@ -152,7 +152,8 @@ class LeServiceDesComptes(unittest.TestCase):
         # Un défaut dans la construction d'un chemin ne doit rien pouvoir
         # toucher ailleurs, même si la validation de comptes.py tombait.
         permis = ("/var/lib/codebyr/", "/run/codebyr/", "/run/codebyr-uid",
-                  "/run/systemd/", "/dev/log", "owner /dev/pts/")
+                  "/run/systemd/", "/dev/log", "owner /dev/pts/",
+                  "/run/user/[0-9]")
         for regle in _regles(PROFIL_SERVICE):
             if regle.startswith(("deny", "include", "unix", "network", "signal",
                                  "ptrace", "profile", "abi", "capability")):
@@ -167,9 +168,26 @@ class LeServiceDesComptes(unittest.TestCase):
     def test_du_bureau_il_ne_voit_que_les_sockets_qu_il_presente(self):
         # Le bus de session n'y est pas, et n'y sera pas : c'est lui qui
         # donnait accès à systemd --user, donc à l'exécution hors bac à sable.
-        vues = [r for r in _regles(PROFIL_SERVICE) if r.startswith("/run/user/")]
+        vues = [r for r in _regles(PROFIL_SERVICE)
+                if r.startswith("/run/user/") and r.endswith(" r,")]
         self.assertEqual(vues, ["/run/user/[0-9]*/wayland-[0-9]* r,",
                                 "/run/user/[0-9]*/pipewire-0 r,"])
+
+    def test_il_n_ecrit_dans_aucun_dossier_d_execution_d_utilisateur(self):
+        # Le dossier d'exécution d'un Espace vit dans le MÊME arbre que celui
+        # des utilisateurs. La seule barrière est le nombre de chiffres de
+        # l'UID : un compte d'Espace est système (au plus 999), un utilisateur
+        # commence à 1000. Un motif à quatre chiffres — ou un « * » qui les
+        # couvrirait tous — rendrait le dossier du bureau accessible en
+        # écriture au service, et personne ne le verrait.
+        for regle in _regles(PROFIL_SERVICE):
+            if not regle.startswith("/run/user/"):
+                continue
+            if not re.search(r"\s[rmkix]*[wa][rmkix]*,$", regle):
+                continue        # une règle de lecture seule : pas le sujet
+            chiffres = regle.split("/")[3]
+            self.assertIn(chiffres, ("[0-9]", "[0-9][0-9]", "[0-9][0-9][0-9]"),
+                          "écriture trop large dans /run/user : %s" % regle)
 
     def test_les_programmes_qu_il_lance_sont_nommes_un_par_un(self):
         lances = [r.split()[0] for r in _regles(PROFIL_SERVICE)

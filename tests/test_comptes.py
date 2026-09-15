@@ -115,12 +115,13 @@ class Chemins(unittest.TestCase):
             with self.assertRaises(ValueError, msg=espace):
                 comptes.chemin_home(1000, espace)
 
-    def test_la_passerelle_n_existe_que_pour_un_espace(self):
-        self.assertEqual(comptes.chemin_passerelle("cbyr-1000-banque"),
-                         "/run/codebyr/passerelles/cbyr-1000-banque")
-        for compte in ("romtouf", "root", "", "cbyr"):
-            with self.assertRaises(ValueError, msg=compte):
-                comptes.chemin_passerelle(compte)
+    def test_le_dossier_d_execution_est_a_sa_place_canonique(self):
+        # /run/user/<uid>, et pas un chemin à nous : mesuré le 15/09/2026,
+        # une application Flatpak ne démarre pas ailleurs.
+        self.assertEqual(comptes.chemin_runtime(997), "/run/user/997")
+        for uid in (0, -1, None, "997", True):
+            with self.assertRaises(ValueError, msg=repr(uid)):
+                comptes.chemin_runtime(uid)
 
     def test_le_depot_n_existe_que_pour_un_espace(self):
         self.assertEqual(comptes.chemin_depot("cbyr-1000-banque"),
@@ -129,13 +130,19 @@ class Chemins(unittest.TestCase):
             with self.assertRaises(ValueError, msg=compte):
                 comptes.chemin_depot(compte)
 
-    def test_depot_et_passerelle_ne_se_confondent_pas(self):
+    def test_depot_et_dossier_d_execution_ne_se_confondent_pas(self):
         # Les deux vont dans des sens opposés : l'un porte les sockets du
-        # bureau vers l'Espace, l'autre ceux que le bureau sert à l'Espace.
-        # Les mélanger reviendrait à laisser un Espace écrire là où root
-        # présente les sockets du bureau.
+        # bureau vers l'Espace, l'autre celles que le bureau sert à l'Espace.
+        # Les mélanger reviendrait à laisser un Espace écrire dans le dépôt,
+        # où il pourrait se faire passer pour l'hôte auprès d'un autre.
         self.assertNotEqual(comptes.chemin_depot("cbyr-1000-banque"),
-                            comptes.chemin_passerelle("cbyr-1000-banque"))
+                            comptes.chemin_runtime(997))
+
+    def test_le_dossier_d_execution_du_bureau_n_est_jamais_celui_d_un_espace(self):
+        # Le compte d'un Espace est un compte système : son UID est sous 1000,
+        # donc son dossier ne peut pas tomber sur celui d'un utilisateur.
+        self.assertNotEqual(comptes.chemin_runtime(997),
+                            "/run/user/%d" % comptes.UID_MINIMAL)
 
     def test_un_depot_ne_contient_jamais_le_bus_de_session(self):
         self.assertNotIn("bus", comptes.SOCKETS_DU_BUREAU)
@@ -239,7 +246,7 @@ class LeService(unittest.TestCase):
 
     def test_aucun_chemin_ne_vient_du_client(self):
         for interdit in ('demande.get("home")', 'demande.get("chemin")',
-                         'demande.get("socket")', 'demande.get("passerelle")'):
+                         'demande.get("socket")', 'demande.get("runtime")'):
             self.assertNotIn(interdit, self.source, interdit)
 
     def test_le_service_n_execute_aucune_commande_du_client(self):

@@ -121,7 +121,7 @@ def derniere_erreur(r):
     return lignes[-1][:88] if lignes else ""
 
 
-def dans_le_bac(espace, home, passerelle, cmd, env_sup=None, **options):
+def dans_le_bac(espace, home, runtime, cmd, env_sup=None, **options):
     """Construit la VRAIE ligne de commande du bac à sable, et l'exécute.
 
     On appelle bac_a_sable.wrap_bwrap, pas une copie : mesurer une copie
@@ -129,7 +129,7 @@ def dans_le_bac(espace, home, passerelle, cmd, env_sup=None, **options):
     """
     run = bac_a_sable.wrap_bwrap(
         home, cmd, {"XDG_RUNTIME_DIR": "/run/user/%d" % espace.pw_uid},
-        passerelle=passerelle, chez=home, **options)
+        runtime_espace=runtime, chez=home, **options)
     environnement = ["/usr/bin/env", "-i", "PATH=/usr/bin:/bin",
                      "LANG=C.UTF-8", "HOME=" + home,
                      "WAYLAND_DISPLAY=wayland-0", "GDK_BACKEND=wayland"]
@@ -207,8 +207,8 @@ def main():
             dire("préparation de l'Espace", False, r.get("erreur") or r.get("brut", ""))
             return 1
         espace = pwd.getpwnam(r["compte"])
-        home, passerelle = r["home"], r["passerelle"]
-        dire("Espace préparé", True, "%s (UID %d), passerelle %s"
+        home, runtime = r["home"], r["runtime"]
+        dire("Espace préparé", True, "%s (UID %d), dossier %s"
              % (r["compte"], espace.pw_uid, ", ".join(r["presentes"]) or "rien"))
 
         script = os.path.join(home, "fenetre.py")
@@ -217,14 +217,14 @@ def main():
         os.chown(script, espace.pw_uid, espace.pw_gid)
 
         titre("1. Le bac à sable démarre-t-il sous ce compte ?")
-        r1 = dans_le_bac(espace, home, passerelle, ["/bin/true"], audio=False)
+        r1 = dans_le_bac(espace, home, runtime, ["/bin/true"], audio=False)
         if not dire("bubblewrap, isolation ordinaire", r1.returncode == 0,
                     derniere_erreur(r1)):
             manques.append("bubblewrap ne démarre pas sous un compte système")
             consequence("tout le reste en dépend : rien d'autre ne sera concluant")
 
         titre("2. Et avec le Blindage ?")
-        r2 = dans_le_bac(espace, home, passerelle, ["/bin/true"],
+        r2 = dans_le_bac(espace, home, runtime, ["/bin/true"],
                          renforce=True, audio=False)
         if not dire("espace de noms utilisateur + filtre d'appels système",
                     r2.returncode == 0, derniere_erreur(r2)):
@@ -232,15 +232,15 @@ def main():
             consequence("Banque et Jetable en dépendent — à régler avant tout "
                         "déploiement")
 
-        titre("3. L'affichage passe-t-il par la passerelle ?")
-        r3 = dans_le_bac(espace, home, passerelle,
+        titre("3. L'affichage passe-t-il par le dossier de l'Espace ?")
+        r3 = dans_le_bac(espace, home, runtime,
                          ["/usr/bin/python3", script], audio=False)
         if not dire("fenêtre affichée depuis le bac à sable",
                     "FENETRE-AFFICHEE" in r3.stdout, derniere_erreur(r3)):
             manques.append("l'affichage ne traverse pas le bac à sable")
 
         titre("4. Et avec le bus de session privé par-dessus ?")
-        r4 = dans_le_bac(espace, home, passerelle,
+        r4 = dans_le_bac(espace, home, runtime,
                          ["/usr/bin/dbus-run-session", "--",
                           "/usr/bin/python3", script], audio=False)
         if not dire("dbus-run-session + fenêtre",
@@ -250,7 +250,7 @@ def main():
                         "les applications mono-instance se rejoignent entre Espaces")
 
         titre("5. Le dossier personnel est-il vraiment à lui ?")
-        r5 = dans_le_bac(espace, home, passerelle,
+        r5 = dans_le_bac(espace, home, runtime,
                          ["/bin/sh", "-c",
                           "echo bonjour > %s/temoin && cat %s/temoin"
                           % (home, home)], audio=False)
@@ -306,7 +306,7 @@ def main():
                 # Le trajet complet d'une notification : de l'application, dans
                 # le bac à sable, jusqu'au service qui écoute sur le bureau.
                 dedans = dans_le_bac(
-                    espace, home, passerelle,
+                    espace, home, runtime,
                     ["/usr/bin/python3", "-c",
                      "import socket\n"
                      "s=socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)\n"
@@ -345,7 +345,7 @@ def main():
         subprocess.run(["/usr/sbin/userdel", nom], capture_output=True)
         shutil.rmtree(comptes.chemin_home(bureau.pw_uid, ESPACE), ignore_errors=True)
         shutil.rmtree(coin_hote, ignore_errors=True)
-        shutil.rmtree(comptes.chemin_passerelle(nom), ignore_errors=True)
+        shutil.rmtree(comptes.chemin_runtime(espace.pw_uid), ignore_errors=True)
         subprocess.run(["/usr/bin/systemctl", "stop", "--quiet",
                         comptes.unite_de_l_espace(nom)], capture_output=True)
         for reste in (SOCKET, INIT_MESURE):

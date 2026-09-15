@@ -149,7 +149,7 @@ class LOrdreDesChoses(unittest.TestCase):
     def test_la_socket_d_ordres_n_entre_jamais_dans_le_bac_a_sable(self):
         appel = self.lancer.split("bac_a_sable.wrap_bwrap(")[1].split(")\n")[0]
         self.assertNotIn("ordres", appel)
-        self.assertIn("passerelle=session.passerelle", appel)
+        self.assertIn("runtime_espace=session.runtime", appel)
 
     def test_le_bureau_n_ecrit_plus_dans_le_dossier_d_un_espace_dedie(self):
         bloc = self.lancer.split("if session:")[1].split("elif not esp.get(\"ephemere\"):")[0]
@@ -358,7 +358,8 @@ class LeDialogue(unittest.TestCase):
     def test_la_session_tient_jusqu_a_ce_qu_on_la_rende(self):
         self._servir([{"ok": True, "compte": "cbyr-1000-travail",
                        "home": "/var/lib/codebyr/espaces/1000/travail",
-                       "passerelle": "/p", "depot": "/d", "ordres": "/d/exec"}],
+                       "runtime": "/run/user/997", "depot": "/d",
+                       "ordres": "/d/exec"}],
                      tenir=True)
         session = compte_dedie.Session("travail", "wayland-0", True, "2G", 800,
                                        chemin=self.chemin)

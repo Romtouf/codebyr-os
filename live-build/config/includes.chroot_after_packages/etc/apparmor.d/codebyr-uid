@@ -65,16 +65,39 @@ profile codebyr-uid /usr/lib/codebyr/codebyr-uid {
   # leur compte, effacés à la suppression de l'Espace.
   /var/lib/codebyr/ rw,
   /var/lib/codebyr/** rw,
-  # Passerelles et dépôts : le volatile, refait à chaque ouverture.
+  # Dépôts : le volatile, refait à chaque ouverture.
   /run/codebyr/ rw,
   /run/codebyr/** rw,
   # La socket d'écoute, quand le service est lancé pour un essai plutôt que
   # par systemd (qui la lui passe déjà ouverte).
   /run/codebyr-uid*.sock rw,
 
+  # Dossier d'exécution d'un Espace : /run/user/<uid de l'Espace>. Root le
+  # crée, le donne à l'Espace, y présente ses sockets, et l'efface à la
+  # fermeture — l'Espace y ayant écrit les siennes entre-temps.
+  #
+  # C'est le même arbre que les dossiers d'exécution des utilisateurs, et
+  # l'écriture y est donc bornée par le NOMBRE DE CHIFFRES de l'UID : un
+  # compte d'Espace est un compte système, créé par « useradd --system », donc
+  # au plus trois chiffres (Debian : SYS_UID_MAX=999). Un utilisateur de
+  # bureau en a au moins quatre (UID_MIN=1000). Le service ne peut donc pas
+  # écrire dans le dossier d'exécution d'un utilisateur — pas même dans celui
+  # de son propre demandeur — quand bien même un chemin serait mal construit.
+  #
+  # Si un jour un compte d'Espace recevait un UID à quatre chiffres, l'Espace
+  # ne s'ouvrirait pas et le refus serait au journal : un échec bruyant, pas
+  # une protection qui s'évapore en silence.
+  /run/user/[0-9]/ rw,
+  /run/user/[0-9]/** rw,
+  /run/user/[0-9][0-9]/ rw,
+  /run/user/[0-9][0-9]/** rw,
+  /run/user/[0-9][0-9][0-9]/ rw,
+  /run/user/[0-9][0-9][0-9]/** rw,
+
   # ── Ce qu'il LIT du bureau : les sockets qu'il présente, et rien d'autre ─
   # Il les monte par « mount --bind » ; il vérifie seulement qu'elles existent.
-  # Le bus de session (/run/user/*/bus) n'est pas ici, et n'y sera pas.
+  # Lecture seule, et nommées une par une : le bus de session (/run/user/*/bus)
+  # n'est pas ici, et n'y sera pas.
   /run/user/[0-9]*/wayland-[0-9]* r,
   /run/user/[0-9]*/pipewire-0 r,
 

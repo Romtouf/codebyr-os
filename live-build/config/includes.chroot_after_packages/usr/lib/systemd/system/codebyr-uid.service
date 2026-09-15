@@ -21,7 +21,7 @@ ExecStart=/usr/lib/codebyr/codebyr-uid
 #
 # · TOUT CE QUI PASSE PAR UN ESPACE DE NOMS DE MONTAGE cache les montages que
 #   ce service pose. ProtectKernelTunables=, ProtectHome=, PrivateTmp= en
-#   créent un : la passerelle d'un Espace y serait montée pour le service seul,
+#   créent un : les sockets d'un Espace y seraient montées pour le service seul,
 #   et l'Espace n'y verrait rien — sans le moindre message d'erreur.
 #
 # NoNewPrivileges= n'y est pas non plus, pour une troisième raison : sur un

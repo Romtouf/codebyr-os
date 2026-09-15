@@ -17,15 +17,9 @@ import tempfile
 import comptes
 
 
-# Dossier d'exécution vu DANS un Espace qui tourne sous son propre compte.
-# Ce n'est pas /run/user/<uid> : ce dossier appartient au BUREAU, et l'ouvrir
-# rendait joignable son bus de session — mesuré le 14/09/2026 (voir comptes.py).
-RUNTIME_ESPACE = "/run/codebyr-espace"
-
-
 def wrap_bwrap(home, cmd, env, renforce=False, hors_ligne=False, audio=True,
                envoi=None, filtre=None, gpu=True, notifications=None,
-               passerelle=None, chez=None):
+               runtime_espace=None, chez=None):
     """Enveloppe avec bubblewrap : dossier personnel isolé, /tmp isolé,
     affichage (et éventuellement son) partagés. Repli géré par l'appelant si
     bwrap échoue.
@@ -64,14 +58,16 @@ def wrap_bwrap(home, cmd, env, renforce=False, hors_ligne=False, audio=True,
                  n'est partagé entre Espaces : c'est l'hôte qui relève et
                  distribue, jamais l'Espace qui écrit chez le voisin.
 
-    passerelle : dossier tenu par root où sont présentés les SEULS sockets
-                 auxquels cet Espace a droit, quand il tourne sous son propre
-                 compte Unix (voir comptes.py). Les sockets ne viennent alors
-                 plus du dossier d'exécution du bureau : ce compte n'y a aucun
-                 droit, et c'est précisément l'objet du chantier. Le dossier
-                 d'exécution vu dans le bac à sable devient RUNTIME_ESPACE —
-                 celui du bureau n'existe plus pour cet Espace, ce qui retire
-                 du même coup toute chance de retomber sur son bus de session.
+    runtime_espace : dossier d'exécution de l'Espace quand il tourne sous son
+                 propre compte Unix — /run/user/<uid de l'Espace>, voir
+                 comptes.py. Root y présente les SEULS sockets auxquels cet
+                 Espace a droit ; celui du BUREAU n'existe plus pour lui, ce
+                 qui retire toute chance de retomber sur son bus de session.
+
+                 Il apparaît dans le bac à sable au même chemin qu'au dehors :
+                 c'est celui que Flatpak et le reste de l'écosystème
+                 supposent, et le déguiser sous un nom à nous empêchait une
+                 application Flatpak de démarrer (mesuré le 15/09/2026).
 
     chez       : chemin où le dossier personnel de l'Espace apparaît dans le
                  bac à sable. Par défaut celui de l'appelant, ce qui convient
@@ -95,12 +91,13 @@ def wrap_bwrap(home, cmd, env, renforce=False, hors_ligne=False, audio=True,
     # « or » et non env.get(défaut) : le défaut ne doit être calculé que s'il
     # sert (os.getuid n'existe pas partout où l'on teste ce code).
     runtime = env.get("XDG_RUNTIME_DIR") or "/run/user/%d" % os.getuid()
-    # Sous compte dédié, les sockets viennent de la passerelle et non du
-    # dossier d'exécution du bureau, et le dossier vu dans le bac à sable
-    # change de nom : plus rien ne pointe vers /run/user/<uid du bureau>.
-    depuis = passerelle or runtime
-    if passerelle:
-        runtime = RUNTIME_ESPACE
+    # Sous compte dédié, les sockets viennent du dossier d'exécution de
+    # l'ESPACE, et plus de celui du bureau : ce compte n'y a aucun droit, et
+    # c'est tout l'objet du chantier. Dedans comme dehors, le dossier garde
+    # son vrai chemin — plus rien ne pointe vers /run/user/<uid du bureau>.
+    depuis = runtime_espace or runtime
+    if runtime_espace:
+        runtime = runtime_espace
     chez = chez or os.path.expanduser("~")
     bwrap = [
         "bwrap",
@@ -137,7 +134,7 @@ def wrap_bwrap(home, cmd, env, renforce=False, hors_ligne=False, audio=True,
         bwrap += ["--dev-bind-try", "/dev/dri", "/dev/dri"]
     if audio and not hors_ligne:
         bwrap += ["--ro-bind-try", depuis + "/pipewire-0", runtime + "/pipewire-0"]
-    if passerelle:
+    if runtime_espace:
         # L'environnement hérité désigne encore le dossier du bureau : le
         # laisser ferait chercher les sockets là où cet Espace n'a aucun droit,
         # et l'échec serait muet.

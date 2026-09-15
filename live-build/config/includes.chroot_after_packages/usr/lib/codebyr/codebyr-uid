@@ -1,6 +1,6 @@
 #!/usr/bin/python3 -IS
 # -*- coding: utf-8 -*-
-"""Service privilégié : prépare le compte Unix et la passerelle d'un Espace.
+"""Service privilégié : prépare le compte Unix et le dossier d'exécution d'un Espace.
 
 C'est la pièce sensible du chantier « un UID par Espace ». Elle tourne en root.
 Tout ce qu'elle accepte de faire est décidé par comptes.py, écrit à part et
@@ -27,14 +27,16 @@ Une demande JSON par connexion, une réponse JSON :
    "son": false, "memoire": "2G", "taches": 800}
       → {"ok": true, "compte": "cbyr-1000-banque", "uid": 997, "gid": 997,
          "home": "/var/lib/codebyr/espaces/1000/banque",
-         "passerelle": "/run/codebyr/passerelles/cbyr-1000-banque",
+         "runtime": "/run/user/997",
          "depot": "/run/codebyr/depots/cbyr-1000-banque",
          "ordres": "/run/codebyr/depots/cbyr-1000-banque/exec"}
 
-  La « passerelle » va du bureau vers l'Espace : root y présente les sockets
-  du bureau auxquels l'Espace a droit. Le « dépôt » va dans l'autre sens :
-  c'est le bureau qui y crée les sockets qu'il sert lui-même (notifications,
-  filtre réseau), et l'Espace ne fait que les joindre.
+  Le « runtime » est le dossier d'exécution de l'Espace : le sien, à la place
+  canonique que logind lui aurait donnée. Root y présente les sockets du
+  bureau auxquels l'Espace a droit, et l'Espace y écrit les siennes. Le
+  « dépôt » va dans l'autre sens : c'est le bureau qui y crée les sockets
+  qu'il sert lui-même (notifications, filtre réseau), et l'Espace ne fait que
+  les joindre.
 
   « ordres » est la socket par laquelle le bureau fait exécuter ses commandes
   DANS l'Espace — non par root, mais par le premier processus de l'Espace,
@@ -170,8 +172,11 @@ def racines():
     n'aurait dit pourquoi. On ne laisse pas une protection dépendre d'un
     réglage qu'on ne contrôle pas.
     """
+    # /run/user n'est pas dans la liste : il appartient au système (tmpfs de
+    # systemd, 0755), et nous n'avons pas à le créer ni à en changer les
+    # droits. On y pose seulement le dossier de chaque Espace.
     for chemin in (os.path.dirname(comptes.RACINE_ESPACES),
-                   os.path.dirname(comptes.RACINE_PASSERELLES)):
+                   comptes.RACINE_DEPOTS.rsplit("/", 1)[0]):
         dossier_root(chemin)
 
 
@@ -326,12 +331,34 @@ def droit_sur_socket(chemin, uid, accorder=True):
                    check=True, capture_output=True)
 
 
+def dossier_runtime(uid_espace, utilisateur):
+    """Le dossier d'exécution de l'Espace : à lui, 0700, à sa place canonique.
+
+    Root le crée — /run/user appartient au système — et le donne aussitôt à
+    l'Espace, qui doit pouvoir y écrire : c'est là que Flatpak pose ses
+    sockets et son « .dbus-proxy ». Lui laisser l'écriture ne lui donne
+    aucune prise sur les sockets qu'on y présente : un montage lié ne peut
+    être ni supprimé, ni renommé, ni remplacé par un lien piégé, fût-ce par
+    le propriétaire du dossier (mesuré le 15/09/2026).
+    """
+    chemin = comptes.chemin_runtime(uid_espace)
+    if os.path.islink(chemin):
+        raise ValueError("Lien symbolique refusé : %s" % chemin)
+    os.makedirs(chemin, mode=0o700, exist_ok=True)
+    st = os.stat(chemin)
+    if st.st_uid not in (0, utilisateur.pw_uid):
+        raise ValueError("Dossier d'exécution déjà pris par un autre compte")
+    os.chown(chemin, utilisateur.pw_uid, utilisateur.pw_gid)
+    os.chmod(chemin, 0o700)
+    return chemin
+
+
 def presenter(source, destination):
-    """Présente un socket du bureau dans la passerelle, par un montage lié.
+    """Présente un socket du bureau dans le dossier de l'Espace, par un montage lié.
 
     Un montage déjà présent — laissé par une préparation interrompue — serait
-    RECOUVERT par le nouveau, et la fermeture n'en retirerait qu'un : la
-    passerelle survivrait à l'Espace. Constaté le 14/09/2026. On retire donc
+    RECOUVERT par le nouveau, et la fermeture n'en retirerait qu'un : le
+    dossier survivrait à l'Espace. Constaté le 14/09/2026. On retire donc
     d'abord ce qui est là, avant de monter.
     """
     for _ in range(8):
@@ -352,7 +379,7 @@ def retirer(destination):
     """Retire un socket présenté. Renvoie la raison d'un échec, ou None.
 
     Rien n'est ignoré : un démontage refusé passait ici en silence, et la
-    fermeture se disait réussie en laissant la passerelle en place — constaté
+    fermeture se disait réussie en laissant le montage en place — constaté
     le 14/09/2026. Root ne prétend pas avoir rangé ce qu'il n'a pas rangé.
     """
     if os.path.ismount(destination):
@@ -452,7 +479,7 @@ def preparer(uid_demandeur, espace, affichage, son, memoire=None, taches=None,
     """Tout ou rien : une préparation qui échoue défait ce qu'elle a posé.
 
     Constaté le 14/09/2026 : le premier processus refusait de démarrer, alors
-    que le socket Wayland était déjà monté dans la passerelle et le DROIT déjà
+    que le socket Wayland était déjà monté chez l'Espace et le DROIT déjà
     accordé au compte de l'Espace. Rien n'était défait. L'Espace n'existait
     pas, mais son compte gardait l'accès à l'affichage du bureau — et l'essai
     suivant a monté un second socket par-dessus le premier.
@@ -484,14 +511,14 @@ def _preparer(uid_demandeur, espace, affichage, son, memoire, taches, ephemere=F
     envois = boite_de_depart(uid_demandeur, espace, utilisateur)
     arrivees = boite_d_arrivee(uid_demandeur, espace, utilisateur)
 
-    passerelle = dossier_root(comptes.chemin_passerelle(nom))
+    runtime = dossier_runtime(utilisateur.pw_uid, utilisateur)
     depot = dossier_depot(nom, uid_demandeur, utilisateur.pw_uid)
     presentes = []
     for source_nom, fichier in comptes.passages(affichage, son):
         source = comptes.socket_du_bureau(uid_demandeur, source_nom)
         if not os.path.exists(source):
             continue        # le son peut manquer : ce n'est pas une erreur
-        destination = os.path.join(passerelle, fichier)
+        destination = os.path.join(runtime, fichier)
         presenter(source, destination)
         droit_sur_socket(source, utilisateur.pw_uid, accorder=True)
         presentes.append(fichier)
@@ -520,7 +547,7 @@ def _preparer(uid_demandeur, espace, affichage, son, memoire, taches, ephemere=F
                                                    ", ".join(presentes) or "aucun socket"))
     return {"ok": True, "compte": nom, "uid": utilisateur.pw_uid,
             "gid": utilisateur.pw_gid, "home": home,
-            "passerelle": passerelle, "depot": depot, "presentes": presentes,
+            "runtime": runtime, "depot": depot, "presentes": presentes,
             "ordres": os.path.join(depot, comptes.SOCKET_EXEC),
             "envois": envois, "arrivees": arrivees}
 
@@ -556,10 +583,16 @@ def fermer(uid_demandeur, espace):
             # le dit.
             subprocess.run(["/usr/bin/umount", "--lazy", home], capture_output=True)
             echecs.append("jetable détaché en différé : %s" % demontage.stderr.strip())
-    passerelle = comptes.chemin_passerelle(nom)
-    if os.path.isdir(passerelle):
-        for fichier in sorted(os.listdir(passerelle)):
-            echec = retirer(os.path.join(passerelle, fichier))
+    runtime = comptes.chemin_runtime(utilisateur.pw_uid)
+    if os.path.isdir(runtime):
+        # Le dossier ne contient plus seulement ce que root y a présenté :
+        # l'Espace y a posé ses propres fichiers (le bus, « .dbus-proxy »,
+        # « .flatpak »). On démonte ce qui est monté, puis on efface le reste.
+        for fichier in sorted(os.listdir(runtime)):
+            chemin = os.path.join(runtime, fichier)
+            if not os.path.ismount(chemin):
+                continue        # un fichier de l'Espace : il partira avec le dossier
+            echec = retirer(chemin)
             if echec:
                 echecs.append("%s, %s" % (fichier, echec))
             source = os.path.join("/run/user/%d" % uid_demandeur, fichier)
@@ -571,10 +604,18 @@ def fermer(uid_demandeur, espace):
                     # l'Espace garderait l'accès au socket du bureau.
                     echecs.append("%s, DROIT NON RETIRÉ : %s" % (
                         fichier, (exc.stderr or b"").decode("utf-8", "replace").strip()))
-        try:
-            os.rmdir(passerelle)
-        except OSError as exc:
-            echecs.append("passerelle conservée : %s" % exc)
+        # rmtree sur un dossier écrit par un AUTRE compte : on ne s'y risque
+        # que si Python garantit la traversée sans suivre les liens, comme
+        # pour la suppression d'un Espace.
+        if not shutil.rmtree.avoids_symlink_attacks:
+            echecs.append("dossier d'exécution conservé : suppression sûre "
+                          "indisponible sur ce système")
+        else:
+            restes = []
+            shutil.rmtree(runtime, onexc=lambda *a: restes.append(a[1]))
+            if os.path.exists(runtime):
+                echecs.append("dossier d'exécution conservé : %s"
+                              % (restes[-1] if restes else "cause inconnue"))
     vider_depot(comptes.chemin_depot(nom))
     if echecs:
         for echec in echecs:

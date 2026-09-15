@@ -136,7 +136,18 @@ class Session:
         self._client.settimeout(None)
         self.compte = reponse["compte"]
         self.home = reponse["home"]
-        self.passerelle = reponse["passerelle"]
+        try:
+            self.runtime = reponse["runtime"]
+        except KeyError:
+            # Un service resté en 1.15.0 pendant que le lanceur est passé en
+            # 1.16.0 : il répond « passerelle », que plus rien ne sait lire.
+            # Le dire plutôt que de planter sur une clé manquante — l'Espace
+            # ne s'ouvrira pas, et l'utilisateur saura quoi faire.
+            if self._client:
+                self._client.close()
+            raise Indisponible(
+                "le service des comptes date d'avant la mise à jour ; "
+                "déconnectez-vous et reconnectez-vous")
         self.depot = reponse["depot"]
         self.ordres = reponse["ordres"]
         self.envois = reponse.get("envois")

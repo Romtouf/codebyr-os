@@ -94,11 +94,11 @@ class SousSonPropreCompte(unittest.TestCase):
     s'ouvrirait sans affichage et sans que personne sache pourquoi.
     """
 
-    PASSERELLE = "/run/codebyr/passerelles/cbyr-1000-banque"
+    RUNTIME = "/run/user/997"
 
     def _argv(self, **kw):
         env = {"XDG_RUNTIME_DIR": "/run/user/1000"}
-        kw.setdefault("passerelle", self.PASSERELLE)
+        kw.setdefault("runtime_espace", self.RUNTIME)
         kw.setdefault("chez", "/var/lib/codebyr/espaces/1000/banque")
         return bac_a_sable.wrap_bwrap("/var/lib/codebyr/espaces/1000/banque",
                                       ["firefox"], env, **kw)
@@ -110,19 +110,19 @@ class SousSonPropreCompte(unittest.TestCase):
                 self.assertNotIn("/run/user/1000", argument,
                                  "chemin du bureau exposé (%s)" % options)
 
-    def test_les_sockets_viennent_de_la_passerelle(self):
+    def test_les_sockets_viennent_du_dossier_de_l_espace(self):
         argv = self._argv(audio=True)
-        self.assertIn(self.PASSERELLE + "/wayland-0", argv)
-        self.assertIn(self.PASSERELLE + "/pipewire-0", argv)
+        self.assertIn(self.RUNTIME + "/wayland-0", argv)
+        self.assertIn(self.RUNTIME + "/pipewire-0", argv)
 
     def test_le_dossier_d_execution_vu_dans_l_espace_est_annonce(self):
         # Sans --setenv, l'application chercherait ses sockets dans le dossier
         # du bureau hérité de l'environnement : échec muet.
         argv = self._argv()
-        self.assertIn(bac_a_sable.RUNTIME_ESPACE + "/wayland-0", argv)
+        self.assertIn(self.RUNTIME + "/wayland-0", argv)
         i = argv.index("XDG_RUNTIME_DIR")
         self.assertEqual(argv[i - 1], "--setenv")
-        self.assertEqual(argv[i + 1], bac_a_sable.RUNTIME_ESPACE)
+        self.assertEqual(argv[i + 1], self.RUNTIME)
 
     def test_le_dossier_personnel_apparait_ou_on_le_demande(self):
         argv = self._argv(envoi="/tmp/envoi-banque")
@@ -135,14 +135,14 @@ class SousSonPropreCompte(unittest.TestCase):
         for argument in self._argv(audio=True):
             self.assertFalse(argument.endswith("/bus"), argument)
 
-    def test_sans_passerelle_rien_ne_change(self):
+    def test_sans_compte_dedie_rien_ne_change(self):
         # Le chantier est progressif : tant qu'un Espace tourne sous le compte
         # du bureau, sa ligne de commande doit être exactement celle d'avant.
         env = {"XDG_RUNTIME_DIR": "/run/user/1000"}
         argv = bac_a_sable.wrap_bwrap("/tmp/espace-home", ["firefox"], env)
         self.assertIn("/run/user/1000/wayland-0", argv)
         self.assertNotIn("XDG_RUNTIME_DIR", argv)
-        self.assertNotIn(bac_a_sable.RUNTIME_ESPACE, argv)
+        self.assertNotIn(self.RUNTIME, argv)
 
 
 class SondeIsolation(unittest.TestCase):

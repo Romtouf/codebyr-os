@@ -278,9 +278,13 @@ class LeService(unittest.TestCase):
         self.assertIn("if _applications_de(", abandon)
         self.assertIn("conservé", abandon)
         applications = self.source.split("def _applications_de(")[1].split("\ndef ")[0]
-        # L'init et le bus ne comptent pas : seuls, ils ne sont que la coquille.
+        # Une application d'Espace est un ENFANT DIRECT du premier processus.
+        # Compter tous les processus du compte rendait l'Espace « encore
+        # utilisé » à jamais : le bus y laisse des portails et des auxiliaires
+        # Flatpak qui survivent aux fenêtres (constaté le 15/09/2026).
         self.assertIn("INIT.encode", applications)
         self.assertIn("dbus-daemon --session", applications)
+        self.assertIn("_parent_de(pid) == premier", applications)
 
     def test_les_droits_nominatifs_ne_visent_jamais_un_dossier(self):
         # Un droit posé sur un DOSSIER ouvrirait tout ce qu'il contient, et

@@ -866,13 +866,35 @@ def servir_client(client):
             pass
 
 
-def _applications_de(uid):
-    """Les processus de ce compte, hors son premier processus et son bus.
+def _parent_de(pid):
+    """Le processus qui a lancé celui-ci, d'après le noyau."""
+    try:
+        with open("/proc/%d/status" % pid, encoding="utf-8") as f:
+            for ligne in f:
+                if ligne.startswith("PPid:"):
+                    return int(ligne.split()[1])
+    except (OSError, ValueError, IndexError):
+        pass
+    return 0
 
-    Ce sont eux qui disent si l'Espace sert encore à quelque chose : l'init et
-    le bus, à eux seuls, ne sont que la coquille.
+
+def _applications_de(uid):
+    """Les applications que le premier processus de l'Espace a lancées lui-même.
+
+    C'est bien plus étroit que « les processus de ce compte », et c'est
+    voulu : le bus de l'Espace démarre de son côté des portails et des
+    auxiliaires Flatpak qui SURVIVENT à la fermeture des fenêtres. Les compter
+    comme des applications rendait tout Espace « encore utilisé » à jamais, et
+    le rangement ne se faisait plus — constaté le 15/09/2026, au journal :
+    « abandonné par un service arrêté, mais encore utilisé : conservé », la
+    fenêtre venant pourtant d'être fermée.
+
+    Une application d'Espace est toujours un ENFANT DIRECT du premier
+    processus : c'est lui qui l'exécute (voir codebyr-espace-init). Ce que le
+    bus a démarré descend du bus, pas de lui.
     """
-    restants = []
+    premier = 0
+    candidats = []
     for entree in os.listdir("/proc"):
         if not entree.isdigit():
             continue
@@ -883,10 +905,14 @@ def _applications_de(uid):
                 ligne = f.read().replace(b"\0", b" ")
         except OSError:
             continue        # parti entre-temps : tant mieux
-        if INIT.encode("utf-8") in ligne or b"dbus-daemon --session" in ligne:
-            continue
-        restants.append(int(entree))
-    return restants
+        pid = int(entree)
+        if INIT.encode("utf-8") in ligne:
+            premier = pid
+        elif b"dbus-daemon --session" not in ligne:
+            candidats.append(pid)
+    if not premier:
+        return []           # plus de premier processus : plus rien à attendre
+    return [pid for pid in candidats if _parent_de(pid) == premier]
 
 
 def fermer_les_espaces_abandonnes():

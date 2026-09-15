@@ -56,6 +56,15 @@ preuves["wayland_present"] = bool(_runtime) and os.path.exists(
 # Le bus de l'Espace sert aux applications Flatpak. Une application ordinaire,
 # dans son bac à sable, ne doit PAS le voir : elle a le sien.
 preuves["bus_visible"] = bool(_runtime) and os.path.exists(os.path.join(_runtime, "bus"))
+# La carte graphique, vue de l'INTERIEUR : c'est le seul moment ou elle est
+# accordee. La verifier depuis le bureau apres coup ne trouvait rien, et pour
+# cause : le droit venait d'etre repris (constate le 15/09/2026).
+try:
+    _cartes = [os.path.join("/dev/dri", n) for n in sorted(os.listdir("/dev/dri"))
+               if n.startswith("renderD")]
+except OSError:
+    _cartes = []
+preuves["cartes"] = [c for c in _cartes if os.access(c, os.R_OK | os.W_OK)]
 try:
     import gi
     gi.require_version("Gtk", "4.0")
@@ -279,12 +288,10 @@ def main():
     if not cartes:
         dire("carte graphique presente sur cette machine", False, "/dev/dri vide")
     else:
-        accorde = bool(espace) and any(
-            ("user:%d:" % espace.pw_uid) in subprocess.run(
-                ["/usr/bin/getfacl", "-pn", c], capture_output=True, text=True).stdout
-            for c in cartes)
-        reussi &= dire("la carte graphique lui a ete accordee", accorde,
-                       "" if accorde else "aucun droit sur %s" % ", ".join(cartes))
+        ouvertes = preuves.get("cartes") or []
+        reussi &= dire("l'Espace a pu ouvrir la carte graphique", bool(ouvertes),
+                       ", ".join(ouvertes) if ouvertes
+                       else "aucune de %s" % ", ".join(cartes), aussi_si_oui=True)
 
     ancienne = os.path.exists("/run/codebyr/passerelles")
     reussi &= dire("plus aucune passerelle à l'ancienne", not ancienne,

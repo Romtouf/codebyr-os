@@ -205,6 +205,189 @@ def supprimer_compte(compte, home):
     return True
 
 
+# Exécuté SOUS le compte de l'Espace : demande au portail une vraie fenêtre
+# « Ouvrir un fichier », et attend la réponse de l'utilisateur. Le code de
+# réponse dit tout : 1 = annulé par l'utilisateur, donc la fenêtre s'est bien
+# affichée et répondait ; 0 = un fichier choisi, même conclusion ; 2 = le
+# portail a abandonné sans rien montrer.
+DEMANDE_OUVRIR = r'''
+import sys
+import gi
+gi.require_version("Gio", "2.0")
+from gi.repository import Gio, GLib
+bus = Gio.bus_get_sync(Gio.BusType.SESSION, None)
+expediteur = bus.get_unique_name()[1:].replace(".", "_")
+jeton = "codebyr_essai"
+requete = "/org/freedesktop/portal/desktop/request/%s/%s" % (expediteur, jeton)
+boucle = GLib.MainLoop()
+resultat = {}
+def reponse(_c, _e, _p, _i, _s, parametres):
+    resultat["code"] = parametres.unpack()[0]
+    boucle.quit()
+bus.signal_subscribe("org.freedesktop.portal.Desktop",
+                     "org.freedesktop.portal.Request", "Response", requete,
+                     None, Gio.DBusSignalFlags.NONE, reponse)
+try:
+    bus.call_sync("org.freedesktop.portal.Desktop",
+                  "/org/freedesktop/portal/desktop",
+                  "org.freedesktop.portal.FileChooser", "OpenFile",
+                  GLib.Variant("(ssa{sv})", ("", "Codebyr, essai : cliquez sur Annuler",
+                               {"handle_token": GLib.Variant("s", jeton)})),
+                  None, Gio.DBusCallFlags.NONE, 60000, None)
+except GLib.Error as exc:
+    print("APPEL-REFUSE " + exc.message)
+    sys.exit(0)
+def trop_long():
+    resultat.setdefault("code", "delai")
+    boucle.quit()
+GLib.timeout_add_seconds(120, trop_long)
+boucle.run()
+print("REPONSE %s" % resultat.get("code"))
+'''
+
+
+def processus_du_compte(uid):
+    """Les noms des programmes qui tournent sous ce compte : qui a répondu."""
+    noms = set()
+    for entree in os.listdir("/proc"):
+        if not entree.isdigit():
+            continue
+        try:
+            if os.stat("/proc/" + entree).st_uid != uid:
+                continue
+            with open("/proc/%s/comm" % entree, encoding="utf-8") as f:
+                noms.add(f.read().strip())
+        except OSError:
+            continue
+    return noms
+
+
+def mesurer_portails(compte, home, affichage, runtime_bureau):
+    """Le portail sait-il faire son travail sur le bus privé d'un Espace ?
+
+    Le premier passage a montré qu'il RÉPOND. Reste à savoir s'il affiche une
+    vraie fenêtre « Ouvrir un fichier ». Sur GNOME, elle est dessinée par un
+    composant qui s'appuie d'habitude sur GNOME Shell — absent d'un bus privé.
+    C'est ce que la tranche 2 doit savoir avant d'être bâtie.
+
+    Contrairement à l'essai manuel du premier passage, le portail n'est PAS
+    lancé à la main : c'est le bus qui le démarre à la première demande,
+    comme il le fera dans un vrai Espace.
+    """
+    titre("7. Le portail fait-il son travail sur ce bus ?")
+    canonique = "/run/user/%d" % compte.pw_uid
+    deja = os.path.isdir(canonique)
+    socket_bureau = os.path.join(runtime_bureau, affichage)
+    socket_espace = os.path.join(canonique, affichage)
+    monte = False
+    bus = None
+    code = 0
+    try:
+        os.makedirs(canonique, exist_ok=True)
+        os.chown(canonique, compte.pw_uid, compte.pw_gid)
+        os.chmod(canonique, 0o700)
+        if os.path.exists(socket_bureau):
+            open(socket_espace, "a").close()
+            m = subprocess.run(["/usr/bin/mount", "--bind", socket_bureau,
+                                socket_espace], capture_output=True, text=True)
+            monte = m.returncode == 0
+            if monte:
+                subprocess.run(["/usr/bin/setfacl", "-m", "u:%d:rw" % compte.pw_uid,
+                                socket_bureau], capture_output=True)
+        if not dire("affichage présenté à l'Espace", monte, socket_bureau):
+            return 1
+
+        # L'environnement du BUS est celui que recevront les services qu'il
+        # démarre : sans l'affichage et le bureau, le portail ne saurait ni où
+        # dessiner, ni quel composant choisir.
+        chemin_bus = os.path.join(canonique, "bus")
+        adresse = "unix:path=" + chemin_bus
+        env_bus = {"HOME": home, "PATH": "/usr/bin:/bin",
+                   "LANG": os.environ.get("LANG", "fr_FR.UTF-8"),
+                   "XDG_RUNTIME_DIR": canonique, "WAYLAND_DISPLAY": affichage,
+                   "XDG_SESSION_TYPE": "wayland", "XDG_CURRENT_DESKTOP": "GNOME",
+                   "GDK_BACKEND": "wayland"}
+        bus = subprocess.Popen(
+            ["/usr/bin/setpriv", "--reuid", str(compte.pw_uid), "--regid",
+             str(compte.pw_gid), "--clear-groups", "--no-new-privs",
+             "/usr/bin/env", "-i"] + ["%s=%s" % kv for kv in sorted(env_bus.items())] +
+            ["/usr/bin/dbus-daemon", "--session", "--nofork", "--address", adresse],
+            stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True)
+        attente = 0.0
+        while attente < 5.0 and not os.path.exists(chemin_bus):
+            time.sleep(0.1)
+            attente += 0.1
+        if not dire("bus privé démarré", os.path.exists(chemin_bus), chemin_bus):
+            return 1
+
+        env_appel = dict(env_bus)
+        env_appel["DBUS_SESSION_BUS_ADDRESS"] = adresse
+        script = os.path.join(home, "demande-ouvrir.py")
+        with open(script, "w", encoding="utf-8") as f:
+            f.write(DEMANDE_OUVRIR)
+        os.chown(script, compte.pw_uid, compte.pw_gid)
+
+        print()
+        print("  >>> Une fenêtre « Ouvrir un fichier » va apparaître.")
+        print("  >>> Cliquez simplement sur « Annuler ».")
+        print("  >>> (Si rien n'apparaît d'ici une minute, ne faites rien.)")
+        print()
+        r = sous(compte, ["/usr/bin/python3", "-I", script], env=env_appel, delai=150)
+        sortie = (r.stdout or "").strip()
+        repondants = sorted(n for n in processus_du_compte(compte.pw_uid)
+                            if "portal" in n)
+        dire("composants démarrés par le bus", bool(repondants),
+             ", ".join(repondants) or "aucun", aussi_si_oui=True)
+
+        if sortie.startswith("REPONSE 1") or sortie.startswith("REPONSE 0"):
+            dire("la fenêtre « Ouvrir un fichier » s'est affichée", True)
+            consequence("le portail fonctionne sur le bus de l'Espace : la "
+                        "tranche 2 peut s'appuyer sur lui tel quel.")
+        else:
+            code = 1
+            detail = sortie or derniere_erreur(r) or "aucune réponse"
+            dire("la fenêtre « Ouvrir un fichier » s'est affichée", False, detail)
+            for ligne in [l.strip() for l in (r.stderr or "").splitlines()
+                          if l.strip()][-5:]:
+                print("         %s" % ligne[:92])
+            consequence("le composant GNOME a besoin de ce que le bus privé "
+                        "n'a pas : il faudra en choisir un autre.")
+
+        # Les documents : c'est par ce portail qu'une application Flatpak
+        # reçoit un fichier choisi hors de son bac à sable.
+        r = sous(compte, ["/usr/bin/gdbus", "call", "--session",
+                          "--dest", "org.freedesktop.portal.Documents",
+                          "--object-path", "/org/freedesktop/portal/documents",
+                          "--method", "org.freedesktop.portal.Documents.GetMountPoint"],
+                 env=env_appel, delai=40)
+        dire("le portail des documents répond", r.returncode == 0,
+             (r.stdout or "").strip()[:60] if r.returncode == 0
+             else derniere_erreur(r), aussi_si_oui=True)
+        if r.returncode != 0:
+            consequence("sans lui, une application Flatpak ne reçoit un fichier "
+                        "que si ses permissions lui ouvrent déjà le dossier.")
+        return code
+    finally:
+        if bus:
+            bus.terminate()
+            try:
+                bus.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                bus.kill()
+        # Le portail et ses composants ont été démarrés par le bus : ils ne
+        # meurent pas avec lui.
+        tuer_les_processus(compte.pw_uid)
+        if monte:
+            subprocess.run(["/usr/bin/umount", socket_espace], capture_output=True)
+            subprocess.run(["/usr/bin/setfacl", "-x", "u:%d" % compte.pw_uid,
+                            socket_bureau], capture_output=True)
+        if not deja:
+            # Le portail des documents peut y avoir monté son système FUSE.
+            subprocess.run(["/usr/bin/umount", "--lazy", os.path.join(canonique, "doc")],
+                           capture_output=True)
+            shutil.rmtree(canonique, ignore_errors=True)
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -212,6 +395,8 @@ def main():
                     help="application Flatpak cobaye (défaut : %s)" % APP_DEFAUT)
     ap.add_argument("--garder", action="store_true",
                     help="ne pas supprimer le compte d'essai à la fin")
+    ap.add_argument("--portails", action="store_true",
+                    help="mesurer seulement les portails (rien à télécharger)")
     args = ap.parse_args()
 
     if os.geteuid() != 0:
@@ -249,6 +434,13 @@ def main():
 
     try:
         # ── 1. Ce dont le bac à sable de Flatpak a besoin ──────────────────
+        if args.portails:
+            code = mesurer_portails(compte, home, affichage, runtime_bureau)
+            titre("Ce qu'il faut retenir")
+            print("  Les sections 1 à 6 sont acquises (voir les passages précédents) ;")
+            print("  seule la 7 a été rejouée.")
+            return code
+
         titre("1. Le compte peut-il faire ce que Flatpak exige du noyau ?")
 
         r = sous(compte, ["/usr/bin/unshare", "--user", "--map-root-user",
@@ -620,6 +812,9 @@ def main():
                 subprocess.run(["/usr/bin/umount", socket_espace], capture_output=True)
                 subprocess.run(["/usr/bin/setfacl", "-x", "u:%d" % compte.pw_uid,
                                 socket_bureau], capture_output=True)
+
+        if mesurer_portails(compte, home, affichage, runtime_bureau):
+            code = 1
 
         titre("Ce qu'il faut retenir")
         print("  Chaque NON ci-dessus est une pièce à écrire. Les OUI disent ce")

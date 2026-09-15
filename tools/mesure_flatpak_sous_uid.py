@@ -36,6 +36,7 @@ import pwd
 import shutil
 import subprocess
 import sys
+import time
 
 RACINE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 LIVRE = os.path.join(RACINE, "live-build", "config", "includes.chroot_after_packages")
@@ -64,7 +65,18 @@ def titre(texte):
     print("\n── %s %s" % (texte, "─" * max(0, 62 - len(texte))))
 
 
-def dire(quoi, bon, detail=""):
+def dire(quoi, bon, detail="", aussi_si_oui=False):
+    """Une ligne de mesure.
+
+    « detail » est presque toujours un message d'ERREUR : l'afficher derrière
+    un OUI a fait lire l'inverse de ce qui s'était passé. Constaté le
+    15/09/2026 : l'installation réussissait, et la ligne OUI portait un
+    « Permission denied » de bubblewrap — un avertissement sans conséquence,
+    qui donnait l'air d'un demi-échec. Un détail ne suit un OUI que si on le
+    demande.
+    """
+    if bon and not aussi_si_oui:
+        detail = ""
     print("%s %-48s %s" % ("  OUI " if bon else "  NON ", quoi, detail))
     return bon
 
@@ -305,15 +317,116 @@ def main():
                 consequence("c'est ici que se joue le chantier : lire l'erreur ci-dessus.")
                 code = 1
 
-            # c) Ce qui manque encore : le bus de session, donc les portails.
+            # c) Ce qui manque : le bus de session, donc les portails.
+            # Le test doit chercher SANS-BUS d'abord : « BUS in "SANS-BUS" »
+            # est vrai, et la première version de cet outil a donc affiché OUI
+            # sur une mesure qui disait exactement l'inverse.
             r = sous(compte, ["/usr/bin/flatpak", "run", "--die-with-parent",
                               "--command=/bin/sh", args.app, "-c",
-                              "test -S $XDG_RUNTIME_DIR/bus && echo BUS || echo SANS-BUS"],
+                              "test -S $XDG_RUNTIME_DIR/bus && echo AVEC-BUS || echo SANS-BUS"],
                      env=env_run, delai=60)
-            dire("l'application voit un bus de session", "BUS" in (r.stdout or ""),
-                 (r.stdout or "").strip() or derniere_erreur(r))
+            sortie = (r.stdout or "").strip()
+            dire("l'application voit un bus de session",
+                 "AVEC-BUS" in sortie, sortie or derniere_erreur(r))
             consequence("sans bus : pas de portails — ouvrir/enregistrer un "
                         "fichier, imprimer, ouvrir un lien.")
+
+            # ── 5. La pièce à construire : un bus privé pour l'Espace ──────
+            titre("5. Un bus de session PRIVÉ, sous le compte de l'Espace")
+            print("  Le bus du bureau n'entrera jamais dans un Espace (règle")
+            print("  absolue du bac à sable). Reste à savoir si un bus à lui")
+            print("  suffit à Flatpak, et si les portails savent y vivre.")
+
+            bus = None
+            adresse = ""
+            if not shutil.which("dbus-daemon"):
+                dire("dbus-daemon disponible", False, "paquet « dbus-bin » absent")
+            else:
+                chemin_bus = os.path.join(runtime_espace, "bus")
+                adresse = "unix:path=" + chemin_bus
+                bus = subprocess.Popen(
+                    ["/usr/bin/setpriv", "--reuid", str(compte.pw_uid),
+                     "--regid", str(compte.pw_gid), "--clear-groups",
+                     "--no-new-privs", "/usr/bin/dbus-daemon", "--session",
+                     "--nofork", "--address", adresse],
+                    stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True)
+                attente = 0.0
+                while attente < 5.0 and not os.path.exists(chemin_bus):
+                    time.sleep(0.1)
+                    attente += 0.1
+                dire("un bus privé démarre sous ce compte",
+                     os.path.exists(chemin_bus), chemin_bus)
+
+            if bus and os.path.exists(os.path.join(runtime_espace, "bus")):
+                env_bus = dict(env_run)
+                env_bus["DBUS_SESSION_BUS_ADDRESS"] = adresse
+
+                r = sous(compte, ["/usr/bin/dbus-send", "--session",
+                                  "--print-reply", "--dest=org.freedesktop.DBus",
+                                  "/org/freedesktop/DBus",
+                                  "org.freedesktop.DBus.ListNames"],
+                         env=env_bus, delai=30)
+                dire("le compte parle à son bus", r.returncode == 0,
+                     derniere_erreur(r))
+
+                r = sous(compte, ["/usr/bin/flatpak", "run", "--die-with-parent",
+                                  "--command=/bin/sh", args.app, "-c",
+                                  "test -S $XDG_RUNTIME_DIR/bus && echo AVEC-BUS || echo SANS-BUS"],
+                         env=env_bus, delai=60)
+                sortie = (r.stdout or "").strip()
+                vu = dire("l'application le voit à son tour",
+                          "AVEC-BUS" in sortie, sortie or derniere_erreur(r))
+                if vu:
+                    consequence("un bus par Espace suffit à Flatpak : c'est la "
+                                "pièce à poser.")
+
+                # Les portails : c'est par eux que passe « ouvrir un fichier ».
+                # Debian les a déplacés de /usr/lib vers /usr/libexec ; on
+                # cherche aux deux endroits plutôt que de parier.
+                portail = next(
+                    (c for c in ("/usr/libexec/xdg-desktop-portal",
+                                 "/usr/lib/xdg-desktop-portal",
+                                 "/usr/lib/x86_64-linux-gnu/xdg-desktop-portal")
+                     if os.path.exists(c)), None)
+                if not portail:
+                    dire("xdg-desktop-portal installé", False,
+                         "ni /usr/libexec ni /usr/lib")
+                    consequence("sans lui, aucune application Flatpak ne sait "
+                                "ouvrir un fichier — même sous votre compte.")
+                else:
+                    p = subprocess.Popen(
+                        ["/usr/bin/setpriv", "--reuid", str(compte.pw_uid),
+                         "--regid", str(compte.pw_gid), "--clear-groups",
+                         "--no-new-privs", "/usr/bin/env", "-i",
+                         "HOME=" + home, "PATH=/usr/bin:/bin",
+                         "XDG_RUNTIME_DIR=" + runtime_espace,
+                         "DBUS_SESSION_BUS_ADDRESS=" + adresse,
+                         "XDG_CURRENT_DESKTOP=GNOME", portail],
+                        stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True)
+                    time.sleep(3)
+                    r = sous(compte, ["/usr/bin/dbus-send", "--session",
+                                      "--print-reply",
+                                      "--dest=org.freedesktop.portal.Desktop",
+                                      "/org/freedesktop/portal/desktop",
+                                      "org.freedesktop.DBus.Peer.Ping"],
+                             env=env_bus, delai=30)
+                    ok = dire("le portail répond sur ce bus", r.returncode == 0,
+                              derniere_erreur(r))
+                    if not ok:
+                        consequence("les portails demanderont plus qu'un bus : "
+                                    "lire l'erreur, c'est le prochain pas.")
+                    p.terminate()
+                    try:
+                        p.wait(timeout=5)
+                    except subprocess.TimeoutExpired:
+                        p.kill()
+
+            if bus:
+                bus.terminate()
+                try:
+                    bus.wait(timeout=5)
+                except subprocess.TimeoutExpired:
+                    bus.kill()
 
             if monte:
                 subprocess.run(["/usr/bin/umount", socket_espace], capture_output=True)
@@ -323,6 +436,9 @@ def main():
         titre("Ce qu'il faut retenir")
         print("  Chaque NON ci-dessus est une pièce à écrire. Les OUI disent ce")
         print("  sur quoi on peut déjà s'appuyer.")
+        if installee and tourne:
+            print("\n  Le dossier d'exécution posé dans /run a suffi : Flatpak")
+            print("  n'y exécute rien, le « noexec » de Debian ne gêne donc pas.")
     finally:
         shutil.rmtree(runtime_espace, ignore_errors=True)
         if args.garder:

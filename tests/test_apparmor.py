@@ -173,6 +173,20 @@ class LeServiceDesComptes(unittest.TestCase):
         self.assertEqual(vues, ["/run/user/[0-9]*/wayland-[0-9]* r,",
                                 "/run/user/[0-9]*/pipewire-0 r,"])
 
+    def test_il_lit_la_table_des_processus_mais_rien_de_leur_contenu(self):
+        # Il en a besoin pour savoir si un Espace abandonné a encore des
+        # applications ouvertes : sans cela, le rangement échoue sur
+        # « Permission denied: '/proc' » et l'Espace reste ouvert avec ses
+        # droits (constaté le 15/09/2026). Mais la ligne de commande suffit :
+        # « environ » livrerait des secrets passés par l'environnement, et
+        # « mem » la mémoire d'un processus.
+        regles = _regles(PROFIL_SERVICE)
+        self.assertIn("@{PROC}/[0-9]*/cmdline r,", regles)
+        for interdit in ("environ", "/mem", "maps", "syscall"):
+            for regle in regles:
+                if regle.startswith("@{PROC}") or regle.startswith("/proc"):
+                    self.assertNotIn(interdit, regle, regle)
+
     def test_il_n_ecrit_dans_aucun_dossier_d_execution_d_utilisateur(self):
         # Le dossier d'exécution d'un Espace vit dans le MÊME arbre que celui
         # des utilisateurs. La seule barrière est le nombre de chiffres de

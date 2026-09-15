@@ -47,6 +47,12 @@ except ImportError:
 FENETRE = r'''
 import json, os, sys
 preuves = {"uid": os.getuid()}
+# Où l'application cherche ses sockets, et si l'affichage y est bien : depuis
+# 1.16.0, le dossier d'exécution de l'Espace est /run/user/<son UID>.
+_runtime = os.environ.get("XDG_RUNTIME_DIR", "")
+preuves["runtime"] = _runtime
+preuves["wayland_present"] = bool(_runtime) and os.path.exists(
+    os.path.join(_runtime, os.environ.get("WAYLAND_DISPLAY", "wayland-0")))
 try:
     import gi
     gi.require_version("Gtk", "4.0")
@@ -241,6 +247,36 @@ def main():
                    preuves.get("erreur", "") or "UID %s" % preuves.get("uid"))
     reussi &= dire("le service a démarré à la demande",
                    systemctl("is-active", "codebyr-uid.service").stdout.strip() == "active")
+
+    # ── Ce que la 1.16.0 a changé : le dossier d'exécution de l'Espace ──
+    attendu = "/run/user/%d" % espace.pw_uid if espace else "?"
+    reussi &= dire("l'Espace voit son dossier d'exécution à sa place",
+                   preuves.get("runtime") == attendu,
+                   "vu : %s — attendu : %s" % (preuves.get("runtime") or "rien", attendu))
+    reussi &= dire("l'affichage y est présenté", preuves.get("wayland_present") is True)
+    reussi &= dire("plus aucune passerelle à l'ancienne",
+                   not os.path.exists("/run/codebyr/passerelles"),
+                   "/run/codebyr/passerelles existe encore")
+    # Le lanceur est revenu : sa dernière application est fermée, l'Espace
+    # doit l'être aussi — dossier effacé, droit sur l'affichage retiré.
+    ferme = False
+    for _ in range(30):
+        if not os.path.exists(attendu):
+            ferme = True
+            break
+        time.sleep(0.5)
+    reussi &= dire("fermé, son dossier d'exécution est effacé", ferme, attendu)
+    affichage_bureau = "/run/user/%d/%s" % (uid, os.environ.get("WAYLAND_DISPLAY", "wayland-0"))
+    acl = subprocess.run(["/usr/bin/getfacl", "-pn", affichage_bureau],
+                         capture_output=True, text=True).stdout
+    garde = bool(espace) and ("user:%d:" % espace.pw_uid) in acl
+    reussi &= dire("…et son droit sur votre affichage retiré", not garde,
+                   "le compte de l'Espace garde un droit sur %s" % affichage_bureau)
+    for sensible in ("/run/user/%d" % uid, affichage_bureau):
+        st = os.stat(sensible)
+        if st.st_uid != uid:
+            reussi &= dire("votre dossier d'exécution est resté à vous", False,
+                           "%s appartient à l'UID %d" % (sensible, st.st_uid))
 
     titre("4. Le service est bien confiné")
     principal = systemctl("show", "-p", "MainPID", "--value", "codebyr-uid.service").stdout.strip()

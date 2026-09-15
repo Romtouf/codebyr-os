@@ -42,13 +42,36 @@ processus lancé : c'est elle qui en rapporte la fin.
 
 Lancement : par codebyr-uid, jamais à la main.
     codebyr-espace-init <uid du bureau> <fd de la socket> <fd du tuyau d'annonce>
+                        <affichage>
 
 Le tuyau d'annonce sert à dire « j'écoute ». Sans lui, un échec au lancement
 serait invisible : la socket d'ordres est créée et mise en écoute par root, et
 accepte donc les connexions même si personne n'y répond jamais.
+
+── LE BUS DE L'ESPACE ──────────────────────────────────────────────────────
+Au démarrage, il lance le bus de session de l'Espace, à sa place canonique :
+/run/user/<uid>/bus. Les applications Flatpak en ont besoin — c'est par lui
+qu'elles joignent les portails, qui dessinent « Ouvrir un fichier » et le
+reste. Mesuré le 15/09/2026 : sur ce bus, le portail démarre de lui-même à la
+première demande, et la fenêtre s'affiche.
+
+Ce n'est PAS le bus du bureau, qui n'entre jamais dans un Espace. C'est celui
+de ce compte, dans un dossier auquel lui seul a accès. Les applications
+ordinaires ne le voient pas : le bac à sable ne monte que l'affichage et le
+son, et leur donne un bus à elles (dbus-run-session).
+
+Le bus hérite de « no-new-privs », comme tout ce qui tourne ici. Le portail
+des documents, qui a besoin d'un programme setuid (fusermount3), ne peut donc
+pas démarrer : c'est voulu, et c'est une limite connue plutôt qu'une
+protection retirée.
+
+Un bus qui ne démarre pas n'empêche pas l'Espace de s'ouvrir : les
+applications ordinaires n'en ont pas besoin. On le dit au journal.
 """
 import json
 import os
+import pwd
+import re
 import select
 import socket
 import struct
@@ -56,8 +79,17 @@ import subprocess
 import sys
 import syslog
 import threading
+import time
 
 TAILLE_MAX = 65536
+BUS_DAEMON = "/usr/bin/dbus-daemon"
+# Le temps laissé au bus pour créer sa socket. Il le fait en quelques
+# millisecondes ; au-delà, on ouvre l'Espace sans lui plutôt que de le retarder.
+DELAI_BUS = 5.0
+# Même forme que comptes.FORME_AFFICHAGE : ce programme ne charge pas les
+# modules de Codebyr (lancé en -IS, par root, sous un autre compte), et
+# l'argument doit être validé ici, là où il sert.
+FORME_AFFICHAGE = re.compile(r"wayland-[0-9]{1,3}\Z")
 
 
 def journal(message):
@@ -191,6 +223,67 @@ def arreter(proc):
         proc.wait()
 
 
+def environnement_du_bus(affichage, uid=None):
+    """Ce que le bus transmettra aux services qu'il démarre — les portails.
+
+    Construit en entier, jamais hérité : ce processus tient son environnement
+    de root, par systemd-run. Sans l'affichage, le portail ne saurait pas où
+    dessiner ; sans le nom du bureau, il ne choisirait pas le bon composant.
+    """
+    uid = os.getuid() if uid is None else uid
+    return {
+        "HOME": pwd.getpwuid(uid).pw_dir,
+        "PATH": "/usr/bin:/bin",
+        "LANG": os.environ.get("LANG") or "C.UTF-8",
+        "XDG_RUNTIME_DIR": "/run/user/%d" % uid,
+        "WAYLAND_DISPLAY": affichage,
+        "XDG_SESSION_TYPE": "wayland",
+        "XDG_CURRENT_DESKTOP": "GNOME",
+        "GDK_BACKEND": "wayland",
+    }
+
+
+def demarrer_bus(affichage):
+    """Lance le bus de l'Espace et attend sa socket. Renvoie le processus, ou None.
+
+    Le bus meurt avec l'Espace : le service arrête la portée ENTIÈRE à la
+    fermeture, et avec elle tout ce que le bus a démarré.
+    """
+    env = environnement_du_bus(affichage)
+    runtime = env["XDG_RUNTIME_DIR"]
+    chemin = os.path.join(runtime, "bus")
+    if not os.path.isdir(runtime) or not os.path.exists(BUS_DAEMON):
+        journal("bus de l'Espace non démarré : %s absent"
+                % (runtime if not os.path.isdir(runtime) else BUS_DAEMON))
+        return None
+    try:
+        # Une socket laissée par un bus précédent refuserait la nouvelle.
+        # Le dossier est à ce compte seul : rien d'autre ne peut l'avoir mise là.
+        os.unlink(chemin)
+    except FileNotFoundError:
+        pass
+    try:
+        proc = subprocess.Popen(
+            [BUS_DAEMON, "--session", "--nofork", "--nopidfile",
+             "--address", "unix:path=" + chemin],
+            env=env, cwd="/", stdin=subprocess.DEVNULL,
+            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    except OSError as exc:
+        journal("bus de l'Espace non démarré : %s" % exc)
+        return None
+    fin = time.monotonic() + DELAI_BUS
+    while time.monotonic() < fin:
+        if os.path.exists(chemin):
+            return proc
+        if proc.poll() is not None:
+            break
+        time.sleep(0.05)
+    journal("bus de l'Espace non démarré : pas de socket après %.0f s (code %s)"
+            % (DELAI_BUS, proc.poll()))
+    arreter(proc)
+    return None
+
+
 def servir(srv, uid_bureau):
     uid_propre = os.getuid()
     while True:
@@ -204,7 +297,7 @@ def servir(srv, uid_bureau):
 
 
 def main(argv):
-    if len(argv) != 4:
+    if len(argv) != 5 or not FORME_AFFICHAGE.match(argv[4]):
         sys.stderr.write("codebyr-espace-init : lancé par le service des "
                          "comptes d'Espaces, jamais à la main.\n")
         return 2
@@ -216,8 +309,13 @@ def main(argv):
     syslog.openlog("codebyr-espace", syslog.LOG_PID, syslog.LOG_DAEMON)
     uid_bureau = int(argv[1])
     srv = socket.socket(fileno=int(argv[2]))
-    journal("Espace prêt sous l'UID %d, aux ordres du bureau %d"
-            % (os.getuid(), uid_bureau))
+    # Avant l'annonce : un Espace annoncé prêt doit avoir son bus, sinon la
+    # première application Flatpak lancée aussitôt ne le trouverait pas. Mais
+    # un bus absent n'empêche pas l'annonce — voir l'en-tête.
+    bus = demarrer_bus(argv[4])
+    journal("Espace prêt sous l'UID %d, aux ordres du bureau %d, %s"
+            % (os.getuid(), uid_bureau,
+               "bus démarré" if bus else "SANS bus de session"))
     # L'annonce vient APRÈS tout ce qui peut échouer : elle ne veut dire
     # « j'écoute » que si c'est vrai. Si ce processus meurt avant, le tuyau se
     # ferme et celui qui l'a lancé le sait tout de suite.

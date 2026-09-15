@@ -53,6 +53,9 @@ _runtime = os.environ.get("XDG_RUNTIME_DIR", "")
 preuves["runtime"] = _runtime
 preuves["wayland_present"] = bool(_runtime) and os.path.exists(
     os.path.join(_runtime, os.environ.get("WAYLAND_DISPLAY", "wayland-0")))
+# Le bus de l'Espace sert aux applications Flatpak. Une application ordinaire,
+# dans son bac à sable, ne doit PAS le voir : elle a le sien.
+preuves["bus_visible"] = bool(_runtime) and os.path.exists(os.path.join(_runtime, "bus"))
 try:
     import gi
     gi.require_version("Gtk", "4.0")
@@ -258,6 +261,18 @@ def main():
                    attendu if vu else "vu : %s — attendu : %s"
                    % (preuves.get("runtime") or "rien", attendu))
     reussi &= dire("l'affichage y est présenté", preuves.get("wayland_present") is True)
+    # ── Tranche 2 : le bus de l'Espace ──
+    espace_journal = subprocess.run(
+        ["/usr/bin/journalctl", "--no-pager", "-o", "cat", "-t", "codebyr-espace",
+         "--since", "@%d" % int(debut)], capture_output=True, text=True).stdout
+    demarre = "bus démarré" in espace_journal
+    reussi &= dire("l'Espace a démarré son bus de session", demarre,
+                   "" if demarre else (espace_journal.strip().splitlines() or
+                                       ["rien au journal de codebyr-espace"])[-1][:70])
+    reussi &= dire("une application ordinaire ne le voit pas",
+                   preuves.get("bus_visible") is False,
+                   "" if preuves.get("bus_visible") is False else
+                   "visible depuis le bac à sable : %s" % preuves.get("bus_visible"))
     ancienne = os.path.exists("/run/codebyr/passerelles")
     reussi &= dire("plus aucune passerelle à l'ancienne", not ancienne,
                    "/run/codebyr/passerelles existe encore" if ancienne else "")

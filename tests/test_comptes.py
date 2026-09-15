@@ -314,6 +314,51 @@ class LePremierProcessus(unittest.TestCase):
         self.assertLess(code.index("socket.socket(fileno="),
                         code.index("os.write("))
 
+    def test_l_espace_reste_sous_no_new_privs(self):
+        # Décidé le 15/09/2026 : le portail des documents, qui a besoin de
+        # fusermount3 (setuid), ne fonctionne pas sous cette protection — et on
+        # la garde. Ni retrait, ni exception : ce qui s'échappe du bac à sable
+        # ne doit jamais retrouver les programmes setuid (PwnKit, Baron
+        # Samedit…). Si ce test tombe, c'est une décision à reprendre, pas un
+        # test à corriger.
+        lancement = self.service.split("def premier_processus(")[1].split("\ndef ")[0]
+        self.assertIn('"--no-new-privs"', lancement)
+        self.assertNotIn("xdg-document-portal", self.service)
+        self.assertNotIn("xdg-document-portal", self.code)
+
+    def test_son_bus_est_a_sa_place_canonique(self):
+        # Ailleurs que dans /run/user/<uid>, une application Flatpak ne
+        # démarre pas (mesuré le 15/09/2026).
+        bus = self.code.split("def environnement_du_bus(")[1].split("\ndef servir(")[0]
+        # _code() normalise la source : guillemets simples.
+        self.assertIn("'XDG_RUNTIME_DIR': '/run/user/%d' % uid", bus)
+        self.assertIn("os.path.join(runtime, 'bus')", bus)
+
+    def test_l_environnement_du_bus_est_construit_pas_herite(self):
+        # Ce processus tient son environnement de root : le transmettre au
+        # bus, c'était le transmettre à tous les portails.
+        env = self.code.split("def environnement_du_bus(")[1].split("\ndef demarrer_bus(")[0]
+        self.assertNotIn("dict(os.environ)", env)
+        self.assertNotIn("os.environ.copy()", env)
+        demarrer = self.code.split("def demarrer_bus(")[1].split("\ndef servir(")[0]
+        self.assertIn("env=env", demarrer)
+
+    def test_le_bus_est_la_avant_l_annonce_mais_ne_la_conditionne_pas(self):
+        # Une application Flatpak lancée dès l'annonce doit trouver son bus ;
+        # mais un bus absent ne doit pas empêcher d'ouvrir l'Espace, dont les
+        # applications ordinaires n'en ont pas besoin.
+        main = self.code.split("def main(")[1]
+        self.assertLess(main.index("demarrer_bus("), main.index("os.write(annonce"))
+        entre = main.split("demarrer_bus(")[1].split("os.write(annonce")[0]
+        # Rien entre le bus et l'annonce ne doit pouvoir sortir faute de bus.
+        self.assertNotIn("return", entre)
+        self.assertNotIn("if not bus", entre)
+        self.assertNotIn("raise", entre)
+
+    def test_l_affichage_recu_est_valide_la_ou_il_sert(self):
+        main = self.code.split("def main(")[1]
+        self.assertIn("FORME_AFFICHAGE.match(argv[4])", main)
+
     def test_il_refuse_de_tourner_en_root(self):
         # S'il y tournait, tout le chantier serait vide de sens : il exécute
         # justement ce que le bureau lui envoie.

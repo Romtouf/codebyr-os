@@ -460,7 +460,7 @@ def socket_d_ordres(depot):
     return srv
 
 
-def premier_processus(utilisateur, uid_demandeur, srv, memoire, taches):
+def premier_processus(utilisateur, uid_demandeur, srv, memoire, taches, affichage):
     """Lance le premier processus de l'Espace, sous son compte et sous plafond.
 
     Root n'exécute qu'UN chemin, écrit ici en toutes lettres. Ce qui vient du
@@ -490,7 +490,10 @@ def premier_processus(utilisateur, uid_demandeur, srv, memoire, taches):
              "--", "/usr/bin/setpriv",
              "--reuid", str(utilisateur.pw_uid), "--regid", str(utilisateur.pw_gid),
              "--clear-groups", "--no-new-privs",
-             INIT, str(uid_demandeur), str(fd), str(ecriture)],
+             # L'affichage a déjà été validé par comptes.passages() : c'est le
+             # nom du socket présenté dans le dossier de l'Espace, que son bus
+             # transmettra aux portails.
+             INIT, str(uid_demandeur), str(fd), str(ecriture), affichage],
             pass_fds=(fd, ecriture), stdin=subprocess.DEVNULL)
     finally:
         # Côté écriture fermé ici : sinon la fin du processus ne fermerait pas
@@ -581,7 +584,7 @@ def _preparer(uid_demandeur, espace, affichage, son, memoire, taches, ephemere=F
         srv = socket_d_ordres(depot)
         try:
             OUVERTS[nom] = (premier_processus(utilisateur, uid_demandeur, srv,
-                                              memoire, taches), srv)
+                                              memoire, taches, affichage), srv)
         except OSError:
             srv.close()
             raise

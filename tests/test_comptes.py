@@ -119,7 +119,9 @@ class Chemins(unittest.TestCase):
         # /run/user/<uid>, et pas un chemin à nous : mesuré le 15/09/2026,
         # une application Flatpak ne démarre pas ailleurs.
         self.assertEqual(comptes.chemin_runtime(997), "/run/user/997")
-        for uid in (0, -1, None, "997", True):
+        # 1000 et au-delà : un utilisateur. La fermeture efface ce dossier en
+        # entier ; il ne doit jamais pouvoir désigner celui du bureau.
+        for uid in (0, -1, None, "997", True, 1000, 1002, 65534):
             with self.assertRaises(ValueError, msg=repr(uid)):
                 comptes.chemin_runtime(uid)
 

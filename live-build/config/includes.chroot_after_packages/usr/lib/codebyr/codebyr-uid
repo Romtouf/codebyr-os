@@ -180,6 +180,50 @@ def racines():
         dossier_root(chemin)
 
 
+ANCIENNES_PASSERELLES = "/run/codebyr/passerelles"
+
+
+def ranger_les_anciennes_passerelles():
+    """Ce qu'un service 1.15.0 aurait laissé derrière lui, rangé au démarrage.
+
+    Jusqu'en 1.15.0, les sockets d'un Espace étaient présentées dans
+    /run/codebyr/passerelles/<compte>. Un ancien service qui s'arrête
+    normalement range tout — il ne s'arrête que quand plus aucun Espace n'est
+    ouvert. Mais tué pendant une mise à jour, il laisserait des montages, et
+    surtout le DROIT du compte de l'Espace sur le socket Wayland du bureau :
+    un accès à l'affichage que plus personne ne saurait retirer avant la
+    déconnexion. Au démarrage, aucun Espace n'est ouvert par ce service-ci :
+    tout ce qui reste là-dessous est un reste, et on le retire.
+    """
+    if not os.path.isdir(ANCIENNES_PASSERELLES) or os.path.islink(ANCIENNES_PASSERELLES):
+        return
+    for compte in sorted(os.listdir(ANCIENNES_PASSERELLES)):
+        dossier = os.path.join(ANCIENNES_PASSERELLES, compte)
+        proprietaire = comptes.decomposer(compte) if comptes.est_compte_d_espace(compte) else None
+        try:
+            uid_espace = pwd.getpwnam(compte).pw_uid
+        except KeyError:
+            uid_espace = None
+        for fichier in sorted(os.listdir(dossier)) if os.path.isdir(dossier) else []:
+            echec = retirer(os.path.join(dossier, fichier))
+            if echec:
+                journal("ancienne passerelle %s : %s, %s" % (compte, fichier, echec))
+            if proprietaire and uid_espace is not None:
+                source = os.path.join("/run/user/%d" % proprietaire[0], fichier)
+                if os.path.exists(source):
+                    subprocess.run(["/usr/bin/setfacl", "-x", "u:%d" % uid_espace,
+                                    source], capture_output=True)
+        try:
+            os.rmdir(dossier)
+        except OSError as exc:
+            journal("ancienne passerelle %s conservée : %s" % (compte, exc))
+    try:
+        os.rmdir(ANCIENNES_PASSERELLES)
+        journal("anciennes passerelles (1.15.0) rangées")
+    except OSError:
+        pass
+
+
 def dossier_espace(home, utilisateur):
     """Le dossier personnel de l'Espace : à lui seul, 0700."""
     dossier_root(os.path.dirname(home))
@@ -607,9 +651,15 @@ def fermer(uid_demandeur, espace):
         # rmtree sur un dossier écrit par un AUTRE compte : on ne s'y risque
         # que si Python garantit la traversée sans suivre les liens, comme
         # pour la suppression d'un Espace.
+        st = os.lstat(runtime)
         if not shutil.rmtree.avoids_symlink_attacks:
             echecs.append("dossier d'exécution conservé : suppression sûre "
                           "indisponible sur ce système")
+        elif os.path.islink(runtime) or st.st_uid != utilisateur.pw_uid:
+            # Troisième barrière, après comptes.chemin_runtime et AppArmor :
+            # on n'efface que ce qui appartient au compte de CET Espace.
+            echecs.append("dossier d'exécution conservé : il n'appartient pas "
+                          "à %s (UID %d)" % (nom, st.st_uid))
         else:
             restes = []
             shutil.rmtree(runtime, onexc=lambda *a: restes.append(a[1]))
@@ -804,6 +854,12 @@ def main(argv):
         return 2
     syslog.openlog("codebyr-uid", syslog.LOG_PID, syslog.LOG_DAEMON)
     racines()
+    try:
+        ranger_les_anciennes_passerelles()
+    except Exception as exc:
+        # Un rangement raté ne doit pas empêcher tout Espace de s'ouvrir :
+        # on le dit, et on sert quand même.
+        journal("rangement des anciennes passerelles impossible : %s" % exc)
     if len(argv) >= 3 and argv[1] == "--essai":
         chemin = argv[2]
         if os.path.exists(chemin):

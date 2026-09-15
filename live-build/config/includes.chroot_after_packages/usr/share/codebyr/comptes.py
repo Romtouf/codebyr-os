@@ -228,8 +228,13 @@ def chemin_runtime(uid_espace):
     Nommé par l'UID et non par le compte : c'est la place que logind aurait
     donnée, et ce que Flatpak — comme le reste de l'écosystème — suppose.
     """
+    # Un compte d'Espace est un compte SYSTÈME : son UID est sous UID_MINIMAL.
+    # Refuser tout le reste, c'est rendre impossible par construction que ce
+    # chemin désigne le dossier d'exécution d'un utilisateur — que la
+    # fermeture efface en entier. Le profil AppArmor l'interdit aussi ; on ne
+    # laisse pas la sécurité du bureau reposer sur une seule barrière.
     if not isinstance(uid_espace, int) or isinstance(uid_espace, bool) \
-            or uid_espace <= 0:
+            or not 0 < uid_espace < UID_MINIMAL:
         raise ValueError("UID d'Espace invalide")
     return "%s/%d" % (RACINE_RUNTIME, uid_espace)
 

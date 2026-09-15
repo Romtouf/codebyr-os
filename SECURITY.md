@@ -186,10 +186,14 @@ surface applicative minimale (`--apt-recommends false`).
   `~/.config/codebyr/presse-papiers-libre` désactive le vidage automatique.
 - **Applications Flatpak** : proviennent de Flathub — confiance déléguée à
   Flathub et à l'éditeur de chaque application.
-- **Compte séparé : ce qui n'y fonctionne pas encore.** La carte graphique
-  n'est pas accessible au compte de l'Espace : l'affichage s'y fait en rendu
-  logiciel. C'est annoncé dans la fenêtre de configuration, et c'est pourquoi
-  le réglage reste au choix de l'utilisateur plutôt qu'appliqué d'office.
+- **Compte séparé : la carte graphique.** Depuis la 1.16.0, un Espace qui y a
+  droit reçoit un accès NOMINATIF et TEMPORAIRE aux nœuds de rendu de
+  `/dev/dri`, posé à son ouverture et repris à sa fermeture — le même mécanisme
+  que `logind` applique à une session d'utilisateur. Seuls les nœuds de rendu
+  sont accordés : ceux qui pilotent l'écran (modes, sorties) ne le sont jamais.
+  Banque et Jetable, dont le réglage est à « non », n'y touchent pas, et une
+  pièce jointe non plus. Cet accès n'est pas une surface nouvelle : un Espace
+  ordinaire l'avait déjà, par les droits de votre propre session.
 - **Compte séparé : ouvrir un fichier depuis une application Flatpak.** Depuis
   la 1.16.0, les applications Flatpak s'ouvrent sous compte séparé, avec leurs
   portails — la fenêtre « Ouvrir un fichier » s'affiche, et elle ne montre que

@@ -49,6 +49,14 @@ séparé sont **à réinstaller** dans l'Espace : leur installation vit dans un
 dossier de votre compte, auquel celui de l'Espace n'a pas accès. La fenêtre de
 configuration le dit.
 
+**La carte graphique fonctionne aussi.** C'était la seconde limite annoncée en
+1.15.0 ; elle est levée dans la même version. Un Espace qui y a droit reçoit
+l'accès à la carte le temps qu'il est ouvert, et le perd à sa fermeture —
+exactement comme votre session le reçoit à l'ouverture et le perd à la
+déconnexion. L'affichage d'un Espace n'est donc plus dessiné par le processeur.
+Banque et Jetable, qui n'ont pas accès à la carte par choix, n'y touchent
+toujours pas.
+
 **Sous le capot** : le dossier d'exécution d'un Espace a pris sa place
 canonique, `/run/user/<son numéro de compte>`. Sans cela, aucune application
 Flatpak ne démarrait — son bac à sable interne butait sur un chemin de notre

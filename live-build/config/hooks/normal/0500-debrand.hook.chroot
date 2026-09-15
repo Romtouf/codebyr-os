@@ -4,12 +4,16 @@ set -e
 
 echo "P: Codebyr — dé-branding Debian"
 
+# — Version de l'image (déposée par build.sh, cf. hook 0100) —
+VER="1.0"
+[ -r /etc/codebyr/version ] && VER="$(tr -d ' \t\r\n' < /etc/codebyr/version)"
+
 # — Identité complète (os-release : logo + version propre) —
-cat > /etc/os-release <<'EOF'
-PRETTY_NAME="Codebyr OS 1.0"
+cat > /etc/os-release <<EOF
+PRETTY_NAME="Codebyr OS $VER"
 NAME="Codebyr OS"
-VERSION_ID="1.0"
-VERSION="1.0"
+VERSION_ID="$VER"
+VERSION="$VER"
 VERSION_CODENAME=codebyr
 ID=codebyr
 ID_LIKE=debian
@@ -22,11 +26,11 @@ EOF
 cp -f /etc/os-release /usr/lib/os-release 2>/dev/null || true
 
 # — lsb-release (lu par lsb_release, certains outils système) —
-cat > /etc/lsb-release <<'EOF'
+cat > /etc/lsb-release <<EOF
 DISTRIB_ID=Codebyr
-DISTRIB_RELEASE=1.0
+DISTRIB_RELEASE=$VER
 DISTRIB_CODENAME=codebyr
-DISTRIB_DESCRIPTION="Codebyr OS 1.0"
+DISTRIB_DESCRIPTION="Codebyr OS $VER"
 EOF
 
 # — Clavier système AZERTY (console + défaut X/Wayland) —

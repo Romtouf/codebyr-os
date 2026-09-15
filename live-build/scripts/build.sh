@@ -65,6 +65,15 @@ fi
 # embarquée dans l'image, et c'est donc elle qui doit la nommer à la fin.
 VER_EMBARQUEE="$(tr -d ' \t\r\n' < "$REPO/VERSION")"
 
+# Cette version doit aussi NOMMER le système à l'intérieur de l'image, et pas
+# seulement le fichier ISO. Les hooks de branding la figeaient en dur : l'ISO
+# 1.15.0 s'annonçait « Codebyr OS 1.0 » dans /etc/os-release, dans lsb_release
+# et sur la bannière de console. On la dépose donc dans le chroot, et les hooks
+# la lisent — ce qui reste vrai aux versions suivantes sans rien y retoucher.
+mkdir -p "$WORK/config/includes.chroot_after_packages/etc/codebyr"
+printf '%s\n' "$VER_EMBARQUEE" \
+	> "$WORK/config/includes.chroot_after_packages/etc/codebyr/version"
+
 if [ -f "$REPO/packaging/build-deb.sh" ]; then
 	echo "==> Construction du paquet codebyr-tools $VER_EMBARQUEE (embarqué pour les MAJ)"
 	CODEBYR_REPO="$REPO" bash "$REPO/packaging/build-deb.sh" >/dev/null

@@ -44,6 +44,11 @@ application **Flatpak** installée dans un Espace ne s'ouvre pas sous compte
 séparé, et l'accélération graphique n'y est pas encore disponible (l'affichage
 se fait en rendu logiciel).
 
+**Sur l'image d'installation**, cette version est la première à embarquer le
+service des comptes d'Espaces, activé dès le premier démarrage. Le système s'y
+annonce aussi sous son vrai numéro — `/etc/os-release`, `lsb_release` et
+l'installeur affichaient « Codebyr OS 1.0 » quelle que soit la version gravée.
+
 ## 1.14.0 — 13 septembre 2026
 
 **Les notifications reviennent dans les Espaces.** Une application qui prévient

@@ -40,6 +40,18 @@ for d in /usr/share/applications/calamares*.desktop \
     sed -i '/^StartupWMClass=/d' "$d"
 done
 
+# 2 bis) Version affichée par l'installeur.
+# branding.desc la porte en dur ; sans cette reprise, on installe la 1.15.0
+# sous le titre « Codebyr OS 1.0 ». La version vient du même fichier que
+# /etc/os-release (déposé par build.sh, cf. hook 0100).
+BRANDING=/etc/calamares/branding/debian/branding.desc
+if [ -r /etc/codebyr/version ] && [ -f "$BRANDING" ]; then
+    VER="$(tr -d ' \t\r\n' < /etc/codebyr/version)"
+    sed -i -e "s/^\(    version: *\).*/\1$VER/" \
+           -e "s/^\(    versionedName: *\).*/\1Codebyr OS $VER/" "$BRANDING"
+    echo "0800-installeur : installeur estampillé $VER."
+fi
+
 # 3) Droits.
 [ -f /usr/bin/codebyr-installer ] && chmod 755 /usr/bin/codebyr-installer
 [ -f /usr/share/calamares/helpers/calamares-bootloader-config ] && \

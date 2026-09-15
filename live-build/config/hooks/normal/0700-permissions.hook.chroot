@@ -16,4 +16,10 @@ fi
 # Filtre réseau et bouclier : lisibles.
 [ -d /usr/share/codebyr ] && find /usr/share/codebyr -type f -exec chmod 644 {} + || true
 
+# Service des comptes d'Espaces : root le lance, donc le bit +x doit être sûr.
+if [ -d /usr/lib/codebyr ]; then
+    chmod 755 /usr/lib/codebyr
+    find /usr/lib/codebyr -type f -exec chmod 755 {} +
+fi
+
 echo "0700-permissions : droits des composants Codebyr normalisés."

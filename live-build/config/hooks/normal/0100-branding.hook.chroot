@@ -4,14 +4,25 @@ set -e
 
 echo "P: Codebyr — application du branding"
 
+# — Version de l'image —
+# Déposée par build.sh depuis le fichier VERSION du dépôt. Sans elle on
+# retombe sur « 1.0 », mais une image qui se trompe de nom est un mauvais
+# départ pour tout rapport de bug : on le dit.
+VER="1.0"
+if [ -r /etc/codebyr/version ]; then
+	VER="$(tr -d ' \t\r\n' < /etc/codebyr/version)"
+else
+	echo "P: Codebyr — AVERTISSEMENT : /etc/codebyr/version absent, image nommée 1.0." >&2
+fi
+
 # — Identité du système (/etc/os-release) —
 # On remplace le lien symbolique par un vrai fichier pour qu'il prime.
 rm -f /etc/os-release
-cat > /etc/os-release <<'EOF'
-PRETTY_NAME="Codebyr OS 1.0"
+cat > /etc/os-release <<EOF
+PRETTY_NAME="Codebyr OS $VER"
 NAME="Codebyr OS"
-VERSION_ID="1.0"
-VERSION="1.0 (Phase 1)"
+VERSION_ID="$VER"
+VERSION="$VER"
 VERSION_CODENAME=trixie
 ID=codebyr
 ID_LIKE=debian
@@ -21,8 +32,10 @@ BUG_REPORT_URL="https://codebyr.io/bug"
 EOF
 
 # — Bannière console —
-cat > /etc/issue <<'EOF'
-Codebyr OS 1.0 \n \l
+# Guillemets volontairement absents du délimiteur : « $VER » doit être
+# remplacé, mais « \n \l » sont des échappements d'agetty, pas du shell.
+cat > /etc/issue <<EOF
+Codebyr OS $VER \n \l
 
 EOF
 printf 'Bienvenue sur Codebyr OS — Sécurisé par conception. Simple par conviction.\n' > /etc/motd

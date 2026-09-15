@@ -26,6 +26,27 @@ else
 	echo "P: Codebyr — paquet codebyr-tools non embarqué, MAJ auto indisponibles." >&2
 fi
 
+# 1 bis) Socket du service des comptes d'Espaces.
+#
+# Le postinst du paquet l'active — mais il se garde derrière
+# « [ -d /run/systemd/system ] », faux dans un chroot de construction. Sur une
+# machine installée depuis l'ISO, aucun postinst ne repasse : sans ce lien, la
+# socket n'existe jamais, et cocher « Compte séparé, par Espace » échouerait à
+# la première ouverture avec « connexion refusée ». Constaté en inspectant
+# l'ISO 1.15.0 : /etc/systemd/system/sockets.target.wants était vide.
+#
+# Lien manuel plutôt que « systemctl enable » : peu fiable en chroot, comme
+# pour codebyr-invite-reset (hook 0400).
+#
+# Rien ne tourne pour autant au démarrage : la socket écoute, le service ne
+# démarre qu'à la première connexion d'un Espace qui demande un compte dédié.
+if [ -f /usr/lib/systemd/system/codebyr-uid.socket ]; then
+	mkdir -p /etc/systemd/system/sockets.target.wants
+	ln -sf /usr/lib/systemd/system/codebyr-uid.socket \
+	       /etc/systemd/system/sockets.target.wants/codebyr-uid.socket
+	echo "P: Codebyr — socket codebyr-uid activée au démarrage."
+fi
+
 # 2) Trousseau apt PUIS sources.list (jamais l'inverse).
 if [ -f "$KEY_ASC" ]; then
 	gpg --dearmor < "$KEY_ASC" > "$KEYRING"

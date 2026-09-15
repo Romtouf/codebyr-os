@@ -746,7 +746,22 @@ def _lancer(espaces, esp, extra, fichier, session):
                "/run/codebyr-proxy", "17890", "--"] + cmd
     if est_flatpak:
         appid = app_cmd[-1] if len(app_cmd) >= 2 else ""
-        if appid and _flatpak_app_dans_espace(esp["id"], appid):
+        if session:
+            # Sous compte dédié, c'est l'Espace qui lance — son compte, son
+            # dossier d'exécution, son bus, son installation Flatpak. Le bureau
+            # ne peut rien lire de tout cela : il ne vérifie donc pas où
+            # l'application est installée, il la nomme et laisse flatpak
+            # chercher chez l'Espace d'abord, puis sur la machine.
+            env = _env_flatpak_dedie(esp, session, env)
+            run = cmd
+            print("Application Flatpak dans l'Espace %s, sous son compte." % esp["nom"])
+            _prevenir("Permissions Flatpak",
+                      "Ses accès aux fichiers et au réseau dépendent des "
+                      "permissions de cette application, dans les limites du "
+                      "compte de l'Espace.")
+            journal("Espace %s : application Flatpak %s sous compte dédié"
+                    % (esp["id"], appid or "?"))
+        elif appid and _flatpak_app_dans_espace(esp["id"], appid):
             # Installée DANS l'Espace : installation Flatpak dédiée +
             # données isolées (HOME de l'Espace → ~/.var/app séparé).
             env["FLATPAK_USER_DIR"] = _espace_flatpak_dir(esp["id"])
@@ -1029,7 +1044,7 @@ def _taille_sans_suivre(chemin):
     return total
 
 
-def _ordre_interne(session, action, produire=None, consommer=None):
+def _ordre_interne(session, action, produire=None, consommer=None, args=()):
     """Fait exécuter un ordre interne par l'Espace, avec un flux si besoin.
 
     `produire(flux)` écrit ce que l'Espace lira sur son entrée standard ;
@@ -1064,7 +1079,8 @@ def _ordre_interne(session, action, produire=None, consommer=None):
         fil = threading.Thread(target=dans_un_fil, daemon=True)
         fil.start()
     try:
-        code = compte_dedie.executer(session.ordres, _commande_interne(action),
+        code = compte_dedie.executer(session.ordres,
+                                     _commande_interne(action, *args),
                                      _env_interne(session), **options)
     except compte_dedie.Indisponible as exc:
         code = None
@@ -1213,14 +1229,15 @@ def _rapatrier_depuis_compte_dedie(esp):
     return True
 
 
-def _geste_dans_l_espace(esp, action, produire=None, consommer=None):
+def _geste_dans_l_espace(esp, action, produire=None, consommer=None, args=()):
     """Ouvre l'Espace, fait exécuter un ordre interne, le rend. Renvoie (code, erreurs)."""
     try:
         session = _session_pour_un_geste(esp)
     except compte_dedie.Indisponible as exc:
         return None, [str(exc)]
     try:
-        return _ordre_interne(session, action, produire=produire, consommer=consommer)
+        return _ordre_interne(session, action, produire=produire,
+                              consommer=consommer, args=args)
     finally:
         session.rendre()
 
@@ -1863,6 +1880,52 @@ def cmd_import(espaces, esp_id, source=None):
 
 
 FLATHUB_REPO = "/etc/flatpak/remotes.d/flathub.flatpakrepo"
+INTERNE_FLATPAK = "interne-flatpak"
+# Un identifiant Flatpak : des étiquettes séparées par des points, comme
+# org.gnome.Calculator. Vérifié avant d'entrer dans une commande ET avant
+# d'entrer dans un chemin — c'est le seul morceau de ces ordres qui vienne
+# de l'extérieur.
+FORME_APPID = re.compile(r"[A-Za-z0-9][A-Za-z0-9_-]*(\.[A-Za-z0-9][A-Za-z0-9_-]*){1,8}\Z")
+
+
+def _flatpak_dir_dedie(home):
+    """Installation Flatpak d'un Espace à compte dédié, dans son dossier interne.
+
+    Sous « .codebyr » et non sous ~/.local/share : ce dossier est le seul que
+    la sauvegarde et le retour au compte du bureau laissent de côté. Des
+    centaines de mégaoctets de binaires, retéléchargeables d'un geste, n'ont
+    rien à faire dans une archive — c'est déjà le choix fait pour les Espaces
+    ordinaires, où l'installation vit à côté du dossier personnel.
+    """
+    return os.path.join(home, DOSSIER_INTERNE, "flatpak")
+
+
+def _env_flatpak_dedie(esp, session, env):
+    """L'environnement d'une application Flatpak sous compte dédié.
+
+    Construit, jamais hérité : celui du bureau désigne SON dossier d'exécution
+    et SON bus de session, auxquels le compte de l'Espace n'a aucun droit.
+    L'application les chercherait, ne les trouverait pas, et échouerait sans
+    dire pourquoi.
+
+    Le bus est celui de l'Espace (voir codebyr-espace-init) : c'est par lui que
+    l'application joint ses portails — « Ouvrir un fichier », l'impression.
+    """
+    runtime = session.runtime
+    return {
+        "PATH": "/usr/bin:/bin",
+        "LANG": env.get("LANG") or "C.UTF-8",
+        "HOME": session.home,
+        "XDG_RUNTIME_DIR": runtime,
+        "DBUS_SESSION_BUS_ADDRESS": "unix:path=" + os.path.join(runtime, "bus"),
+        "WAYLAND_DISPLAY": os.path.basename(env.get("WAYLAND_DISPLAY") or "wayland-0"),
+        "XDG_SESSION_TYPE": "wayland",
+        "XDG_CURRENT_DESKTOP": "GNOME",
+        "GDK_BACKEND": "wayland",
+        "FLATPAK_USER_DIR": _flatpak_dir_dedie(session.home),
+        "CODEBYR_ESPACE": esp["id"],
+        "CODEBYR_ESPACE_COULEUR": esp.get("couleur", "#888888"),
+    }
 
 
 def _espace_flatpak_dir(esp_id):
@@ -1915,6 +1978,73 @@ def _enregistrer_app(esp_id, nom, cmd):
     registre.modifier_espace(esp_id, {"apps": apps})
 
 
+def cmd_interne_flatpak(args):
+    """Installe, désinstalle ou liste — DANS l'Espace, et par lui.
+
+    Exécuté sous le compte de l'Espace : c'est lui qui télécharge, chez lui,
+    dans un dossier où le bureau n'a aucun droit. Root n'y est pour rien : il
+    n'a lancé que le premier processus de l'Espace, qui exécute ceci.
+
+    Sur la sortie standard, une seule ligne, que le bureau lit. Tout le reste
+    — progression, plaintes de flatpak — part sur l'erreur standard.
+    """
+    compte = _compte_d_espace_courant()
+    if not compte:
+        sys.stderr.write("codebyr-space : réservé au compte d'un Espace.\n")
+        return 2
+    geste = args[0] if args else ""
+    appid = args[1] if len(args) > 1 else ""
+    if geste not in ("installer", "desinstaller", "liste") or (
+            geste != "liste" and not FORME_APPID.match(appid)):
+        sys.stderr.write("codebyr-space : ordre Flatpak mal formé.\n")
+        return 2
+    if not shutil.which("flatpak"):
+        sys.stderr.write("Flatpak n'est pas installé.\n")
+        return 2
+    dossier = _flatpak_dir_dedie(compte.pw_dir)
+    os.makedirs(dossier, mode=0o700, exist_ok=True)
+    env = {"PATH": "/usr/bin:/bin", "LANG": os.environ.get("LANG", "C.UTF-8"),
+           "HOME": compte.pw_dir, "FLATPAK_USER_DIR": dossier,
+           # Flatpak monte un bac à sable pour ses propres besoins, et le fait
+           # sous le dossier d'exécution : sans lui à la place attendue, il
+           # échoue (mesuré le 15/09/2026).
+           "XDG_RUNTIME_DIR": "/run/user/%d" % os.getuid()}
+    if geste == "liste":
+        r = subprocess.run(["flatpak", "--user", "list", "--app",
+                            "--columns=application,name"],
+                           env=env, capture_output=True, text=True)
+        sys.stdout.write(r.stdout)
+        return r.returncode
+    if geste == "installer":
+        _assurer_flathub(env)
+        code = subprocess.call(["flatpak", "--user", "install", "-y", "flathub", appid],
+                               env=env, stdin=subprocess.DEVNULL, stdout=sys.stderr)
+        if code == 0:
+            print(_flatpak_nom_lisible(env, appid) or appid)
+        return code
+    return subprocess.call(["flatpak", "--user", "uninstall", "-y", appid],
+                           env=env, stdin=subprocess.DEVNULL, stdout=sys.stderr)
+
+
+def _flatpak_dans_l_espace(esp, geste, appid):
+    """Fait faire le geste Flatpak par l'Espace. Renvoie (code, nom lu)."""
+    if not FORME_APPID.match(appid or ""):
+        sys.stderr.write("Identifiant d'application invalide : %s\n" % appid)
+        return 2, ""
+    recu = []
+    code, erreurs = _geste_dans_l_espace(
+        esp, INTERNE_FLATPAK, args=(geste, appid),
+        consommer=lambda flux: recu.append(flux.read()))
+    if code != 0 or erreurs:
+        sys.stderr.write("codebyr-space : %s de %s dans l'Espace %s a échoué (%s).\n"
+                         % (geste, appid, esp["nom"],
+                            "; ".join(erreurs) or "code %s" % code))
+        return 1, ""
+    lignes = (recu[0].decode("utf-8", "replace").strip().splitlines()
+              if recu and recu[0] else [])
+    return 0, (lignes[-1].strip() if lignes else "")
+
+
 def cmd_install(esp_id, appid):
     """Installe une application Flatpak DANS un Espace (isolée : binaires + données)."""
     espaces = load_espaces()
@@ -1925,6 +2055,18 @@ def cmd_install(esp_id, appid):
     if not shutil.which("flatpak"):
         sys.stderr.write("Flatpak n'est pas installé.\n")
         return 2
+    if compte_dedie.demande(esp):
+        # L'installation se fait DANS l'Espace : son dossier n'appartient plus
+        # au bureau, qui ne peut ni y écrire, ni savoir ce qui s'y trouve.
+        print("Installation de %s dans l'Espace %s, sous son compte "
+              "(le téléchargement peut être long)..." % (appid, esp["nom"]))
+        code, nom = _flatpak_dans_l_espace(esp, "installer", appid)
+        if code != 0:
+            return code
+        nom = nom or appid
+        _enregistrer_app(esp_id, nom, "flatpak run " + appid)
+        print("« %s » installée dans l'Espace %s." % (nom, esp["nom"]))
+        return 0
     env, _ = _flatpak_env(esp_id)
     _assurer_flathub(env)
     print("Installation de « %s » dans l'Espace %s…" % (appid, esp["nom"]))
@@ -1994,8 +2136,11 @@ def cmd_remove_app(esp_id, appid):
     if not esp:
         sys.stderr.write("Espace inconnu : %s\n" % esp_id)
         return 2
-    env, _ = _flatpak_env(esp_id)
-    rc = subprocess.call(["flatpak", "--user", "uninstall", "-y", appid], env=env)
+    if compte_dedie.demande(esp):
+        rc, _ = _flatpak_dans_l_espace(esp, "desinstaller", appid)
+    else:
+        env, _ = _flatpak_env(esp_id)
+        rc = subprocess.call(["flatpak", "--user", "uninstall", "-y", appid], env=env)
     apps = [a for a in (esp.get("apps") or [])
             if a.get("cmd") != "flatpak run " + appid]
     registre.modifier_espace(esp_id, {"apps": apps})
@@ -2608,6 +2753,8 @@ def main(argv):
         return cmd_interne_effacer()
     if action == INTERNE_CONTAGION and not args:
         return cmd_interne_contagion()
+    if action == INTERNE_FLATPAK and args:
+        return cmd_interne_flatpak(args)
     if action not in ACTIONS:
         sys.stderr.write("Action inconnue : %s\n" % action)
         sys.stderr.write("Actions : %s\n" % ", ".join(sorted(ACTIONS)))

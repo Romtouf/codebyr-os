@@ -49,9 +49,11 @@ def incompatibilites(esp, fichier=None, est_flatpak=False):
     raisons = []
     if not demande(esp):
         return raisons
-    if est_flatpak:
-        raisons.append("les applications Flatpak ne sont pas encore prises en "
-                       "charge dans un Espace à compte dédié")
+    # Les applications Flatpak étaient refusées jusqu'en 1.15.0. Elles
+    # s'ouvrent depuis la 1.16.0 : l'Espace a son bus de session, donc ses
+    # portails, et son installation Flatpak à lui (voir codebyr-space,
+    # interne-flatpak). « est_flatpak » reste pour les refus à venir.
+    del fichier, est_flatpak
     return raisons
 
 
@@ -60,7 +62,8 @@ def incompatibilites(esp, fichier=None, est_flatpak=False):
 # données sont ailleurs, et le bureau ne peut pas les lire : les laisser faire
 # afficherait « données effacées » ou « exporté » sur un dossier vide.
 GESTES_PAS_ENCORE_PRETS = {
-    "install": "y installer une application Flatpak",
+    # « install » est parti en 1.16.0 : l'installation se fait maintenant DANS
+    # l'Espace, par lui, comme les autres gestes sur ses données.
     "add-app": "y ajouter une application",
 }
 

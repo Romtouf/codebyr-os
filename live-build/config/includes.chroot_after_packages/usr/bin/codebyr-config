@@ -239,9 +239,13 @@ class Fenetre(Adw.ApplicationWindow):
         for e in self._data.get("espaces", []):
             actif = e.get("compte") == "dedie"
             flatpak = self._a_des_applications_flatpak(e)
-            if flatpak:
-                sous_titre = ("Ses applications Flatpak ne s'ouvriront pas sous "
-                              "compte séparé")
+            if flatpak and not actif:
+                # Depuis la 1.16.0, les applications Flatpak s'ouvrent sous
+                # compte séparé — mais celles déjà installées vivent dans un
+                # dossier du bureau, que l'Espace ne peut plus lire. Elles se
+                # réinstallent d'un geste, dans l'Espace cette fois.
+                sous_titre = ("Ses applications Flatpak seront à réinstaller "
+                              "dans l'Espace")
             elif actif:
                 sous_titre = "Ses fichiers lui appartiennent"
             else:
@@ -254,7 +258,11 @@ class Fenetre(Adw.ApplicationWindow):
             groupe.add(row)
 
     def _a_des_applications_flatpak(self, esp):
-        """Cet Espace a-t-il des applications que le compte séparé ne sait pas ouvrir ?"""
+        """Cet Espace a-t-il des applications Flatpak installées côté bureau ?
+
+        Elles ne suivent pas le déménagement : leur installation vit hors du
+        dossier de l'Espace, dans un dossier auquel son compte n'a pas accès.
+        """
         if os.path.isdir(os.path.expanduser(
                 "~/.local/share/codebyr/espaces/%s/flatpak" % esp.get("id"))):
             return True
@@ -452,7 +460,10 @@ class Fenetre(Adw.ApplicationWindow):
             appid = cmd.split()[-1]
             d = os.path.expanduser(
                 "~/.local/share/codebyr/espaces/%s/flatpak/app/%s" % (esp.get("id"), appid))
-            if os.path.isdir(d):
+            # Sous compte séparé, l'installation vit chez l'Espace : ce dossier
+            # n'existe pas, et le bureau n'a pas le droit d'aller voir. C'est
+            # « codebyr-space » qui demandera la désinstallation à l'Espace.
+            if os.path.isdir(d) or compte_dedie.demande(esp):
                 term_cmd = ("codebyr-space remove-app %s %s; echo; "
                             "echo '— Terminé. Fermez cette fenêtre. —'; read _"
                             % (esp.get("id"), appid))

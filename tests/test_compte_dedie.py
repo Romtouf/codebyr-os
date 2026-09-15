@@ -61,8 +61,11 @@ class CeQuiNEstPasEncorePret(unittest.TestCase):
         self.assertEqual(compte_dedie.incompatibilites(
             dict(ORDINAIRE, ephemere=True), fichier="/tmp/x", est_flatpak=True), [])
 
-    def test_flatpak_est_refuse(self):
-        self.assertTrue(compte_dedie.incompatibilites(DEDIE, est_flatpak=True))
+    def test_flatpak_n_est_plus_refuse(self):
+        # Refusees jusqu'en 1.15.0, les applications Flatpak s'ouvrent depuis
+        # la 1.16.0 : l'Espace a son bus de session, donc ses portails, et sa
+        # propre installation Flatpak.
+        self.assertEqual(compte_dedie.incompatibilites(DEDIE, est_flatpak=True), [])
 
     def test_un_espace_jetable_est_accepte(self):
         # Son dossier devient un tmpfs sous son compte (voir codebyr-uid).
@@ -73,7 +76,7 @@ class CeQuiNEstPasEncorePret(unittest.TestCase):
         self.assertEqual(compte_dedie.incompatibilites(DEDIE, fichier="/tmp/facture.pdf"), [])
 
     def test_les_gestes_sur_les_donnees_sont_refuses_avec_une_explication(self):
-        for geste in ("install", "add-app"):
+        for geste in ("add-app",):
             message = compte_dedie.refus_de_geste(geste, DEDIE)
             self.assertIsNotNone(message, geste)
             self.assertIn("Travail", message)
@@ -81,7 +84,7 @@ class CeQuiNEstPasEncorePret(unittest.TestCase):
 
     def test_ouvrir_et_fermer_restent_possibles(self):
         for geste in ("launch", "close", "list", "apps", "envoyer", "purge", "delete",
-                      "export", "import", "contagion"):
+                      "export", "import", "contagion", "install", "remove-app"):
             self.assertIsNone(compte_dedie.refus_de_geste(geste, DEDIE), geste)
 
     def test_les_gestes_refuses_existent_bien_dans_le_lanceur(self):
@@ -91,11 +94,73 @@ class CeQuiNEstPasEncorePret(unittest.TestCase):
 
     def test_le_lanceur_refuse_avant_d_agir(self):
         with mock.patch.object(space, "load_espaces", return_value={"travail": DEDIE}), \
-                mock.patch.object(space, "cmd_install") as installer, \
+                mock.patch.object(space, "cmd_add_app") as ajouter, \
                 mock.patch.object(space, "_prevenir"):
-            code = space.main(["codebyr-space", "install", "travail", "org.exemple.App"])
+            code = space.main(["codebyr-space", "add-app", "travail", "Jeu", "/tmp/jeu"])
         self.assertEqual(code, 1)
-        installer.assert_not_called()
+        ajouter.assert_not_called()
+
+
+class LesApplicationsFlatpakDansUnEspaceDedie(unittest.TestCase):
+    """1.16.0 : l'Espace installe et lance ses applications Flatpak lui-même."""
+
+    def setUp(self):
+        self.source = _source()
+
+    def test_un_identifiant_tordu_n_entre_jamais_dans_une_commande(self):
+        # C'est le seul morceau de ces ordres qui vienne de l'extérieur, et il
+        # sert à la fois de nom de paquet et de bout de chemin.
+        for appid in ("org.gnome.Calculator", "io.codebyr.App2", "a.b-c.d_e"):
+            self.assertTrue(space.FORME_APPID.match(appid), appid)
+        for appid in ("", "sans-point", "org.gnome.Calculator; rm -rf /",
+                      "../../etc/passwd", "org/gnome/App", "-org.x.y",
+                      "org.x.y\nz", "org.x.y ", ".org.x"):
+            self.assertIsNone(space.FORME_APPID.match(appid), repr(appid))
+
+    def test_l_ordre_interne_est_reserve_au_compte_d_un_espace(self):
+        # Lancé depuis le bureau, il écrirait dans le dossier du bureau en
+        # croyant servir l'Espace.
+        interne = _fonction(self.source, "cmd_interne_flatpak", "_flatpak_dans_l_espace")
+        self.assertIn("_compte_d_espace_courant()", interne)
+        self.assertLess(interne.index("_compte_d_espace_courant()"),
+                        interne.index("shutil.which"))
+        self.assertIn('("installer", "desinstaller", "liste")', interne)
+        self.assertIn("FORME_APPID.match(appid)", interne)
+
+    def test_l_installation_passe_par_l_espace_et_pas_par_le_bureau(self):
+        installer = _fonction(self.source, "cmd_install", "cmd_add_app")
+        avant = installer.split("_flatpak_env(esp_id)")[0]
+        self.assertIn("compte_dedie.demande(esp)", avant)
+        self.assertIn("_flatpak_dans_l_espace(esp, \"installer\", appid)", avant)
+
+    def test_l_installation_d_un_espace_dedie_reste_hors_des_sauvegardes(self):
+        # Le dossier interne est le seul que l'export laisse de côté : des
+        # binaires retéléchargeables n'ont rien à faire dans une archive.
+        dossier = _fonction(self.source, "_flatpak_dir_dedie", "_env_flatpak_dedie")
+        self.assertIn("DOSSIER_INTERNE", dossier)
+
+    def test_l_environnement_flatpak_est_construit_jamais_herite(self):
+        # Celui du bureau désigne SON dossier d'exécution et SON bus, auxquels
+        # le compte de l'Espace n'a aucun droit.
+        env = _fonction(self.source, "_env_flatpak_dedie", "_espace_flatpak_dir")
+        for interdit in ("dict(os.environ)", "os.environ.copy()", "dict(env)"):
+            self.assertNotIn(interdit, env, interdit)
+        self.assertIn("session.runtime", env)
+        self.assertIn("session.home", env)
+
+    def test_l_application_flatpak_parle_au_bus_de_son_espace(self):
+        env = _fonction(self.source, "_env_flatpak_dedie", "_espace_flatpak_dir")
+        self.assertIn("DBUS_SESSION_BUS_ADDRESS", env)
+        self.assertIn('os.path.join(runtime, "bus")', env)
+
+    def test_sous_compte_dedie_le_bureau_ne_cherche_plus_dans_son_dossier(self):
+        # Il ne peut pas lire le dossier de l'Espace : y chercher l'application
+        # répondrait toujours « absente », et le lanceur dirait le contraire de
+        # la vérité à l'utilisateur.
+        lancer = _fonction(self.source, "_lancer", "_preparer_depuis_l_espace")
+        bloc = lancer.split("if est_flatpak:")[1].split("else:")[0]
+        self.assertLess(bloc.index("if session:"),
+                        bloc.index("_flatpak_app_dans_espace"))
 
 
 class JamaisDeReplieSousLeCompteDuBureau(unittest.TestCase):
@@ -727,5 +792,9 @@ class LeReglageDansLaConfiguration(unittest.TestCase):
         self.assertIn("n'est pas actif", self.source)
         self.assertIn("row.set_sensitive(service)", self.source)
 
-    def test_elle_annonce_la_limite_des_applications_flatpak(self):
-        self.assertIn("applications Flatpak ne s'ouvriront pas", self.source)
+    def test_elle_dit_ce_qu_il_advient_des_applications_flatpak(self):
+        # Depuis la 1.16.0 elles s'ouvrent sous compte séparé, mais celles
+        # déjà installées vivent chez le bureau et ne suivent pas : le dire,
+        # plutôt que de laisser croire à une perte ou à un bug.
+        self.assertIn("applications Flatpak seront à réinstaller", self.source)
+        self.assertNotIn("applications Flatpak ne s'ouvriront pas", self.source)

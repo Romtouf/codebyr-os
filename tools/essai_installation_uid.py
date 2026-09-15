@@ -236,6 +236,18 @@ def main():
     with open(script, "w", encoding="utf-8") as f:
         f.write(FENETRE)
     os.chmod(script, 0o644)
+    # Un essai interrompu — une erreur en plein milieu — laisse son Espace
+    # d'essai enregistré et son compte en place. L'essai suivant repartirait
+    # alors d'un état qui n'est pas le sien. On efface d'abord ce qui reste.
+    try:
+        pwd.getpwnam(comptes.nom_compte(uid, ESPACE))
+        reste = True
+    except KeyError:
+        reste = False
+    if reste:
+        lanceur(bureau, "delete", ESPACE)
+        dire("restes d'un essai précédent effacés", True, ESPACE)
+
     reussi &= dire("Espace d'essai ajouté au registre", registre(bureau, "ajouter"))
     nom = comptes.nom_compte(uid, ESPACE)
     home = comptes.chemin_home(uid, ESPACE)
@@ -291,7 +303,7 @@ def main():
         ouvertes = preuves.get("cartes") or []
         reussi &= dire("l'Espace a pu ouvrir la carte graphique", bool(ouvertes),
                        ", ".join(ouvertes) if ouvertes
-                       else "aucune de %s" % ", ".join(cartes), aussi_si_oui=True)
+                       else "aucune de %s" % ", ".join(cartes))
 
     ancienne = os.path.exists("/run/codebyr/passerelles")
     reussi &= dire("plus aucune passerelle à l'ancienne", not ancienne,

@@ -42,6 +42,7 @@ import compte_dedie  # noqa: E402
 import comptes  # noqa: E402
 import fichiers_surs
 import modeles  # noqa: E402
+import permissions_flatpak  # noqa: E402
 import provenance  # noqa: E402
 import registre  # noqa: E402
 import relais_notifications  # noqa: E402
@@ -586,8 +587,11 @@ def _lancer(espaces, esp, extra, fichier, session):
             envoi = None
         if not _espace_courant():
             relever_envois(espaces)
-    use_bwrap = True  # vérifié avant toute préparation ; jamais de repli non isolé
-    runtime_home = os.path.expanduser("~") if use_bwrap else home
+    # Le dossier personnel tel que l'application le voit : celui de l'Espace
+    # est monté par bubblewrap au chemin du bureau (voir wrap_bwrap, « chez »).
+    # Il n'y a pas d'autre cas : aucun Espace ne s'ouvre sans bac à sable —
+    # l'ancien repli « sans bwrap », et le drapeau qui le gardait, sont partis.
+    runtime_home = os.path.expanduser("~")
 
     # Niveau d'isolation : « renforce » déclaré dans le registre (ex. Banque),
     # ou imposé automatiquement pour l'examen d'une pièce jointe.
@@ -644,11 +648,28 @@ def _lancer(espaces, esp, extra, fichier, session):
     # peut ni l'enfermer dans le nôtre (sandbox imbriqué = échec), ni lui donner
     # un bus de session privé (elle a besoin du vrai bus pour ses portails).
     est_flatpak = os.path.basename(app_cmd[0]) == "flatpak" or app_cmd[0].endswith("/flatpak")
-    if est_flatpak and (renforce or hors_ligne or esp.get("ephemere") or
-                        (esp.get("reseau") or {}).get("mode") == "liste-blanche"):
-        _prevenir("Application incompatible avec cet Espace",
-                  "Les permissions Flatpak ne garantissent pas le blindage ou le réseau demandé. Utilisez une application native.")
-        return 1
+    if est_flatpak:
+        refus = permissions_flatpak.incompatibilite(esp, renforce, hors_ligne,
+                                                    sous_compte=bool(session))
+        if refus:
+            _prevenir("Application incompatible avec cet Espace", refus)
+            return 1
+    appid = permissions_flatpak.identifiant(app_cmd) if est_flatpak else None
+    if est_flatpak and not session:
+        # Espace ordinaire : l'application ne passe pas par notre bac à sable,
+        # et ses permissions s'exercent sous le compte du bureau. Celles qui la
+        # font sortir de l'Espace la font refuser — sinon le liseré de l'Espace
+        # mentirait. Sous compte séparé, le compte de l'Espace les borne.
+        refus = _sorties_flatpak(esp, app_cmd, appid)
+        if refus:
+            nom_app = appid or os.path.basename(app_cmd[0])
+            _prevenir("%s ne s'ouvre pas dans %s" % (nom_app, esp["nom"]),
+                      "Elle pourrait %s. Ouvrez-la hors des Espaces, ou activez "
+                      "« Compte séparé » pour %s dans Configuration Codebyr : elle "
+                      "y serait bornée au compte de l'Espace." % (refus[0], esp["nom"]))
+            journal("Espace %s : application Flatpak %s refusée (%s)"
+                    % (esp["id"], nom_app, " ; ".join(refus)))
+            return 1
     cmd = build_command(esp, home, app_cmd)
 
     # Bus de session privé par Espace : les apps « mono-instance » (Fichiers,
@@ -749,7 +770,6 @@ def _lancer(espaces, esp, extra, fichier, session):
         cmd = ["python3", "/usr/share/codebyr/relais_reseau.py",
                "/run/codebyr-proxy", "17890", "--"] + cmd
     if est_flatpak:
-        appid = app_cmd[-1] if len(app_cmd) >= 2 else ""
         if session:
             # Sous compte dédié, c'est l'Espace qui lance — son compte, son
             # dossier d'exécution, son bus, son installation Flatpak. Le bureau
@@ -759,17 +779,29 @@ def _lancer(espaces, esp, extra, fichier, session):
             env = _env_flatpak_dedie(esp, session, env)
             run = cmd
             print("Application Flatpak dans l'Espace %s, sous son compte." % esp["nom"])
-            _prevenir("Permissions Flatpak",
-                      "Ses accès aux fichiers et au réseau dépendent des "
-                      "permissions de cette application, dans les limites du "
-                      "compte de l'Espace.")
-            journal("Espace %s : application Flatpak %s sous compte dédié"
-                    % (esp["id"], appid or "?"))
+            message = ("Ses accès aux fichiers et au réseau dépendent des "
+                       "permissions de cette application, dans les limites du "
+                       "compte de l'Espace.")
+            if renforce:
+                # Accepté dans un Espace blindé parce que le compte la borne
+                # (voir permissions_flatpak.incompatibilite) : le 🛡 du menu
+                # ne doit pas laisser croire qu'elle a le Blindage.
+                message += (" Elle a le bac à sable de Flatpak, pas le "
+                            "Blindage de l'Espace.")
+            _prevenir("Permissions Flatpak", message)
+            journal("Espace %s : application Flatpak %s sous compte dédié%s"
+                    % (esp["id"], appid or "?", " (Espace blindé)" if renforce else ""))
         elif appid and _flatpak_app_dans_espace(esp["id"], appid):
             # Installée DANS l'Espace : installation Flatpak dédiée +
             # données isolées (HOME de l'Espace → ~/.var/app séparé).
             env["FLATPAK_USER_DIR"] = _espace_flatpak_dir(esp["id"])
             env["HOME"] = home
+            # Les dossiers XDG se déduisent de HOME… sauf si la session les
+            # fixe : ils désigneraient alors les VÔTRES, et « xdg-config »
+            # ouvrirait à l'application les réglages du bureau.
+            for variable in ("XDG_CONFIG_HOME", "XDG_DATA_HOME",
+                             "XDG_CACHE_HOME", "XDG_STATE_HOME"):
+                env.pop(variable, None)
             run = cmd
             print("Application Flatpak dédiée à %s : permissions Flatpak applicables." % esp["nom"])
             _prevenir("Permissions Flatpak", "Installation dédiée ; les accès aux fichiers et au réseau dépendent des permissions de cette application.")
@@ -817,11 +849,10 @@ def _lancer(espaces, esp, extra, fichier, session):
             print("🎤 Son et micro coupés dans l'Espace %s." % esp["nom"])
 
     print("Ouverture de « %s » dans l'Espace %s…" % (os.path.basename(cmd[0]), esp["nom"]))
-    journal("Espace %s : ouverture de %s%s%s%s"
+    journal("Espace %s : ouverture de %s%s%s"
             % (esp["id"], os.path.basename(app_cmd[0]),
                " [blindage]" if renforce else "",
-               " [hors-ligne]" if hors_ligne else "",
-               "" if use_bwrap or est_flatpak else " [SANS bac à sable]"))
+               " [hors-ligne]" if hors_ligne else ""))
     # Répertoire d'exécution partagé avec l'extension GNOME : on y note
     # « ce processus (et ses enfants) appartient à tel Espace », pour que
     # l'extension colore la fenêtre par filiation, même sans marqueur de classe.
@@ -1951,6 +1982,26 @@ def _flatpak_app_dans_espace(esp_id, appid):
     return os.path.isdir(os.path.join(_espace_flatpak_dir(esp_id), "app", appid))
 
 
+def _sorties_flatpak(esp, app_cmd, appid):
+    """Pourquoi cette application Flatpak sortirait de cet Espace ordinaire.
+
+    Liste vide : rien de connu. Dans le doute — identifiant illisible,
+    permissions introuvables —, on refuse, comme partout ailleurs ici.
+    Voir permissions_flatpak.py pour ce qui fait sortir, et pourquoi.
+    """
+    raisons = permissions_flatpak.options_accordees(app_cmd)
+    if not appid or not FORME_APPID.match(appid):
+        return raisons + ["échapper à tout contrôle : son identifiant est illisible"]
+    env = dict(os.environ)
+    dans_l_espace = _flatpak_app_dans_espace(esp["id"], appid)
+    if dans_l_espace:
+        env["FLATPAK_USER_DIR"] = _espace_flatpak_dir(esp["id"])
+    permissions = permissions_flatpak.lire_permissions(appid, env)
+    if permissions is None:
+        return raisons + ["échapper à tout contrôle : ses permissions n'ont pas pu être lues"]
+    return raisons + permissions_flatpak.sorties(permissions, dans_l_espace)
+
+
 def _assurer_flathub(env):
     """Ajoute le dépôt Flathub à l'installation de l'Espace (fichier local → hors-ligne OK)."""
     src = FLATHUB_REPO if os.path.exists(FLATHUB_REPO) else \
@@ -2170,9 +2221,14 @@ def cmd_create(nom, couleur):
     base = unicodedata.normalize("NFKD", nom).encode("ascii", "ignore").decode().lower()
     base = re.sub(r"[^a-z0-9]+", "-", base).strip("-") or "espace"
     esp_id = registre.identifiant_libre(base)
+    # Sous son propre compte d'office, comme les Espaces livrés depuis la
+    # 1.16.1 : un Espace créé par l'utilisateur n'a pas à être moins isolé que
+    # les autres. Désactivable dans « Configuration Codebyr » ; sans effet pour
+    # l'invité (voir compte_dedie.session_invitee).
     registre.ajouter_espace({
         "id": esp_id, "nom": nom, "couleur": couleur,
         "app": "org.gnome.Nautilus.desktop", "ephemere": False,
+        "compte": "dedie",
     })
     print("Espace « %s » créé (%s)." % (nom, couleur))
     return 0

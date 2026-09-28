@@ -39,4 +39,7 @@ ExecStart=/usr/lib/codebyr/codebyr-uid
 # compte d'utilisateur du bureau (voir comptes.py).
 
 [Install]
-WantedBy=multi-user.target
+# Pas de « WantedBy=multi-user.target » : activé, il aurait lancé le service à
+# chaque démarrage, contre la promesse écrite plus haut. Activer ce service,
+# c'est activer sa socket — rien d'autre.
+Also=codebyr-uid.socket

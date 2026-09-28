@@ -117,6 +117,11 @@ def wrap_bwrap(home, cmd, env, renforce=False, hors_ligne=False, audio=True,
         "--unshare-pid", "--unshare-uts", "--unshare-ipc",
         "--die-with-parent",
         "--setenv", "HOME", chez,
+        # On démarre DANS le dossier de l'Espace. Sans cela, l'application
+        # héritait du dossier courant de son lanceur — « / » sous compte séparé,
+        # où le premier processus travaille : un terminal s'y ouvrait, et « ls »
+        # montrait le système au lieu des fichiers de l'Espace (28/09/2026).
+        "--chdir", chez,
         # Le chemin du bus de l'hôte hérité de l'environnement ne mène plus à
         # rien dans le bac à sable : on le retire pour éviter toute confusion
         # (dbus-run-session posera la bonne valeur juste après).
@@ -139,6 +144,11 @@ def wrap_bwrap(home, cmd, env, renforce=False, hors_ligne=False, audio=True,
         # laisser ferait chercher les sockets là où cet Espace n'a aucun droit,
         # et l'échec serait muet.
         bwrap += ["--setenv", "XDG_RUNTIME_DIR", runtime]
+        # La liste des comptes vue du bac à sable, où le compte de l'Espace a
+        # un vrai shell (voir codebyr-espace-init, « passwd_du_bac »). Sans
+        # elle, un terminal lançait « nologin » et ne s'ouvrait jamais. Montée
+        # APRÈS /etc, donc par-dessus ; « -try » : absente, on garde l'originale.
+        bwrap += ["--ro-bind-try", depuis + "/codebyr-passwd", "/etc/passwd"]
     if filtre:
         bwrap += ["--ro-bind", filtre, "/run/codebyr-proxy"]
     if notifications:
@@ -321,6 +331,11 @@ SITUATIONS = (
       "son": True, "gpu": None, "reseau": True, "home_isole": True}),
     ("Espace blindé, sans micro ni carte graphique (Banque)",
      {"renforce": True, "audio": False, "gpu": False},
+     {"bus_hote": False, "systemd_user": False, "bus_systeme": False, "x11": False,
+      "son": False, "gpu": False, "reseau": True, "home_isole": True}),
+    # Un lien douteux : le réseau reste ouvert (il faut bien charger la page),
+    # mais ni micro ni carte graphique — réglage du Jetable depuis la 1.16.1.
+    ("Lien en Jetable", {"renforce": True, "audio": False, "gpu": False},
      {"bus_hote": False, "systemd_user": False, "bus_systeme": False, "x11": False,
       "son": False, "gpu": False, "reseau": True, "home_isole": True}),
     ("Pièce jointe en Jetable", {"renforce": True, "hors_ligne": True, "gpu": False},

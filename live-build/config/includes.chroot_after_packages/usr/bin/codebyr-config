@@ -229,7 +229,14 @@ class Fenetre(Adw.ApplicationWindow):
             "les autres Espaces, ni votre dossier personnel. Ses données le "
             "suivent à sa prochaine ouverture, et reviennent si vous le "
             "désactivez — rien n'est effacé.")
-        if not service:
+        invite = compte_dedie.session_invitee()
+        if invite:
+            # Voir comptes.COMPTE_INVITE : ce réglage ne s'applique jamais ici,
+            # et un bouton sans effet mentirait.
+            description += ("\n\nSession invitée : ses Espaces n'ont jamais de "
+                            "compte séparé — ils s'effacent avec elle, à la "
+                            "déconnexion.")
+        elif not service:
             description += ("\n\nLe service des comptes d'Espaces n'est pas actif "
                             "sur cette machine : ce réglage reste sans effet.")
         groupe = Adw.PreferencesGroup(title="Compte séparé, par Espace",
@@ -251,8 +258,8 @@ class Fenetre(Adw.ApplicationWindow):
             else:
                 sous_titre = "Ses fichiers appartiennent à votre compte"
             row = Adw.SwitchRow(title=e.get("nom", e.get("id")), subtitle=sous_titre)
-            row.set_active(actif)
-            row.set_sensitive(service)
+            row.set_active(actif and not invite)
+            row.set_sensitive(service and not invite)
             row.add_prefix(interface.pastille(e.get("couleur", "#888888"), 18))
             row.connect("notify::active", self._basculer_compte, e.get("id"))
             groupe.add(row)

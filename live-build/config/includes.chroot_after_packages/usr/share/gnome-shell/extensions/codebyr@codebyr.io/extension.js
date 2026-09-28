@@ -631,9 +631,12 @@ class PressePapiers {
             // frontière ne se franchissait pas d'Espace à Espace, elle se
             // contournait par le bureau.
             //
-            // On vide donc aussi en SORTANT d'un Espace sensible. Pour les
-            // Espaces ordinaires, on ne touche à rien : coller une adresse
-            // depuis Navigation dans une note doit rester possible.
+            // On vide donc aussi en SORTANT d'un Espace sensible. Pour un
+            // Espace qui ne l'est pas, on ne touche à rien. Attention : est
+            // sensible tout Espace blindé (voir _sensible). Navigation l'est
+            // depuis la 1.12.0, Personnel et Travail depuis la 1.16.1 — ce
+            // commentaire affirmait à tort le contraire pour Navigation.
+            // Quitter un Espace livré pour le bureau vide donc le presse-papiers.
             if (this._dernier && this._sensible(this._dernier)) {
                 this._vider();
                 this._dernier = null;

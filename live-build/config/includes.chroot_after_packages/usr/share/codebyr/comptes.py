@@ -110,6 +110,13 @@ SOCKET_EXEC = "exec"
 # d'au moins 1000 sur Debian.
 UID_MINIMAL = 1000
 
+# Le compte invité, créé par l'image (hook 0400). Sa session s'efface à chaque
+# déconnexion : son dossier personnel, et rien d'autre. Un Espace à compte
+# séparé vit HORS de ce dossier — il survivrait, et l'invité suivant
+# retrouverait le navigateur, les cookies et les fichiers du précédent. Ses
+# Espaces restent donc sous son propre compte, et s'effacent avec lui.
+COMPTE_INVITE = "invite"
+
 # Combien d'Espaces un utilisateur peut avoir sous compte dédié. Le service
 # écoute pour tout le monde : sans ce plafond, un utilisateur local pourrait
 # demander l'ouverture d'Espaces aux noms sans cesse différents et faire créer
@@ -190,6 +197,8 @@ def demandeur_autorise(uid, nom):
     # compte d'Espace naîtrait au-dessus de 1000 et passerait.
     if est_compte_d_espace(nom):
         return False, "un Espace ne demande pas l'ouverture d'un autre Espace"
+    if nom == COMPTE_INVITE:
+        return False, "compte invité : ses Espaces s'effacent avec sa session"
     if uid < UID_MINIMAL:
         return False, "compte système (UID %d)" % uid
     return True, ""

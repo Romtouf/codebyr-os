@@ -124,6 +124,27 @@ class SousSonPropreCompte(unittest.TestCase):
         self.assertEqual(argv[i - 1], "--setenv")
         self.assertEqual(argv[i + 1], self.RUNTIME)
 
+    def test_le_bac_a_sable_voit_sa_propre_liste_des_comptes(self):
+        # Le compte d'un Espace a « nologin » pour shell : sans cette liste, un
+        # terminal lançait nologin et ne s'ouvrait jamais (28/09/2026).
+        argv = self._argv()
+        i = argv.index("/etc/passwd")
+        self.assertEqual(argv[i - 2], "--ro-bind-try")
+        self.assertEqual(argv[i - 1], self.RUNTIME + "/codebyr-passwd")
+        # Par-dessus /etc, donc APRÈS son montage.
+        self.assertGreater(i, argv.index("/etc"))
+
+    def test_les_applications_demarrent_dans_le_dossier_de_l_espace(self):
+        # Sous compte séparé, le premier processus travaille dans « / » : un
+        # terminal s'y ouvrait, loin des fichiers de l'Espace (28/09/2026).
+        argv = self._argv()
+        i = argv.index("--chdir")
+        self.assertEqual(argv[i + 1], "/var/lib/codebyr/espaces/1000/banque")
+
+    def test_un_espace_ordinaire_garde_la_liste_du_systeme(self):
+        argv = bac_a_sable.wrap_bwrap("/tmp/h", ["x"], {"XDG_RUNTIME_DIR": "/run/user/1000"})
+        self.assertNotIn("/etc/passwd", argv)
+
     def test_le_dossier_personnel_apparait_ou_on_le_demande(self):
         argv = self._argv(envoi="/tmp/envoi-banque")
         i = argv.index("/var/lib/codebyr/espaces/1000/banque", 1)

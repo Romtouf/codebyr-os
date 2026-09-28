@@ -9,6 +9,7 @@ import ast
 import os
 import re
 import subprocess
+import sys
 import unittest
 
 from outils import LIB, RACINE  # noqa: F401 — place les modules partagés
@@ -92,6 +93,13 @@ class QuiADroitDeDemander(unittest.TestCase):
         for uid, nom in ((0, "root"), (33, "www-data"), (999, "systemd-network")):
             autorise, _ = comptes.demandeur_autorise(uid, nom)
             self.assertFalse(autorise, nom)
+
+    def test_l_invite_n_a_jamais_de_compte_separe(self):
+        # Sa session s'efface à la déconnexion ; un Espace à compte séparé,
+        # rangé hors de son dossier, survivrait à l'invité suivant.
+        autorise, raison = comptes.demandeur_autorise(1001, comptes.COMPTE_INVITE)
+        self.assertFalse(autorise)
+        self.assertIn("invité", raison)
 
     def test_le_nom_seul_ne_suffit_pas_a_passer(self):
         # Un compte d'Espace reste refusé même si son UID est élevé.
@@ -251,6 +259,29 @@ class LeService(unittest.TestCase):
                          'demande.get("socket")', 'demande.get("runtime")'):
             self.assertNotIn(interdit, self.source, interdit)
 
+    @unittest.skipUnless(os.name == "posix", "le service importe pwd et syslog")
+    def test_les_variables_d_essai_sont_ignorees_hors_essai(self):
+        # CODEBYR_INIT désigne le SEUL programme que root lance pour ouvrir un
+        # Espace. Hors de « --essai », le service ne doit pas la lire.
+        code = "\n".join((
+            "import importlib.machinery, importlib.util, sys",
+            "sys.argv = sys.argv[1:]",
+            "l = importlib.machinery.SourceFileLoader('service', %r)" % SERVICE,
+            "m = importlib.util.module_from_spec(importlib.util.spec_from_loader('service', l))",
+            "l.exec_module(m)",
+            "print(m.INIT)",
+        ))
+        env = dict(os.environ, CODEBYR_INIT="/tmp/piege", PYTHONPATH=LIB)
+
+        def init(*argv):
+            r = subprocess.run([sys.executable, "-B", "-c", code] + list(argv),
+                               env=env, capture_output=True, text=True, timeout=20)
+            self.assertEqual(r.returncode, 0, r.stderr)
+            return r.stdout.strip()
+
+        self.assertEqual(init("codebyr-uid"), "/usr/lib/codebyr/codebyr-espace-init")
+        self.assertEqual(init("codebyr-uid", "--essai", "/tmp/s"), "/tmp/piege")
+
     def test_le_service_n_execute_aucune_commande_du_client(self):
         # Il prépare, il n'exécute pas : pas de shell, pas de commande reçue.
         self.assertNotIn("shell=True", self.source)
@@ -369,6 +400,35 @@ class LePremierProcessus(unittest.TestCase):
         # derrière. Un échec de lancement doit être un échec, pas une attente.
         self.assertIn("os.pipe()", self.service)
         self.assertIn("select.select", self.service)
+
+    @unittest.skipUnless(os.name == "posix", "le premier processus importe pwd et syslog")
+    def test_seul_le_compte_de_l_espace_recoit_un_shell_dans_le_bac(self):
+        import importlib.machinery
+        import importlib.util
+        chargeur = importlib.machinery.SourceFileLoader("codebyr_espace_init", INIT)
+        init = importlib.util.module_from_spec(
+            importlib.util.spec_from_loader(chargeur.name, chargeur))
+        chargeur.exec_module(init)
+        texte = "\n".join((
+            "root:x:0:0:root:/root:/bin/bash",
+            "cbyr-1002-travail:x:997:986::/var/lib/codebyr/espaces/1002/travail:/usr/sbin/nologin",
+            "cbyr-1002-banque:x:9970:985::/var/lib/codebyr/espaces/1002/banque:/usr/sbin/nologin",
+        ))
+        vu = init.passwd_du_bac(texte, 997)
+        self.assertIn("cbyr-1002-travail:x:997:986::/var/lib/codebyr/espaces/1002/travail:/bin/bash", vu)
+        # Les autres lignes, telles quelles — y compris un numéro qui COMMENCE par 997.
+        self.assertIn("root:x:0:0:root:/root:/bin/bash", vu)
+        self.assertIn("cbyr-1002-banque:x:9970:985::/var/lib/codebyr/espaces/1002/banque:/usr/sbin/nologin", vu)
+
+    def test_la_liste_des_comptes_du_bac_est_prete_avant_l_annonce(self):
+        code = _code(INIT)
+        principal = code.split("def main(")[1]
+        self.assertLess(principal.index("ecrire_passwd_du_bac()"), principal.index("os.write("))
+
+    def test_hors_du_bac_le_compte_n_a_toujours_pas_de_shell(self):
+        # Le shell n'existe que DANS le bac à sable : le compte, lui, ne doit
+        # jamais pouvoir ouvrir de session.
+        self.assertIn('"--shell", "/usr/sbin/nologin"', self.service)
 
     def test_il_n_annonce_qu_apres_ce_qui_peut_echouer(self):
         # Une annonce faite trop tôt ne dirait plus « j'écoute » mais

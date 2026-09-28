@@ -28,6 +28,8 @@ import json
 import os
 import socket
 
+import comptes
+
 SOCKET_SERVICE = os.environ.get("CODEBYR_UID_SOCKET", "/run/codebyr-uid.sock")
 TAILLE_MAX = 65536
 
@@ -36,8 +38,23 @@ class Indisponible(OSError):
     """Le compte dédié ne peut pas être obtenu : l'Espace ne s'ouvre pas."""
 
 
+def session_invitee():
+    """La session est-elle celle du compte invité ? (voir comptes.COMPTE_INVITE)
+
+    Hors Linux — les tests sur un autre système — la réponse est non.
+    """
+    try:
+        import pwd
+        return pwd.getpwuid(os.getuid()).pw_name == comptes.COMPTE_INVITE
+    except (ImportError, AttributeError, KeyError):
+        return False
+
+
 def demande(esp):
-    return isinstance(esp, dict) and esp.get("compte") == "dedie"
+    # Jamais pour l'invité, même si le réglage le demande — par défaut ou
+    # coché dans sa session : ses Espaces doivent s'effacer avec elle.
+    return (isinstance(esp, dict) and esp.get("compte") == "dedie"
+            and not session_invitee())
 
 
 def incompatibilites(esp, fichier=None, est_flatpak=False):

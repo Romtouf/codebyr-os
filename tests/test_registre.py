@@ -55,6 +55,27 @@ class Registre(unittest.TestCase):
         # crier le bouclier anti-hameçonnage sur tout site contenant « example ».
         self.assertEqual(banque["reseau"].get("domaines"), [])
 
+    def test_le_jetable_n_a_pas_de_micro(self):
+        # Le Jetable existe pour les liens et les pièces jointes DOUTEUX. Le
+        # socket PipeWire, c'est aussi le micro : une page piégée n'a pas à
+        # pouvoir écouter la pièce. Le son de sortie part avec — c'est le prix.
+        jetable = next(e for e in self.espaces if e["id"] == "jetable")
+        self.assertIs(jetable.get("audio"), False)
+        self.assertIs(jetable.get("gpu"), False)
+
+    def test_les_espaces_du_quotidien_sont_blindes(self):
+        # 1.16.1 : Personnel et Travail étaient les seuls Espaces sans filtre
+        # d'appels système. Plafonds larges, comme Navigation : une journée
+        # de travail ouvre plus d'applications qu'un geste bancaire.
+        for ident in ("personnel", "travail"):
+            esp = next(e for e in self.espaces if e["id"] == ident)
+            self.assertEqual(esp.get("blindage"), "renforce", ident)
+            self.assertEqual(esp.get("plafonds"), {"memoire": "75%", "taches": 4096}, ident)
+
+    def test_chaque_espace_livre_a_son_propre_compte(self):
+        for esp in self.espaces:
+            self.assertEqual(esp.get("compte"), "dedie", esp["id"])
+
     def test_les_applications_par_defaut_sont_utilisables(self):
         for app in self.data.get("apps", []):
             self.assertTrue(app.get("nom"))

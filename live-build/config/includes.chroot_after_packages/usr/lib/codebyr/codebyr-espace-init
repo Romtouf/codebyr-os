@@ -284,6 +284,58 @@ def demarrer_bus(affichage):
     return None
 
 
+# ── Un shell DANS le bac à sable, et nulle part ailleurs ────────────────────
+# Le compte d'un Espace est créé sans shell de connexion (/usr/sbin/nologin) :
+# il ne doit jamais pouvoir ouvrir de session. Mais un terminal lance le shell
+# du compte, lu dans /etc/passwd : sous compte séparé, la Console d'un Espace
+# lançait donc « nologin », qui se referme aussitôt — la fenêtre « moulinait »
+# et n'apparaissait jamais. Constaté le 28/09/2026, quand le compte séparé est
+# devenu le défaut ; tout terminal était touché (Console, GNOME Terminal, celui
+# d'un éditeur de code).
+#
+# Comme Flatpak, on présente au bac à sable SA liste des comptes : une copie
+# de /etc/passwd où seule la ligne de ce compte reçoit un vrai shell. Elle est
+# montée par-dessus /etc/passwd (voir bac_a_sable.wrap_bwrap). Hors du bac à
+# sable, le compte garde « nologin », et rien ne change pour le système.
+PASSWD_DU_BAC = "codebyr-passwd"
+SHELL_DU_BAC = "/bin/bash"
+
+
+def passwd_du_bac(texte, uid, shell=SHELL_DU_BAC):
+    """La liste des comptes vue du bac à sable : un vrai shell pour CE compte seul."""
+    lignes = []
+    for ligne in texte.splitlines():
+        champs = ligne.split(":")
+        if len(champs) == 7 and champs[2] == str(uid):
+            champs[6] = shell
+            ligne = ":".join(champs)
+        lignes.append(ligne)
+    return "\n".join(lignes) + "\n"
+
+
+def ecrire_passwd_du_bac(uid=None):
+    """Écrit la copie dans le dossier d'exécution de l'Espace. Vrai si c'est fait.
+
+    Un échec n'empêche pas l'Espace de s'ouvrir : seuls les terminaux en
+    pâtissent, et le montage, facultatif, est alors simplement ignoré.
+    """
+    uid = os.getuid() if uid is None else uid
+    runtime = "/run/user/%d" % uid
+    cible = os.path.join(runtime, PASSWD_DU_BAC)
+    try:
+        with open("/etc/passwd", encoding="utf-8") as f:
+            contenu = passwd_du_bac(f.read(), uid)
+        neuf = cible + ".neuf"
+        with open(neuf, "w", encoding="utf-8") as f:
+            f.write(contenu)
+        os.chmod(neuf, 0o644)
+        os.replace(neuf, cible)
+        return True
+    except OSError as exc:
+        journal("liste des comptes du bac à sable non écrite : %s" % exc)
+        return False
+
+
 def servir(srv, uid_bureau):
     uid_propre = os.getuid()
     while True:
@@ -313,6 +365,9 @@ def main(argv):
     # première application Flatpak lancée aussitôt ne le trouverait pas. Mais
     # un bus absent n'empêche pas l'annonce — voir l'en-tête.
     bus = demarrer_bus(argv[4])
+    # Avant l'annonce, pour la même raison que le bus : le premier terminal
+    # ouvert aussitôt doit déjà trouver son shell.
+    ecrire_passwd_du_bac()
     journal("Espace prêt sous l'UID %d, aux ordres du bureau %d, %s"
             % (os.getuid(), uid_bureau,
                "bus démarré" if bus else "SANS bus de session"))

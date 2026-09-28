@@ -73,15 +73,23 @@ import sys
 import syslog
 import threading
 
-sys.path.insert(0, os.environ.get("CODEBYR_LIB", "/usr/share/codebyr"))
+# CODEBYR_LIB et CODEBYR_INIT n'existent que pour les essais sur une machine de
+# test (tools/essai_*.py), qui lancent toujours le service avec « --essai ».
+# Hors de ce mode, elles sont IGNORÉES. Ce n'est pas une faille qu'on ferme :
+# seul root règle l'environnement d'un service, et systemd le démarre propre.
+# C'est une porte qu'aucun usage normal n'emprunte — celle par laquelle root
+# chargerait un module ou lancerait un programme venus d'ailleurs — et qui n'a
+# donc aucune raison de rester ouverte.
+EN_ESSAI = len(sys.argv) >= 3 and sys.argv[1] == "--essai"
+sys.path.insert(0, os.environ.get("CODEBYR_LIB", "/usr/share/codebyr")
+                if EN_ESSAI else "/usr/share/codebyr")
 import comptes  # noqa: E402
 
 SOCKET_SERVICE = "/run/codebyr-uid.sock"
 TAILLE_MAX = 4096
 # Le SEUL programme que root lance. Écrit en clair, jamais reçu du client.
-# Comme CODEBYR_LIB, la variable n'existe que pour les essais : systemd démarre
-# ce service avec un environnement propre, où elle est absente.
-INIT = os.environ.get("CODEBYR_INIT", "/usr/lib/codebyr/codebyr-espace-init")
+INIT = (os.environ.get("CODEBYR_INIT", "/usr/lib/codebyr/codebyr-espace-init")
+        if EN_ESSAI else "/usr/lib/codebyr/codebyr-espace-init")
 
 # Les Espaces ouverts : nom de compte → (processus initial, socket d'ordres).
 # Rien n'est persisté : si ce service redémarre, il ne prétend pas savoir ce

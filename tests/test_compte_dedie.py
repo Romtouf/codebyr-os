@@ -44,15 +44,39 @@ class LaDemande(unittest.TestCase):
         for esp in (ORDINAIRE, {"compte": "oui"}, {"compte": True}, None, "dedie"):
             self.assertFalse(compte_dedie.demande(esp), repr(esp))
 
-    def test_aucun_espace_livre_ne_le_demande(self):
-        # Réglage d'essai tant que le chantier n'est pas fini : l'activer par
-        # défaut sur un Espace livré ferait perdre à ses utilisateurs l'accès
-        # à leurs données existantes, qui ne sont pas encore migrées.
+    def test_chaque_espace_livre_le_demande(self):
+        # Décision du 27/09/2026 (1.16.1) : le compte séparé devient le défaut.
+        # Ce test disait l'inverse tant que les données d'un Espace ne
+        # savaient pas le suivre ; elles déménagent depuis la 1.15.0, à la
+        # première ouverture, et reviennent si l'on désactive le réglage.
         chemin = os.path.join(outils.ETC, "codebyr", "espaces.json")
         with open(chemin, encoding="utf-8") as f:
             livres = json.load(f)["espaces"]
-        for esp in livres:
-            self.assertFalse(compte_dedie.demande(esp), esp.get("id"))
+        with mock.patch.object(compte_dedie, "session_invitee", return_value=False):
+            for esp in livres:
+                self.assertTrue(compte_dedie.demande(esp), esp.get("id"))
+
+    def test_un_espace_cree_par_l_utilisateur_le_demande_aussi(self):
+        creer = _fonction(_source(), "cmd_create", "cmd_delete")
+        self.assertIn('"compte": "dedie"', creer)
+
+
+class LInvite(unittest.TestCase):
+    """L'invité n'obtient jamais de compte séparé, même demandé."""
+
+    def test_meme_demande_le_reglage_ne_s_applique_pas_a_l_invite(self):
+        with mock.patch.object(compte_dedie, "session_invitee", return_value=True):
+            self.assertFalse(compte_dedie.demande(DEDIE))
+        with mock.patch.object(compte_dedie, "session_invitee", return_value=False):
+            self.assertTrue(compte_dedie.demande(DEDIE))
+
+    @unittest.skipUnless(POSIX, "comptes Unix")
+    def test_l_invite_est_reconnu_a_son_nom(self):
+        invite = mock.Mock(pw_name="invite")
+        with mock.patch("pwd.getpwuid", return_value=invite):
+            self.assertTrue(compte_dedie.session_invitee())
+        with mock.patch("pwd.getpwuid", return_value=mock.Mock(pw_name="romtouf")):
+            self.assertFalse(compte_dedie.session_invitee())
 
 
 class CeQuiNEstPasEncorePret(unittest.TestCase):
@@ -158,7 +182,9 @@ class LesApplicationsFlatpakDansUnEspaceDedie(unittest.TestCase):
         # répondrait toujours « absente », et le lanceur dirait le contraire de
         # la vérité à l'utilisateur.
         lancer = _fonction(self.source, "_lancer", "_preparer_depuis_l_espace")
-        bloc = lancer.split("if est_flatpak:")[1].split("else:")[0]
+        # Le DERNIER « if est_flatpak: » : celui du lancement. Le premier ne
+        # fait que décider si l'application est compatible avec l'Espace.
+        bloc = lancer.split("if est_flatpak:")[-1].split("else:")[0]
         self.assertLess(bloc.index("if session:"),
                         bloc.index("_flatpak_app_dans_espace"))
 
@@ -225,6 +251,7 @@ class LOrdreDesChoses(unittest.TestCase):
 
 class LaPreparationDepuisLEspace(unittest.TestCase):
 
+    @unittest.skipUnless(POSIX, "comptes Unix")
     def test_refuse_de_tourner_sous_un_compte_qui_n_est_pas_un_espace(self):
         faux = mock.Mock(pw_name="romtouf", pw_dir="/home/romtouf")
         with mock.patch("pwd.getpwuid", return_value=faux), \
@@ -248,6 +275,7 @@ class LaPreparationDepuisLEspace(unittest.TestCase):
         ouverture.assert_called_once_with(vrai)
         modeles.assert_called_once_with(vrai)
 
+    @unittest.skipUnless(POSIX, "comptes Unix")
     def test_des_associations_non_posees_ne_passent_pas_pour_une_reussite(self):
         # Constaté le 14/09/2026 : elles n'étaient pas écrites, et la
         # préparation se disait réussie. Ce sont elles qui ouvrent sous cloche.
@@ -278,6 +306,7 @@ class LesBoites(unittest.TestCase):
         bloc = lancer.split("if session:")[1].split("elif not esp.get(\"ephemere\"):")[0]
         self.assertIn("envoi = session.envois", bloc)
 
+    @unittest.skipUnless(POSIX, "numéros de compte Unix (os.getuid)")
     def test_le_bureau_releve_un_espace_dedie_hors_de_son_dossier(self):
         with mock.patch.object(space.comptes, "chemin_envois",
                                return_value="/var/lib/codebyr/envois/1000/travail"):
@@ -790,7 +819,13 @@ class LeReglageDansLaConfiguration(unittest.TestCase):
     def test_elle_previent_quand_le_service_n_est_pas_la(self):
         self.assertIn("compte_dedie.SOCKET_SERVICE", self.source)
         self.assertIn("n'est pas actif", self.source)
-        self.assertIn("row.set_sensitive(service)", self.source)
+        self.assertIn("row.set_sensitive(service and not invite)", self.source)
+
+    def test_elle_ne_propose_rien_a_l_invite(self):
+        # Pour l'invité, le réglage ne s'applique jamais : un bouton actif
+        # sans effet mentirait.
+        self.assertIn("compte_dedie.session_invitee()", self.source)
+        self.assertIn("Session invitée", self.source)
 
     def test_elle_dit_ce_qu_il_advient_des_applications_flatpak(self):
         # Depuis la 1.16.0 elles s'ouvrent sous compte séparé, mais celles

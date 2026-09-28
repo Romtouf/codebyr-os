@@ -1,7 +1,6 @@
 # Chantiers — Codebyr OS
 
-Mise à jour de lecture : **27 septembre 2026**, version publiée **1.16.0** —
-la 1.16.1 est en préparation, pas encore servie par `apt`.
+Mise à jour de lecture : **28 septembre 2026**, version publiée **1.16.1**.
 
 Ce document est la carte du projet : ce qui est fait, ce qui reste, et pourquoi.
 Les estimations d'effort des lignes anciennes n'ont pas été refaites.
@@ -146,7 +145,7 @@ Voir `usr/share/codebyr/relais_notifications.py`.
 | | Chantier | Pourquoi | Effort |
 |---|---|---|---|
 | ✅ | **CI réparée — 27/09/2026** | Rouge du 13 au 27 septembre, sans que rien n'arrête les publications. Quatre causes, dont une que l'échec de ruff masquait : un import inutile (ruff) ; un test d'intégration qui attendait du filtre réseau ce que le correctif 1.12.0 lui interdit — joindre la boucle locale ; les réglages `net.core.bpf_jit_*`, invisibles hors de l'espace de noms réseau initial (conteneur) ; un test dont le nettoyage échouait sur tout compte ordinaire. Le chemin positif du filtre est désormais vérifié sans réseau (`test_filtre_reseau.py`) | S |
-| 🔵 | **Construction de l'ISO en CI — sans doute débloquée, jamais relancée** | Le workflow existe (`construire-iso.yml`, déclenchement manuel, vérification du contenu produit). Ses deux essais, le 20/08/2026, ont échoué sur `E: repository 'http://security.debian.org trixie/updates' does not have a Release`. **Le diagnostic écrit ici se trompait de prémisse** : ce n'était pas le même `live-build` qu'en local. Relu le 27/09/2026, le journal montre que ces essais tournaient directement sur le runner Ubuntu, avec le `live-build` d'Ubuntu 24.04 — `3.0~a57-1ubuntu49.1`, une branche de 2012 qui nomme encore le dépôt de sécurité à l'ancienne. Le passage au conteneur `debian:trixie` (12/09) règle précisément cela, mais le workflow n'a pas été relancé depuis : **le lancer une fois**, puis vérifier l'ISO produite | S |
+| ✅ | **Construction de l'ISO en CI — réussie le 28/09/2026** | Ses deux essais du 20/08/2026 échouaient sur `E: repository 'http://security.debian.org trixie/updates' does not have a Release` : ils tournaient sur le `live-build` d'Ubuntu 24.04 (`3.0~a57`, une branche de 2012), et non sur le même qu'en local, contrairement à ce que cette carte affirmait. Le passage au conteneur `debian:trixie` (12/09) le réglait ; relancé le 28/09/2026, le workflow produit l'ISO en 11 minutes et vérifie ce qu'elle contient. **Le facteur bus de la construction tombe** : une ISO sort d'un checkout propre, sans le poste du mainteneur. Reste : la rendre reproductible (ligne « ISO reproductibles ») | M |
 
 ---
 

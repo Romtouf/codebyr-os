@@ -14,10 +14,9 @@ installée sur machine réelle. Voir la [feuille de route](#feuille-de-route).
 
 ![Bureau Codebyr OS — vue d'ensemble GNOME, fond d'écran au Sceau, dock des applications](captures_ecran/01-bureau.png)
 
-## Où en est le projet — 27 septembre 2026
+## Où en est le projet — 28 septembre 2026
 
-Version publiée : **1.16.0**. La 1.16.1 est **en préparation** — elle n'est
-pas encore servie par `apt` : voir le [CHANGELOG](CHANGELOG.md). Le lot de
+Version publiée : **1.16.1** (voir le [CHANGELOG](CHANGELOG.md)). Le lot de
 sécurité de septembre est publié (frontières des fichiers, restauration non
 destructive, aucun repli sans isolation, réseau restreint par namespace, filtre
 d'appels système).
@@ -65,7 +64,7 @@ depuis le menu du Sceau.
   c'est ce qui empêche d'en sortir), liserés colorés par fenêtre (extension
   GNOME Shell dédiée).
 - **Un compte Unix par Espace** (1.15.0, complété en 1.16.0, par défaut
-  depuis la 1.16.1 en préparation) : un Espace tourne sous **son propre compte
+  depuis la 1.16.1) : un Espace tourne sous **son propre compte
   système**. Ses fichiers lui
   appartiennent, et le noyau vérifie cette frontière à chaque ouverture — ce
   qui s'échappe du bac à sable ne retrouve alors que cet Espace, ni les autres,
@@ -79,8 +78,8 @@ depuis le menu du Sceau.
 - **Le Blindage** : niveau d'isolation renforcé par Espace — espace de noms
   utilisateur, zéro privilège (`--cap-drop ALL`), session neuve, filtre
   d'appels système, plafonds mémoire/processus (anti fork-bomb). Actif par
-  défaut sur Banque, Navigation et Jetable — et, depuis la 1.16.1 en
-  préparation, sur Personnel et Travail ; Banque et Jetable n'ont en plus
+  défaut sur Banque, Navigation et Jetable — et, depuis la 1.16.1,
+  sur Personnel et Travail ; Banque et Jetable n'ont en plus
   aucun accès direct à la carte graphique.
 - **Jetable automatique** : menu du Sceau → « Ouvrir un lien en Jetable », ou
   `codebyr-jetable <lien|fichier>` (également disponible au clic droit dans Fichiers). Une pièce jointe douteuse s'ouvre dans une bulle
@@ -295,12 +294,12 @@ codebyros/
       machine réelle
 - [x] **Phase 5 — Diffusion** : ISO signées, canal de mise à jour `apt`,
       intégration continue des tests (qu'une publication ne peut plus
-      contourner), site en ligne — restent la construction de l'ISO en CI,
-      et surtout **des testeurs**
+      contourner) et de l'ISO, site en ligne — reste surtout : **des
+      testeurs**
 - [x] **Phase 6 — Isolation par compte** : un UID Unix par Espace, pour que la
       séparation reste vraie même si le bac à sable cède — livrée en 1.15.0 et
       1.16.0 (applications Flatpak, carte graphique) ; réglage par défaut de
-      chaque Espace dans la 1.16.1 (en préparation)
+      chaque Espace depuis la 1.16.1
 
 Le détail de tout ce qui reste — sécurité, produit, dette technique, et ce qui
 est volontairement hors périmètre — est dans

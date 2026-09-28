@@ -10,9 +10,7 @@ GNOME (menu du Sceau, liserés colorés) ne se recharge pas à chaud.
 
 ---
 
-## 1.16.1 — non publiée
-
-*En préparation : rien de ce qui suit n'est encore livré par `apt`.*
+## 1.16.1 — 28 septembre 2026
 
 **Chaque Espace a désormais son propre compte.** Le réglage « Compte séparé,
 par Espace », livré en 1.15.0 et complété en 1.16.0, devient celui de tous les

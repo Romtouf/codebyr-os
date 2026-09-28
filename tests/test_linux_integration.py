@@ -8,7 +8,6 @@ import socket
 import subprocess
 import sys
 import tempfile
-import threading
 import unittest
 from pathlib import Path
 
@@ -135,19 +134,24 @@ assert ctypes.get_errno() == errno.EPERM, ctypes.get_errno()
                                   capture_output=True, text=True, timeout=10)
         self.assertEqual(resultat.returncode, 0, resultat.stderr)
 
-    def test_namespace_refuse_direct_et_autorise_uniquement_proxy(self):
+    def test_namespace_sans_sortie_directe_et_bouclage_refuse_par_le_filtre(self):
+        """L'Espace n'a que le filtre ; le filtre ne le mène pas à cette machine.
+
+        Le témoin écoute sur la boucle locale et figure dans la liste
+        blanche. Jusqu'en 1.11, ce test attendait que le filtre l'atteigne.
+        Depuis 1.12.0, c'est précisément ce qu'il doit refuser : un domaine
+        autorisé qui mène à la machine ou au réseau local ne doit jamais
+        devenir un passage. L'ancien test contredisait ce correctif, et la CI
+        est restée rouge du 13 au 27 septembre sans que personne ne le lise.
+
+        Le chemin positif — un site public autorisé est bien relayé — est
+        vérifié sans réseau dans test_filtre_reseau.py.
+        """
         proxy = charger("codebyr-net-proxy")
         with tempfile.TemporaryDirectory() as tmp, socket.socket() as temoin:
             temoin.bind(("127.0.0.1", 0))
             temoin.listen(1)
             port = temoin.getsockname()[1]
-
-            def repondre():
-                connexion, _ = temoin.accept()
-                with connexion:
-                    connexion.sendall(b"TEMOIN")
-
-            threading.Thread(target=repondre, daemon=True).start()
             chemin = str(Path(tmp) / "proxy")
             with socket.socket(socket.AF_UNIX) as serveur:
                 serveur.bind(chemin)
@@ -166,10 +170,13 @@ with socket.create_connection(("127.0.0.1",17890),timeout=3) as s:
  assert b"403" in s.recv(4096)
 with socket.create_connection(("127.0.0.1",17890),timeout=3) as s:
  s.sendall(b"CONNECT 127.0.0.1:%d HTTP/1.1\\r\\n\\r\\n")
- data=s.recv(4096)
- assert b"200" in data
- if b"TEMOIN" not in data: data += s.recv(4096)
- assert b"TEMOIN" in data
+ data=b""
+ while True:
+  morceau=s.recv(4096)
+  if not morceau: break
+  data+=morceau
+ assert b"403" in data, data[:80]
+ assert "réseau local".encode() in data, "refus sans l'explication du réseau local"
 ''' % (port, port)
                     cmd = ["/usr/bin/python3", "/usr/share/codebyr/relais_reseau.py",
                            "/run/codebyr-proxy", "17890", "--", "/usr/bin/python3", "-c", sonde]
@@ -182,6 +189,11 @@ with socket.create_connection(("127.0.0.1",17890),timeout=3) as s:
                 finally:
                     filtre.terminate()
                     filtre.wait(timeout=5)
+            # Ni la sonde ni le filtre n'ont joint le témoin : une connexion
+            # établie attendrait ici, dans la file d'écoute.
+            temoin.settimeout(0.3)
+            with self.assertRaises(socket.timeout, msg="le témoin a été joint"):
+                temoin.accept()[0].close()
         self.assertFalse(proxy.autorise("interdit.test", ["127.0.0.1"]))
 
     def test_jetable_sans_interface_externe(self):

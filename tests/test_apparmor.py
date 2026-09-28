@@ -95,6 +95,7 @@ class CeQueLeFiltrePeutFaire(unittest.TestCase):
             "owner /dev/pts/[0-9]* rw,",
         ])
 
+    @unittest.skipUnless(os.name == "posix", "chemins Linux, comparés tels quels au profil")
     def test_le_chemin_du_journal_suit_la_convention_de_codebyr_space(self):
         space = charger("codebyr-space")
         chemin = space.journal_refus("banque")

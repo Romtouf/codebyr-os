@@ -246,9 +246,16 @@ class DossiersSeulementTraverses(unittest.TestCase):
                 # Sans root : on se retire à soi-même la lecture du dossier
                 # intermédiaire, ce qui reproduit la même situation.
                 os.chmod(proprietaire, 0o311)
-                self.addCleanup(os.chmod, proprietaire, 0o755)
-            r = subprocess.run([sys.executable, "-B", "-c", _TRAVERSEE, t, outils.LIB],
-                               capture_output=True, text=True, timeout=30, **options)
+            try:
+                r = subprocess.run([sys.executable, "-B", "-c", _TRAVERSEE, t, outils.LIB],
+                                   capture_output=True, text=True, timeout=30, **options)
+            finally:
+                # Rendue AVANT la sortie du « with » : le dossier temporaire a
+                # besoin de ce droit pour s'effacer. Un addCleanup passait
+                # après lui, sur un chemin déjà effacé — le test finissait en
+                # erreur sur tout compte ordinaire, donc sur le runner de CI.
+                if os.geteuid() != 0:
+                    os.chmod(proprietaire, 0o755)
             self.assertIn("ECRIT", r.stdout, r.stderr)
             self.assertIn("LIEN-REFUSE", r.stdout,
                           "O_PATH ne doit pas faire suivre un lien symbolique")

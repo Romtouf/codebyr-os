@@ -154,7 +154,6 @@ def simuler(hexa, vision):
 
 
 def _lab(rgb_encode):
-    import math
     r, g, b = [_lineaire(c) for c in rgb_encode]
     x = (0.4124 * r + 0.3576 * g + 0.1805 * b) / 0.95047
     y = 0.2126 * r + 0.7152 * g + 0.0722 * b

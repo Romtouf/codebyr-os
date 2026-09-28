@@ -396,10 +396,20 @@ class ReglagesNoyau(unittest.TestCase):
         # Une faute de frappe dans un nom de réglage ne produit aucune erreur au
         # démarrage : la protection manque, simplement. Seul legacy_tiocsti a
         # le droit d'être inconnu (noyaux antérieurs à 6.2, d'où son « - »).
+        #
+        # Les réglages « net.core.bpf_jit_* » n'existent que dans l'espace de
+        # noms réseau INITIAL : un conteneur — celui de la CI — ne les voit
+        # pas, et ce test y échouait depuis leur ajout. On ne les ignore que
+        # si leur famille entière manque (bpf_jit_enable compris) : une faute
+        # de frappe dans leur nom échoue toujours sur une machine ordinaire.
+        famille_bpf_visible = os.path.exists("/proc/sys/net/core/bpf_jit_enable")
         for cle in self.ATTENDUS:
             if cle == "dev.tty.legacy_tiocsti":
                 continue
-            self.assertTrue(os.path.exists("/proc/sys/" + cle.replace(".", "/")), cle)
+            if cle.startswith("net.core.bpf_jit_") and not famille_bpf_visible:
+                continue
+            with self.subTest(cle=cle):
+                self.assertTrue(os.path.exists("/proc/sys/" + cle.replace(".", "/")), cle)
 
 
 if __name__ == "__main__":

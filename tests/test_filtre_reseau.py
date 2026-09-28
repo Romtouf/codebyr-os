@@ -6,6 +6,7 @@ import tempfile
 import threading
 import time
 import unittest
+from unittest import mock
 
 from outils import charger
 
@@ -142,6 +143,70 @@ class SocketHeritee(unittest.TestCase):
         c.close()
         srv.close()
         self.assertIn("403", reponse.splitlines()[0])
+
+
+class LeRelaisAutorise(unittest.TestCase):
+    """Un site autorisé ET public est bien relayé, en HTTP comme en SOCKS5.
+
+    Les autres tests vérifient ce que le filtre REFUSE. Celui-ci vérifie qu'il
+    laisse passer ce qu'il doit : un filtre qui refuserait tout passerait les
+    autres sans broncher, et l'Espace Banque ne joindrait plus la banque.
+
+    Un « site public » sans réseau : le témoin écoute sur la boucle locale, et
+    l'on déclare son adresse publique dans ce processus seulement — le filtre
+    réel la refuse, et c'est vérifié dans test_linux_integration.py.
+    """
+
+    def setUp(self):
+        self.temoin = socket.socket()
+        self.temoin.bind(("127.0.0.1", 0))
+        self.temoin.listen(1)
+        self.addCleanup(self.temoin.close)
+        self.port = self.temoin.getsockname()[1]
+
+        def repondre():
+            connexion, _ = self.temoin.accept()
+            with connexion:
+                connexion.sendall(b"TEMOIN")
+
+        threading.Thread(target=repondre, daemon=True).start()
+        patch = mock.patch.object(proxy, "adresse_interne", return_value=False)
+        patch.start()
+        self.addCleanup(patch.stop)
+
+    def _servir(self):
+        client, filtre = socket.socketpair()
+        self.addCleanup(client.close)
+        client.settimeout(5)
+        threading.Thread(target=proxy.gerer, args=(filtre, ["127.0.0.1"]),
+                         daemon=True).start()
+        return client
+
+    def _lire_jusqua(self, client, attendu):
+        recu = b""
+        while attendu not in recu:
+            morceau = client.recv(4096)
+            if not morceau:
+                break
+            recu += morceau
+        return recu
+
+    def test_connect_http_ouvre_le_tunnel(self):
+        client = self._servir()
+        client.sendall(b"CONNECT 127.0.0.1:%d HTTP/1.1\r\n\r\n" % self.port)
+        recu = self._lire_jusqua(client, b"TEMOIN")
+        self.assertTrue(recu.startswith(b"HTTP/1.1 200"), recu[:40])
+        self.assertIn(b"TEMOIN", recu)
+
+    def test_connect_socks5_ouvre_le_tunnel(self):
+        client = self._servir()
+        client.sendall(bytes([5, 1, 0]))
+        self.assertEqual(self._lire_jusqua(client, bytes([5, 0]))[:2], bytes([5, 0]))
+        nom = b"127.0.0.1"
+        client.sendall(bytes([5, 1, 0, 3, len(nom)]) + nom + self.port.to_bytes(2, "big"))
+        recu = self._lire_jusqua(client, b"TEMOIN")
+        self.assertEqual(recu[1], proxy.SOCKS_OK, recu[:10])
+        self.assertIn(b"TEMOIN", recu)
 
 
 class Socks5(unittest.TestCase):

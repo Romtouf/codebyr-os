@@ -1,0 +1,39 @@
+#!/bin/sh
+# Codebyr OS — après retrait de codebyr-tools.
+set -e
+
+# Rendre à base-files l'identité du système détournée par le preinst : sans
+# Codebyr, la machine redevient Debian, et le dit.
+#
+# « abort-upgrade » : une mise à jour annulée depuis une version antérieure à
+# la déviation doit la retirer aussi, sinon elle resterait sans propriétaire.
+#
+# La déviation est retirée SANS déplacement (« --no-rename », comme dans le
+# preinst) : on remet d'abord en place la copie de base-files, pour que
+# /usr/lib/os-release ne manque à aucun moment. Une déviation posée par une
+# version plus ancienne, qui déplaçait le fichier, se défait de la même façon :
+# sa copie est au même endroit.
+DEBIAN_OS_RELEASE=/usr/lib/os-release.debian
+retirer_la_deviation() {
+	[ "$(dpkg-divert --listpackage /usr/lib/os-release)" = "codebyr-tools" ] || return 0
+	if [ -e "$DEBIAN_OS_RELEASE" ]; then
+		cp -a "$DEBIAN_OS_RELEASE" /usr/lib/os-release.codebyr-retour
+		mv -f /usr/lib/os-release.codebyr-retour /usr/lib/os-release
+	fi
+	dpkg-divert --package codebyr-tools --remove --no-rename \
+		--divert "$DEBIAN_OS_RELEASE" /usr/lib/os-release >/dev/null
+	rm -f "$DEBIAN_OS_RELEASE"
+}
+
+case "$1" in
+	remove|abort-install|disappear)
+		retirer_la_deviation
+		;;
+	abort-upgrade)
+		if dpkg --compare-versions "$2" lt 1.16.1; then
+			retirer_la_deviation
+		fi
+		;;
+esac
+
+exit 0

@@ -265,6 +265,40 @@ class Paquet(unittest.TestCase):
         self.assertEqual(parasites, [], "caches Python à supprimer : %s" % parasites)
 
 
+class LeReglageAptDeConstruction(unittest.TestCase):
+    """Le réglage qui fait insister apt sert à CONSTRUIRE l'image, pas aux machines.
+
+    Resté sur les machines installées, il faisait attendre apt jusqu'à 40
+    minutes devant un dépôt injoignable. Le 28/09/2026, le serveur du projet
+    coupé par une panne de courant, une installation a échoué ainsi.
+    """
+
+    RESILIENT = os.path.join(RACINE, "live-build", "config", "includes.chroot_before_packages",
+                             "etc", "apt", "apt.conf.d", "99codebyr-resilient.conf")
+
+    def _lire(self, *morceaux):
+        with open(os.path.join(RACINE, *morceaux), encoding="utf-8") as f:
+            return f.read()
+
+    def test_il_sert_toujours_a_la_construction(self):
+        self.assertTrue(os.path.isfile(self.RESILIENT))
+
+    def test_le_dernier_hook_le_retire_de_l_image(self):
+        hook = self._lire("live-build", "config", "hooks", "normal", "1000-canal-maj.hook.chroot")
+        self.assertIn("rm -f /etc/apt/apt.conf.d/99codebyr-resilient.conf", hook)
+
+    def test_les_machines_installees_le_perdent_a_la_mise_a_jour(self):
+        durcir = self._lire("live-build", "config", "includes.chroot_after_packages",
+                            "usr", "bin", "codebyr-durcir-poste")
+        with open(self.RESILIENT, encoding="utf-8") as f:
+            entete = f.readline().rstrip("\n")
+        # L'en-tête reconnu doit être EXACTEMENT celui du fichier : sinon la
+        # suppression ne se ferait jamais, sans que rien le dise. (Le motif
+        # de grep échappe le point final.)
+        motif = "'^%s$'" % entete.replace(".", "\\.")
+        self.assertIn(motif, durcir)
+
+
 class LanceursGraphiques(unittest.TestCase):
     """Une fenêtre sans lanceur du même nom n'est rattachée à aucune application.
 
@@ -378,4 +412,11 @@ class LeServiceDesComptes(unittest.TestCase):
         with open(chemin, encoding="utf-8") as f:
             service = f.read()
         self.assertIn("Requires=codebyr-uid.socket", service)
-        self.assertNotIn("WantedBy=multi-user.target\n[", service)
+        # Ce contrôle cherchait « WantedBy=multi-user.target » suivi d'une
+        # autre section : la ligne étant la dernière du fichier, il passait
+        # toujours. Un service lancé à chaque démarrage n'en était pas moins
+        # à un « systemctl enable » près.
+        installation = [ligne.strip() for ligne in service.split("[Install]", 1)[-1].splitlines()
+                        if ligne.strip() and not ligne.lstrip().startswith("#")]
+        self.assertFalse([l for l in installation if l.startswith("WantedBy=")], installation)
+        self.assertIn("Also=codebyr-uid.socket", installation)

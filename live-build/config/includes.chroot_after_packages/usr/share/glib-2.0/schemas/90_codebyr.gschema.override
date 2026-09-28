@@ -28,6 +28,13 @@ button-layout='appmenu:minimize,maximize,close'
 [org.gnome.desktop.input-sources]
 # Clavier AZERTY (français) par défaut.
 sources=[('xkb', 'fr')]
+# Verr. Maj à la manière de Windows : il agit comme Maj sur TOUTES les touches,
+# pas seulement sur les lettres — Verr. Maj + « & » donne « 1 », + « ; » donne
+# « . ». C'est le geste de qui vient de Windows pour taper des chiffres.
+# Vaut pour la session et pour l'écran de connexion. La console et la saisie
+# de la phrase de passe du disque suivent /etc/default/keyboard (posé à
+# l'installation, voir codebyr-nettoyage-installation).
+xkb-options=['caps:shiftlock']
 
 [org.gnome.shell]
 favorite-apps=['io.codebyr.Assistant.desktop', 'firefox-esr.desktop', 'org.gnome.Nautilus.desktop', 'org.gnome.Software.desktop', 'org.gnome.Console.desktop', 'org.gnome.Settings.desktop']

@@ -46,6 +46,7 @@ for chemin in \
 	usr/share/applications/io.codebyr.Ouvrir.desktop \
 	usr/share/applications/io.codebyr.Bienvenue.desktop \
 	usr/share/icons/hicolor/scalable/apps/io.codebyr.Bienvenue.svg \
+	usr/share/glib-2.0/schemas/90_codebyr.gschema.override \
 	etc/xdg/autostart/codebyr-bienvenue.desktop \
 	etc/skel \
 	etc/codebyr/espaces.json \
@@ -73,6 +74,30 @@ done
 find "$STAGE" -type f \( -name 'codebyr-*' -o -name '*.py' -o -name '*.sh' \) \
 	-exec sed -i 's/\r$//' {} + 2>/dev/null || true
 
+# 1 ter) Identité du système. Ce paquet la détourne de base-files (voir
+#    codebyr-tools.preinst) et la génère ici, depuis SA version : c'est ainsi
+#    qu'elle suit les mises à jour. Écrite par un hook de l'image, elle restait
+#    à la version de l'ISO pour toujours, désignait un domaine qui n'existe pas
+#    (codebyr.io), et base-files l'aurait rendue à Debian à la première version
+#    mineure de Debian.
+#
+#    Les adresses sont vérifiées par tests/test_coherence.py : un domaine
+#    « codebyr » qui ne serait pas codebyr.dev y échoue.
+mkdir -p "$STAGE/usr/lib"
+cat > "$STAGE/usr/lib/os-release" <<EOF
+PRETTY_NAME="Codebyr OS $VERSION"
+NAME="Codebyr OS"
+VERSION_ID="$VERSION"
+VERSION="$VERSION"
+VERSION_CODENAME=codebyr
+ID=codebyr
+ID_LIKE=debian
+LOGO=codebyr-logo
+HOME_URL="https://os.codebyr.dev/"
+SUPPORT_URL="https://github.com/Romtouf/codebyr-os/issues/new/choose"
+BUG_REPORT_URL="https://github.com/Romtouf/codebyr-os/issues"
+EOF
+
 # 2) Droits corrects. IMPORTANT : « cp -a » depuis un checkout Windows (9p)
 #    hérite parfois de dossiers en 777 → répertoires système inscriptibles par
 #    tous = faille. On normalise : dossiers 755, scripts 755, données 644.
@@ -87,6 +112,14 @@ find "$STAGE/usr/share/codebyr" "$STAGE/usr/share/nautilus-python" \
 	-type f -exec chmod 644 {} + 2>/dev/null || true
 find "$STAGE/usr/share/gnome-shell" -type f -exec chmod 644 {} + 2>/dev/null || true
 find "$STAGE/usr/share/applications" -type f -exec chmod 644 {} + 2>/dev/null || true
+chmod 644 "$STAGE/usr/lib/os-release"
+# Réglages GNOME par défaut (dont Verr. Maj à la manière de Windows). Ils ne
+# vivaient que dans l'image : une machine installée ne recevait jamais un
+# nouveau défaut. glib les recompile seul, par son déclencheur dpkg.
+if [ -f "$STAGE/usr/share/glib-2.0/schemas/90_codebyr.gschema.override" ]; then
+	sed -i 's/\r$//' "$STAGE/usr/share/glib-2.0/schemas/90_codebyr.gschema.override"
+	chmod 644 "$STAGE/usr/share/glib-2.0/schemas/90_codebyr.gschema.override"
+fi
 # /etc/skel est recopié dans le dossier personnel de chaque nouveau compte : un
 # modèle en 0777 y arriverait exécutable et inscriptible par tous.
 find "$STAGE/etc/skel" -type f -exec chmod 644 {} + 2>/dev/null || true
@@ -115,7 +148,21 @@ TAILLE="$(du -sk "$STAGE" | cut -f1)"
 # « dpkg -i », qui n'installe jamais les recommandations.
 #
 # La leçon vaut au-delà de ce cas : une fonctionnalité qui repose sur un
-# Recommends n'est pas livrée, elle est espérée.
+# Recommends n'est pas livrée, elle est espérée. Deux autres dépendances
+# passent donc de l'espoir à la règle :
+#
+#   · acl — le service des comptes d'Espaces appelle /usr/bin/setfacl pour
+#     prêter l'affichage et la carte graphique à un Espace. Le paquet n'était
+#     présent que par ricochet (colord, libsane1) : qu'ils partent, et un
+#     Espace à compte séparé ne s'ouvrait plus ;
+#   · libnotify-bin — c'est par notify-send que codebyr-space dit POURQUOI il
+#     refuse d'ouvrir un Espace. Sans lui, le refus a lieu en silence ;
+#   · systemd-cryptsetup — c'est lui qui ouvre, une fois le système démarré,
+#     les volumes chiffrés de /etc/crypttab autres que le disque principal
+#     (que l'image de démarrage ouvre seule). Debian 13 l'a sorti dans un
+#     paquet à part, et l'image ne l'avait pas : l'espace d'échange chiffré
+#     ne s'ouvrait jamais, et chaque démarrage l'attendait 90 secondes en vain.
+#     Constaté le 28/09/2026.
 mkdir -p "$STAGE/DEBIAN"
 cat > "$STAGE/DEBIAN/control" <<EOF
 Package: codebyr-tools
@@ -123,8 +170,8 @@ Version: $VERSION
 Architecture: all
 Maintainer: Codebyr OS <romain.formationoc@gmail.com>
 Installed-Size: $TAILLE
-Depends: python3 (>= 3.12), libseccomp2, python3-gi, gir1.2-gtk-4.0, gir1.2-adw-1, bubblewrap, dbus-user-session, firefox-esr | firefox, python3-nautilus
-Recommends: flatpak, gnome-shell, libnotify-bin
+Depends: python3 (>= 3.12), libseccomp2, python3-gi, gir1.2-gtk-4.0, gir1.2-adw-1, bubblewrap, dbus-user-session, firefox-esr | firefox, python3-nautilus, acl, libnotify-bin, systemd-cryptsetup
+Recommends: flatpak, gnome-shell
 Section: admin
 Priority: optional
 Homepage: https://os.codebyr.dev
@@ -145,6 +192,11 @@ echo "/etc/codebyr/espaces.json" > "$STAGE/DEBIAN/conffiles"
 # (un \r dans un script shell le rend inexécutable).
 sed 's/\r$//' "$REPO/packaging/codebyr-tools.postinst" > "$STAGE/DEBIAN/postinst"
 chmod 755 "$STAGE/DEBIAN/postinst"
+# preinst et postrm : la déviation de l'identité du système (voir 1 ter).
+for script in preinst postrm; do
+	sed 's/\r$//' "$REPO/packaging/codebyr-tools.$script" > "$STAGE/DEBIAN/$script"
+	chmod 755 "$STAGE/DEBIAN/$script"
+done
 
 # 5) Construction (root non requis : --root-owner-group fixe les propriétaires).
 mkdir -p "$OUT"

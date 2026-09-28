@@ -14,7 +14,8 @@ def verifier_arbre(stage, racine):
                   "usr/share/nautilus-python", "etc/skel"):
         attendus += list((source / arbre).rglob("*"))
     attendus += [source / "etc/codebyr/espaces.json",
-                 source / "usr/share/applications/io.codebyr.Ouvrir.desktop"]
+                 source / "usr/share/applications/io.codebyr.Ouvrir.desktop",
+                 source / "usr/share/glib-2.0/schemas/90_codebyr.gschema.override"]
     attendus += [source / "usr/bin" / n for n in (
         "codebyr-space", "codebyr-net-proxy", "codebyr-jetable", "codebyr-config",
         "codebyr-assistant", "codebyr-bienvenue", "codebyr-verifier", "codebyr-durcir-poste")]
@@ -34,7 +35,8 @@ def verifier_arbre(stage, racine):
         if relatif.parts[:2] == ("usr", "bin") and not copie.stat().st_mode & 0o111:
             raise ValueError("Commande non exécutable : %s" % relatif)
         controles += 1
-    for nom in ("fichiers_surs.py", "filtre_syscalls.py", "relais_reseau.py"):
+    for nom in ("fichiers_surs.py", "filtre_syscalls.py", "relais_reseau.py",
+                "permissions_flatpak.py"):
         if not (stage / "usr/share/codebyr" / nom).is_file():
             raise ValueError("Module de sécurité absent : " + nom)
     print("%d fichiers conformes aux sources ; permissions vérifiées." % controles)

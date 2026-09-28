@@ -28,10 +28,30 @@ if command -v calamares >/dev/null 2>&1; then
     fi
 fi
 
+# Verr. Maj à la manière de Windows (« & » → « 1 »), pour la console et pour la
+# saisie de la phrase de passe du disque au démarrage. La session live avait déjà
+# ce réglage (90_codebyr.gschema.override) : la phrase de passe a donc été tapée
+# avec lui, et doit se retaper de même au démarrage. Posé ICI, à l'installation,
+# et JAMAIS sur une machine déjà installée : sa phrase de passe a été créée sans
+# lui, et doit continuer à se taper exactement comme à sa création.
+# Calamares vient d'écrire /etc/default/keyboard ; l'image de démarrage n'est
+# construite qu'après cette étape, et en tiendra compte.
+if [ -f /etc/default/keyboard ]; then
+    if grep -q '^XKBOPTIONS=""$' /etc/default/keyboard; then
+        sed -i 's/^XKBOPTIONS=""$/XKBOPTIONS="caps:shiftlock"/' /etc/default/keyboard
+    elif ! grep -q '^XKBOPTIONS=' /etc/default/keyboard; then
+        echo 'XKBOPTIONS="caps:shiftlock"' >> /etc/default/keyboard
+    fi
+fi
+
 # Durcissements qui ne valent QUE sur le système installé : le dossier personnel
 # créé par Calamares doit être privé (0700), sans quoi le compte Invité lirait
 # tous les fichiers de l'utilisateur — exactement ce que le mode invité promet
-# d'empêcher. Le compte invité est verrouillé au passage.
-[ -f /usr/bin/codebyr-durcir-poste ] && sh /usr/bin/codebyr-durcir-poste || true
+# d'empêcher. Le compte invité est verrouillé au passage, et l'espace d'échange
+# chiffré, que Calamares laisse inutilisable, est réparé.
+#
+# CODEBYR_INSTALLATION=1 : Calamares régénère l'image de démarrage juste après
+# cette étape (module « initramfs ») ; inutile de le faire deux fois.
+[ -f /usr/bin/codebyr-durcir-poste ] && CODEBYR_INSTALLATION=1 sh /usr/bin/codebyr-durcir-poste || true
 
 exit 0

@@ -8,22 +8,10 @@ echo "P: Codebyr — dé-branding Debian"
 VER="1.0"
 [ -r /etc/codebyr/version ] && VER="$(tr -d ' \t\r\n' < /etc/codebyr/version)"
 
-# — Identité complète (os-release : logo + version propre) —
-cat > /etc/os-release <<EOF
-PRETTY_NAME="Codebyr OS $VER"
-NAME="Codebyr OS"
-VERSION_ID="$VER"
-VERSION="$VER"
-VERSION_CODENAME=codebyr
-ID=codebyr
-ID_LIKE=debian
-LOGO=codebyr-logo
-HOME_URL="https://codebyr.io/"
-SUPPORT_URL="https://codebyr.io/aide"
-BUG_REPORT_URL="https://codebyr.io/bug"
-EOF
-# /usr/lib/os-release est lu par certains outils : on l'aligne.
-cp -f /etc/os-release /usr/lib/os-release 2>/dev/null || true
+# — Identité complète (os-release) —
+# Livrée par le paquet codebyr-tools, qui la détourne de base-files : voir
+# packaging/build-deb.sh et packaging/codebyr-tools.preinst. Le hook 1000
+# vérifie qu'elle est bien en place à la fin de la construction.
 
 # — lsb-release (lu par lsb_release, certains outils système) —
 cat > /etc/lsb-release <<EOF
@@ -34,11 +22,13 @@ DISTRIB_DESCRIPTION="Codebyr OS $VER"
 EOF
 
 # — Clavier système AZERTY (console + défaut X/Wayland) —
+# « caps:shiftlock » : Verr. Maj à la manière de Windows (« & » → « 1 »), comme
+# dans la session GNOME (90_codebyr.gschema.override).
 cat > /etc/default/keyboard <<'EOF'
 XKBMODEL="pc105"
 XKBLAYOUT="fr"
 XKBVARIANT=""
-XKBOPTIONS=""
+XKBOPTIONS="caps:shiftlock"
 BACKSPACE="guess"
 EOF
 

@@ -116,4 +116,117 @@ if id invite >/dev/null 2>&1; then
 	fi
 fi
 
+# ── 3) Espace d'échange chiffré : la ligne que l'installeur laisse à moitié ──
+# Constaté le 28/09/2026 sur une installation neuve de la 1.16.0 ; vrai de toute
+# installation chiffrée avec espace d'échange depuis la 1.13.0.
+#
+# Calamares chiffre l'espace d'échange à part, et prévoit de l'ouvrir avec un
+# fichier de clé rangé sur le disque principal (« keyscript=/bin/cat »). Ce
+# fichier n'est pas créé quand /boot est séparé et en clair — le choix de
+# Codebyr, voir partition.conf. Restait une ligne « none … keyscript=/bin/cat »,
+# et une zone de reprise « resume=… » sur la ligne du noyau : à chaque démarrage,
+# l'image de démarrage tentait d'ouvrir l'espace d'échange, échouait deux fois
+# avec un message qui fait croire à une phrase de passe refusée, puis
+# continuait SANS espace d'échange.
+#
+# La réparation est la méthode ordinaire de Debian : une clé tirée au hasard à
+# chaque démarrage. Rien à stocker ni à taper, et le contenu de l'espace
+# d'échange devient illisible dès l'extinction. Le prix : pas de mise en veille
+# prolongée — elle ne fonctionnait pas davantage, et GNOME ne la propose pas.
+#
+# Le disque principal n'est JAMAIS touché. Une partition n'est réparée que si
+# elle remplit toutes ces conditions : sa ligne porte la signature exacte du
+# défaut, elle est chiffrée (LUKS), /etc/fstab l'utilise comme espace
+# d'échange, et rien d'autre ne la tient ouverte. Elle est ensuite désignée par
+# son identifiant de PARTITION : son identifiant LUKS disparaîtra au premier
+# démarrage, quand elle sera reformatée en espace d'échange.
+#
+# CODEBYR_INSTALLATION=1 (posé par codebyr-nettoyage-installation) : Calamares
+# régénère lui-même l'image de démarrage juste après ; on ne le fait pas deux
+# fois. GRUB, lui, a déjà été configuré : on le régénère dans tous les cas.
+
+# Vrai si la partition est tenue ouverte sous un AUTRE nom que le sien.
+# Pendant l'installation, Calamares la tient ouverte sous son propre nom.
+tenue_ailleurs() {
+	for tenant in /sys/class/block/"$(basename "$1")"/holders/*; do
+		[ -e "$tenant" ] || continue
+		[ "$(cat "$tenant/dm/name" 2>/dev/null || true)" = "$2" ] || return 0
+	done
+	return 1
+}
+
+a_reparer=""
+if [ -f /etc/crypttab ]; then
+	while read -r nom source cle options _reste; do
+		case "$nom" in ''|'#'*) continue ;; esac
+		[ "$cle" = "none" ] || continue
+		case ",$options," in *,keyscript=/bin/cat,*) ;; *) continue ;; esac
+		case "$source" in UUID=?*) uuid="${source#UUID=}" ;; *) continue ;; esac
+		partition="$(blkid -U "$uuid" 2>/dev/null || true)"
+		[ -n "$partition" ] || continue
+		[ "$(blkid -s TYPE -o value "$partition" 2>/dev/null || true)" = "crypto_LUKS" ] || continue
+		awk -v d="/dev/mapper/$nom" '$1 == d && $3 == "swap" { t = 1 } END { exit !t }' \
+			/etc/fstab 2>/dev/null || continue
+		if tenue_ailleurs "$partition" "$nom"; then continue; fi
+		partuuid="$(blkid -s PARTUUID -o value "$partition" 2>/dev/null || true)"
+		[ -n "$partuuid" ] || continue
+		a_reparer="$a_reparer $nom|$partuuid|$partition"
+	done < /etc/crypttab
+fi
+
+for triplet in $a_reparer; do
+	nom="${triplet%%|*}"
+	reste="${triplet#*|}"
+	partuuid="${reste%%|*}"
+	partition="${reste#*|}"
+	[ -e /etc/crypttab.avant-codebyr ] || cp -a /etc/crypttab /etc/crypttab.avant-codebyr 2>/dev/null || true
+	awk -v n="$nom" -v p="$partuuid" '
+		$1 == n { print n " PARTUUID=" p " /dev/urandom plain,cipher=aes-xts-plain64,size=512,swap,discard"; next }
+		{ print }
+	' /etc/crypttab > /etc/crypttab.codebyr-tmp \
+		&& mv /etc/crypttab.codebyr-tmp /etc/crypttab || { rm -f /etc/crypttab.codebyr-tmp; continue; }
+	chmod 600 /etc/crypttab 2>/dev/null || true
+	# Les en-têtes LUKS de l'ancien volume survivent à « mkswap » : l'Utilitaire
+	# de disques présenterait encore la partition comme un volume chiffré
+	# « verrouillé ». On efface ces seules signatures (-t crypto_LUKS). Aucun
+	# risque nouveau : la ligne ci-dessus la reformate à chaque démarrage.
+	# « -f » : pendant l'installation, Calamares la tient encore ouverte ; le
+	# volume ouvert garde sa clé en mémoire, l'effacement ne le trouble pas.
+	wipefs -q -a -f -t crypto_LUKS "$partition" >/dev/null 2>&1 || true
+	if [ -f /etc/default/grub ] && grep -q "resume=/dev/mapper/$nom" /etc/default/grub; then
+		[ -e /etc/default/grub.avant-codebyr ] || cp -a /etc/default/grub /etc/default/grub.avant-codebyr 2>/dev/null || true
+		sed -i -e "s| resume=/dev/mapper/$nom||g" -e "s|resume=/dev/mapper/$nom ||g" \
+			-e "s|resume=/dev/mapper/$nom||g" /etc/default/grub 2>/dev/null || true
+	fi
+	if [ ! -e /etc/initramfs-tools/conf.d/resume ] \
+			|| grep -q "$nom" /etc/initramfs-tools/conf.d/resume 2>/dev/null; then
+		mkdir -p /etc/initramfs-tools/conf.d 2>/dev/null || true
+		echo "RESUME=none" > /etc/initramfs-tools/conf.d/resume 2>/dev/null || true
+	fi
+	echo "codebyr : espace d'échange « $nom » réparé (clé aléatoire à chaque démarrage)."
+done
+
+if [ -n "$a_reparer" ]; then
+	if command -v update-grub >/dev/null 2>&1; then
+		update-grub >/dev/null 2>&1 \
+			|| echo "codebyr : update-grub a échoué — relancez-le à la main." >&2
+	fi
+	if [ "${CODEBYR_INSTALLATION:-0}" != "1" ] && command -v update-initramfs >/dev/null 2>&1; then
+		update-initramfs -u -k all >/dev/null 2>&1 \
+			|| echo "codebyr : update-initramfs a échoué — relancez-le à la main." >&2
+	fi
+fi
+
+# ── 4) Le réglage APT de la construction, resté sur les machines ────────────
+# Voir le hook 1000 : ce fichier servait à construire l'image, et s'y trouvait
+# encore. Un dépôt injoignable bloquait alors apt jusqu'à 40 minutes. On ne le
+# retire que s'il porte bien son en-tête : un fichier du même nom écrit par
+# l'administrateur de la machine n'est pas le nôtre.
+RESILIENT=/etc/apt/apt.conf.d/99codebyr-resilient.conf
+if [ -f "$RESILIENT" ] \
+		&& head -n 1 "$RESILIENT" | grep -q '^// Codebyr OS — APT résilient pendant la construction\.$'; then
+	rm -f "$RESILIENT" \
+		&& echo "codebyr : réglage APT de construction retiré (délais d'apt ordinaires)."
+fi
+
 exit 0

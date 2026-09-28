@@ -26,7 +26,17 @@ else
 	echo "P: Codebyr — paquet codebyr-tools non embarqué, MAJ auto indisponibles." >&2
 fi
 
-# 1 bis) Socket du service des comptes d'Espaces.
+# 1 bis) Identité du système. Elle est livrée par le paquet (voir
+# packaging/build-deb.sh), plus par les hooks de branding : on vérifie donc
+# ici, après son installation, qu'elle est bien en place. Une image qui se
+# présenterait comme Debian partirait sans que personne ne le remarque.
+if ! grep -q '^ID=codebyr$' /etc/os-release 2>/dev/null; then
+	echo "E: Codebyr — /etc/os-release ne désigne pas Codebyr OS (paquet codebyr-tools absent ?)." >&2
+	exit 1
+fi
+echo "P: Codebyr — identité du système : $(. /etc/os-release && echo "$PRETTY_NAME")."
+
+# 1 ter) Socket du service des comptes d'Espaces.
 #
 # Le postinst du paquet l'active — mais il se garde derrière
 # « [ -d /run/systemd/system ] », faux dans un chroot de construction. Sur une
@@ -62,3 +72,16 @@ SRC
 else
 	echo "P: Codebyr — clé publique absente, canal MAJ non activé." >&2
 fi
+
+# 3) Le réglage APT « résilient » de la CONSTRUCTION ne part pas dans l'image.
+#
+# Il fait insister apt (20 nouvelles tentatives de 2 minutes) parce que le
+# réseau de construction coupe par moments. Posé par includes.chroot_before_
+# packages, il restait sur chaque machine installée : un dépôt injoignable y
+# bloquait apt jusqu'à 40 minutes au lieu de quelques secondes. Constaté le
+# 28/09/2026 : le serveur du projet coupé par une panne de courant, une
+# installation a échoué sur le délai de 10 minutes de l'installeur.
+#
+# Ce hook passe en dernier : plus aucune installation de paquet ne suit.
+rm -f /etc/apt/apt.conf.d/99codebyr-resilient.conf
+echo "P: Codebyr — réglage APT de construction retiré de l'image."

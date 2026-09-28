@@ -108,6 +108,44 @@ class ClavierAuDeverrouillage(unittest.TestCase):
         self.assertIn('XKBLAYOUT="fr"', hook)
 
 
+class VerrMajALaWindows(unittest.TestCase):
+    """Verr. Maj agit comme Maj sur toutes les touches (« & » → « 1 »).
+
+    Il gouverne aussi la saisie de la phrase de passe du disque au démarrage :
+    elle doit s'y taper comme à sa création. D'où deux règles.
+    """
+
+    def test_la_session_et_l_ecran_de_connexion_l_ont(self):
+        reglages = _lire(os.path.join(RACINE, "live-build", "config",
+                                      "includes.chroot_after_packages", "usr", "share",
+                                      "glib-2.0", "schemas", "90_codebyr.gschema.override"))
+        self.assertIn("xkb-options=['caps:shiftlock']", reglages)
+        # Livré par le paquet : sinon les machines installées ne le reçoivent jamais.
+        self.assertIn("usr/share/glib-2.0/schemas/90_codebyr.gschema.override",
+                      _lire(os.path.join(RACINE, "packaging", "build-deb.sh")))
+
+    def test_l_installation_le_pose_pour_le_demarrage(self):
+        # La session live l'a : la phrase de passe est tapée avec lui à
+        # l'installation, et doit se retaper de même au démarrage.
+        nettoyage = _lire(os.path.join(RACINE, "live-build", "config",
+                                       "includes.chroot_after_packages", "usr", "bin",
+                                       "codebyr-nettoyage-installation"))
+        self.assertIn('XKBOPTIONS="caps:shiftlock"', nettoyage)
+        self.assertIn('XKBOPTIONS="caps:shiftlock"', _lire(os.path.join(
+            RACINE, "live-build", "config", "hooks", "normal", "0500-debrand.hook.chroot")))
+
+    def test_jamais_sur_une_machine_deja_installee(self):
+        # Sa phrase de passe a été créée SANS ce réglage : la saisie au
+        # démarrage ne doit pas changer sous elle. Le postinst passe par
+        # codebyr-durcir-poste, qui ne doit donc jamais y toucher.
+        durcir = _lire(os.path.join(RACINE, "live-build", "config",
+                                    "includes.chroot_after_packages", "usr", "bin",
+                                    "codebyr-durcir-poste"))
+        self.assertNotIn("XKBOPTIONS", durcir)
+        self.assertNotIn("XKBOPTIONS", _lire(os.path.join(RACINE, "packaging",
+                                                           "codebyr-tools.postinst")))
+
+
 class AmorcageCompatible(unittest.TestCase):
 
     def test_la_racine_chiffree_est_reconnue_quel_que_soit_boot(self):

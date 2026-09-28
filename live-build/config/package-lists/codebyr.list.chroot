@@ -19,6 +19,17 @@ libnotify-bin
 # Phase 2 — isolation des Espaces (bubblewrap)
 bubblewrap
 
+# setfacl : le service des comptes d'Espaces prête l'affichage et la carte
+# graphique à un Espace par un droit nominatif. Présent jusqu'ici par ricochet
+# (colord, libsane1) — dépendance du paquet codebyr-tools depuis la 1.16.1.
+acl
+
+# Ouvre, une fois le système démarré, les volumes chiffrés de /etc/crypttab
+# autres que le disque principal — l'espace d'échange. Sorti de systemd dans
+# un paquet à part par Debian 13 ; absent, l'espace d'échange ne s'ouvrait
+# jamais et chaque démarrage l'attendait 90 secondes (constaté le 28/09/2026).
+systemd-cryptsetup
+
 # Bus de session PRIVÉ par Espace (dbus-run-session). Load-bearing pour la
 # sécurité : le bus de session de l'hôte n'est plus exposé au bac à sable, ce
 # bus privé est donc le seul que voit l'application. Listé explicitement car

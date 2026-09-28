@@ -8,6 +8,21 @@ case "$1" in
 		for f in /usr/bin/codebyr-*; do
 			[ -f "$f" ] && chmod 755 "$f" || true
 		done
+
+		# Identité du système : /etc/os-release doit désigner la copie livrée
+		# par ce paquet (voir le preinst). Les images jusqu'à la 1.16.0 en
+		# faisaient un fichier ordinaire, figé à la version de l'ISO et à un
+		# domaine qui n'existe pas (codebyr.io) — et c'est lui que les outils
+		# lisent en premier. On rétablit le lien que Debian livre, à la seule
+		# condition que la copie Codebyr soit bien là.
+		#
+		# Écrit à côté puis déplacé : rename() remplace le fichier d'un coup,
+		# jamais un instant sans identité.
+		if [ ! -L /etc/os-release ] && grep -q '^ID=codebyr$' /usr/lib/os-release 2>/dev/null; then
+			rm -f /etc/os-release.codebyr-neuf
+			ln -s ../usr/lib/os-release /etc/os-release.codebyr-neuf
+			mv -f /etc/os-release.codebyr-neuf /etc/os-release
+		fi
 		# L'extension GNOME est déjà activable par l'utilisateur ; on ne force
 		# rien ici (pas de session graphique garantie pendant apt). Un
 		# rechargement de l'extension nécessite une reconnexion — signalé au
@@ -81,8 +96,10 @@ case "$1" in
 
 		# Service des comptes d'Espaces. La socket est activée dès
 		# l'installation, mais RIEN ne tourne tant qu'aucun Espace ne demande
-		# un compte dédié : le service démarre à la première connexion, et
-		# aucun Espace livré ne le demande.
+		# un compte dédié : le service démarre à la première connexion, et se
+		# rendort quand plus aucun Espace n'est ouvert. Depuis la 1.16.1,
+		# chaque Espace livré le demande : sans cette socket, aucun ne
+		# s'ouvrirait.
 		#
 		# L'activer maintenant plutôt qu'au premier besoin évite le pire des
 		# messages : « cet Espace ne s'ouvre pas, redémarrez ».

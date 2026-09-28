@@ -16,20 +16,10 @@ else
 fi
 
 # — Identité du système (/etc/os-release) —
-# On remplace le lien symbolique par un vrai fichier pour qu'il prime.
-rm -f /etc/os-release
-cat > /etc/os-release <<EOF
-PRETTY_NAME="Codebyr OS $VER"
-NAME="Codebyr OS"
-VERSION_ID="$VER"
-VERSION="$VER"
-VERSION_CODENAME=trixie
-ID=codebyr
-ID_LIKE=debian
-HOME_URL="https://codebyr.io/"
-SUPPORT_URL="https://codebyr.io/aide"
-BUG_REPORT_URL="https://codebyr.io/bug"
-EOF
+# Plus écrite ici : elle est livrée par le paquet codebyr-tools (installé par
+# le hook 1000), qui la détourne de base-files. Écrite par un hook, elle était
+# figée à la version de l'image et rendue à Debian à chaque version mineure
+# de Debian, quand base-files se réinstalle.
 
 # — Bannière console —
 # Guillemets volontairement absents du délimiteur : « $VER » doit être

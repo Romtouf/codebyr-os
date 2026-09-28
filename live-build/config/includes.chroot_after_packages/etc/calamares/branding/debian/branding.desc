@@ -19,11 +19,15 @@ strings:
     versionedName:       Codebyr OS 1.0
     shortVersionedName:  Codebyr 1.0
     bootloaderEntryName: Codebyr
-    productUrl:          https://codebyr.io
-    supportUrl:          https://codebyr.io
-    knownIssuesUrl:      https://codebyr.io
-    releaseNotesUrl:     https://codebyr.io
-    donateUrl:           https://codebyr.io
+    # Boutons de l'écran d'accueil (welcome.conf de calamares-settings-debian :
+    # aide, problèmes connus, notes de version). Ils désignaient codebyr.io, un
+    # domaine qui n'existe pas et que n'importe qui pouvait acheter.
+    # « donateUrl » est retiré : le projet ne collecte pas de dons, et
+    # l'écran d'accueil ne l'affiche pas.
+    productUrl:          https://os.codebyr.dev
+    supportUrl:          https://github.com/Romtouf/codebyr-os/issues/new/choose
+    knownIssuesUrl:      https://github.com/Romtouf/codebyr-os/blob/main/SECURITY.md#limites-connues-transparence
+    releaseNotesUrl:     https://github.com/Romtouf/codebyr-os/blob/main/CHANGELOG.md
 
 sidebar: widget
 navigation: widget

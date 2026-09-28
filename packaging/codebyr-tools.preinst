@@ -1,0 +1,39 @@
+#!/bin/sh
+# Codebyr OS — pré-installation de codebyr-tools.
+set -e
+
+# L'identité du système (/usr/lib/os-release, que /etc/os-release désigne)
+# appartient au paquet Debian base-files. Codebyr l'écrivait par un hook de
+# l'image : base-files se réinstalle à chaque version mineure de Debian
+# (13.5 → 13.6…), et chaque réinstallation aurait rendu « Debian GNU/Linux »
+# à toutes les machines, sans que personne ne le décide.
+#
+# On la DÉTOURNE, comme dpkg le prévoit pour ce cas : la copie de base-files
+# est rangée sous /usr/lib/os-release.debian, et celle de Codebyr, livrée par
+# ce paquet, suit ses mises à jour — version comprise. Le postrm défait tout.
+#
+# Avant l'installation des fichiers, et pas après : c'est ce qui permet à ce
+# paquet de livrer un chemin qui appartient à un autre.
+#
+# COPIER, ET NON DÉPLACER (« --no-rename ») : base-files est un paquet
+# « Essential », dont les fichiers ne doivent jamais manquer, pas même le
+# temps d'une installation. « --rename » les déplaçait, et dpkg le signalait
+# à l'écran (« dangereux, utilisez --no-rename » — constaté le 28/09/2026).
+# On range donc une COPIE, et le fichier reste en place jusqu'à ce que celui
+# de Codebyr le remplace. Seulement à la création de la déviation : ensuite,
+# /usr/lib/os-release est celui de Codebyr, et la copie de base-files est
+# tenue à jour par dpkg lui-même.
+DEBIAN_OS_RELEASE=/usr/lib/os-release.debian
+case "$1" in
+	install|upgrade)
+		if [ "$(dpkg-divert --listpackage /usr/lib/os-release)" != "codebyr-tools" ]; then
+			if [ -e /usr/lib/os-release ] && [ ! -e "$DEBIAN_OS_RELEASE" ]; then
+				cp -a /usr/lib/os-release "$DEBIAN_OS_RELEASE"
+			fi
+			dpkg-divert --package codebyr-tools --add --no-rename \
+				--divert "$DEBIAN_OS_RELEASE" /usr/lib/os-release >/dev/null
+		fi
+		;;
+esac
+
+exit 0

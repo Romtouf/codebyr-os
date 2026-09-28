@@ -13,7 +13,7 @@
 # La clé qui signe est donc l'actif le plus sensible du projet — plus que le
 # serveur, plus que le compte GitHub.
 #
-# D'où trois règles, appliquées par le script :
+# D'où ces règles, appliquées par le script :
 #   1. On signe avec une SOUS-CLÉ dédiée au dépôt (CODEBYR_APT_KEY), pas avec la
 #      clé maîtresse — celle-ci reste hors ligne. Voir docs/chaine-de-signature.md.
 #   2. Aucune phrase de passe n'est écrite dans ce fichier. gpg-agent la demande,
@@ -21,11 +21,27 @@
 #   3. Une clé sans phrase de passe fait échouer le script, sauf autorisation
 #      explicite (CODEBYR_AUTORISER_CLE_NUE=1) — un poste de développement volé
 #      ne doit pas suffire à pousser du code root chez les utilisateurs.
+#   4. On ne publie que du code commité, poussé, et validé par la CI — sauf
+#      autorisation explicite (CODEBYR_PUBLIER_SANS_CI=1).
+#   5. Un paquet d'essai (version en « ~ ») ne part jamais : unattended-upgrades
+#      l'installerait sur tout le parc.
+#   6. Le dépôt signé a une date de péremption (Valid-Until) : voir « Durée de
+#      validité » plus bas, et ce qu'elle engage.
 #
-#   ./publish-apt.sh
+#   ./publish-apt.sh               publier la version de ../VERSION
+#   ./publish-apt.sh --resigner    re-signer le dépôt déjà généré, sans rien
+#                                  y changer, pour repousser sa péremption
 #
-# Ensuite : rsync apt-repo/ vers le conteneur qui sert apt.codebyr.dev.
+# Ensuite : envoyer apt-repo/ vers le conteneur qui sert apt.codebyr.dev (la
+# commande exacte est affichée à la fin).
 set -euo pipefail
+
+MODE=publier
+case "${1:-}" in
+	"") ;;
+	--resigner) MODE=resigner ;;
+	*) echo "Usage : $0 [--resigner]" >&2; exit 2 ;;
+esac
 
 HERE="$(cd "$(dirname "$0")" && pwd)"
 REPO="${CODEBYR_REPO:-$(cd "$HERE/.." && pwd)}"
@@ -41,8 +57,36 @@ KEYID="${CODEBYR_APT_KEY:-E6FB6616EC58E15F40DA876CB1E8C803CE596E68}"
 
 command -v dpkg-scanpackages >/dev/null || {
 	echo "ERREUR : dpkg-dev requis (apt install dpkg-dev apt-utils)." >&2; exit 1; }
-ls "$DIST"/*.deb >/dev/null 2>&1 || {
-	echo "ERREUR : aucun .deb dans $DIST — lancez d'abord ./build-deb.sh." >&2; exit 1; }
+command -v apt-ftparchive >/dev/null || {
+	echo "ERREUR : apt-utils requis (apt install apt-utils)." >&2; exit 1; }
+if [ "$MODE" = publier ]; then
+	ls "$DIST"/*.deb >/dev/null 2>&1 || {
+		echo "ERREUR : aucun .deb dans $DIST — lancez d'abord ./build-deb.sh." >&2; exit 1; }
+	for outil in git curl python3; do
+		command -v "$outil" >/dev/null || {
+			echo "ERREUR : $outil requis pour vérifier la CI avant de publier." >&2; exit 1; }
+	done
+else
+	[ -f "$REPODIR/Packages" ] || {
+		echo "ERREUR : aucun dépôt à re-signer dans $REPODIR — publiez d'abord." >&2; exit 1; }
+fi
+
+# ── Durée de validité ────────────────────────────────────────────────────────
+#
+# Sans date de péremption, un Release signé reste valable pour toujours. Qui
+# tient le serveur — ou une copie en cache — peut alors servir indéfiniment un
+# ANCIEN dépôt, parfaitement signé : le parc ne reçoit plus aucun correctif,
+# et rien ne le signale (l'« attaque par gel »). Avec Valid-Until, apt refuse
+# un dépôt périmé, et le dit.
+#
+# CE QUE CELA ENGAGE : republier, ou re-signer (--resigner), AVANT l'échéance.
+# Faute de quoi « apt update » affiche une erreur pour ce dépôt sur toutes les
+# machines, et les outils Codebyr cessent de se mettre à jour — celles de
+# Debian continuent. 0 désactive la péremption (et la protection avec elle).
+VALIDITE_JOURS="${CODEBYR_VALIDITE_JOURS:-90}"
+case "$VALIDITE_JOURS" in
+	''|*[!0-9]*) echo "ERREUR : CODEBYR_VALIDITE_JOURS doit être un nombre de jours." >&2; exit 1 ;;
+esac
 
 # ── Contrôles avant signature ────────────────────────────────────────────────
 echo "==> Clé de signature : $KEYID"
@@ -183,46 +227,163 @@ fi
 # l'on republie en croyant publier le code. On compare donc les dates, et on
 # refuse plutôt que d'avertir.
 VERSION_COURANTE="$(tr -d ' \t\r\n' < "$REPO/VERSION")"
-DEB_COURANT="$DIST/codebyr-tools_${VERSION_COURANTE}_all.deb"
-if [ ! -f "$DEB_COURANT" ]; then
-	echo "ERREUR : aucun paquet pour la version $VERSION_COURANTE." >&2
-	echo "         Lancez d'abord ./build-deb.sh" >&2
-	exit 1
-fi
-RECENT="$(find "$REPO/live-build/config/includes.chroot_after_packages" \
-	"$REPO/packaging/build-deb.sh" "$REPO/packaging/codebyr-tools.postinst" \
-	-newer "$DEB_COURANT" -print -quit 2>/dev/null || true)"
-if [ -n "$RECENT" ]; then
-	echo "ERREUR : le paquet $VERSION_COURANTE est plus ancien que le code." >&2
-	echo "         Modifié depuis sa construction : $RECENT" >&2
-	echo "         Vous publieriez une version périmée sous un numéro juste." >&2
-	echo "         Lancez ./build-deb.sh puis recommencez." >&2
-	exit 1
-fi
-echo "    Paquet $VERSION_COURANTE postérieur au code : OK."
 
-echo "==> Génération du dépôt dans $REPODIR"
-rm -rf "$REPODIR"
-mkdir -p "$REPODIR"
-cp "$DIST"/*.deb "$REPODIR/"
+# ── Le code publié est-il celui que la CI a validé ? ────────────────────────
+#
+# La CI dit d'elle-même : « rien ne doit partir sans passer ici ». Rien ne
+# l'imposait. Du 13 au 15 septembre 2026, quatre versions sont parties avec
+# une CI rouge — dont un test qui contredisait le correctif de sécurité de la
+# 1.12.0 — sans que personne ne la lise. Un garde-fou qu'on peut franchir sans
+# s'en apercevoir n'en est pas un : on vérifie, et l'on refuse.
+#
+# Trois conditions : le code du paquet est commité (sinon la CI n'a pas vu ce
+# qu'on publie), ce commit est sur GitHub, et le workflow « CI » y a réussi.
+verifier_la_ci() {
+	# safe.directory : le dépôt vit sur un disque Windows, et git refuse, en
+	# root, un dépôt qui ne lui appartient pas. core.fileMode : ce disque ne
+	# conserve pas les droits, qui paraîtraient tous modifiés.
+	local git=(git -c safe.directory='*' -c core.fileMode=false -C "$REPO")
+	local sha modifies reponse verdict
+	sha="$("${git[@]}" rev-parse HEAD 2>/dev/null)" || {
+		echo "ERREUR : $REPO n'est pas un dépôt git lisible." >&2; return 1; }
+	modifies="$("${git[@]}" status --porcelain -- VERSION packaging live-build 2>/dev/null)"
+	if [ -n "$modifies" ]; then
+		echo "ERREUR : du code du paquet n'est pas commité — la CI ne l'a jamais vu :" >&2
+		echo "$modifies" | sed 's/^/         /' >&2
+		return 1
+	fi
+	reponse="$(curl -fsS --max-time 20 \
+		"https://api.github.com/repos/Romtouf/codebyr-os/actions/runs?head_sha=$sha&per_page=50")" || {
+		echo "ERREUR : GitHub injoignable — l'état de la CI est inconnu." >&2; return 1; }
+	# Le plus récent passage du workflow « CI » sur CE commit fait foi.
+	verdict="$(printf '%s' "$reponse" | python3 -c '
+import json, sys
+passages = [p for p in json.load(sys.stdin).get("workflow_runs", [])
+            if p.get("path", "").endswith("/ci.yml")]
+if not passages:
+    print("absente")
+elif passages[0].get("status") != "completed":
+    print("en cours")
+else:
+    print("verte" if passages[0].get("conclusion") == "success" else "rouge")
+')"
+	case "$verdict" in
+		verte) echo "    CI verte sur ${sha:0:12} : OK." ;;
+		absente)
+			echo "ERREUR : aucune CI pour ${sha:0:12} — ce commit est-il poussé ?" >&2
+			return 1 ;;
+		*)
+			echo "ERREUR : CI $verdict sur ${sha:0:12} :" >&2
+			echo "         https://github.com/Romtouf/codebyr-os/commit/$sha" >&2
+			return 1 ;;
+	esac
+}
 
-cd "$REPODIR"
-dpkg-scanpackages --multiversion . > Packages
-gzip -9c Packages > Packages.gz
-echo "   Packages : $(grep -c '^Package:' Packages) paquet(s)"
+if [ "$MODE" = publier ]; then
+	# ── Le paquet publié est-il celui du code actuel ? ──────────────────────
+	#
+	# publish-apt.sh publie ce qui traîne dans dist/. Rien ne garantissait que
+	# ce .deb ait été construit APRÈS la dernière modification du code. Le
+	# 23/08/2026, la 1.5.0 a été publiée avec la version précédente de l'icône
+	# du panneau : le paquet datait d'avant le correctif, et personne ne pouvait
+	# le voir — le numéro de version, lui, était le bon.
+	#
+	# C'est le même piège que l'ISO périmée dans build.sh : un artefact daté
+	# que l'on republie en croyant publier le code. On compare donc les dates,
+	# et on refuse plutôt que d'avertir.
+	DEB_COURANT="$DIST/codebyr-tools_${VERSION_COURANTE}_all.deb"
+	if [ ! -f "$DEB_COURANT" ]; then
+		echo "ERREUR : aucun paquet pour la version $VERSION_COURANTE." >&2
+		echo "         Lancez d'abord ./build-deb.sh" >&2
+		exit 1
+	fi
+	RECENT="$(find "$REPO/live-build/config/includes.chroot_after_packages" \
+		"$REPO/packaging/build-deb.sh" "$REPO/packaging/codebyr-tools.postinst" \
+		"$REPO/packaging/codebyr-tools.preinst" "$REPO/packaging/codebyr-tools.postrm" \
+		-newer "$DEB_COURANT" -print -quit 2>/dev/null || true)"
+	if [ -n "$RECENT" ]; then
+		echo "ERREUR : le paquet $VERSION_COURANTE est plus ancien que le code." >&2
+		echo "         Modifié depuis sa construction : $RECENT" >&2
+		echo "         Vous publieriez une version périmée sous un numéro juste." >&2
+		echo "         Lancez ./build-deb.sh puis recommencez." >&2
+		exit 1
+	fi
+	echo "    Paquet $VERSION_COURANTE postérieur au code : OK."
+
+	if ! verifier_la_ci; then
+		# Échappatoire explicite, comme pour la clé nue : GitHub en panne, par
+		# exemple. Jamais par défaut, et toujours dit en toutes lettres.
+		[ "${CODEBYR_PUBLIER_SANS_CI:-0}" = "1" ] || exit 1
+		echo "         → publié SANS validation de la CI (CODEBYR_PUBLIER_SANS_CI=1)." >&2
+	fi
+
+	echo "==> Génération du dépôt dans $REPODIR"
+	rm -rf "$REPODIR"
+	mkdir -p "$REPODIR"
+	# Pas de « cp dist/*.deb » : dist/ reçoit aussi les paquets d'ESSAI. Une
+	# version en « ~ » (1.17.0~essai1) est plus récente que la version publiée
+	# précédente : unattended-upgrades l'installerait sur tout le parc. Et un
+	# paquet plus récent que VERSION n'a rien à faire dans cette publication.
+	vus=" "
+	for deb in "$DIST"/*.deb; do
+		nom="$(dpkg-deb -f "$deb" Package)"
+		v="$(dpkg-deb -f "$deb" Version)"
+		case "$v" in
+			*"~"*) echo "    écarté (paquet d'essai) : $(basename "$deb") — $v"; continue ;;
+		esac
+		if [ "$nom" != codebyr-tools ]; then
+			echo "ERREUR : paquet inattendu dans $DIST : $(basename "$deb") ($nom)." >&2; exit 1
+		fi
+		if dpkg --compare-versions "$v" gt "$VERSION_COURANTE"; then
+			echo "ERREUR : $(basename "$deb") ($v) est plus récent que VERSION ($VERSION_COURANTE)." >&2
+			exit 1
+		fi
+		case "$vus" in
+			*" $v "*) echo "ERREUR : deux paquets portent la version $v dans $DIST." >&2; exit 1 ;;
+		esac
+		vus="$vus$v "
+		cp "$deb" "$REPODIR/"
+	done
+
+	cd "$REPODIR"
+	dpkg-scanpackages --multiversion . > Packages
+	gzip -9c Packages > Packages.gz
+	echo "   Packages : $(grep -c '^Package:' Packages) paquet(s)"
+else
+	echo "==> Re-signature du dépôt existant (aucun paquet n'y change)"
+	cd "$REPODIR"
+fi
 
 # Release : empreintes des index, requis par apt pour la vérification.
-cat > Release <<EOF
-Origin: Codebyr OS
-Label: Codebyr OS
-Suite: stable
-Codename: codebyr
-Architectures: all
-Components: main
-Date: $(date -u '+%a, %d %b %Y %H:%M:%S UTC')
-Description: Dépôt officiel des outils Codebyr OS
-EOF
-apt-ftparchive release . >> Release
+#
+# Tout passe par apt-ftparchive, qui date lui-même le fichier. Auparavant un
+# en-tête écrit à la main portait déjà un « Date: », et apt-ftparchive en
+# ajoutait un second ; il hachait même ce Release à moitié écrit, qui se
+# retrouvait listé dans ses propres empreintes. Écrit hors du dossier, puis
+# déplacé.
+validite=()
+if [ "$VALIDITE_JOURS" -gt 0 ]; then
+	validite=(-o "APT::FTPArchive::Release::ValidTime=$(( VALIDITE_JOURS * 86400 ))")
+fi
+rm -f Release InRelease Release.gpg
+release_neuf="$(mktemp)"
+apt-ftparchive \
+	-o APT::FTPArchive::Release::Origin="Codebyr OS" \
+	-o APT::FTPArchive::Release::Label="Codebyr OS" \
+	-o APT::FTPArchive::Release::Suite=stable \
+	-o APT::FTPArchive::Release::Codename=codebyr \
+	-o APT::FTPArchive::Release::Architectures=all \
+	-o APT::FTPArchive::Release::Components=main \
+	-o APT::FTPArchive::Release::Description="Dépôt officiel des outils Codebyr OS" \
+	"${validite[@]+"${validite[@]}"}" \
+	release . > "$release_neuf"
+mv "$release_neuf" Release
+chmod 0644 Release
+if grep -q '^Valid-Until:' Release; then
+	echo "   Valable jusqu'au : $(sed -n 's/^Valid-Until: //p' Release)"
+else
+	echo "   AVERTISSEMENT : aucune date de péremption (CODEBYR_VALIDITE_JOURS=0)." >&2
+fi
 
 # Signatures : InRelease (clair-signé) + Release.gpg (détachée).
 # « ${SIGNATAIRES[@]} » porte une ou deux clés selon la disponibilité de la
@@ -257,3 +418,9 @@ echo
 echo
 echo "Déployer, depuis GIT BASH (la clé SSH n'existe que côté Windows) :"
 echo "    cd /c/Users/pcrom/codebyros/packaging/apt-repo && scp ./* vps-local:~/docker/codebyr-apt/apt-repo/"
+if grep -q '^Valid-Until:' Release; then
+	echo
+	echo "À RETENIR : ce dépôt se périme le $(sed -n 's/^Valid-Until: //p' Release)."
+	echo "Avant cette date, republiez, ou re-signez sans rien changer :"
+	echo "    ./publish-apt.sh --resigner   (puis le même envoi)"
+fi

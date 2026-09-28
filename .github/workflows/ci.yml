@@ -37,7 +37,8 @@ jobs:
           py=$(grep -rl '^#!/usr/bin/env python3' \
                 live-build/config/includes.chroot_after_packages/usr/bin/ | tr '\n' ' ')
           sh=$(find live-build packaging -type f \
-                \( -name '*.sh' -o -name '*.hook.chroot' -o -name '*.postinst' \) \
+                \( -name '*.sh' -o -name '*.hook.chroot' -o -name '*.postinst' \
+                   -o -name '*.preinst' -o -name '*.postrm' \) \
                 | tr '\n' ' ')
           sh="$sh $(grep -rl '^#!/bin/sh' \
                 live-build/config/includes.chroot_after_packages/usr/bin/ \

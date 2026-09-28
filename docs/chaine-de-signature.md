@@ -205,5 +205,11 @@ Rien à republier côté utilisateur : l'ancre de confiance est inchangée.
 - [x] Phrase de passe sur la clé de signature *(posée le 20/08/2026 ; `publish-apt.sh` le confirme au démarrage)*
 - [x] Certificat de révocation stocké hors ligne *(20/08/2026)*
 - [x] Expiration à 1 an sur la sous-clé *(20/08/2027)*
-- [ ] Empreinte publiée en plusieurs endroits indépendants (dépôt, site, réseaux)
-      pour qu'une substitution soit détectable
+- [~] Empreinte publiée en plusieurs endroits indépendants pour qu'une
+      substitution soit détectable — **dépôt et site : fait** (comparés par un
+      test) ; réseaux : avec les posts de lancement
+- [x] Date de péremption du dépôt signé *(1.16.1)* — `Valid-Until` à 90 jours,
+      contre un serveur qui servirait indéfiniment un ancien dépôt. Re-signer
+      avant l'échéance, sans rien publier : `publish-apt.sh --resigner`
+- [x] Aucune publication sans CI verte sur le commit publié *(1.16.1)* —
+      échappatoire explicite : `CODEBYR_PUBLIER_SANS_CI=1`

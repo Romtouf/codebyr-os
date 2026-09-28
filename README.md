@@ -14,17 +14,20 @@ installée sur machine réelle. Voir la [feuille de route](#feuille-de-route).
 
 ![Bureau Codebyr OS — vue d'ensemble GNOME, fond d'écran au Sceau, dock des applications](captures_ecran/01-bureau.png)
 
-## Où en est le projet — 15 septembre 2026
+## Où en est le projet — 27 septembre 2026
 
-Version publiée : **1.16.1**. Le lot de sécurité de septembre est publié
-(frontières des fichiers, restauration non destructive, aucun repli sans
-isolation, réseau restreint par namespace, filtre d'appels système).
+Version publiée : **1.16.0**. La 1.16.1 est **en préparation** — elle n'est
+pas encore servie par `apt` : voir le [CHANGELOG](CHANGELOG.md). Le lot de
+sécurité de septembre est publié (frontières des fichiers, restauration non
+destructive, aucun repli sans isolation, réseau restreint par namespace, filtre
+d'appels système).
 
-Un Espace peut désormais tourner sous **son propre compte Unix** — réglage
-« Compte séparé, par Espace », avec ses applications Flatpak et la carte
-graphique depuis la 1.16.0. Il reste **désactivé par défaut** le temps d'être
-éprouvé ailleurs que sur les machines du projet. La carte du projet, avec ce
-qui reste ouvert, est dans [docs/chantiers.md](docs/chantiers.md).
+Un Espace peut tourner sous **son propre compte Unix** — réglage « Compte
+séparé, par Espace », avec ses applications Flatpak et la carte graphique
+depuis la 1.16.0. **La 1.16.1 en fait le défaut** de chaque Espace — sauf pour
+l'invité, dont les Espaces s'effacent avec sa session — et blinde aussi
+Personnel et Travail. La carte du projet, avec ce qui reste ouvert, est dans
+[docs/chantiers.md](docs/chantiers.md).
 
 ## Le concept : les Espaces
 
@@ -61,36 +64,41 @@ depuis le menu du Sceau.
   D-Bus **privé** (celui de la session hôte n'entre jamais dans un Espace —
   c'est ce qui empêche d'en sortir), liserés colorés par fenêtre (extension
   GNOME Shell dédiée).
-- **Un compte Unix par Espace, au choix** (1.15.0, complété en 1.16.0) : un
-  Espace peut tourner sous **son propre compte système**. Ses fichiers lui
+- **Un compte Unix par Espace** (1.15.0, complété en 1.16.0, par défaut
+  depuis la 1.16.1 en préparation) : un Espace tourne sous **son propre compte
+  système**. Ses fichiers lui
   appartiennent, et le noyau vérifie cette frontière à chaque ouverture — ce
   qui s'échappe du bac à sable ne retrouve alors que cet Espace, ni les autres,
   ni votre dossier personnel. Ses données le suivent à la première ouverture et
   reviennent si vous désactivez le réglage. Les applications Flatpak s'y
   ouvrent, avec leurs propres fenêtres de fichiers, et la carte graphique y
-  fonctionne. **Désactivé par défaut** le temps d'être éprouvé ; une limite
-  connue est décrite dans [SECURITY.md](SECURITY.md).
+  fonctionne. Désactivable Espace par Espace dans « Configuration Codebyr » ;
+  jamais pour l'invité. Les limites connues — dont « Ajouter une
+  application », pas encore possible sous ce mode — sont dans
+  [SECURITY.md](SECURITY.md).
 - **Le Blindage** : niveau d'isolation renforcé par Espace — espace de noms
   utilisateur, zéro privilège (`--cap-drop ALL`), session neuve, filtre
   d'appels système, plafonds mémoire/processus (anti fork-bomb). Actif par
-  défaut sur Banque, Navigation et Jetable ; Banque et Jetable n'ont en plus
+  défaut sur Banque, Navigation et Jetable — et, depuis la 1.16.1 en
+  préparation, sur Personnel et Travail ; Banque et Jetable n'ont en plus
   aucun accès direct à la carte graphique.
 - **Jetable automatique** : menu du Sceau → « Ouvrir un lien en Jetable », ou
   `codebyr-jetable <lien|fichier>` (également disponible au clic droit dans Fichiers). Une pièce jointe douteuse s'ouvre dans une bulle
   **blindée et sans réseau** (namespace réseau
   isolé : le piège ne peut rien exfiltrer) ; un lien douteux s'ouvre dans une
   bulle **blindée** qui s'autodétruit — le réseau y reste ouvert, il est
-  nécessaire pour charger la page.
-- **Bouclier anti-hameçonnage** : le navigateur de l'Espace Banque n'atteint QUE
-  vos domaines bancaires (proxy local à liste blanche — un garde-fou contre
-  l'erreur humaine, pas une règle réseau système : voir SECURITY.md) ; dans les
-  autres Espaces, une extension Firefox alerte si un site imite l'un de vos
-  sites protégés. **À configurer au premier usage** : tant que vous n'avez pas
+  nécessaire pour charger la page ; le micro, lui, y est coupé (1.16.1).
+- **Bouclier anti-hameçonnage** : l'Espace Banque n'atteint QUE vos domaines
+  bancaires. Il n'a aucune interface réseau à lui et ne sort que par un filtre
+  à liste blanche : un programme qui tenterait de passer à côté ne trouve aucun
+  réseau (voir SECURITY.md pour ce qui reste possible). Dans les autres
+  Espaces, une extension Firefox alerte si un site imite l'un de vos sites
+  protégés. **À configurer au premier usage** : tant que vous n'avez pas
   déclaré votre banque dans « Configuration Codebyr », l'Espace Banque n'ouvre
   aucun site (il échoue fermé) et le bouclier n'a rien à surveiller.
-- **Réseau par Espace** : libre, liste blanche (appliquée au navigateur de
-  l'Espace), ou coupure totale (namespace réseau isolé, comme le Jetable
-  fichier).
+- **Réseau par Espace** : libre, liste blanche (imposée à tout l'Espace par un
+  namespace réseau, depuis la 1.11.0), ou coupure totale (namespace réseau
+  isolé, comme le Jetable fichier).
 - **Retour dans le temps** : instantanés d'un Espace (export/import), restauration
   en un clic depuis le menu du Sceau.
 - **Espace portable** : exportez un Espace complet, réimportez-le ailleurs.
@@ -286,9 +294,13 @@ codebyros/
 - [x] **Phase 4 — Installeur** : Calamares Codebyr, installation vérifiée sur
       machine réelle
 - [x] **Phase 5 — Diffusion** : ISO signées, canal de mise à jour `apt`,
-      intégration continue, site en ligne — **il ne manque que des testeurs**
-- [ ] **Phase 6 — Isolation par compte** : un UID Unix par Espace, pour que la
-      séparation reste vraie même si le bac à sable cède
+      intégration continue des tests (qu'une publication ne peut plus
+      contourner), site en ligne — restent la construction de l'ISO en CI,
+      et surtout **des testeurs**
+- [x] **Phase 6 — Isolation par compte** : un UID Unix par Espace, pour que la
+      séparation reste vraie même si le bac à sable cède — livrée en 1.15.0 et
+      1.16.0 (applications Flatpak, carte graphique) ; réglage par défaut de
+      chaque Espace dans la 1.16.1 (en préparation)
 
 Le détail de tout ce qui reste — sécurité, produit, dette technique, et ce qui
 est volontairement hors périmètre — est dans

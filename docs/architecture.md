@@ -1,7 +1,8 @@
 # Codebyr OS — Architecture technique
 
-Évolution locale non publiée : [correctifs et prototype UID, septembre 2026](securite-2026-09-12.md).
-Les états historiques ci-dessous ne valent pas validation de la dernière ISO.
+Historique : [correctifs et prototype UID du 12 septembre 2026](securite-2026-09-12.md),
+publiés depuis, de la 1.11.0 à la 1.16.0. Les états historiques ci-dessous ne
+valent pas validation de la dernière ISO.
 
 > **Comment lire ce document.** Chaque composant porte un état explicite :
 > **[implémenté]** = présent dans l'ISO et dans `codebyr-tools` aujourd'hui ;
@@ -68,13 +69,21 @@ Debian stable durcie par les hooks de construction (`0200-hardening`) :
 
 ### codebyr-space — l'orchestrateur d'Espaces  *[implémenté]*
 
-**Pas de démon.** L'orchestration est un outil en ligne de commande
-(`/usr/bin/codebyr-space`, Python, bibliothèque standard) que l'extension GNOME
-appelle directement. C'est volontaire tant que le périmètre le permet : pas de
-service privilégié à sécuriser, pas d'API D-Bus à durcir, un chemin d'exécution
-lisible de bout en bout. *[visé]* : un démon `codebyr-spaced` deviendra
-nécessaire le jour où il faudra un état partagé entre sessions ou des
-opérations privilégiées (réseau par Espace au niveau système, par exemple).
+**Un outil, et un seul service privilégié.** L'orchestration est un outil en
+ligne de commande (`/usr/bin/codebyr-space`, Python, bibliothèque standard) que
+l'extension GNOME appelle directement : pas d'API D-Bus à durcir, un chemin
+d'exécution lisible de bout en bout. Un Espace sans compte séparé s'ouvre sans
+rien qui tourne en root.
+
+**[implémenté] depuis 1.15.0, par défaut depuis 1.16.1** : le réglage « Compte
+séparé, par Espace » — celui de chaque Espace livré, sauf pour l'invité —
+demande des opérations privilégiées — créer un compte Unix, monter un tmpfs,
+prêter l'affichage et la carte graphique. Elles passent par **un** service root,
+`codebyr-uid`, démarré à la demande par sa socket, confiné par AppArmor, qui
+n'exécute aucune commande du client et ne prend aucun chemin de lui (voir
+`usr/lib/codebyr/codebyr-uid` et `usr/share/codebyr/comptes.py`). Son unité ne
+porte volontairement aucun durcissement systemd : les Espaces qu'il lance en
+hériteraient (voir le commentaire de `codebyr-uid.service`).
 
 Responsabilités :
 
@@ -84,15 +93,16 @@ Responsabilités :
 | Situation | Niveau | Pourquoi |
 |---|---|---|
 | Tout Espace | Bac à sable bubblewrap (dossier isolé, `/tmp` isolé, bus D-Bus privé) | Isolation réelle des fichiers, du réseau et des processus |
-| Espaces exposés (Banque, Navigation, Jetable) | **Blindage** : espace de noms utilisateur, `--cap-drop ALL`, session neuve, filtre d'appels système, plafonds mémoire/processus réglables par Espace | L'isolation renforcée là où le risque est maximal — le web hostile en tête |
+| Espaces exposés (Banque, Navigation, Jetable) — et, depuis 1.16.1, Personnel et Travail | **Blindage** : espace de noms utilisateur, `--cap-drop ALL`, session neuve, filtre d'appels système, plafonds mémoire/processus réglables par Espace | L'isolation renforcée là où le risque est maximal — le web hostile en tête |
 
 - Le backend est **invisible** : l'utilisateur voit « Banque », jamais un détail technique.
-- Réseau par Espace : le **navigateur** de Banque ne joint que la liste
-  d'autorisation (proxy local, résolution locale) ; une pièce jointe ouverte en
-  Jetable n'a **aucune** interface réseau ; Personnel a le réseau normal.
-  Nuance importante, détaillée dans SECURITY.md : la liste blanche s'applique au
-  navigateur, pas encore à tout l'Espace. Liste vide = **tout est bloqué**
-  (échec fermé), jamais « tout est permis ».
+- Réseau par Espace : **tout l'Espace** Banque — pas seulement son navigateur —
+  ne joint que la liste d'autorisation : il a son propre espace de noms réseau,
+  sans interface vers l'extérieur, et ne sort que par le filtre
+  (`codebyr-net-proxy`, HTTP/HTTPS/SOCKS5, confiné par AppArmor), qui refuse
+  aussi le réseau local (1.11.0, 1.12.0). Une pièce jointe ouverte en Jetable
+  n'a **aucune** interface réseau ; Personnel a le réseau normal. Liste vide =
+  **tout est bloqué** (échec fermé), jamais « tout est permis ».
 - **Le bus de session de l'hôte n'entre jamais dans un Espace.** Chaque Espace
   reçoit un bus PRIVÉ (`dbus-run-session`). Exposer le socket du bus de l'hôte,
   même en lecture seule, revenait à offrir une sortie de bac à sable : un
@@ -160,10 +170,19 @@ Extension GNOME Shell + réglages GNOME personnalisés :
 - Nuance : une application Flatpak **système** (installée pour toute la machine)
   reste partagée entre Espaces et garde son propre bac à sable Flatpak ; le
   liseré n'y est qu'indicatif. `codebyr-space` le dit à l'écran au lancement.
+- **[implémenté] 1.16.1** : dans un Espace ordinaire, une application Flatpak
+  dont les permissions la feraient sortir de l'Espace (bus de session du
+  bureau, `flatpak-spawn --host`, systemd, dconf, système de fichiers entier,
+  parties décisives du dossier personnel) est refusée avant tout lancement —
+  voir `usr/share/codebyr/permissions_flatpak.py`. Sous « Compte séparé », le
+  compte de l'Espace borne ses permissions : le contrôle n'y a pas lieu, et un
+  Espace blindé y accepte l'application en disant qu'elle a le bac à sable de
+  Flatpak, pas le Blindage (réseau restreint et Jetable la refusent toujours).
 
 ### codebyr-installer
 
-Calamares avec branding Codebyr : langue → disque (chiffrement LUKS proposé) →
+Calamares avec branding Codebyr : langue → disque (chiffrement LUKS2 coché par
+défaut depuis 1.13.0) →
 utilisateur → installation, puis nettoyage des artefacts de la session live
 (`codebyr-nettoyage-installation`) et durcissement du poste installé
 (`codebyr-durcir-poste` : dossiers personnels en 0700, compte invité sans mot de

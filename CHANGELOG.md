@@ -10,7 +10,135 @@ GNOME (menu du Sceau, liserés colorés) ne se recharge pas à chaud.
 
 ---
 
-## 1.16.1 — 15 septembre 2026
+## 1.16.1 — non publiée
+
+*En préparation : rien de ce qui suit n'est encore livré par `apt`.*
+
+**Chaque Espace a désormais son propre compte.** Le réglage « Compte séparé,
+par Espace », livré en 1.15.0 et complété en 1.16.0, devient celui de tous les
+Espaces — ceux qui sont livrés comme ceux que vous créez. Ses fichiers lui
+appartiennent : ce qui s'échapperait d'un Espace ne retrouverait que lui, ni
+les autres, ni votre dossier personnel.
+
+À la première ouverture de chaque Espace après la mise à jour, ses données
+**déménagent** vers son compte ; rien n'est effacé, et elles reviennent si vous
+désactivez le réglage pour cet Espace dans « Configuration Codebyr ». Ce que
+cela change pour vous :
+
+- les applications Flatpak que vous aviez installées **dans** un Espace sont à
+  réinstaller, dans l'Espace — la fenêtre de configuration le signale ;
+- « Ajouter une application » (un programme téléchargé, une AppImage) n'est
+  pas encore possible sous ce mode ; c'est dit à l'écran. Désactiver le compte
+  séparé pour l'Espace concerné le permet ;
+- une application Flatpak ne reçoit pas le fichier choisi dans « Ouvrir un
+  fichier » (limite déjà décrite en 1.16.0).
+
+Le terminal d'un Espace s'ouvre sous ce mode. Il « moulinait » sans jamais
+apparaître : le compte d'un Espace n'a volontairement aucun shell de connexion,
+et c'est ce shell qu'un terminal lance. Le bac à sable voit désormais un vrai
+shell pour ce compte, et lui seul ; hors du bac à sable, le compte ne peut
+toujours ouvrir aucune session.
+
+**L'invité n'a jamais de compte séparé.** Sa session s'efface à la
+déconnexion — son dossier personnel, et rien d'autre. Un Espace à compte
+séparé vit ailleurs : il aurait survécu, et l'invité suivant aurait retrouvé le
+navigateur et les fichiers du précédent. C'était déjà vrai d'un invité qui
+cochait le réglage ; ce n'est plus possible.
+
+**Personnel et Travail sont blindés à leur tour**, comme Banque, Navigation et
+Jetable : filtre d'appels système, aucun privilège, session neuve, plafonds —
+larges, comme pour Navigation, pour ne pas couper une journée de travail. Une
+application Flatpak y reste possible, sous compte séparé ; elle y a le bac à
+sable de Flatpak, pas le Blindage, et c'est dit à son ouverture. Les outils de
+débogage qui observent un autre programme (`gdb`, `strace`) n'y fonctionnent
+plus. Et, comme pour tout Espace blindé, le presse-papiers est vidé quand vous
+passez de Personnel ou Travail au bureau (hors Espace) ; d'un Espace à un
+autre, il l'était déjà.
+
+**Une application Flatpak qui sortirait de son Espace ne s'y ouvre plus.**
+Dans un Espace ordinaire, une application Flatpak ne passe pas par le bac à
+sable de Codebyr : elle a le sien, et ce sont ses propres permissions qui
+décident de ce qu'elle atteint. Certaines la font sortir de l'Espace tout
+entier — parler au bus du bureau, y lancer des programmes, voir tous vos
+fichiers. Elle portait pourtant le liseré de l'Espace, qui annonçait une
+isolation qu'elle n'avait pas.
+
+Elle est maintenant refusée, avec l'explication et les deux façons de faire :
+l'ouvrir hors des Espaces, ou activer « Compte séparé » pour cet Espace, où le
+compte de l'Espace borne ce qu'elle peut faire. Cela ne concerne que les
+Espaces sans compte séparé — désormais l'exception : ceux de l'invité, et ceux
+pour lesquels vous le désactivez. Les applications ordinaires ne sont pas
+concernées, et la plupart des applications Flatpak non plus.
+
+Au passage : une application choisie par « Autres applications… » était prise
+pour une installation de toute la machine, même installée dans l'Espace.
+
+**Le Jetable n'a plus de micro.** C'est là que s'ouvrent les liens douteux :
+une page piégée n'a pas à pouvoir écouter la pièce. Le son part avec lui — les
+deux passent par le même canal. Réglable dans « Configuration Codebyr ».
+
+**Verr. Maj fonctionne comme sous Windows.** Il agit désormais comme Maj sur
+toutes les touches, et pas seulement sur les lettres : Verr. Maj + `&` donne
+`1`, + `;` donne `.`. C'est le geste habituel pour taper des chiffres quand on
+vient de Windows. Il s'applique à votre session et à l'écran de connexion dès
+la mise à jour. Sur une nouvelle installation, il vaut aussi pour la phrase de
+passe du disque au démarrage ; sur une machine déjà installée, cette saisie-là
+ne change pas, pour que votre phrase de passe se tape toujours comme le jour où
+vous l'avez choisie.
+
+**Plus de message d'erreur au démarrage, et l'espace d'échange fonctionne
+enfin.** Sur un disque chiffré, deux messages « cryptsetup: ERROR » s'affichaient
+à chaque démarrage, même après la bonne phrase de passe — de quoi croire qu'elle
+avait été refusée. Ils concernaient l'espace d'échange, que l'installeur chiffre
+à part et prévoyait d'ouvrir avec un fichier de clé qu'il ne crée pas dans la
+configuration de Codebyr. Il ne s'ouvrait donc jamais : **aucune machine
+chiffrée n'avait d'espace d'échange** depuis la 1.13.0 — et chaque démarrage
+l'attendait 90 secondes en vain, car le programme qui ouvre ces volumes une fois
+le système lancé (`systemd-cryptsetup`, séparé de systemd par Debian 13) manquait
+à l'image.
+
+Il est désormais chiffré avec une clé tirée au hasard à chaque démarrage : rien
+à taper, et son contenu devient illisible dès l'extinction. Les machines déjà
+installées sont réparées par la mise à jour. Le prix : pas de mise en veille
+prolongée (hibernation), qui ne fonctionnait pas davantage.
+
+**Votre système garde son nom, et le bon.** Deux défauts dans le fichier qui
+porte l'identité du système (`/etc/os-release`) :
+
+- ses adresses d'aide et de signalement menaient à `codebyr.io`, un domaine
+  qui n'existe pas — et que n'importe qui aurait pu acheter pour recevoir vos
+  demandes. Elles mènent désormais au site du projet et à son dépôt. Même
+  correction dans l'installeur, qui n'affiche plus non plus de lien de dons :
+  le projet n'en collecte pas ;
+- ce fichier appartient à Debian, qui le réécrit à chaque version mineure
+  (13.5 → 13.6…) : à la prochaine, votre machine se serait présentée comme
+  « Debian GNU/Linux 13 ». Codebyr le reprend désormais par le mécanisme prévu
+  pour cela, et sa version suit les mises à jour — une machine installée depuis
+  l'ISO 1.13 s'annonçait « 1.13 » pour toujours.
+
+**Sous le capot.**
+
+- **Une version ne peut plus partir avec des tests en échec.** Du 13 au 27
+  septembre, l'intégration continue était en échec, et quatre versions sont
+  parties quand même : un test contredisait un correctif de sécurité, et
+  personne ne l'a vu. La publication vérifie désormais que le code publié est
+  commité, poussé, et validé.
+- **Le dépôt des mises à jour porte une date de péremption.** Sans elle, un
+  serveur compromis pouvait servir indéfiniment un ancien dépôt, correctement
+  signé, et priver les machines de leurs correctifs sans que rien le signale.
+- **Un paquet d'essai ne peut plus partir par erreur** chez tout le monde.
+- **Un serveur de mises à jour injoignable ne bloque plus rien.** Un réglage
+  qui ne servait qu'à construire l'image faisait attendre `apt` jusqu'à 40
+  minutes devant un dépôt injoignable — c'est ainsi qu'une installation a
+  échoué pendant une panne de courant chez le mainteneur. Il est retiré de
+  l'image et des machines installées : `apt` retrouve ses délais ordinaires,
+  et passe son chemin en quelques secondes, comme pour n'importe quel dépôt.
+- `acl` et `libnotify-bin` deviennent des dépendances : sans le premier, un
+  Espace à compte séparé pouvait ne plus s'ouvrir ; sans le second, un refus
+  d'ouvrir un Espace avait lieu sans un mot.
+- Le service des comptes d'Espaces ignore, hors de son mode d'essai, les
+  variables qui lui feraient charger un module ou lancer un programme venus
+  d'ailleurs.
 
 **Le Sceau de la barre du haut se voit enfin.** L'icône était terne et trop
 petite : un petit anneau gris sur un panneau noir où tout le reste est blanc.

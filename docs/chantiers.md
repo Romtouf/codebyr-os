@@ -1,6 +1,7 @@
 # Chantiers — Codebyr OS
 
-Mise à jour de lecture : **15 septembre 2026**, version publiée **1.16.1**.
+Mise à jour de lecture : **27 septembre 2026**, version publiée **1.16.0** —
+la 1.16.1 est en préparation, pas encore servie par `apt`.
 
 Ce document est la carte du projet : ce qui est fait, ce qui reste, et pourquoi.
 Les estimations d'effort des lignes anciennes n'ont pas été refaites.
@@ -9,11 +10,21 @@ Les estimations d'effort des lignes anciennes n'ont pas été refaites.
 sont rendus et publiés ; ce qui reste tient surtout à la diffusion — des
 testeurs, un second mainteneur, les posts de lancement.
 
+**Ce que la relecture du 27 septembre 2026 a appris** : la CI était rouge
+depuis le 13, et quatre versions sont parties quand même — un test contredisait
+le correctif de sécurité de la 1.12.0, et l'échec de ruff en masquait un
+autre. Les documents se contredisaient (la 1.16.1 annoncée publiée, le filtre
+réseau décrit comme limité au navigateur, la Phase 6 décochée). Corrigé en
+1.16.1, et surtout rendu impossible à refaire en silence : `publish-apt.sh`
+exige une CI verte, `tests/test_coherence.py` confronte les documents entre
+eux.
+
 Le chantier « un UID Unix par Espace » est clos depuis la 1.16.0 : un Espace
 peut tourner sous son propre compte, avec ses applications Flatpak et la carte
-graphique. **Il reste une décision** : en faire le réglage par défaut. Elle
-n'est pas technique — le code est là et éprouvé — mais elle engage toutes les
-installations d'un coup.
+graphique. **La décision qui restait est prise** (27/09/2026) : c'est le
+réglage par défaut de chaque Espace dans la 1.16.1 — l'invité excepté, dont
+les Espaces doivent s'effacer avec sa session. Personnel et Travail y sont
+aussi blindés. Les deux se valident sur machine avant publication.
 
 ## Comment lire
 
@@ -33,7 +44,7 @@ installations d'un coup.
 
 | | Chantier | Pourquoi | Effort |
 |---|---|---|---|
-| ✅ | **Un UID Unix par Espace — fait en 1.15.0, au choix de l'utilisateur** | Le chantier structurant est rendu. Un Espace peut tourner sous son propre compte système : dossier à lui (0700) hors du dossier personnel, plafond mémoire sur l'Espace entier, Jetable en mémoire vive. Le **point dur redouté n'en était pas un** : mesuré avant d'être bâti, GNOME 48 affiche sans broncher une fenêtre d'un autre UID — il suffit de lui présenter la socket Wayland. Ce qui a coûté, c'est le reste : root ne lit jamais les données (le bureau emballe, l'Espace déballe, par un tuyau), déménagement ET retour des données, boîtes d'envoi dans les deux sens, pièce jointe, sauvegarde, restauration, suppression du compte. **Reste** : le passage au défaut | XL |
+| ✅ | **Un UID Unix par Espace — fait en 1.15.0, par défaut en 1.16.1** | Le chantier structurant est rendu. Un Espace peut tourner sous son propre compte système : dossier à lui (0700) hors du dossier personnel, plafond mémoire sur l'Espace entier, Jetable en mémoire vive. Le **point dur redouté n'en était pas un** : mesuré avant d'être bâti, GNOME 48 affiche sans broncher une fenêtre d'un autre UID — il suffit de lui présenter la socket Wayland. Ce qui a coûté, c'est le reste : root ne lit jamais les données (le bureau emballe, l'Espace déballe, par un tuyau), déménagement ET retour des données, boîtes d'envoi dans les deux sens, pièce jointe, sauvegarde, restauration, suppression du compte. Passé au défaut en 1.16.1 (voir plus bas) | XL |
 | ✅ | **Carte graphique sous compte séparé — fait en 1.16.0** | Seconde limite de la 1.15.0, levée. Le diagnostic tenait en une phrase : ce n'est pas un groupe qui donne accès à `/dev/dri`, c'est `logind`, qui pose un droit NOMINATIF pour l'utilisateur de la session et le retire à la déconnexion — un compte d'Espace n'a pas de session, donc aucun droit. Le service fait la même chose, le temps de l'Espace. **Deux mesures fausses avant la bonne** : le nom du moteur de rendu de GTK (« gl ») ne dit rien du matériel, il tourne aussi bien au-dessus de llvmpipe ; le signal qui tranche est le descripteur ouvert sur `/dev/dri/renderD*`. Et il a fallu activer la 3D dans la machine d'essai, dont la session était elle-même en rendu logiciel. Garde-fous : nœuds de rendu seulement, liens symboliques écartés, droit repris sur toutes les cartes à la fermeture | M |
 | ✅ | **Applications Flatpak sous compte séparé — fait en 1.16.0** | Première des deux limites de la 1.15.0, levée. Chaque Espace a son bus de session, donc ses portails : la fenêtre « Ouvrir un fichier » s'affiche et ne montre que ses fichiers. L'installation se fait DANS l'Espace, par lui (`interne-flatpak`), dans un dossier que le bureau ne peut pas écrire. **Tout a été mesuré avant d'être bâti** : le blocage n'était ni les droits ni le compte, mais le CHEMIN — Flatpak suppose `/run/user/<uid>`, et la « passerelle » de la 1.15.0 a été remplacée par ce dossier canonique. Gain d'isolation au passage : une application Flatpak parlait jusqu'ici au bus du bureau, et ouvrait donc des programmes sous le compte de l'utilisateur. **Limite assumée** : le portail des documents ne monte pas son système FUSE sous `no-new-privs` (`fusermount3` est setuid), donc l'application ne reçoit pas le fichier choisi. Décidé le 15/09/2026 : garder la protection, dire la limite | L |
 | ✅ | **Notifications des Espaces — fait en 1.14.0, sans `xdg-dbus-proxy`** | Le proxy est écarté pour la raison écrite ci-dessous : il faut retirer le bus privé, donc perdre l'isolation des applications mono-instance. Un relais rend les notifications sans y toucher — service sur le bus PRIVÉ, socket dédiée vers l'hôte, en-tête imposé (« Espace Jetable », jamais « Banque »), texte nettoyé et borné, débit limité, actions refusées. **Les fenêtres de fichiers, elles, n'étaient pas cassées** : GTK se rabat sur sa propre boîte de dialogue quand aucun portail ne répond — vérifié sur machine. Reste ouvert, si le besoin apparaît : les portails eux-mêmes (appareil photo, capture d'écran, ouverture d'une URI par l'hôte) | M |
@@ -42,6 +53,13 @@ installations d'un coup.
 | 🟡 | **Profils AppArmor — le filtre réseau (1.12.1) et le service des comptes (1.15.0)** | `codebyr-net-proxy`, le seul programme qui parle au réseau pour un Espace peut-être compromis, tourne sous un profil strict. Le service des comptes d'Espaces, qui tourne en root, a le sien : il ne réduit pas son pouvoir — qui crée des comptes possède la machine — mais il borne les chemins qu'il écrit et les programmes qu'il lance, et un Espace sort du confinement à l'instant où il abandonne ses privilèges. **Restent** `codebyr-space` et l'extension GNOME, tous deux non confinés | M |
 | 🟡 | **Durcissement noyau au démarrage — `lockdown` acquis** | Vérifié le 13/09/2026 : sous démarrage sécurisé, le noyau Debian se verrouille **tout seul** (`Kernel is locked down from EFI Secure Boot`), niveau `integrity` mesuré : plus rien ne peut modifier le noyau en marche (module non signé, `kexec`, écriture mémoire), même en administrateur. Restent les options de ligne de commande (`slab_nomerge`, `init_on_free`…), à peser une par une : chacune coûte en performance | S |
 | ✅ | **Secure Boot de bout en bout — vérifié le 13/09/2026 (1.13.0)** | La chaîne complète fonctionne sur une machine au démarrage sécurisé activé, disque chiffré compris : le micrologiciel valide `shim`, qui valide GRUB, qui valide le noyau signé Debian (`Loaded X.509 cert 'Debian Secure Boot CA'`). Reste à confirmer sur du matériel réel, hors machine virtuelle | M |
+| ✅ | **Applications Flatpak sorties de leur Espace — fermé en 1.16.1** | Dans un Espace ordinaire, une application Flatpak n'est pas dans notre bac à sable : ses permissions s'exercent sous le compte du bureau. `--socket=session-bus`, ou le droit de parler à `org.freedesktop.Flatpak`, systemd ou dconf, lui ouvraient l'exécution hors de tout bac à sable — sous le liseré de l'Espace. Elle est désormais refusée, avec les deux issues : l'ouvrir hors des Espaces, ou « Compte séparé ». Vérifié contre la sortie réelle de `flatpak info --show-permissions` | M |
+| ✅ | **Personnel et Travail blindés — 1.16.1, validé sur la VM le 28/09/2026** | Les deux Espaces du quotidien étaient les seuls sans filtre d'appels système (`io_uring` y restait ouvert), sans abandon des capabilities ni session neuve. Blindés, avec les plafonds larges de Navigation (75 %, 4096 tâches). Conséquence réglée au passage : un Espace blindé refusait toute application Flatpak, et plus aucun Espace livré n'en aurait accepté — elles y sont admises sous compte séparé, avec un avertissement. **Éprouvé sur la VM** : Fichiers, Console, éditeur de texte ; presse-papiers vidé en quittant Travail pour le bureau ; sonde d'isolation conforme. **Reste à éprouver** : LibreOffice, une application Flatpak sous compte séparé ; `ptrace` étant refusé, ni `gdb` ni `strace` dans ces Espaces. **À examiner** : dans Navigation, le son d'une vidéo saccade les ~5 premières secondes (VM ou bac à sable ? à comparer avec un Firefox hors Espace) | M |
+| ✅ | **Compte séparé par défaut — décidé le 27/09/2026 (1.16.1), validé sur la VM le 28/09/2026** | Chaque Espace livré, et chaque Espace créé, a son compte d'office ; les données déménagent à la première ouverture et reviennent si l'on désactive le réglage. Éprouvé sur une VM installée en 1.16.0 puis mise à jour : déménagement de Personnel et Travail (fichiers présents), les cinq Espaces ouverts sous `cbyr-<uid>-<espace>`, filtre réseau de Banque, Jetable, et la session invitée sans compte séparé, effacée à la déconnexion. **L'invité en est exclu**, des deux côtés (lanceur et service) : sa remise à neuf n'efface que son dossier, et un Espace à compte séparé lui aurait survécu — défaut qui existait déjà pour un invité qui cochait le réglage. Ce que cela coûte, dit à l'utilisateur : « Ajouter une application » refusé (ligne suivante) ; applications Flatpak déjà installées dans un Espace à réinstaller ; une application Flatpak ne reçoit pas le fichier choisi dans « Ouvrir un fichier » | S |
+| ✅ | **Terminal d'un Espace sous compte séparé — réparé en 1.16.1** | Découvert le 28/09/2026 sur la VM : la Console de Travail « moulinait » sans s'ouvrir. Le compte d'un Espace est créé avec `nologin` (voulu : aucune session possible), et un terminal lance le shell du compte. Comme Flatpak, le bac à sable voit sa propre liste des comptes, où seul ce compte a `/bin/bash` (`codebyr-espace-init` l'écrit dans `/run/user/<uid>`, `wrap_bwrap` la monte par-dessus `/etc/passwd`) ; hors du bac à sable, rien ne change. Au passage, les applications d'un Espace démarrent dans son dossier (`bwrap --chdir`) : le terminal s'ouvrait dans `/`. **Validé sur la VM le 28/09/2026** | S |
+| ✅ | **Verr. Maj à la manière de Windows — 1.16.1, validé sur la VM le 28/09/2026** | Demandé par le mainteneur, jamais réalisé : aucune trace dans l'historique. Option XKB `caps:shiftlock` (Verr. Maj + `&` → `1`). Session et écran de connexion : défaut GNOME, désormais livré aussi par le paquet (il ne l'était pas : un nouveau défaut GNOME n'atteignait aucune machine installée). Console et phrase de passe du disque : posé à l'installation seulement — sur une machine installée, la phrase de passe doit continuer à se taper comme à sa création | S |
+| 🟠 | **« Ajouter une application » sous compte séparé** | Seul geste encore refusé sous ce mode, donc désormais par défaut : le programme choisi (AppImage, binaire) vit dans le dossier du bureau, que le compte de l'Espace ne peut pas lire. Piste : le déposer par la boîte d'arrivée de l'Espace, exécutable, et inscrire au menu son chemin DANS l'Espace | M |
+| ✅ | **Espace d'échange chiffré — réparé en 1.16.1** | Découvert le 28/09/2026 sur une installation neuve : deux erreurs « cryptsetup » à chaque démarrage, après une phrase de passe pourtant acceptée. Calamares chiffre l'espace d'échange à part et prévoit de l'ouvrir avec un fichier de clé, qu'il ne crée pas quand /boot est en clair ; il ajoute aussi « resume= » sur la ligne du noyau (modules `fstab` et `grubcfg`). Résultat : **aucune machine chiffrée n'avait d'espace d'échange depuis la 1.13.0**, et chaque démarrage l'attendait 90 secondes — `systemd-cryptsetup`, que Debian 13 a sorti de systemd, manquait à l'image : personne n'ouvrait `/etc/crypttab` après le démarrage (dépendance ajoutée). `codebyr-durcir-poste` le passe en clé aléatoire à chaque démarrage (repère PARTUUID, anciennes signatures LUKS effacées, reprise retirée), à l'installation comme par `apt` sur les machines existantes. Éprouvé sur un vrai disque LUKS de test, garde-fous compris, puis **validé sur la VM le 28/09/2026** : plus aucune erreur au démarrage, 9,1 Go d'espace d'échange actif. Hibernation abandonnée — elle ne fonctionnait pas | S |
 | ✅ | **LUKS pré-coché par défaut — fait le 13/09/2026 (1.13.0)** | `preCheckEncryption: true`, et /boot séparé en clair pour que la phrase de passe soit demandée par l'initramfs (clavier AZERTY) et non par GRUB (QWERTY). Racine en LUKS2/argon2id. Validé par une installation complète : aucun fichier de clé sur /boot, phrase de passe acceptée au clavier français | S |
 
 ### Le point dur de `xdg-dbus-proxy`
@@ -91,6 +109,12 @@ Voir `usr/share/codebyr/relais_notifications.py`.
 | | Chantier | Pourquoi | Effort |
 |---|---|---|---|
 | 🔵 | **ISO reproductibles** | Deux constructions de la même version donnent aujourd'hui deux images différentes (horodatage, état du miroir Debian). Personne ne peut vérifier indépendamment que l'ISO publiée correspond au code publié | L |
+| ✅ | **L'installation ne dépend plus du serveur du projet — 1.16.1, validé sur la VM le 28/09/2026** | Le 28/09/2026, le serveur éteint par une panne de courant, une installation a échoué : l'installeur lance `apt-get update`, et un réglage de CONSTRUCTION resté dans l'image (`99codebyr-resilient.conf`, 20 nouvelles tentatives de 2 minutes) le faisait attendre au-delà des 10 minutes de Calamares. Retiré de l'image (hook 1000) et des machines installées (`codebyr-durcir-poste`, s'il porte bien son en-tête) : `apt` retrouve ses délais ordinaires, comme pour tout dépôt tiers | S |
+| ✅ | **Pas de publication sans CI verte — 1.16.1** | `publish-apt.sh` refuse du code non commité, un commit absent de GitHub, une CI rouge ou en cours. Échappatoire explicite : `CODEBYR_PUBLIER_SANS_CI=1` | S |
+| ✅ | **Paquets d'essai écartés de la publication — 1.16.1** | `dist/` reçoit aussi les paquets d'essai ; une version en `~` plus récente que la version publiée serait partie chez tout le parc par `unattended-upgrades`. Écartés, et un paquet plus récent que `VERSION` fait échouer la publication | S |
+| ✅ | **Date de péremption du dépôt APT — 1.16.1** | `Valid-Until` à 90 jours : un serveur compromis ne peut plus figer les mises à jour en silence. **Engagement** : republier ou `publish-apt.sh --resigner` avant l'échéance | S |
+| ✅ | **Identité du système — 1.16.1** | `/etc/os-release` désignait `codebyr.io`, un domaine inexistant que n'importe qui pouvait acheter, et appartenait à `base-files` : la prochaine version mineure de Debian aurait rebaptisé chaque machine « Debian GNU/Linux 13 » (reproduit sur la 1.16.0). Désormais livrée par `codebyr-tools` et détournée de `base-files` (`dpkg-divert`), sa version suit les mises à jour. Cycle éprouvé : mise à jour, réinstallation de `base-files`, retrait, réinstallation | S |
+| ✅ | **Dépendances fermes : `acl`, `libnotify-bin` — 1.16.1** | `setfacl` (service des comptes) n'était là que par ricochet ; `notify-send` dit pourquoi un Espace est refusé, et le refus était muet sans lui | S |
 
 ---
 
@@ -121,7 +145,8 @@ Voir `usr/share/codebyr/relais_notifications.py`.
 
 | | Chantier | Pourquoi | Effort |
 |---|---|---|---|
-| 🔵 | **Construction de l'ISO en CI — commencée, pas finie** | Le workflow existe (`construire-iso.yml`, déclenchement manuel, conteneur Debian trixie, vérification du contenu produit). Il échoue encore sur `E: repository 'http://security.debian.org trixie/updates' does not have a Release` — l'ancienne convention de nommage du dépôt de sécurité, abandonnée depuis Bullseye. Or le même `live-build` (1:20250505+deb13u1) génère bien `trixie-security` dans le WSL du mainteneur, et le dépôt ne contient aucune configuration figée. **L'écart reste à trouver** : comparer le `config/` engendré par `lb config` des deux côtés est la piste directe | M |
+| ✅ | **CI réparée — 27/09/2026** | Rouge du 13 au 27 septembre, sans que rien n'arrête les publications. Quatre causes, dont une que l'échec de ruff masquait : un import inutile (ruff) ; un test d'intégration qui attendait du filtre réseau ce que le correctif 1.12.0 lui interdit — joindre la boucle locale ; les réglages `net.core.bpf_jit_*`, invisibles hors de l'espace de noms réseau initial (conteneur) ; un test dont le nettoyage échouait sur tout compte ordinaire. Le chemin positif du filtre est désormais vérifié sans réseau (`test_filtre_reseau.py`) | S |
+| 🔵 | **Construction de l'ISO en CI — sans doute débloquée, jamais relancée** | Le workflow existe (`construire-iso.yml`, déclenchement manuel, vérification du contenu produit). Ses deux essais, le 20/08/2026, ont échoué sur `E: repository 'http://security.debian.org trixie/updates' does not have a Release`. **Le diagnostic écrit ici se trompait de prémisse** : ce n'était pas le même `live-build` qu'en local. Relu le 27/09/2026, le journal montre que ces essais tournaient directement sur le runner Ubuntu, avec le `live-build` d'Ubuntu 24.04 — `3.0~a57-1ubuntu49.1`, une branche de 2012 qui nomme encore le dépôt de sécurité à l'ancienne. Le passage au conteneur `debian:trixie` (12/09) règle précisément cela, mais le workflow n'a pas été relancé depuis : **le lancer une fois**, puis vérifier l'ISO produite | S |
 
 ---
 
@@ -141,6 +166,8 @@ Voir `usr/share/codebyr/relais_notifications.py`.
 
 | | Point | Détail | Effort |
 |---|---|---|---|
+| ⚪ | **`codebyr-space` : 2 800 lignes, dont `_lancer` à elle seule ~300** | Le bac à sable en est sorti (1.5), le registre aussi. Le lancement mêle encore préparation, compte dédié, Flatpak, filtre réseau et notifications dans une seule fonction : c'est là que le prochain défaut se cachera | M |
+| ⚪ | **Commentaires-journaux** | Beaucoup de commentaires racontent la découverte d'un défaut (« Constaté le … »). Précieux pour le pourquoi, mais ils alourdissent le code et vieilliront mal : leur place serait le CHANGELOG ou une fiche de décision, le code n'en gardant que la règle | S |
 
 ---
 
@@ -211,9 +238,15 @@ tests. Détail dans [SECURITY.md](../SECURITY.md).
    Chiffre à garder en tête : au 20 août 2026, les cinq ISO publiées totalisent
    **zéro téléchargement**. Ce n'est pas un détail de communication — c'est ce
    qui rend tout le reste de cette liste théorique.
-2. **`xdg-dbus-proxy`** — pour rendre aux Espaces les notifications et les
-   portails perdus en 1.1.0, sans rouvrir la faille. Le point dur est analysé
-   plus haut : cela se tranche sur une machine.
-3. ~~**Un UID par Espace.**~~ Fait en 1.15.0, au choix de l'utilisateur.
-   Reste à le passer au défaut, ce qui suppose de régler les applications
-   Flatpak et l'accès à la carte graphique.
+2. **Éprouver la 1.16.1 sur machine avant de la publier.** Elle change le
+   quotidien de tout le monde d'un coup : chaque Espace passe sous son compte
+   (déménagement des données à la première ouverture), et Personnel et
+   Travail sont blindés. C'est la plus grosse bascule depuis la 1.0 — elle se
+   vérifie sur la VM, geste par geste, avant `apt`.
+3. **Passer le filtre d'appels système en liste d'autorisation**, et rendre
+   « Ajouter une application » possible sous compte séparé. Le filtre laisse
+   passer par défaut ce qu'il ne connaît pas ; à mesurer sur machine avant de
+   construire, comme le reste.
+
+   *(`xdg-dbus-proxy`, ancien numéro deux, a été tranché le 13/09/2026 : les
+   notifications passent par un relais, voir plus haut.)*

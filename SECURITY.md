@@ -12,10 +12,19 @@ code appliquait, relevés par une relecture du 12 septembre — détaillés dans
 l'historique ci-dessous, et validés sur un bureau GNOME réel.
 
 **Publié en 1.15.0 et 1.16.0** : un Espace peut tourner sous **son propre
-compte Unix** — réglage « Compte séparé, par Espace », désactivé par défaut le
-temps d'être éprouvé. Depuis la 1.16.0, ses applications Flatpak et la carte
-graphique y fonctionnent. Ce qui n'était qu'un prototype en septembre est
+compte Unix** — réglage « Compte séparé, par Espace ». Depuis la 1.16.0, ses
+applications Flatpak et la carte graphique y fonctionnent. Ce qui n'était qu'un prototype en septembre est
 maintenant livré et éprouvé sur machine.
+
+**En préparation pour la 1.16.1 (pas encore publiée)** : le compte séparé
+devient le **défaut** de chaque Espace (l'invité excepté), Personnel et Travail
+sont blindés à leur tour ; une application
+Flatpak dont les permissions la feraient sortir d'un Espace ordinaire n'y
+s'ouvre plus ; le Jetable perd le micro ; l'identité du système ne désigne plus
+un domaine inexistant (`codebyr.io`) et ne peut plus être rendue à Debian par
+une mise à jour de `base-files` ; le dépôt APT porte une date de péremption, et
+une version ne peut plus être publiée sans CI verte. Détail dans l'historique
+ci-dessous.
 
 Le modèle ci-dessous décrit aussi des versions antérieures ; ne pas déduire
 la protection d'un poste de la seule présence de ce document.
@@ -46,11 +55,14 @@ utilisateur non technique.
   autres Espaces : dossiers personnels séparés, `/tmp` isolés, et **bus de
   session privé** — le socket du bus de session de l'hôte n'est jamais monté
   dans le bac à sable (voir « Historique des correctifs »).
-- Le **navigateur** de l'Espace Banque ne peut joindre que les domaines de la
-  liste blanche de l'utilisateur (proxy local — voir « Limites connues » :
-  c'est un garde-fou au niveau du navigateur, pas encore une règle réseau
-  imposée à tout l'Espace). **Liste vide = tout est bloqué** : un Espace à
-  réseau restreint échoue fermé, jamais ouvert.
+- L'Espace Banque — et tout Espace à réseau restreint — ne peut joindre que
+  les domaines de la liste blanche de l'utilisateur. La règle vaut pour
+  **tout l'Espace**, pas seulement pour son navigateur : depuis 1.11.0, il a
+  son propre espace de noms réseau, sans aucune interface vers l'extérieur, et
+  ne sort que par le filtre (HTTP, HTTPS et SOCKS5). Un programme qui tenterait
+  de passer à côté ne trouve aucun réseau. Ce qui reste possible est dans
+  « Limites connues ». **Liste vide = tout est bloqué** : un Espace à réseau
+  restreint échoue fermé, jamais ouvert.
 - Le **mode invité** est un vrai compte Unix distinct, sans droits
   d'administration, dont la session est effacée à la déconnexion. Le dossier
   personnel de l'utilisateur principal est en `0700` — sur l'image live **comme
@@ -61,8 +73,10 @@ utilisateur non technique.
 - Le Blindage ajoute : espace de noms utilisateur, abandon de toutes les
   capabilities, session neuve (anti-injection TIOCSTI), filtre d'appels
   système, plafonds mémoire/processus. Actif par défaut sur Banque, Jetable
-  et — à partir de 1.12.0 — Navigation. Banque et Jetable n'ont pas non plus
-  d'accès direct à la carte graphique (`"gpu": false`).
+  et — à partir de 1.12.0 — Navigation ; sur Personnel et Travail à partir de
+  1.16.1, avec des plafonds larges (75 % de la mémoire, 4096 tâches). Banque
+  et Jetable n'ont pas non plus d'accès direct à la carte graphique
+  (`"gpu": false`).
 - **Le démarrage est vérifié** quand la machine a le démarrage sécurisé
   activé — le cas de la plupart des PC vendus aujourd'hui. Chaîne éprouvée le
   13/09/2026 : micrologiciel → `shim` → GRUB → noyau signé par Debian. Le noyau
@@ -78,6 +92,11 @@ utilisateur non technique.
   c'est ce qui permet de saisir la phrase de passe avec le clavier choisi à
   l'installation plutôt qu'avec celui de GRUB, toujours QWERTY. Aucun fichier
   de clé n'est déposé sur cette partition — vérifié sur une installation réelle.
+  L'espace d'échange est chiffré à part, avec une clé tirée au hasard à chaque
+  démarrage (1.16.1) : ce qu'il contient devient illisible à l'extinction.
+  Jusqu'en 1.16.0, il restait inutilisé — l'installeur l'avait réglé pour un
+  fichier de clé jamais créé, d'où deux erreurs « cryptsetup » à chaque
+  démarrage.
 - Un domaine autorisé dont l'adresse désigne la machine ou le réseau local
   (bouclage, plages privées, lien local) est refusé par le filtre réseau, qui
   se connecte à l'adresse qu'il a vérifiée et non à un nom résolu une seconde
@@ -107,16 +126,20 @@ utilisateur non technique.
   lire l'écran d'un autre via Wayland, mais ce canal n'a pas l'étanchéité d'une VM.
 - **Micro** : le socket PipeWire partagé vaut accès au microphone. Un Espace
   peut le refuser (`"audio": false` dans le registre) — c'est le cas de Banque
-  par défaut. Partout ailleurs, le son fonctionne, donc le micro est joignable.
-- **Un seul compte Unix pour tous les Espaces — sauf si vous l'activez.** Par
-  défaut, les données des Espaces vivent sous `~/.local/share/codebyr/espaces/`,
-  sous votre compte : le bac à sable empêche une application *lancée dans un
-  Espace* d'en sortir, mais toute application lancée normalement (hors Espace),
-  ou tout code qui s'échapperait du bac à sable, lit l'ensemble. Le réglage
-  « Compte séparé, par Espace » (1.15.0) lève cette limite, Espace par Espace :
-  le noyau vérifie alors la frontière à chaque ouverture de fichier. Il reste
-  **désactivé par défaut** le temps d'être éprouvé sur d'autres machines que
-  celles du projet.
+  par défaut, et de Jetable depuis 1.16.1 : c'est là que s'ouvrent les liens
+  douteux. Le son de sortie part avec lui, par le même canal. Partout ailleurs,
+  le son fonctionne, donc le micro est joignable.
+- **Un compte Unix par Espace — par défaut depuis 1.16.1, sauf exceptions.**
+  Jusqu'à la 1.16.0, les données des Espaces vivaient par défaut sous
+  `~/.local/share/codebyr/espaces/`, sous votre compte : le bac à sable
+  empêchait une application *lancée dans un Espace* d'en sortir, mais toute
+  application lancée normalement (hors Espace), ou tout code qui s'échapperait
+  du bac à sable, lisait l'ensemble. Depuis la 1.16.1, chaque Espace a son
+  compte d'office, et le noyau vérifie la frontière à chaque ouverture de
+  fichier. La limite demeure là où ce réglage ne s'applique pas : un Espace
+  pour lequel vous le désactivez, et les Espaces de l'**invité**, qui n'en ont
+  jamais — sa session s'efface à la déconnexion, et un Espace à compte séparé,
+  rangé hors de son dossier, survivrait à l'invité suivant.
 
 **Principe de communication** : Codebyr OS « réduit drastiquement les dégâts » —
 jamais « rend invulnérable ». Toute contribution qui gonflerait la promesse
@@ -132,15 +155,20 @@ README. N'utilisez jamais une ISO dont la signature n'est pas valide.
 
 La même clé signe le dépôt APT, qui installe des paquets **en root** sur les
 machines Codebyr via `unattended-upgrades` : c'est l'actif le plus sensible du
-projet. Sa protection, sa hiérarchie cible (clé maîtresse hors ligne +
+projet. Depuis 1.16.1, ce dépôt porte une date de péremption (`Valid-Until`,
+90 jours) : un serveur compromis ne peut plus servir indéfiniment un ancien
+dépôt signé pour priver le parc de ses correctifs sans que rien le signale. Sa protection, sa hiérarchie cible (clé maîtresse hors ligne +
 sous-clés), la procédure de renouvellement et la conduite à tenir en cas de fuite
 sont décrites dans [docs/chaine-de-signature.md](docs/chaine-de-signature.md) —
 qui indique aussi, sans détour, ce qui n'est **pas encore** en place.
 
 ## Durcissement de la base
 
-**Un compte Unix par Espace (1.15.0, au choix de l'utilisateur).** Un Espace
-peut tourner sous son propre compte système : son dossier lui appartient (0700),
+**Un compte Unix par Espace (1.15.0, par défaut depuis 1.16.1).** Ce compte n'a
+ni mot de passe utilisable ni shell de connexion (`nologin`) : il ne peut ouvrir
+aucune session. Dans son bac à sable seulement, une copie de la liste des
+comptes lui donne `/bin/bash`, pour que ses terminaux fonctionnent (1.16.1). Un
+Espace tourne sous son propre compte système : son dossier lui appartient (0700),
 hors du dossier personnel, et le compte du bureau ne peut pas le lire. Ce qui
 s'échappe du bac à sable retrouve alors ce compte-là, et rien d'autre. Le
 service qui prépare ces comptes tourne en root, sur activation de socket ; il
@@ -182,9 +210,12 @@ surface applicative minimale (`--apt-recommends false`).
   sens ; l'utilisateur peut lever définitivement une alerte sur un site donné.
   Ce n'est pas une liste noire d'hameçonnage, et ça ne remplace pas celle de
   Firefox.
-- **Filtre réseau bancaire** : appliqué au niveau du profil navigateur ; un code
-  hostile déjà exécuté *dans* l'Espace pourrait le contourner. Il protège du web
-  et de l'hameçonnage, pas d'un binaire malveillant lancé dans l'Espace.
+- **Filtre réseau d'un Espace restreint : les domaines autorisés restent
+  joignables.** Le filtre s'impose à tout l'Espace (voir plus haut), mais il
+  juge des NOMS : un programme hostile déjà exécuté dans l'Espace peut joindre
+  les domaines de la liste — sur n'importe quel port — puisqu'ils sont
+  autorisés. Le réseau local et la machine elle-même lui restent fermés, même
+  si un domaine autorisé y mène (1.12.0).
 - **Compositeur Wayland et audio (PipeWire) partagés** entre Espaces. Comme le
   presse-papiers Wayland dépend du compositeur, il est techniquement commun à
   tous les Espaces : la protection Codebyr (vidage au changement d'Espace,
@@ -192,7 +223,27 @@ surface applicative minimale (`--apt-recommends false`).
   elle n'apporte pas l'étanchéité d'une VM. Soupape :
   `~/.config/codebyr/presse-papiers-libre` désactive le vidage automatique.
 - **Applications Flatpak** : proviennent de Flathub — confiance déléguée à
-  Flathub et à l'éditeur de chaque application.
+  Flathub et à l'éditeur de chaque application. Dans un Espace **ordinaire**,
+  une application Flatpak ne passe pas par le bac à sable de Codebyr : elle a
+  le sien, et ce sont ses permissions qui s'exercent, sous votre compte.
+  Depuis 1.16.1, celles qui la feraient sortir de l'Espace la font refuser :
+  bus de session du bureau, services qui exécutent pour elle
+  (`org.freedesktop.Flatpak`, systemd, dconf), système de fichiers entier,
+  dossier d'exécution du bureau, et — pour une application installée pour
+  toute la machine — les parties décisives de votre dossier personnel
+  (données des Espaces, lanceurs, démarrage de session). Ses **autres**
+  permissions restent les siennes : une application installée pour toute la
+  machine peut, par exemple, lire votre dossier Téléchargements, et ses
+  données sont communes à tous les Espaces (c'est dit à l'écran). Sous
+  « Compte séparé », le compte de l'Espace borne tout cela. Un Espace **blindé**
+  n'accepte une application Flatpak que sous compte séparé, et le dit : elle
+  y a le bac à sable de Flatpak, pas le Blindage de l'Espace. Banque et
+  Jetable les refusent toujours — leur promesse porte sur le réseau.
+- **Sous compte séparé, « Ajouter une application » n'est pas encore
+  possible** (programme local, AppImage…) : le programme choisi vit dans votre
+  dossier, que le compte de l'Espace ne peut pas lire. Le geste est refusé
+  avec une explication, jamais tenté à moitié. Désactiver le compte séparé
+  pour cet Espace le rend possible, avec la limite qui va avec.
 - **Compte séparé : un Espace abandonné est refermé.** Un Espace vit dans sa
   propre portée systemd : il survit donc à l'arrêt du service des comptes (mise
   à jour, `systemctl stop`). Jusqu'en 1.16.0, le lanceur qui le tenait s'en
@@ -239,6 +290,10 @@ surface applicative minimale (`--apt-recommends false`).
 
 | Version | Correctif |
 |---|---|
+| 1.16.1 *(en préparation)* | **Applications Flatpak sorties de leur Espace.** Dans un Espace ordinaire, une application Flatpak n'est pas dans le bac à sable de Codebyr, et ses permissions s'exercent sous le compte du bureau. Une application déclarant `--socket=session-bus`, ou le droit de parler à `org.freedesktop.Flatpak` (`flatpak-spawn --host`), à systemd ou à dconf, pouvait donc exécuter du code hors de tout bac à sable — la même classe de sortie que celle fermée en 1.1.0 — en portant le liseré de l'Espace. Ces permissions, et l'accès au système de fichiers entier, au dossier d'exécution du bureau ou aux parties décisives du dossier personnel, font désormais refuser l'application, avant tout lancement. Vérifié contre la sortie réelle de `flatpak info --show-permissions`, surcharges comprises. |
+| 1.16.1 *(en préparation)* | **Adresses d'aide vers un domaine inexistant.** `/etc/os-release`, l'installeur Calamares (aide, problèmes connus, notes de version, dons) et l'extension GNOME désignaient `codebyr.io`, qui n'existe pas : quiconque l'aurait acheté recevait les demandes d'aide — et de dons — des utilisateurs d'une distribution de sécurité. Adresses remplacées par `os.codebyr.dev` et le dépôt GitHub ; un test refuse désormais tout domaine `codebyr` autre que `codebyr.dev`. |
+| 1.16.1 *(en préparation)* | **Un Espace de l'invité pouvait survivre à sa session.** La remise à neuf de l'invité n'efface que son dossier personnel ; un Espace à compte séparé vit hors de ce dossier. Un invité qui cochait « Compte séparé » laissait donc le navigateur, les cookies et les fichiers de ses Espaces à l'invité suivant. L'invité n'obtient plus jamais de compte séparé : ni le lanceur ne le demande, ni le service ne l'accorde. *Non traité* : d'éventuels restes laissés sur une machine par un invité en 1.15–1.16. |
+| 1.16.1 *(en préparation)* | **Micro ouvert dans le Jetable.** L'Espace où s'ouvrent les liens douteux avait accès au socket PipeWire, donc au microphone. Coupé par défaut. |
 | 1.13.0 | **Disque non chiffré par défaut.** Le chiffrement était proposé sans être coché : la protection dépendait de l'utilisateur qui pense à la cocher. Case cochée d'avance, LUKS2/argon2id, /boot séparé en clair (aucune donnée, aucun fichier de clé) pour que la phrase de passe se tape avec le clavier de l'installation — GRUB, qui la demandait auparavant, lit toujours en QWERTY et rendait un disque AZERTY impossible à ouvrir. |
 | 1.12.1 | **Filtre réseau non confiné.** Le seul programme qui parle au réseau pour un Espace restreint tournait hors bac à sable, avec tous les droits de l'utilisateur. Il est désormais confiné par AppArmor (socket héritée, résolution, connexions sortantes, journal des refus — rien d'autre) et démarre en Python isolé, sans module du dossier personnel. |
 | 1.12.0 | **Navigation, l'Espace le plus exposé au web, n'était pas blindé** : pas de filtre d'appels système (io_uring, qui contourne seccomp et reste une source majeure de failles noyau, y était accessible), pas d'abandon des capabilities ni de session neuve. Blindé par défaut, avec des plafonds adaptés à un navigateur (75 % de la mémoire, 4096 tâches) pour ne pas tuer une session chargée. |

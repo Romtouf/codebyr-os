@@ -67,6 +67,7 @@ import pwd
 import select
 import shutil
 import socket
+import stat
 import struct
 import subprocess
 import sys
@@ -217,10 +218,21 @@ def ranger_les_anciennes_passerelles():
             if echec:
                 journal("ancienne passerelle %s : %s, %s" % (compte, fichier, echec))
             if proprietaire and uid_espace is not None:
-                source = os.path.join("/run/user/%d" % proprietaire[0], fichier)
-                if os.path.exists(source):
-                    subprocess.run(["/usr/bin/setfacl", "-x", "u:%d" % uid_espace,
-                                    source], capture_output=True)
+                # Par son nom cette fois — le montage est peut-être déjà parti —
+                # mais épinglé et vérifié comme à l'ouverture : ce nom est dans
+                # le dossier du bureau, qui a pu y poser un lien.
+                try:
+                    tenu = socket_epingle(comptes.socket_du_bureau(
+                        proprietaire[0], {"pipewire-0": "pipewire"}.get(fichier, fichier)),
+                        proprietaire[0])
+                    if tenu is not None:
+                        try:
+                            droit_sur_socket(tenu, uid_espace, accorder=False)
+                        finally:
+                            os.close(tenu)
+                except (ValueError, subprocess.CalledProcessError) as exc:
+                    journal("ancienne passerelle %s : droit sur %s non retiré, %s"
+                            % (compte, fichier, exc))
         try:
             os.rmdir(dossier)
         except OSError as exc:
@@ -405,16 +417,66 @@ def cartes_presentes():
     return [c for c in comptes.cartes_de_rendu(noms) if not os.path.islink(c)]
 
 
-def droit_sur_socket(chemin, uid, accorder=True):
+def droit_sur_socket(fichier, uid, accorder=True):
     """Accorde (ou retire) l'accès d'UN compte à UN fichier. Jamais un dossier.
 
     Sert aux sockets du bureau et aux cartes graphiques : dans les deux cas,
     c'est un droit NOMINATIF, posé le temps d'un Espace et retiré après —
     exactement ce que logind fait pour une session d'utilisateur.
+
+    Un socket du bureau se désigne par son DESCRIPTEUR, déjà vérifié par
+    socket_epingle() : setfacl suit les liens, et le droit doit aller au
+    fichier qu'on a vérifié, pas à ce que son nom désigne au moment où setfacl
+    s'exécute. Une carte graphique se désigne par son chemin : /dev/dri
+    n'appartient qu'à root, et les liens y sont déjà écartés.
     """
     regle = ["-m", "u:%d:rw" % uid] if accorder else ["-x", "u:%d" % uid]
-    subprocess.run(["/usr/bin/setfacl"] + regle + [chemin],
+    tenus = ()
+    if isinstance(fichier, int):
+        tenus, fichier = (fichier,), par_descripteur(fichier)
+    subprocess.run(["/usr/bin/setfacl"] + regle + [fichier], pass_fds=tenus,
                    check=True, capture_output=True)
+
+
+def socket_epingle(chemin, uid_proprietaire):
+    """Ouvre un socket SANS suivre de lien, et vérifie ce qu'on tient.
+
+    Renvoie un descripteur (à fermer par l'appelant), ou None si le socket
+    n'existe pas — le son peut manquer. Tout le reste est refusé.
+
+    Le dossier d'exécution du bureau appartient au demandeur : il peut y
+    créer « wayland-9 », lien vers /etc/shadow, puis demander un Espace avec
+    cet affichage. Root suivait ce lien : il montait le fichier chez l'Espace,
+    et surtout lui en accordait l'écriture — setfacl suit les liens, et tourne
+    hors du profil AppArmor. N'importe quel utilisateur du bureau devenait
+    root. Reproduit le 29/09/2026, corrigé ici.
+
+    Vérifier le nom, puis s'en servir, laisserait un instant pour échanger le
+    socket contre un lien. On ouvre donc le fichier lui-même — O_PATH et
+    O_NOFOLLOW : un lien s'ouvre comme lien, sans jamais être suivi —, on
+    vérifie CE descripteur (un socket, au bon propriétaire), et mount comme
+    setfacl travaillent ensuite dessus. Le nom peut changer entre-temps ; ce
+    qu'on a vérifié, non.
+    """
+    try:
+        fd = os.open(chemin, os.O_PATH | os.O_NOFOLLOW | os.O_CLOEXEC)
+    except FileNotFoundError:
+        return None
+    st = os.fstat(fd)
+    if not stat.S_ISSOCK(st.st_mode) or st.st_uid != uid_proprietaire:
+        os.close(fd)
+        raise ValueError("%s n'est pas un socket de l'UID %d : refusé"
+                         % (chemin, uid_proprietaire))
+    return fd
+
+
+def par_descripteur(fd):
+    """Le chemin par lequel un outil lancé par root atteint un descripteur tenu.
+
+    Ce lien-là mène au fichier OUVERT, sans relire son nom — mesuré le
+    29/09/2026 avec mount (util-linux 2.41) et setfacl (acl 2.3.2).
+    """
+    return "/proc/self/fd/%d" % fd
 
 
 def dossier_runtime(uid_espace, utilisateur):
@@ -442,6 +504,16 @@ def dossier_runtime(uid_espace, utilisateur):
 def presenter(source, destination):
     """Présente un socket du bureau dans le dossier de l'Espace, par un montage lié.
 
+    « source » est un descripteur vérifié par socket_epingle() : mount monte
+    le fichier ouvert, quoi que son nom désigne entre-temps.
+
+    La destination est dans le dossier de l'Espace, où l'Espace écrit : il
+    peut y avoir posé un lien. Elle doit donc être un fichier ordinaire, créé
+    ici sans suivre de lien, et mount la reçoit sans la « canonicaliser »,
+    c'est-à-dire sans résoudre ses liens : un lien glissé à cette place est
+    alors recouvert, jamais suivi. Mesuré le 29/09/2026 (util-linux 2.41) :
+    sans « --no-canonicalize », le montage atterrissait sur la cible du lien.
+
     Un montage déjà présent — laissé par une préparation interrompue — serait
     RECOUVERT par le nouveau, et la fermeture n'en retirerait qu'un : le
     dossier survivrait à l'Espace. Constaté le 14/09/2026. On retire donc
@@ -454,11 +526,17 @@ def presenter(source, destination):
                        check=True, capture_output=True)
     else:
         raise OSError("montages empilés impossibles à retirer : %s" % destination)
-    if not os.path.exists(destination):
-        with open(destination, "w"):
-            pass
-    subprocess.run(["/usr/bin/mount", "--bind", source, destination],
-                   check=True, capture_output=True)
+    try:
+        os.close(os.open(destination, os.O_WRONLY | os.O_CREAT | os.O_EXCL
+                         | os.O_NOFOLLOW | os.O_CLOEXEC, 0o600))
+    except FileExistsError:
+        pass
+    if not stat.S_ISREG(os.lstat(destination).st_mode):
+        raise ValueError("Destination refusée, pas un fichier ordinaire : %s"
+                         % destination)
+    subprocess.run(["/usr/bin/mount", "--no-canonicalize", "--bind",
+                    par_descripteur(source), destination],
+                   pass_fds=(source,), check=True, capture_output=True)
 
 
 def retirer(destination):
@@ -491,12 +569,29 @@ def socket_d_ordres(depot):
     n'a donc besoin d'aucun droit sur le dossier pour y écouter.
     """
     chemin = os.path.join(depot, comptes.SOCKET_EXEC)
-    if os.path.exists(chemin):
+    try:
         os.unlink(chemin)
+    except FileNotFoundError:
+        pass
     srv = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-    srv.bind(chemin)
-    # Le dossier fait le tri : seuls le bureau et cet Espace le traversent.
-    os.chmod(chemin, 0o666)
+    try:
+        srv.bind(chemin)
+        # Le dossier fait le tri : seuls le bureau et cet Espace le traversent.
+        # Le mode se pose sur la socket TENUE, pas sur son nom : le bureau
+        # écrit dans ce dossier, et entre bind et chmod il pouvait mettre à sa
+        # place un lien vers /etc/shadow — chmod l'aurait suivi, et rendu le
+        # fichier inscriptible par tous. Root possède la socket qu'il vient de
+        # créer ; tout autre fichier à cette place est refusé.
+        tenu = socket_epingle(chemin, 0)
+        if tenu is None:
+            raise OSError("socket d'ordres disparue avant d'être ouverte : %s" % chemin)
+        try:
+            os.chmod(par_descripteur(tenu), 0o666)
+        finally:
+            os.close(tenu)
+    except (OSError, ValueError):
+        srv.close()
+        raise
     srv.listen(16)
     srv.set_inheritable(True)
     return srv
@@ -606,12 +701,15 @@ def _preparer(uid_demandeur, espace, affichage, son, memoire, taches,
     depot = dossier_depot(nom, uid_demandeur, utilisateur.pw_uid)
     presentes = []
     for source_nom, fichier in comptes.passages(affichage, son):
-        source = comptes.socket_du_bureau(uid_demandeur, source_nom)
-        if not os.path.exists(source):
+        source = socket_epingle(comptes.socket_du_bureau(uid_demandeur, source_nom),
+                                uid_demandeur)
+        if source is None:
             continue        # le son peut manquer : ce n'est pas une erreur
-        destination = os.path.join(runtime, fichier)
-        presenter(source, destination)
-        droit_sur_socket(source, utilisateur.pw_uid, accorder=True)
+        try:
+            presenter(source, os.path.join(runtime, fichier))
+            droit_sur_socket(source, utilisateur.pw_uid, accorder=True)
+        finally:
+            os.close(source)
         presentes.append(fichier)
     # La carte graphique, quand l'Espace y a droit. Le droit est nominatif et
     # temporaire, comme celui que logind donne à une session d'utilisateur :
@@ -691,18 +789,27 @@ def fermer(uid_demandeur, espace):
             chemin = os.path.join(runtime, fichier)
             if not os.path.ismount(chemin):
                 continue        # un fichier de l'Espace : il partira avec le dossier
+            # Le droit part AVANT le démontage, et du socket monté ici :
+            # celui-là même qui l'a reçu, quoi que son nom désigne aujourd'hui
+            # chez le bureau. Aller le chercher par ce nom, c'était suivre un
+            # lien que le bureau aurait posé à sa place.
+            try:
+                tenu = socket_epingle(chemin, uid_demandeur)
+                if tenu is not None:
+                    try:
+                        droit_sur_socket(tenu, utilisateur.pw_uid, accorder=False)
+                    finally:
+                        os.close(tenu)
+            except ValueError as exc:
+                echecs.append("%s, montage inattendu : %s" % (fichier, exc))
+            except subprocess.CalledProcessError as exc:
+                # Le plus grave des échecs possibles ici : le compte de
+                # l'Espace garderait l'accès au socket du bureau.
+                echecs.append("%s, DROIT NON RETIRÉ : %s" % (
+                    fichier, (exc.stderr or b"").decode("utf-8", "replace").strip()))
             echec = retirer(chemin)
             if echec:
                 echecs.append("%s, %s" % (fichier, echec))
-            source = os.path.join("/run/user/%d" % uid_demandeur, fichier)
-            if os.path.exists(source):
-                try:
-                    droit_sur_socket(source, utilisateur.pw_uid, accorder=False)
-                except subprocess.CalledProcessError as exc:
-                    # Le plus grave des échecs possibles ici : le compte de
-                    # l'Espace garderait l'accès au socket du bureau.
-                    echecs.append("%s, DROIT NON RETIRÉ : %s" % (
-                        fichier, (exc.stderr or b"").decode("utf-8", "replace").strip()))
         # rmtree sur un dossier écrit par un AUTRE compte : on ne s'y risque
         # que si Python garantit la traversée sans suivre les liens, comme
         # pour la suppression d'un Espace.

@@ -338,6 +338,88 @@ class LeService(unittest.TestCase):
         cartes = self.source.split("def cartes_presentes(")[1].split("\ndef ")[0]
         self.assertIn("os.path.islink", cartes)
 
+    @unittest.skipUnless(sys.platform.startswith("linux"), "O_PATH n'existe que sous Linux")
+    def test_un_lien_a_la_place_d_un_socket_du_bureau_est_refuse(self):
+        # Constaté le 29/09/2026 : le bureau créait « wayland-9 », lien vers
+        # /etc/shadow, puis demandait un Espace avec cet affichage. Root
+        # montait le fichier chez l'Espace et lui en accordait l'écriture :
+        # n'importe quel utilisateur devenait root. Rejoué ici sans privilège.
+        # Même un lien vers le VRAI socket est refusé : on ne suit rien.
+        code = "\n".join((
+            "import importlib.machinery, importlib.util, os, shutil, socket, stat, tempfile",
+            "l = importlib.machinery.SourceFileLoader('service', %r)" % SERVICE,
+            "m = importlib.util.module_from_spec(importlib.util.spec_from_loader('service', l))",
+            "l.exec_module(m)",
+            "d = tempfile.mkdtemp()",
+            "vrai = os.path.join(d, 'wayland-0')",
+            "s = socket.socket(socket.AF_UNIX)",
+            "s.bind(vrai)",
+            "secret = os.path.join(d, 'secret')",
+            "open(secret, 'w').close()",
+            "os.symlink(secret, os.path.join(d, 'wayland-9'))",
+            "os.symlink(vrai, os.path.join(d, 'wayland-8'))",
+            "def essai(nom, uid):",
+            "    try:",
+            "        fd = m.socket_epingle(os.path.join(d, nom), uid)",
+            "    except ValueError:",
+            "        return 'refuse'",
+            "    if fd is None:",
+            "        return 'absent'",
+            "    tenu = stat.S_ISSOCK(os.fstat(fd).st_mode)",
+            "    os.close(fd)",
+            "    return 'tenu' if tenu else 'AUTRE CHOSE'",
+            "u = os.getuid()",
+            "for nom, uid in (('wayland-0', u), ('wayland-0', u + 1), ('wayland-9', u),",
+            "                 ('wayland-8', u), ('secret', u), ('wayland-7', u)):",
+            "    print(nom, uid - u, essai(nom, uid))",
+            "shutil.rmtree(d)",
+        ))
+        r = subprocess.run([sys.executable, "-B", "-c", code],
+                           env=dict(os.environ, PYTHONPATH=LIB),
+                           capture_output=True, text=True, timeout=20)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertEqual(r.stdout.splitlines(), [
+            "wayland-0 0 tenu",         # le vrai socket, au demandeur
+            "wayland-0 1 refuse",       # le même, demandé pour un autre UID
+            "wayland-9 0 refuse",       # le lien vers un fichier de root
+            "wayland-8 0 refuse",       # un lien, même vers le vrai socket
+            "secret 0 refuse",          # un fichier ordinaire
+            "wayland-7 0 absent",       # le son peut manquer : pas une erreur
+        ])
+
+    def test_root_ne_suit_aucun_lien_de_ce_que_le_bureau_possede(self):
+        # Le dossier d'exécution du bureau et le dépôt, où le bureau écrit,
+        # peuvent contenir un lien. Root n'y agit que par un descripteur
+        # vérifié : mount, setfacl et chmod reçoivent /proc/self/fd/N — le
+        # fichier ouvert —, jamais un nom qu'on aurait pu échanger entre-temps.
+        code = _code(SERVICE)
+
+        def corps(nom):
+            return code.split("def %s(" % nom)[1].split("\ndef ")[0]
+
+        epingle = corps("socket_epingle")
+        for attendu in ("O_PATH", "O_NOFOLLOW", "S_ISSOCK", "st.st_uid != uid_proprietaire"):
+            self.assertIn(attendu, epingle)
+        self.assertIn("pass_fds", corps("droit_sur_socket"))
+        preparer = corps("_preparer")
+        self.assertIn("socket_epingle(", preparer)
+        self.assertNotIn("os.path.exists", preparer)
+        # La destination est chez l'Espace : un lien y serait recouvert, pas
+        # suivi — à condition que mount ne résolve pas le chemin lui-même.
+        presenter = corps("presenter")
+        for attendu in ("--no-canonicalize", "O_NOFOLLOW", "O_EXCL", "S_ISREG",
+                        "pass_fds=(source,)"):
+            self.assertIn(attendu, presenter)
+        # À la fermeture, le droit part du socket MONTÉ — celui qui l'a reçu —
+        # et avant le démontage.
+        fermer = corps("fermer")
+        self.assertLess(fermer.index("socket_epingle(chemin"), fermer.index("retirer(chemin)"))
+        self.assertIn("socket_epingle(", corps("ranger_les_anciennes_passerelles"))
+        # Le dépôt : le bureau y écrit, et chmod suit les liens.
+        ordres = corps("socket_d_ordres")
+        self.assertIn("os.chmod(par_descripteur(", ordres)
+        self.assertNotIn("os.chmod(chemin", ordres)
+
     def test_la_carte_est_reprise_a_la_fermeture_meme_si_elle_n_a_pas_servi(self):
         # Un Espace ouvert une fois avec la carte, refermé, puis rouvert sans
         # elle ne doit pas la garder : on retire de toutes, sans condition.

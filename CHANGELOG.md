@@ -10,6 +10,20 @@ GNOME (menu du Sceau, liserés colorés) ne se recharge pas à chaud.
 
 ---
 
+## 1.16.2 — non publiée
+
+**Correctif de sécurité important.** Le service qui prépare les Espaces tourne
+avec tous les droits. Pour présenter l'affichage et le son du bureau à un
+Espace, il prenait ce qu'il trouvait à leur place dans le dossier de votre
+session, sans vérifier que c'était bien eux. Un programme lancé sous votre
+compte, ou un autre utilisateur de la machine, pouvait y mettre un raccourci
+vers un fichier du système et se le faire ouvrir en écriture : c'est devenir
+administrateur sans mot de passe. Jusqu'en 1.16.0, le compte invité le pouvait
+aussi. Le service ne suit plus aucun raccourci : il vérifie ce qu'il ouvre et
+travaille sur ce qu'il a vérifié. Le défaut existait depuis la 1.15.0.
+
+---
+
 ## 1.16.1 — 28 septembre 2026
 
 **Chaque Espace a désormais son propre compte.** Le réglage « Compte séparé,

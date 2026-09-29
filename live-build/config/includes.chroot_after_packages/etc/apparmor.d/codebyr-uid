@@ -117,9 +117,11 @@ profile codebyr-uid /usr/lib/codebyr/codebyr-uid {
   /dev/dri/renderD[0-9]* r,
 
   # ── Ce qu'il LIT du bureau : les sockets qu'il présente, et rien d'autre ─
-  # Il les monte par « mount --bind » ; il vérifie seulement qu'elles existent.
-  # Lecture seule, et nommées une par une : le bus de session (/run/user/*/bus)
-  # n'est pas ici, et n'y sera pas.
+  # Il les ouvre sans suivre de lien et vérifie ce qu'il tient — un socket, au
+  # demandeur — puis les fait monter et accorder PAR CE DESCRIPTEUR : mount et
+  # setfacl, non confinés, suivraient sinon un lien posé par le bureau à leur
+  # place (voir socket_epingle). Lecture seule, et nommées une par une : le bus
+  # de session (/run/user/*/bus) n'est pas ici, et n'y sera pas.
   /run/user/[0-9]*/wayland-[0-9]* r,
   /run/user/[0-9]*/pipewire-0 r,
 

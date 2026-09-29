@@ -26,6 +26,11 @@ une mise à jour de `base-files` ; le dépôt APT porte une date de péremption,
 une version ne peut plus être publiée sans CI verte. Détail dans l'historique
 ci-dessous.
 
+**En préparation, 1.16.2** : le service root qui prépare les Espaces suivait
+les liens symboliques posés dans le dossier d'exécution du bureau. Tout compte
+du bureau pouvait s'en servir pour devenir root. Détail dans l'historique
+ci-dessous.
+
 Le modèle ci-dessous décrit aussi des versions antérieures ; ne pas déduire
 la protection d'un poste de la seule présence de ce document.
 
@@ -290,6 +295,7 @@ surface applicative minimale (`--apt-recommends false`).
 
 | Version | Correctif |
 |---|---|
+| 1.16.2 | **Élévation au rang de root par le service des comptes d'Espaces** (présent depuis 1.15.0). `codebyr-uid` tourne en root et présente à un Espace les sockets du bureau, pris dans `/run/user/<uid>`, un dossier qui appartient au demandeur. Il suivait les liens symboliques. Le demandeur y créait `wayland-9`, lien vers `/etc/shadow`, puis demandait un Espace avec cet affichage. Le service montait le fichier chez l'Espace, puis lui en accordait l'écriture par `setfacl`, qui suit les liens et tourne hors du profil AppArmor. Tout compte du bureau devenait root, l'invité compris jusqu'en 1.16.0, comme tout programme lancé sous le compte de l'utilisateur, sans mot de passe. Même classe de défaut : `chmod` de la socket d'ordres dans un dépôt où le bureau écrit (course), et la destination du montage, dans le dossier de l'Espace. Le service ouvre désormais chaque socket sans suivre de lien (`O_PATH`, `O_NOFOLLOW`) et vérifie le descripteur : un socket, au demandeur. `mount`, `setfacl` et `chmod` agissent sur ce descripteur (`/proc/self/fd/N`), jamais sur un nom échangeable entre-temps. La destination est créée sans suivre de lien et montée sans résolution de chemin (`--no-canonicalize`). Attaque reproduite puis vérifiée fermée le 29/09/2026 ; un test la rejoue. |
 | 1.16.1 | **Applications Flatpak sorties de leur Espace.** Dans un Espace ordinaire, une application Flatpak n'est pas dans le bac à sable de Codebyr, et ses permissions s'exercent sous le compte du bureau. Une application déclarant `--socket=session-bus`, ou le droit de parler à `org.freedesktop.Flatpak` (`flatpak-spawn --host`), à systemd ou à dconf, pouvait donc exécuter du code hors de tout bac à sable — la même classe de sortie que celle fermée en 1.1.0 — en portant le liseré de l'Espace. Ces permissions, et l'accès au système de fichiers entier, au dossier d'exécution du bureau ou aux parties décisives du dossier personnel, font désormais refuser l'application, avant tout lancement. Vérifié contre la sortie réelle de `flatpak info --show-permissions`, surcharges comprises. |
 | 1.16.1 | **Adresses d'aide vers un domaine inexistant.** `/etc/os-release`, l'installeur Calamares (aide, problèmes connus, notes de version, dons) et l'extension GNOME désignaient `codebyr.io`, qui n'existe pas : quiconque l'aurait acheté recevait les demandes d'aide — et de dons — des utilisateurs d'une distribution de sécurité. Adresses remplacées par `os.codebyr.dev` et le dépôt GitHub ; un test refuse désormais tout domaine `codebyr` autre que `codebyr.dev`. |
 | 1.16.1 | **Un Espace de l'invité pouvait survivre à sa session.** La remise à neuf de l'invité n'efface que son dossier personnel ; un Espace à compte séparé vit hors de ce dossier. Un invité qui cochait « Compte séparé » laissait donc le navigateur, les cookies et les fichiers de ses Espaces à l'invité suivant. L'invité n'obtient plus jamais de compte séparé : ni le lanceur ne le demande, ni le service ne l'accorde. *Non traité* : d'éventuels restes laissés sur une machine par un invité en 1.15–1.16. |

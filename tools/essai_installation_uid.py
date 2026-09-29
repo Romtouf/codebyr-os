@@ -367,7 +367,77 @@ def main():
                    (navigateur.stderr or "").strip().splitlines()[-1][:70]
                    if (navigateur.stderr or "").strip() else "aucune capture")
 
-    titre("6. Suppression complète")
+    titre("6. Un lien posé à la place d'un socket est refusé")
+    # Constaté le 29/09/2026 sur la 1.16.1 : le bureau posait « wayland-9 »,
+    # lien vers un fichier de root, puis demandait un Espace avec cet
+    # affichage. Le service montait le fichier chez l'Espace et lui en
+    # accordait l'écriture. La cible est ici un fichier d'essai, à root et en
+    # 0600 — surtout pas /etc/shadow : si la correction manquait, c'est elle
+    # qui recevrait le droit.
+    cible = os.path.join(COIN, "cible-de-root")
+    with open(cible, "w", encoding="utf-8") as f:
+        f.write("fichier de root\n")
+    os.chmod(cible, 0o600)
+    piege = "/run/user/%d/wayland-9" % uid
+    try:
+        os.unlink(piege)    # laissé par un essai interrompu
+    except OSError:
+        pass
+
+    def demander(affichage, lien=None):
+        """Une demande « preparer » envoyée PAR LE BUREAU, qui pose d'abord son lien."""
+        code = ("import json, os, socket, sys\n"
+                "if sys.argv[1]: os.symlink(sys.argv[2], sys.argv[1])\n"
+                "s = socket.socket(socket.AF_UNIX)\n"
+                "s.connect(%r)\n"
+                "s.sendall(sys.argv[3].encode() + b'\\n')\n"
+                "print(s.makefile().readline().strip())\n" % SOCKET)
+        demande = json.dumps({"action": "preparer", "espace": ESPACE, "affichage": affichage,
+                              "son": False, "memoire": "1G", "taches": 256})
+        r = comme_le_bureau(bureau, ["/usr/bin/python3", "-c", code, lien or "", cible, demande])
+        try:
+            return json.loads(r.stdout)
+        except ValueError:
+            return {"ok": None, "erreur": (r.stderr or r.stdout).strip()[:70]}
+
+    def droit_sur_la_cible():
+        acl = subprocess.run(["/usr/bin/getfacl", "-pn", cible],
+                             capture_output=True, text=True).stdout
+        return bool(espace) and ("user:%d:" % espace.pw_uid) in acl
+
+    reponse = demander("wayland-9", lien=piege)
+    reussi &= dire("le service refuse le lien du bureau", reponse.get("ok") is False,
+                   reponse.get("erreur", "") if reponse.get("ok") is not False else "")
+    reussi &= dire("…et la cible ne reçoit aucun droit", not droit_sur_la_cible(),
+                   "le compte de l'Espace a un droit sur la cible" if droit_sur_la_cible() else "")
+    try:
+        os.unlink(piege)
+    except OSError:
+        pass
+    # L'autre côté : le dossier d'exécution de l'Espace, où l'Espace écrit. Un
+    # lien posé là, à la place de l'affichage, faisait monter l'affichage du
+    # bureau PAR-DESSUS sa cible.
+    if espace:
+        runtime_espace = comptes.chemin_runtime(espace.pw_uid)
+        os.makedirs(runtime_espace, mode=0o700, exist_ok=True)
+        os.chown(runtime_espace, espace.pw_uid, espace.pw_gid)
+        glisse = os.path.join(runtime_espace, os.environ.get("WAYLAND_DISPLAY", "wayland-0"))
+        os.symlink(cible, glisse)
+        os.lchown(glisse, espace.pw_uid, espace.pw_gid)
+        reponse = demander(os.environ.get("WAYLAND_DISPLAY", "wayland-0"))
+        recouverte = os.path.ismount(cible) or not os.path.isfile(cible)
+        reussi &= dire("un lien glissé chez l'Espace est refusé", reponse.get("ok") is False,
+                       reponse.get("erreur", "") if reponse.get("ok") is not False else "")
+        reussi &= dire("…et la cible n'est pas recouverte", not recouverte,
+                       "l'affichage du bureau est monté sur la cible" if recouverte else "")
+        if os.path.ismount(cible):
+            subprocess.run(["/usr/bin/umount", cible], capture_output=True)
+    try:
+        os.unlink(cible)
+    except OSError:
+        pass
+
+    titre("7. Suppression complète")
     suppression = lanceur(bureau, "delete", ESPACE)
     reussi &= dire("Espace supprimé", suppression.returncode == 0,
                    (suppression.stderr or "").strip()[:70])

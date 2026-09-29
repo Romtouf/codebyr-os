@@ -16,9 +16,11 @@ installée sur machine réelle. Voir la [feuille de route](#feuille-de-route).
 
 ## Où en est le projet — 29 septembre 2026
 
-Version publiée : **1.16.2** (voir le [CHANGELOG](CHANGELOG.md)) — elle ferme
-une élévation de privilèges du service des comptes d'Espaces, présente depuis
-la 1.15.0 (détail dans [SECURITY.md](SECURITY.md)). Le lot de
+Version publiée : **1.16.3** (voir le [CHANGELOG](CHANGELOG.md)). La 1.16.2 a
+fermé une élévation de privilèges du service des comptes d'Espaces, présente
+depuis la 1.15.0 ; la 1.16.3 remet en marche le bouclier anti-hameçonnage, muet
+depuis la 1.6.0, et lui fait reconnaître les adresses déguisées par d'autres
+alphabets (détail dans [SECURITY.md](SECURITY.md)). Le lot de
 sécurité de septembre est publié (frontières des fichiers, restauration non
 destructive, aucun repli sans isolation, réseau restreint par namespace, filtre
 d'appels système).

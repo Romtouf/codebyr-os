@@ -26,7 +26,7 @@ une mise à jour de `base-files` ; le dépôt APT porte une date de péremption,
 une version ne peut plus être publiée sans CI verte. Détail dans l'historique
 ci-dessous.
 
-**En préparation, 1.16.3** : le bouclier anti-hameçonnage était muet sur toutes
+**Publié en 1.16.3** : le bouclier anti-hameçonnage était muet sur toutes
 les machines depuis la 1.6.0 (droit de lire les pages jamais accordé) ; il est
 désormais installé par Firefox lui-même, et reconnaît aussi les adresses
 déguisées par des lettres d'autres alphabets (homographes).

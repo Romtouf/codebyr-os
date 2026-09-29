@@ -134,6 +134,31 @@ assert ctypes.get_errno() == errno.EPERM, ctypes.get_errno()
                                   capture_output=True, text=True, timeout=10)
         self.assertEqual(resultat.returncode, 0, resultat.stderr)
 
+    def test_le_mode_mesure_journalise_sans_rien_desserrer_ni_casser(self):
+        """Le mode mesure laisse passer les candidats, et garde les refus.
+
+        Il sert à regarder des applications réelles : s'il refusait un
+        candidat, il casserait ce qu'on mesure ; s'il laissait passer un refus,
+        activer la mesure affaiblirait le Blindage.
+        """
+        code = '''import ctypes, errno
+from filtre_syscalls import appliquer
+appliquer(mesure=True)
+lib = ctypes.CDLL(None, use_errno=True)
+# get_mempolicy (candidat) : permis, journalisé.
+mode = ctypes.c_int(0)
+assert lib.syscall(239, ctypes.byref(mode), 0, 0, 0, 0) == 0, ctypes.get_errno()
+# personality(0xffffffff) (candidat) : la lecture du modèle d'exécution.
+assert lib.syscall(135, 0xffffffff) >= 0, ctypes.get_errno()
+# ptrace et io_uring : toujours refusés.
+assert lib.ptrace(0, 0, 0, 0) == -1 and ctypes.get_errno() == errno.EPERM
+assert lib.syscall(425, 1, 0) == -1 and ctypes.get_errno() == errno.EPERM
+'''
+        resultat = subprocess.run([sys.executable, "-B", "-c", code],
+                                  env=dict(os.environ, PYTHONPATH=LIB),
+                                  capture_output=True, text=True, timeout=10)
+        self.assertEqual(resultat.returncode, 0, resultat.stderr)
+
     def test_namespace_sans_sortie_directe_et_bouclage_refuse_par_le_filtre(self):
         """L'Espace n'a que le filtre ; le filtre ne le mène pas à cette machine.
 

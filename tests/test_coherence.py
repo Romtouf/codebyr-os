@@ -12,6 +12,7 @@ Deux dérives constatées le 27 septembre 2026, que rien ne détectait :
 L'état du projet est réécrit à la main en plusieurs endroits. Ces tests ne les
 empêchent pas de vieillir ; ils les empêchent de se contredire.
 """
+import json
 import os
 import re
 import unittest
@@ -66,6 +67,35 @@ class LesAdresses(unittest.TestCase):
             self.assertTrue(ligne.group(1).startswith(("https://os.codebyr.dev/",
                                                        "https://github.com/Romtouf/codebyr-os/")),
                             ligne.group(1))
+
+
+class LaDetteAnnoncee(unittest.TestCase):
+    """Ce que les documents vivants disent du code, face au code.
+
+    Relevé par l'audit du 29/09/2026 : CONTRIBUTING.md annonçait encore, dans
+    sa « dette technique connue », un bouclier en Manifest V2 — passé en V3 en
+    1.6.0, un mois plus tôt — et un seul compte Unix pour tous les Espaces,
+    quand chacun a le sien depuis la 1.16.1. Une dette soldée qui reste
+    affichée envoie un contributeur refaire ce qui est fait.
+    """
+
+    VIVANTS = ("README.md", "CONTRIBUTING.md",
+               os.path.join("docs", "chantiers.md"), os.path.join("docs", "architecture.md"))
+    INCLUS = ("live-build", "config", "includes.chroot_after_packages")
+
+    def test_le_manifeste_annonce_est_celui_du_bouclier(self):
+        manifeste = json.loads(_lire(*self.INCLUS, "usr", "share", "codebyr",
+                                     "antiphishing", "manifest.json"))
+        for chemin in self.VIVANTS:
+            for version in re.findall(r"\b(?:Manifest V|MV)(\d)\b", _lire(chemin)):
+                self.assertEqual(int(version), manifeste["manifest_version"],
+                                 "%s annonce Manifest V%s" % (chemin, version))
+
+    def test_la_dette_ne_dit_pas_un_seul_compte_quand_chacun_a_le_sien(self):
+        registre = json.loads(_lire(*self.INCLUS, "etc", "codebyr", "espaces.json"))
+        if all(e.get("compte") == "dedie" for e in registre["espaces"]):
+            dette = _lire("CONTRIBUTING.md").split("## Dette technique connue")[1]
+            self.assertNotRegex(dette.split("\n## ")[0], r"(?i)un seul compte")
 
 
 class LaVersionAnnoncee(unittest.TestCase):

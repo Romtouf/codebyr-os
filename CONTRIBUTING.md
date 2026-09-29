@@ -135,16 +135,15 @@ franchement vaut mieux que de laisser chacun le découvrir :
 
 ## Dette technique connue (assumée, écrite noir sur blanc)
 
-- **Extension Firefox en Manifest V2.** Firefox la supporte encore, mais AMO
-  pousse vers MV3 ; la migration devra être faite avant que MV2 ne soit refusé
-  à la signature. Le bouclier étant un simple content script sans arrière-plan,
-  la conversion devrait rester mécanique.
 - **Registre des Espaces lu par quatre programmes** (trois en Python, un en
   GJS) : impossible de partager du code entre Python et GJS, et les outils
   Python restent volontairement autonomes. La règle (« la copie utilisateur
   prime ») est donc vérifiée par un test (`tests/test_registre_coherence.py`)
   plutôt que garantie par le langage.
-- **Un seul compte Unix pour tous les Espaces** — voir SECURITY.md.
+- **Deux fonctions manquent sous compte séparé**, le mode par défaut depuis
+  1.16.1 : « Ajouter une application » (un programme téléchargé) n'y est pas
+  encore possible, et une application Flatpak n'y reçoit pas le fichier choisi
+  dans « Ouvrir un fichier » — voir SECURITY.md.
 - **Les ISO ne sont pas reproductibles** (horodatage, état du miroir Debian).
 
 ## Où aider en priorité

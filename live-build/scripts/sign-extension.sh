@@ -116,6 +116,18 @@ rm -f "$SIGNES"/*.xpi
 cp "$nouveau" "$SIGNES/"
 echo "==> Installé : $SIGNES/$(basename "$nouveau")"
 
+# ── 6 bis) La politique qui fait installer le bouclier par Firefox ──────────
+# Elle désigne le .xpi par son nom, que Mozilla change à chaque signature.
+# Sans cette ligne, Firefox chercherait l'ancien fichier, et n'installerait plus
+# rien (tests/test_bouclier.py le vérifie).
+POLITIQUE="$REPO/live-build/config/includes.chroot_after_packages/usr/lib/firefox-esr/distribution/policies.json"
+sed -i "s#\"install_url\": \"file:///usr/share/codebyr/antiphishing/signed/[^\"]*\"#\"install_url\": \"file:///usr/share/codebyr/antiphishing/signed/$(basename "$nouveau")\"#" "$POLITIQUE"
+grep -q "signed/$(basename "$nouveau")\"" "$POLITIQUE" || {
+	echo "ERREUR : la politique Firefox ne désigne pas le nouveau .xpi : $POLITIQUE" >&2
+	exit 1
+}
+echo "    Politique Firefox : désigne $(basename "$nouveau")"
+
 # ── 7) Vérification : le .xpi correspond-il bien aux sources ? ──────────────
 # Attention sous Windows : « python » existe souvent comme simple RACCOURCI vers
 # le Microsoft Store — il répond à « command -v », affiche « Python est

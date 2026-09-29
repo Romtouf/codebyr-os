@@ -18,13 +18,21 @@ exactement comme celle de votre banque, et le bouclier ne la reconnaissait pas.
 Il la lit désormais comme vous la voyez, accents et lettres d'autres alphabets
 compris, et son avertissement indique comment l'adresse s'écrit réellement.
 
-**Le bouclier s'active aussi quand la banque est déclarée après coup.** Si le
-navigateur d'un Espace avait été ouvert avant que vous déclariez votre banque
-— la liste est vide à l'installation —, Firefox s'était créé son propre
-profil, et le bouclier était déposé dans un autre, que personne n'ouvrait. Il
-ne s'affichait donc jamais dans cet Espace. Il va désormais dans le profil
-que Firefox utilise vraiment ; vos marque-pages et votre historique restent
-où ils sont.
+**Le bouclier fonctionne de nouveau — il ne fonctionnait plus depuis la
+1.6.0.** En l'éprouvant dans un vrai Firefox, nous avons découvert qu'il était
+bien chargé, mais muet : depuis son passage au nouveau format d'extension de
+Firefox (août 2026), le droit de lire les pages n'est plus accordé d'office à
+une extension déposée dans le profil, comme le faisait Codebyr. Personne ne le
+lui accordait, et rien ne le signalait. C'est désormais Firefox qui installe le
+bouclier lui-même, par une règle livrée avec Codebyr : il reçoit ce droit sans
+que vous ayez rien à faire. Au premier ou au deuxième lancement de chaque
+navigateur après la mise à jour, l'ancienne copie est remplacée.
+
+Au passage, le bouclier s'installe aussi dans les Espaces dont le navigateur
+avait été ouvert avant que vous déclariez votre banque (il était déposé dans un
+profil que Firefox n'ouvrait pas), et Firefox retrouve son garde-fou contre les
+extensions glissées en silence dans un profil, que Codebyr désactivait pour y
+déposer la sienne.
 
 ---
 

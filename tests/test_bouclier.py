@@ -215,33 +215,112 @@ class InstallationDansLeProfil(unittest.TestCase):
     def _xpi(self, profil):
         return os.path.join(self.ff, profil, "extensions", "antiphishing@codebyr.io.xpi")
 
+    def _lire(self, *chemin):
+        with open(os.path.join(*chemin), encoding="utf-8") as f:
+            return f.read()
+
+    def _domaines(self):
+        stock = os.path.join(self.home, ".mozilla", "managed-storage", "antiphishing@codebyr.io.json")
+        return json.loads(self._lire(stock))["data"]["domaines"]
+
+    def _profil_existant(self, nom, extensions_json=None, copie=False):
+        os.makedirs(os.path.join(self.ff, nom, "extensions"))
+        with open(os.path.join(self.ff, "profiles.ini"), "w", encoding="utf-8") as f:
+            f.write("[Profile0]\nName=x\nIsRelative=1\nPath=%s\nDefault=1\n" % nom)
+        if extensions_json is not None:
+            with open(os.path.join(self.ff, nom, "extensions.json"), "w", encoding="utf-8") as f:
+                json.dump(extensions_json, f)
+        if copie:
+            with open(self._xpi(nom), "wb") as f:
+                f.write(b"PK copie")
+
     def test_premier_lancement_sans_banque_le_profil_de_codebyr_est_pose(self):
         self.space._installer_bouclier_pour(self.home, [])
-        with open(os.path.join(self.ff, "profiles.ini"), encoding="utf-8") as f:
-            self.assertIn("Path=codebyr.default", f.read())
-        self.assertFalse(os.path.exists(self._xpi("codebyr.default")))
+        self.assertIn("Path=codebyr.default", self._lire(self.ff, "profiles.ini"))
+        # Liste écrite même vide : une banque retirée ne reste pas protégée.
+        self.assertEqual(self._domaines(), [])
 
-    def test_le_bouclier_va_dans_le_profil_que_firefox_s_est_cree(self):
-        os.makedirs(os.path.join(self.ff, "ab12cd.default-esr"))
-        ini = ("[Profile0]\nName=default-esr\nIsRelative=1\nPath=ab12cd.default-esr\n"
-               "Default=1\n\n[General]\nStartWithLastProfile=1\nVersion=2\n")
-        with open(os.path.join(self.ff, "profiles.ini"), "w", encoding="utf-8") as f:
-            f.write(ini)
+    def test_codebyr_ne_depose_plus_l_extension_c_est_firefox_qui_l_installe(self):
+        # Par la politique du paquet (dossier distribution) : son circuit
+        # d'installation est le seul qui accorde le droit de lire les pages.
+        self.space._installer_bouclier_pour(self.home, ["mabanque.fr"])
+        self.assertFalse(os.path.exists(self._xpi("codebyr.default")))
+        self.assertEqual(self._domaines(), ["mabanque.fr"])
+
+    def test_le_garde_fou_de_firefox_contre_les_extensions_deposees_est_retabli(self):
+        # Codebyr posait autoDisableScopes à 0 pour SON extension : toute autre
+        # extension glissée dans le profil s'activait alors sans rien demander.
+        self.space._installer_bouclier_pour(self.home, ["mabanque.fr"])
+        prefs = self._lire(self.ff, "codebyr.default", "user.js")
+        self.assertIn('user_pref("extensions.autoDisableScopes", 3);', prefs)
+        self.assertNotIn('"extensions.autoDisableScopes", 0', prefs)
+
+    def test_les_reglages_vont_dans_le_profil_que_firefox_s_est_cree(self):
+        self._profil_existant("ab12cd.default-esr")
+        ini = self._lire(self.ff, "profiles.ini")
+        self.space._installer_bouclier_pour(self.home, ["mabanque.fr"])
+        self.assertIn("autoDisableScopes", self._lire(self.ff, "ab12cd.default-esr", "user.js"))
+        self.assertFalse(os.path.exists(os.path.join(self.ff, "codebyr.default")))
+        self.assertEqual(self._lire(self.ff, "profiles.ini"), ini, "le choix de Firefox est gardé")
+
+    def test_la_copie_deposee_a_l_ancienne_est_retiree(self):
+        # Déposée par Codebyr jusqu'en 1.16.3, souvent sans droit sur les pages.
+        # Firefox refuse de réinstaller par la politique une version présente :
+        # sans ce retrait, elle resterait muette à vie (constaté sur la VM).
+        self._profil_existant("ab12cd.default-esr", {"addons": [
+            {"id": "antiphishing@codebyr.io", "version": "1.3",
+             "installTelemetryInfo": {"source": "app-profile", "method": "sideload"}}]},
+            copie=True)
+        self.space._installer_bouclier_pour(self.home, ["mabanque.fr"])
+        self.assertFalse(os.path.exists(self._xpi("ab12cd.default-esr")))
+
+    def test_la_copie_installee_par_firefox_est_gardee(self):
+        self._profil_existant("ab12cd.default-esr", {"addons": [
+            {"id": "antiphishing@codebyr.io", "version": "1.3",
+             "installTelemetryInfo": {"source": "enterprise-policy"}}]}, copie=True)
         self.space._installer_bouclier_pour(self.home, ["mabanque.fr"])
         self.assertTrue(os.path.isfile(self._xpi("ab12cd.default-esr")))
-        self.assertFalse(os.path.exists(self._xpi("codebyr.default")))
-        with open(os.path.join(self.ff, "ab12cd.default-esr", "user.js"), encoding="utf-8") as f:
-            self.assertIn("extensions.autoDisableScopes", f.read())
-        with open(os.path.join(self.ff, "profiles.ini"), encoding="utf-8") as f:
-            self.assertEqual(f.read(), ini, "le choix de profil de Firefox est gardé")
 
     def test_un_profiles_ini_piege_ne_fait_rien_ecrire_ailleurs(self):
         os.makedirs(self.ff)
         with open(os.path.join(self.ff, "profiles.ini"), "w", encoding="utf-8") as f:
             f.write("[Profile0]\nIsRelative=1\nPath=../../dehors\nDefault=1\n")
         self.space._installer_bouclier_pour(self.home, ["mabanque.fr"])
-        self.assertTrue(os.path.isfile(self._xpi("codebyr.default")))
+        self.assertTrue(os.path.isfile(os.path.join(self.ff, "codebyr.default", "user.js")))
         self.assertFalse(os.path.exists(os.path.join(self.home, "dehors")))
+
+
+class PolitiqueFirefox(unittest.TestCase):
+    """La politique qui fait installer le bouclier par Firefox lui-même.
+
+    Mesuré le 29/09/2026 sur Firefox 140 ESR : placée dans le dossier
+    distribution, elle installe l'extension signée par le circuit ordinaire, qui
+    lui accorde le droit de lire les pages ; /etc/firefox-esr/policies n'est pas
+    lu par ce Firefox.
+    """
+
+    CHEMIN = os.path.join(RACINE, "live-build", "config", "includes.chroot_after_packages",
+                          "usr", "lib", "firefox-esr", "distribution", "policies.json")
+
+    def test_elle_designe_le_xpi_signe_livre(self):
+        with open(self.CHEMIN, encoding="utf-8") as f:
+            reglage = json.load(f)["policies"]["ExtensionSettings"]["antiphishing@codebyr.io"]
+        signes = [os.path.basename(x) for x in glob.glob(os.path.join(SIGNES, "*.xpi"))]
+        self.assertEqual(len(signes), 1, signes)
+        self.assertEqual(reglage["install_url"],
+                         "file:///usr/share/codebyr/antiphishing/signed/" + signes[0],
+                         "la politique doit désigner le .xpi livré — sign-extension.sh "
+                         "la met à jour à chaque signature")
+        self.assertEqual(reglage["installation_mode"], "normal_installed")
+
+    def test_elle_part_avec_le_paquet(self):
+        with open(os.path.join(RACINE, "packaging", "build-deb.sh"), encoding="utf-8") as f:
+            self.assertIn("usr/lib/firefox-esr/distribution/policies.json", f.read())
+
+    def test_la_signature_la_tient_a_jour(self):
+        with open(os.path.join(RACINE, "live-build", "scripts", "sign-extension.sh"),
+                  encoding="utf-8") as f:
+            self.assertIn("distribution/policies.json", f.read())
 
 
 class XpiSigne(unittest.TestCase):

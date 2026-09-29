@@ -40,6 +40,7 @@ for chemin in \
 	usr/lib/codebyr \
 	usr/lib/systemd/system/codebyr-uid.socket \
 	usr/lib/systemd/system/codebyr-uid.service \
+	usr/lib/firefox-esr/distribution/policies.json \
 	usr/share/gnome-shell/extensions/codebyr@codebyr.io \
 	usr/share/codebyr \
 	usr/share/nautilus-python \
@@ -113,6 +114,8 @@ find "$STAGE/usr/share/codebyr" "$STAGE/usr/share/nautilus-python" \
 find "$STAGE/usr/share/gnome-shell" -type f -exec chmod 644 {} + 2>/dev/null || true
 find "$STAGE/usr/share/applications" -type f -exec chmod 644 {} + 2>/dev/null || true
 chmod 644 "$STAGE/usr/lib/os-release"
+# La politique qui fait installer le bouclier par Firefox lui-même.
+chmod 644 "$STAGE/usr/lib/firefox-esr/distribution/policies.json"
 # Réglages GNOME par défaut (dont Verr. Maj à la manière de Windows). Ils ne
 # vivaient que dans l'image : une machine installée ne recevait jamais un
 # nouveau défaut. glib les recompile seul, par son déclencheur dpkg.

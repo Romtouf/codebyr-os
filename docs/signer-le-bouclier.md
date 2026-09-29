@@ -70,6 +70,27 @@ en une à deux minutes.
 | `401 Unauthorized` | Identifiants invalides ou expirés | Régénérer les identifiants sur la page AMO |
 | `Upload failed` | Identifiants faux, ou AMO indisponible | Vérifier `~/.codebyr-amo`, puis réessayer |
 
+## Comment le bouclier arrive dans Firefox
+
+C'est **Firefox qui l'installe**, par une politique d'entreprise livrée avec le
+paquet : `/usr/lib/firefox-esr/distribution/policies.json`, qui désigne le
+`.xpi` signé par son nom. `sign-extension.sh` met ce nom à jour à chaque
+signature, et `tests/test_bouclier.py` vérifie que les deux concordent.
+
+Pourquoi pas une copie déposée dans le profil, comme avant la 1.16.3 : une
+extension Manifest V3 n'y reçoit pas d'office le droit de lire les pages.
+Firefox ne l'accorde qu'à une installation par son circuit ordinaire — celui
+qu'emprunte la politique. Le bouclier déposé restait chargé, signé, actif, et
+ne s'exécutait sur aucune page (de la 1.6.0 à la 1.16.2). Deux autres faits
+mesurés sur Firefox 140 ESR :
+
+- ce Firefox lit la politique dans son dossier `distribution`, et dans
+  `/etc/firefox/policies/` — **pas** dans `/etc/firefox-esr/policies/`. Un
+  administrateur qui pose la sienne dans `/etc/firefox/policies/` remplace
+  celle de Codebyr, et doit alors y reprendre le bouclier ;
+- Firefox refuse de réinstaller par la politique une version déjà présente :
+  c'est pourquoi `codebyr-space` retire les copies déposées autrefois.
+
 ## Comment les domaines arrivent dans une extension scellée
 
 Le bouclier a besoin des domaines bancaires **de chaque utilisateur**, mais une

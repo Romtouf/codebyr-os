@@ -440,17 +440,16 @@ def _ajouter_prefs(chemin, prefs):
 
 
 def _installer_bouclier(esp, home, espaces):
-    """Installe le bouclier anti-hameçonnage dans le profil Firefox d'un Espace
-    de navigation : avertit si un site imite une banque protégée.
+    """Prépare le bouclier anti-hameçonnage pour le Firefox d'un Espace : il
+    avertit si un site imite une banque protégée.
 
-    Les domaines passent par le stockage managé : le code de l'extension reste
-    STATIQUE, donc signable par Mozilla. Seul un .xpi SIGNÉ est installé.
-
-    Il n'existe volontairement PLUS de repli « .xpi non signé » : il obligeait à
-    poser xpinstall.signatures.required=false, c'est-à-dire à désactiver la
-    vérification des signatures d'extensions dans le profil — un affaiblissement
-    réel du navigateur pour installer une protection. Sans .xpi signé, on
-    n'installe rien, et on le dit."""
+    Firefox installe l'extension signée lui-même, par la politique du paquet ;
+    les domaines passent par le stockage managé, et le code de l'extension
+    reste STATIQUE, donc signable par Mozilla. Il n'existe volontairement pas
+    de repli « .xpi non signé » : il obligeait à poser
+    xpinstall.signatures.required=false, c'est-à-dire à désactiver la
+    vérification des signatures d'extensions — un affaiblissement réel du
+    navigateur pour installer une protection."""
     _installer_bouclier_pour(home, _domaines_proteges(espaces))
 
 
@@ -463,43 +462,60 @@ def _installer_bouclier_pour(home, doms):
     """
     if not os.path.isdir(BOUCLIER_DIR):
         return
-    # Le profil d'abord, même sans banque déclarée : Firefox ouvre ainsi celui
-    # de Codebyr dès son premier lancement, et le bouclier y trouvera sa place
-    # le jour où une banque le sera.
+    # L'extension, c'est FIREFOX qui l'installe, par la politique que livre le
+    # paquet (/usr/lib/firefox-esr/distribution/policies.json) : par son circuit
+    # d'installation ordinaire, le seul qui accorde à une extension Manifest V3
+    # le droit de lire les pages. Codebyr la déposait lui-même dans le profil ;
+    # Firefox ne la découvrait pas toujours, et, découverte, ne lui accordait
+    # pas toujours ce droit. Le bouclier restait chargé, et muet — depuis le
+    # passage à Manifest V3 (1.6.0). Constaté le 29/09/2026 sur la VM.
+    #
+    # Reste à Codebyr ce que la politique ne sait pas faire : le profil, et la
+    # liste des banques de CET utilisateur, fournie en donnée (l'extension reste
+    # statique, donc signable). Écrite même vide : une banque retirée ne doit
+    # pas rester protégée par une liste périmée.
     ffdir = _profil_firefox(home)
-    if not doms:
-        return
-    extdir = os.path.join(ffdir, "extensions")
-    fichiers_surs.mkdir(extdir)
-
-    # Domaines fournis en donnée (l'extension reste statique → signable).
-    _ecrire_stockage_manage(home, doms)
-
-    # .xpi signé par Mozilla, s'il y en a un (nom quelconque : AMO le génère).
-    signe = None
-    signed_dir = os.path.join(BOUCLIER_DIR, "signed")
-    if os.path.isdir(signed_dir):
-        for f in sorted(os.listdir(signed_dir)):
-            if f.endswith(".xpi"):
-                signe = os.path.join(signed_dir, f)
-                break
-    if signe is None:
-        sys.stderr.write(
-            "codebyr-space : bouclier anti-hameçonnage indisponible (aucune "
-            "extension signée dans %s/signed). Aucune protection installée — et "
-            "aucun réglage de sécurité de Firefox abaissé.\n" % BOUCLIER_DIR)
-        return
-
+    _ecrire_stockage_manage(home, list(doms or []))
+    _retirer_copie_deposee(ffdir)
+    # Firefox fait attendre l'accord de l'utilisateur avant d'activer une
+    # extension déposée en silence dans le profil (3 : son réglage par défaut).
+    # Codebyr posait 0 pour la sienne, et désarmait du même coup ce garde-fou
+    # pour toutes les autres. On le rétablit.
     _ajouter_prefs(os.path.join(ffdir, "user.js"), [
-        'user_pref("extensions.autoDisableScopes", 0);',
+        'user_pref("extensions.autoDisableScopes", 3);',
         'user_pref("extensions.enabledScopes", 15);',
     ])
+    if doms:
+        print("Bouclier anti-hameçonnage : %d domaine(s) de banque protégé(s)." % len(doms))
 
-    with open(signe, "rb") as src, fichiers_surs.ouvrir(
-            os.path.join(extdir, BOUCLIER_ID + ".xpi"), "wb") as dst:
-        shutil.copyfileobj(src, dst)
-    print("Bouclier anti-hameçonnage actif [signé] "
-          "(%d domaine(s) de banque protégé(s))." % len(doms))
+
+def _retirer_copie_deposee(ffdir):
+    """Retire le bouclier que Codebyr déposait dans le profil (jusqu'en 1.16.3).
+
+    Firefox refuse de réinstaller par la politique une version déjà présente :
+    la copie déposée, souvent sans droit sur les pages, resterait donc à vie.
+    On la retire ; Firefox la désinstalle au lancement suivant, et la politique
+    la réinstalle au suivant, avec son droit (mesuré le 29/09/2026). Une copie
+    que Firefox a installée LUI-MÊME par la politique n'est jamais touchée.
+    """
+    nom = BOUCLIER_ID + ".xpi"
+    extdir = os.path.join(ffdir, "extensions")
+    try:
+        with fichiers_surs.ouvrir(os.path.join(ffdir, "extensions.json"), encoding="utf-8") as f:
+            base = json.load(f)
+        for a in base.get("addons") or []:
+            if isinstance(a, dict) and a.get("id") == BOUCLIER_ID and \
+                    (a.get("installTelemetryInfo") or {}).get("source") == "enterprise-policy":
+                return
+    except (OSError, ValueError):
+        pass
+    try:
+        with fichiers_surs.dossier(extdir) as fd:
+            os.unlink(nom, dir_fd=fd)
+    except OSError:
+        # Absente, ou un piège (lien, dossier) : rien à retirer, et rien qui
+        # doive empêcher l'Espace de s'ouvrir.
+        pass
 
 
 def _visionneuse_pour(nom):

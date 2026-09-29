@@ -15,7 +15,8 @@ def verifier_arbre(stage, racine):
         attendus += list((source / arbre).rglob("*"))
     attendus += [source / "etc/codebyr/espaces.json",
                  source / "usr/share/applications/io.codebyr.Ouvrir.desktop",
-                 source / "usr/share/glib-2.0/schemas/90_codebyr.gschema.override"]
+                 source / "usr/share/glib-2.0/schemas/90_codebyr.gschema.override",
+                 source / "usr/lib/firefox-esr/distribution/policies.json"]
     attendus += [source / "usr/bin" / n for n in (
         "codebyr-space", "codebyr-net-proxy", "codebyr-jetable", "codebyr-config",
         "codebyr-assistant", "codebyr-bienvenue", "codebyr-verifier", "codebyr-durcir-poste")]

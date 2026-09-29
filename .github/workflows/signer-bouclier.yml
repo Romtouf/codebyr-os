@@ -101,7 +101,8 @@ jobs:
           set -e
           git config user.name  "codebyr-signature"
           git config user.email "noreply@codebyr.dev"
-          git add live-build/config/includes.chroot_after_packages/usr/share/codebyr/antiphishing
+          git add live-build/config/includes.chroot_after_packages/usr/share/codebyr/antiphishing \
+                  live-build/config/includes.chroot_after_packages/usr/lib/firefox-esr/distribution/policies.json
           git commit -m "Bouclier : re-signé par Mozilla en $VERSION_BOUCLIER
 
           $RAISON

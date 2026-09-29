@@ -10,7 +10,10 @@ bouclier ne puisse pas rester lettre morte sans qu'on le voie.
 import glob
 import json
 import os
+import random
 import re
+import shutil
+import subprocess
 import unittest
 import zipfile
 
@@ -64,6 +67,93 @@ class CodeStatique(unittest.TestCase):
         # On construit l'avertissement avec textContent : le nom d'hôte affiché
         # vient du site visité, il n'a rien à faire dans du HTML interprété.
         self.assertEqual(re.findall(r"\.innerHTML\s*=", self.code), [])
+
+
+HARNAIS = os.path.join(os.path.dirname(os.path.abspath(__file__)), "bouclier_harnais.cjs")
+
+
+def _node(demande):
+    r = subprocess.run(["node", HARNAIS], input=json.dumps(demande), capture_output=True,
+                       text=True, encoding="utf-8", timeout=60)
+    if r.returncode != 0:
+        raise AssertionError("banc d'essai du bouclier : %s" % r.stderr)
+    return json.loads(r.stdout)
+
+
+@unittest.skipUnless(shutil.which("node"), "node absent : le bouclier ne peut pas être exécuté")
+class Detection(unittest.TestCase):
+    """Le VRAI content.js, exécuté comme Firefox l'exécute, face à des adresses.
+
+    Relevé par l'audit du 29/09/2026 : le navigateur donne le nom d'hôte en
+    punycode. « mаbanque.fr » avec un « а » cyrillique arrivait comme
+    « xn--mbanque-2fg.fr », ne ressemblait plus à rien, et le bouclier se
+    taisait — sur l'attaque qu'il existe pour arrêter. Les adresses piégées
+    sont écrites ici en codes : à l'œil, elles sont identiques aux vraies.
+    """
+
+    # Le registre n'accepte que de l'ASCII (registre.normaliser_domaine) : un
+    # domaine accentué, « société-exemple.fr », y est inscrit en punycode.
+    PROTEGES = ["mabanque.fr", "revolut.com", "paypal.com", "xn--socit-exemple-ehbb.fr"]
+    ATTENDUS = [
+        ("https://mabanque.fr/", False, "le site officiel"),
+        ("https://www.mabanque.fr/", False, "un sous-domaine officiel"),
+        ("https://mabanque.com/", True, "même nom, autre extension"),
+        ("https://nabanque.fr/", True, "faute de frappe"),
+        ("https://mabanque.piege.com/", True, "le nom en étiquette"),
+        ("https://revolution.com/", False, "le nom dans un mot, pas en étiquette"),
+        ("https://mаbanque.fr/", True, "un « а » cyrillique"),
+        ("https://раураӏ.com/", True, "« paypal » tout en cyrillique"),
+        ("https://ραyραl.com/", True, "« paypal » en partie grec"),
+        ("https://mabánque.fr/", True, "un accent ajouté"),
+        ("https://mаbаnquе-sесurе.com/", True,
+         "alphabets mêlés, nom en préfixe"),
+        ("https://ｍａｂａｎｑｕｅ.com/", True, "pleine chasse"),
+        ("https://münchen.de/", False, "un domaine international ordinaire"),
+        ("https://пример.рф/", False,
+         "un domaine cyrillique ordinaire"),
+        ("https://société-exemple.fr/", False, "un domaine protégé accentué, officiel"),
+        ("https://societe-exemple.fr/", True, "le même, sans ses accents"),
+    ]
+
+    def setUp(self):
+        self.resultats = {r["adresse"]: r for r in _node({
+            "mode": "adresses", "proteges": self.PROTEGES,
+            "adresses": [a for a, _alerte, _cas in self.ATTENDUS]})}
+
+    def test_chaque_adresse(self):
+        for adresse, alerte, cas in self.ATTENDUS:
+            with self.subTest(cas=cas):
+                r = self.resultats[adresse]
+                self.assertEqual(r["alerte"], alerte, "%s (%s)" % (cas, r["hote"]))
+
+    def test_l_alerte_montre_l_adresse_telle_qu_elle_s_ecrit(self):
+        # À l'écran, « mаbanque.fr » est « mabanque.fr » : l'alerte dit ce que
+        # l'adresse est vraiment, et seulement quand elle trompe l'œil.
+        piege = self.resultats["https://mаbanque.fr/"]
+        self.assertTrue(any("s'écrit « xn--" in t for t in piege["textes"]), piege["textes"])
+        simple = self.resultats["https://mabanque.com/"]
+        self.assertFalse(any("s'écrit «" in t for t in simple["textes"]), simple["textes"])
+
+    def test_le_decodeur_rend_ce_que_rend_celui_de_node(self):
+        # RFC 3492, contre l'implémentation de référence de node (ICU), sur des
+        # étiquettes tirées de plusieurs alphabets — la graine est fixe.
+        alphabets = ["abcdefghijklmnopqrstuvwxyz0123456789-",
+                     "àâäçéèêëîïôöùûüÿñ",
+                     "".join(chr(c) for c in range(0x0430, 0x0450)),
+                     "".join(chr(c) for c in range(0x03b1, 0x03ca)),
+                     "".join(chr(c) for c in range(0x0561, 0x0587)),
+                     "".join(chr(c) for c in range(0x4e00, 0x4e40))]
+        hasard = random.Random(20260929)
+        etiquettes = ["münchen", "пример", "bücher",
+                      "ñandú", "例え"]
+        for _ in range(400):
+            melange = "".join(hasard.sample(alphabets, hasard.randint(1, 3)))
+            etiquettes.append("".join(hasard.choice(melange)
+                                      for _ in range(hasard.randint(1, 20))).strip("-"))
+        r = _node({"mode": "punycode", "etiquettes": [e for e in etiquettes if e]})
+        self.assertEqual(r["ecarts"], [])
+        # Un test qui n'a rien comparé ne prouve rien.
+        self.assertGreater(r["comparees"], 300)
 
 
 class XpiSigne(unittest.TestCase):

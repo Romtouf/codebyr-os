@@ -10,6 +10,16 @@ GNOME (menu du Sceau, liserés colorés) ne se recharge pas à chaud.
 
 ---
 
+## 1.16.3 — non publiée
+
+**Le bouclier anti-hameçonnage voit les adresses déguisées.** Une adresse
+comme « mаbanque.fr », écrite avec un « а » de l'alphabet cyrillique, s'affiche
+exactement comme celle de votre banque, et le bouclier ne la reconnaissait pas.
+Il la lit désormais comme vous la voyez, accents et lettres d'autres alphabets
+compris, et son avertissement indique comment l'adresse s'écrit réellement.
+
+---
+
 ## 1.16.2 — 29 septembre 2026
 
 **Correctif de sécurité important.** Le service qui prépare les Espaces tourne

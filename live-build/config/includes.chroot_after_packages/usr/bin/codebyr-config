@@ -5,6 +5,7 @@ codebyr-config — Configuration de Codebyr OS.
 Permet à chacun de définir SES vrais sites bancaires (protégés + surveillés par
 le bouclier anti-hameçonnage) et de voir ses Espaces. 100% local.
 """
+import json
 import os
 import shutil
 import subprocess
@@ -447,7 +448,9 @@ class Fenetre(Adw.ApplicationWindow):
         if esp is not None:
             prog = Adw.ActionRow(
                 title="Ajouter un programme téléchargé",
-                subtitle="Un fichier exécutable présent sur le disque, vers « %s »"
+                subtitle=("Un programme téléchargé dans « %s », ou envoyé vers lui"
+                          if compte_dedie.demande(esp) else
+                          "Un fichier exécutable présent sur le disque, vers « %s »")
                          % esp.get("nom", ""))
             bprog = Gtk.Button(icon_name="document-open-symbolic",
                                valign=Gtk.Align.CENTER, label="Parcourir…")
@@ -640,12 +643,94 @@ class Fenetre(Adw.ApplicationWindow):
 
     # ---- Ajout d'un programme LOCAL (binaire téléchargé) au menu d'un Espace ----
     def _ouvrir_ajout_programme(self, esp):
+        if compte_dedie.demande(esp):
+            # Sous compte séparé, le bureau ne voit pas le dossier de l'Espace
+            # — c'est tout l'objet du compte. C'est l'Espace qui dresse la liste
+            # de ses programmes ; on n'y choisit que parmi eux.
+            self._chercher_programmes_de_l_espace(esp)
+            return
         dialog = Gtk.FileDialog(title="Choisir un programme")
         dl = os.path.expanduser(
             "~/.local/share/codebyr/espaces/%s/home/Téléchargements" % esp.get("id"))
         if os.path.isdir(dl):
             dialog.set_initial_folder(Gio.File.new_for_path(dl))
         dialog.open(self, None, self._programme_choisi, esp)
+
+    NATURES = {"appimage": "AppImage", "elf": "Programme", "script": "Script"}
+
+    def _annoncer(self, texte):
+        if hasattr(self, "_toaster"):
+            self._toaster.add_toast(Adw.Toast(title=texte))
+
+    def _chercher_programmes_de_l_espace(self, esp):
+        """Demande à l'Espace sa liste de programmes, sans figer la fenêtre."""
+        self._annoncer("Recherche des programmes de « %s »…" % esp.get("nom", ""))
+        try:
+            proc = Gio.Subprocess.new(
+                ["codebyr-space", "programmes", esp.get("id", "")],
+                Gio.SubprocessFlags.STDOUT_PIPE | Gio.SubprocessFlags.STDERR_SILENCE)
+        except GLib.Error:
+            self._annoncer("Impossible d'interroger l'Espace « %s »." % esp.get("nom", ""))
+            return
+        proc.communicate_utf8_async(None, None, self._programmes_recus, esp)
+
+    def _programmes_recus(self, proc, resultat, esp):
+        try:
+            _ok, sortie, _err = proc.communicate_utf8_finish(resultat)
+            liste = json.loads((sortie or "").strip().splitlines()[-1])
+        except (GLib.Error, ValueError, IndexError):
+            liste = None
+        if not isinstance(liste, list):
+            self._annoncer("L'Espace « %s » n'a pas pu dresser la liste de ses "
+                           "programmes." % esp.get("nom", ""))
+            return
+        self._choisir_programme(esp, liste)
+
+    def _choisir_programme(self, esp, liste):
+        """La liste que l'Espace a dressée. Les noms viennent de lui : sans balisage."""
+        dlg = Adw.Window(transient_for=self, modal=True, default_width=500,
+                         default_height=520,
+                         title="Programmes de « %s »" % esp.get("nom", ""))
+        tv = Adw.ToolbarView()
+        tv.add_top_bar(Adw.HeaderBar())
+        boite = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
+        for m in ("top", "bottom", "start", "end"):
+            getattr(boite, "set_margin_" + m)(10)
+        aide = ("Pour en ajouter un autre, téléchargez-le avec le navigateur de "
+                "l'Espace, ou envoyez-le-lui (clic droit sur le fichier → « Envoyer "
+                "vers l'Espace »), puis revenez ici.")
+        entete = Gtk.Label(wrap=True, xalign=0, label=(
+            ("Programmes trouvés dans les Téléchargements et le dossier Partagé de "
+             "l'Espace. " if liste else
+             "Aucun programme trouvé dans l'Espace « %s ». " % esp.get("nom", "")) + aide))
+        entete.add_css_class("dim-label")
+        boite.append(entete)
+        if liste:
+            defilement = Gtk.ScrolledWindow(vexpand=True)
+            rangs = Gtk.ListBox()
+            rangs.add_css_class("boxed-list")
+            rangs.set_selection_mode(Gtk.SelectionMode.NONE)
+            for entree in liste:
+                chemin = entree.get("chemin", "")
+                rang = Adw.ActionRow(
+                    title=os.path.basename(chemin),
+                    subtitle="%s — dans « %s »" % (
+                        self.NATURES.get(entree.get("nature"), "Programme"),
+                        os.path.basename(os.path.dirname(chemin))),
+                    activatable=True)
+                rang.set_use_markup(False)
+                rang.connect("activated", self._programme_de_l_espace_choisi,
+                             esp, chemin, dlg)
+                rangs.append(rang)
+            defilement.set_child(rangs)
+            boite.append(defilement)
+        tv.set_content(boite)
+        dlg.set_content(tv)
+        dlg.present()
+
+    def _programme_de_l_espace_choisi(self, _rang, esp, chemin, dlg):
+        dlg.close()
+        self._dialogue_nom_programme(esp, chemin)
 
     def _programme_choisi(self, dialog, result, esp):
         try:

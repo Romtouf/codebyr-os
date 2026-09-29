@@ -26,6 +26,10 @@ une mise à jour de `base-files` ; le dépôt APT porte une date de péremption,
 une version ne peut plus être publiée sans CI verte. Détail dans l'historique
 ci-dessous.
 
+**En préparation, 1.16.6** : « Ajouter une application » sous compte séparé,
+fait par l'Espace lui-même ; et un programme ajouté à un Espace ordinaire
+n'est plus rendu exécutable en suivant un lien.
+
 **Publié en 1.16.4** : le filtre d'appels système du Blindage devient une
 liste d'autorisation — tout appel qu'il ne connaît pas est refusé.
 
@@ -252,11 +256,12 @@ surface applicative minimale (`--apt-recommends false`).
   n'accepte une application Flatpak que sous compte séparé, et le dit : elle
   y a le bac à sable de Flatpak, pas le Blindage de l'Espace. Banque et
   Jetable les refusent toujours — leur promesse porte sur le réseau.
-- **Sous compte séparé, « Ajouter une application » n'est pas encore
-  possible** (programme local, AppImage…) : le programme choisi vit dans votre
-  dossier, que le compte de l'Espace ne peut pas lire. Le geste est refusé
-  avec une explication, jamais tenté à moitié. Désactiver le compte séparé
-  pour cet Espace le rend possible, avec la limite qui va avec.
+- **Sous compte séparé, « Ajouter une application » ne prend qu'un programme
+  de l'Espace** (depuis 1.16.6) : celui que son navigateur a téléchargé, ou
+  qu'on lui a envoyé. Le bureau ne voit pas le dossier de l'Espace ; c'est
+  l'Espace qui dresse la liste de ses programmes et rend exécutable celui
+  qu'on choisit. Une AppImage y est lancée décompressée, sans FUSE : le
+  Blindage interdit l'outil à privilèges qui la monterait.
 - **Compte séparé : un Espace abandonné est refermé.** Un Espace vit dans sa
   propre portée systemd : il survit donc à l'arrêt du service des comptes (mise
   à jour, `systemctl stop`). Jusqu'en 1.16.0, le lanceur qui le tenait s'en
@@ -303,6 +308,7 @@ surface applicative minimale (`--apt-recommends false`).
 
 | Version | Correctif |
 |---|---|
+| 1.16.6 | **« Ajouter une application » rendait exécutable en suivant les liens.** Pour un Espace ordinaire, le programme choisi dans le dossier de l'Espace était rendu exécutable (`chmod 0755`) par son nom, depuis le compte du bureau. Un Espace compromis pouvait y placer un lien vers `~/.ssh/id_rsa` : le choisir rendait la clé privée lisible par tous les comptes de la machine. Le fichier est désormais ouvert sans suivre de lien et modifié par son descripteur, et seulement s'il est un fichier ordinaire. Sous compte séparé, le geste — nouveau en 1.16.6 — est fait par l'Espace lui-même, sur ses propres fichiers. |
 | 1.16.4 | **Filtre d'appels système en liste de refus.** Sous Blindage, 24 appels étaient refusés et tout le reste passait — y compris l'appel qu'un futur noyau ajoutera, que personne n'aura examiné. Le filtre n'autorise plus que les appels connus de libseccomp 2.6.0 (liste figée dans le code), moins les refus (EPERM) et 39 appels écartés ; tout autre appel reçoit ENOSYS. Établi en mesurant d'abord, sur la VM, ce que les applications réelles des Espaces appellent (Firefox, Fichiers, Flatpak, la console) : six candidats ont servi et restent permis. |
 | 1.16.3 | **Bouclier anti-hameçonnage muet depuis la 1.6.0.** Passé en Manifest V3 le 23/08/2026, il demande à Firefox le droit de lire les pages ; pour une extension Manifest V3, Firefox ne l'accorde d'office qu'à une installation par son circuit ordinaire. Codebyr déposait l'extension dans le profil : Firefox ne la découvrait pas toujours et, découverte, ne lui accordait pas toujours ce droit. Elle restait chargée, signée, active — et ne s'exécutait sur aucune page. Constaté le 29/09/2026 en l'éprouvant sur la VM ; mesuré ensuite dans Firefox 140 ESR. L'extension est désormais installée par Firefox lui-même, par une politique livrée dans son dossier `distribution` ; les copies déposées sont retirées, et le réglage `extensions.autoDisableScopes` — que Codebyr mettait à 0, désarmant pour toutes les extensions le garde-fou de Firefox contre les dépôts silencieux — revient à sa valeur par défaut. |
 | 1.16.3 | **Bouclier anti-hameçonnage aveugle aux homographes.** Le navigateur donne au script le nom d'hôte en punycode : « mаbanque.fr », écrit avec un « а » cyrillique, arrivait comme `xn--mbanque-2fg.fr` et ne ressemblait plus à la banque protégée — alors qu'à l'écran l'adresse est identique à la vraie. Le bouclier relit désormais chaque étiquette comme elle s'affiche (RFC 3492), retire les accents, ramène les sosies cyrilliques, grecs et arméniens à leur lettre latine, et compare cette silhouette. Un banc d'essai exécute le vrai `content.js` : l'ancien bouclier laissait passer les cinq attaques essayées. Extension re-signée par Mozilla (1.3). |

@@ -10,6 +10,22 @@ GNOME (menu du Sceau, liserés colorés) ne se recharge pas à chaud.
 
 ---
 
+## 1.16.6 — non publiée
+
+**« Ajouter une application » fonctionne sous compte séparé.** C'était le
+dernier geste refusé dans ce mode, qui est celui de tous les Espaces. Téléchargez
+le programme avec le navigateur de l'Espace — ou envoyez-le-lui —, puis, dans
+« Configuration Codebyr », choisissez-le dans la liste des programmes que
+l'Espace a trouvés chez lui : il apparaît dans son menu.
+
+**Les AppImage s'ouvrent dans les Espaces.** C'est la forme la plus courante
+d'un programme téléchargé, et elle ne pouvait pas s'y lancer : elle a besoin,
+pour se monter, d'un outil que la protection des Espaces interdit à juste
+titre. Codebyr lui demande désormais de se décompresser et de se lancer sans
+lui.
+
+---
+
 ## 1.16.5 — 29 septembre 2026
 
 **Les images ont de nouveau un aperçu dans Fichiers.** Photos, captures et

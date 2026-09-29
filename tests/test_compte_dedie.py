@@ -99,16 +99,20 @@ class CeQuiNEstPasEncorePret(unittest.TestCase):
         # Elle passe par la boîte d'arrivée de l'Espace (voir _lancer).
         self.assertEqual(compte_dedie.incompatibilites(DEDIE, fichier="/tmp/facture.pdf"), [])
 
-    def test_les_gestes_sur_les_donnees_sont_refuses_avec_une_explication(self):
-        for geste in ("add-app",):
-            message = compte_dedie.refus_de_geste(geste, DEDIE)
-            self.assertIsNotNone(message, geste)
-            self.assertIn("Travail", message)
-            self.assertIn("dedie", message, "le message doit dire comment revenir")
+    def test_un_geste_pas_pret_serait_refuse_avec_une_explication(self):
+        # Plus aucun geste n'est refusé depuis la 1.16.6 ; le mécanisme reste,
+        # pour le prochain. On le vérifie sur un geste inscrit pour l'essai.
+        with mock.patch.dict(compte_dedie.GESTES_PAS_ENCORE_PRETS,
+                             {"purge": "y effacer les données"}):
+            message = compte_dedie.refus_de_geste("purge", DEDIE)
+        self.assertIsNotNone(message)
+        self.assertIn("Travail", message)
+        self.assertIn("dedie", message, "le message doit dire comment revenir")
 
-    def test_ouvrir_et_fermer_restent_possibles(self):
+    def test_tous_les_gestes_sont_possibles_sous_compte_separe(self):
         for geste in ("launch", "close", "list", "apps", "envoyer", "purge", "delete",
-                      "export", "import", "contagion", "install", "remove-app"):
+                      "export", "import", "contagion", "install", "remove-app",
+                      "add-app", "programmes"):
             self.assertIsNone(compte_dedie.refus_de_geste(geste, DEDIE), geste)
 
     def test_les_gestes_refuses_existent_bien_dans_le_lanceur(self):
@@ -117,12 +121,135 @@ class CeQuiNEstPasEncorePret(unittest.TestCase):
             self.assertIn(geste, space.ACTIONS, geste)
 
     def test_le_lanceur_refuse_avant_d_agir(self):
-        with mock.patch.object(space, "load_espaces", return_value={"travail": DEDIE}), \
+        with mock.patch.dict(compte_dedie.GESTES_PAS_ENCORE_PRETS,
+                             {"add-app": "y ajouter une application"}), \
+                mock.patch.object(space, "load_espaces", return_value={"travail": DEDIE}), \
                 mock.patch.object(space, "cmd_add_app") as ajouter, \
                 mock.patch.object(space, "_prevenir"):
             code = space.main(["codebyr-space", "add-app", "travail", "Jeu", "/tmp/jeu"])
         self.assertEqual(code, 1)
         ajouter.assert_not_called()
+
+
+class AjouterUnProgrammeSousCompteSepare(unittest.TestCase):
+    """1.16.6 : le dernier geste refusé sous compte séparé devient possible.
+
+    Le bureau ne voit pas le dossier de l'Espace. C'est donc l'Espace qui
+    dresse la liste de ses programmes, vérifie celui qu'on choisit et le rend
+    exécutable ; le bureau n'inscrit au menu que ce qui revient bien formé.
+    """
+
+    ELF = b"\x7fELF\x02\x01\x01\x00" + b"\x00" * 8
+    APPIMAGE = b"\x7fELF\x02\x01\x01\x00AI\x02" + b"\x00" * 5
+
+    def test_la_nature_se_lit_dans_les_premiers_octets(self):
+        self.assertEqual(space.nature_programme(self.APPIMAGE), "appimage")
+        self.assertEqual(space.nature_programme(self.ELF), "elf")
+        self.assertEqual(space.nature_programme(b"#!/bin/sh\necho"), "script")
+        for autre in (b"", b"%PDF-1.7", b"PK\x03\x04", b"\x89PNG\r\n"):
+            self.assertIsNone(space.nature_programme(autre), autre)
+
+    def test_une_appimage_se_lance_sans_fuse(self):
+        # Le Blindage interdit tout nouveau privilège : l'outil à privilèges
+        # qui monte une AppImage par FUSE y échoue. Elle se décompresse.
+        self.assertEqual(space.commande_programme("/e/Téléchargements/Obsidian 1.6.AppImage",
+                                                  "appimage", ["--no-sandbox"]),
+                         "'/e/Téléchargements/Obsidian 1.6.AppImage' "
+                         "--appimage-extract-and-run --no-sandbox")
+        self.assertEqual(space.commande_programme("/e/outil", "elf"), "/e/outil")
+
+    def test_seule_une_reponse_bien_formee_de_l_espace_est_crue(self):
+        self.assertTrue(space.programme_valide({"chemin": "/e/x.AppImage", "nature": "appimage"}))
+        for tordu in (None, [], "x", {"chemin": "x.AppImage", "nature": "appimage"},
+                      {"chemin": "/e/x\n/bin/sh", "nature": "elf"},
+                      {"chemin": "/e/x", "nature": "binaire"}, {"nature": "elf"}):
+            self.assertFalse(space.programme_valide(tordu), repr(tordu))
+
+    def test_l_ajout_inscrit_ce_que_l_espace_a_prepare(self):
+        reponse = {"chemin": "/var/lib/codebyr/espaces/1002/travail/Téléchargements/Jeu.AppImage",
+                   "nature": "appimage"}
+        with mock.patch.object(space, "load_espaces", return_value={"travail": DEDIE}), \
+                mock.patch.object(space, "_reponse_de_l_espace", return_value=reponse) as ordre, \
+                mock.patch.object(space, "_enregistrer_app") as inscrire:
+            code = space.cmd_add_app("travail", "Jeu", reponse["chemin"], ["--no-sandbox"])
+        self.assertEqual(code, 0)
+        self.assertEqual(ordre.call_args[0][1], space.INTERNE_PROGRAMME)
+        inscrire.assert_called_once_with(
+            "travail", "Jeu", "'%s' --appimage-extract-and-run --no-sandbox" % reponse["chemin"])
+
+    def test_une_reponse_tordue_n_inscrit_rien(self):
+        with mock.patch.object(space, "load_espaces", return_value={"travail": DEDIE}), \
+                mock.patch.object(space, "_reponse_de_l_espace",
+                                  return_value={"chemin": "relatif", "nature": "elf"}), \
+                mock.patch.object(space, "_enregistrer_app") as inscrire:
+            self.assertEqual(space.cmd_add_app("travail", "Jeu", "/x", []), 1)
+        inscrire.assert_not_called()
+
+
+@unittest.skipUnless(POSIX, "O_NOFOLLOW et les comptes d'Espace : Linux")
+class LEspaceDresseLaListe(unittest.TestCase):
+    """Ce que fait l'Espace, sous son compte : lister, vérifier, rendre exécutable."""
+
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self.home = os.path.join(self._tmp.name, "espace")
+        self.dl = os.path.join(self.home, "Téléchargements")
+        os.makedirs(os.path.join(self.dl, "a", "b", "c"))
+        os.makedirs(os.path.join(self.home, "Partagé"))
+        compte = mock.Mock(pw_dir=self.home)
+        self._compte = mock.patch.object(space, "_compte_d_espace_courant", return_value=compte)
+        self._compte.start()
+
+    def tearDown(self):
+        self._compte.stop()
+        self._tmp.cleanup()
+
+    def _poser(self, chemin, contenu, mode=0o644):
+        with open(chemin, "wb") as f:
+            f.write(contenu)
+        os.chmod(chemin, mode)
+
+    def _sortie(self, fonction, *args):
+        import io
+        from contextlib import redirect_stdout
+        tampon = io.StringIO()
+        with redirect_stdout(tampon):
+            code = fonction(*args)
+        return code, tampon.getvalue()
+
+    def test_la_liste_ne_retient_que_des_programmes_de_l_espace(self):
+        self._poser(os.path.join(self.dl, "Jeu.AppImage"), AjouterUnProgrammeSousCompteSepare.APPIMAGE)
+        self._poser(os.path.join(self.home, "Partagé", "installer.sh"), b"#!/bin/sh\n")
+        self._poser(os.path.join(self.dl, "notes.txt"), b"rien")
+        self._poser(os.path.join(self.dl, "a", "b", "c", "profond"), AjouterUnProgrammeSousCompteSepare.ELF)
+        dehors = os.path.join(self._tmp.name, "dehors")
+        self._poser(dehors, AjouterUnProgrammeSousCompteSepare.ELF)
+        os.symlink(dehors, os.path.join(self.dl, "lien"))
+        code, sortie = self._sortie(space.cmd_interne_programmes)
+        self.assertEqual(code, 0)
+        trouves = {os.path.basename(e["chemin"]): e["nature"] for e in json.loads(sortie)}
+        self.assertEqual(trouves, {"Jeu.AppImage": "appimage", "installer.sh": "script"})
+
+    def test_le_programme_choisi_est_rendu_executable_par_l_espace(self):
+        chemin = os.path.join(self.dl, "Jeu.AppImage")
+        self._poser(chemin, AjouterUnProgrammeSousCompteSepare.APPIMAGE, 0o644)
+        code, sortie = self._sortie(space.cmd_interne_programme, chemin)
+        self.assertEqual(code, 0)
+        self.assertEqual(json.loads(sortie), {"chemin": chemin, "nature": "appimage"})
+        self.assertTrue(os.stat(chemin).st_mode & 0o100)
+
+    def test_ce_qui_n_est_pas_un_programme_de_l_espace_est_refuse(self):
+        texte = os.path.join(self.dl, "notes.txt")
+        self._poser(texte, b"rien")
+        dehors = os.path.join(self._tmp.name, "dehors")
+        self._poser(dehors, AjouterUnProgrammeSousCompteSepare.ELF)
+        os.symlink(self._tmp.name, os.path.join(self.dl, "sortie"))
+        for chemin in (texte, dehors, os.path.join(self.dl, "sortie", "dehors"),
+                       "relatif", os.path.join(self.dl, "x\n")):
+            code, sortie = self._sortie(space.cmd_interne_programme, chemin)
+            self.assertNotEqual(code, 0, chemin)
+            self.assertEqual(sortie, "", chemin)
+        self.assertFalse(os.stat(dehors).st_mode & 0o100, "rien hors de l'Espace n'est touché")
 
 
 class LesApplicationsFlatpakDansUnEspaceDedie(unittest.TestCase):

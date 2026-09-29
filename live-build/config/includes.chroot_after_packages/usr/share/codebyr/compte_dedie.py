@@ -88,9 +88,9 @@ def incompatibilites(esp, fichier=None, est_flatpak=False):
 # données sont ailleurs, et le bureau ne peut pas les lire : les laisser faire
 # afficherait « données effacées » ou « exporté » sur un dossier vide.
 GESTES_PAS_ENCORE_PRETS = {
-    # « install » est parti en 1.16.0 : l'installation se fait maintenant DANS
-    # l'Espace, par lui, comme les autres gestes sur ses données.
-    "add-app": "y ajouter une application",
+    # « install » est parti en 1.16.0, « add-app » en 1.16.6 : l'installation
+    # comme l'ajout d'un programme se font DANS l'Espace, par lui, comme les
+    # autres gestes sur ses données. La liste reste, vide, pour le prochain.
 }
 
 

@@ -141,10 +141,9 @@ franchement vaut mieux que de laisser chacun le découvrir :
   [docs/registre.md](docs/registre.md), et `tests/test_registre_coherence.py`
   vérifie que les deux appliquent la même règle et que chaque clé livrée y est
   décrite.
-- **Deux fonctions manquent sous compte séparé**, le mode par défaut depuis
-  1.16.1 : « Ajouter une application » (un programme téléchargé) n'y est pas
-  encore possible, et une application Flatpak n'y reçoit pas le fichier choisi
-  dans « Ouvrir un fichier » — voir SECURITY.md.
+- **Une fonction manque sous compte séparé**, le mode par défaut depuis
+  1.16.1 : une application Flatpak n'y reçoit pas le fichier choisi dans
+  « Ouvrir un fichier » — voir SECURITY.md.
 - **Les ISO ne sont pas reproductibles** (horodatage, état du miroir Debian).
 
 ## Où aider en priorité

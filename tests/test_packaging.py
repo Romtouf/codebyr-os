@@ -385,6 +385,56 @@ class LesVignettesDesImages(unittest.TestCase):
             self.assertIn("libgdk-pixbuf2.0-bin", f.read().split())
 
 
+@unittest.skipUnless(os.name == "posix", "fichiers_surs travaille par descripteur de dossier")
+class LesEchecsDeVignettesOublies(unittest.TestCase):
+    """Fichiers note un aperçu raté, et ne réessaie plus jamais pour ce fichier.
+
+    Tant que l'outil manquait, tous les SVG, JXL et WebP vus dans Fichiers ont
+    été notés en échec (45 sur la VM le 29/09/2026). Codebyr les fait oublier
+    une fois, sans suivre les liens qu'un Espace aurait posés.
+    """
+
+    def setUp(self):
+        import tempfile
+        from outils import charger
+        self.space = charger("codebyr-space")
+        self._tmp = tempfile.TemporaryDirectory()
+        self.home = os.path.join(self._tmp.name, "home")
+        self.echecs = os.path.join(self.home, ".cache", "thumbnails", "fail",
+                                   "gnome-thumbnail-factory")
+        os.makedirs(self.echecs)
+
+    def tearDown(self):
+        self._tmp.cleanup()
+
+    def _poser(self, dossier, nom):
+        with open(os.path.join(dossier, nom), "wb") as f:
+            f.write(b"\x89PNG echec")
+
+    def test_les_echecs_sont_oublies_une_seule_fois(self):
+        for i in range(3):
+            self._poser(self.echecs, "%d.png" % i)
+        self.space._oublier_echecs_de_vignettes(self.home)
+        self.assertEqual(os.listdir(self.echecs), [])
+        # Un échec survenu APRÈS, avec l'outil présent, est un vrai échec :
+        # on ne l'efface pas à chaque lancement.
+        self._poser(self.echecs, "nouveau.png")
+        self.space._oublier_echecs_de_vignettes(self.home)
+        self.assertEqual(os.listdir(self.echecs), ["nouveau.png"])
+
+    def test_un_lien_pose_par_l_espace_n_est_pas_suivi(self):
+        ailleurs = os.path.join(self._tmp.name, "ailleurs")
+        os.makedirs(os.path.join(ailleurs, "fail", "gnome-thumbnail-factory"))
+        self._poser(os.path.join(ailleurs, "fail", "gnome-thumbnail-factory"), "precieux.png")
+        cache = os.path.join(self.home, ".cache", "thumbnails")
+        import shutil
+        shutil.rmtree(cache)
+        os.symlink(ailleurs, cache)
+        self.space._oublier_echecs_de_vignettes(self.home)
+        self.assertTrue(os.path.exists(os.path.join(
+            ailleurs, "fail", "gnome-thumbnail-factory", "precieux.png")))
+
+
 if __name__ == "__main__":
     unittest.main()
 

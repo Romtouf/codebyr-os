@@ -616,9 +616,50 @@ def cmd_launch(espaces, esp_id, extra, fichier=None):
         session.rendre()
 
 
+TEMOIN_VIGNETTES = os.path.join(".cache", "codebyr", "vignettes-oubliees-1.16.5")
+
+
+def _oublier_echecs_de_vignettes(home):
+    """Oublie, UNE fois, les aperçus d'images que Fichiers a notés en échec.
+
+    Jusqu'en 1.16.4, l'outil qui les fabrique manquait (voir build-deb.sh).
+    Fichiers tentait les SVG, JXL et WebP, échouait, et notait l'échec — puis
+    ne réessayait plus jamais pour ces fichiers, même l'outil installé.
+    Constaté le 29/09/2026 sur la VM : 45 échecs, tous antérieurs à la mise à
+    jour. Ce n'est qu'un cache : Fichiers le refait au besoin.
+
+    Le dossier est celui d'un Espace, qui peut y avoir posé des liens :
+    chaque composante est ouverte sans les suivre (fichiers_surs), et l'on ne
+    retire que des fichiers, jamais un dossier.
+    """
+    temoin = os.path.join(home, TEMOIN_VIGNETTES)
+    if os.path.lexists(temoin):
+        return
+    echecs = os.path.join(home, ".cache", "thumbnails", "fail", "gnome-thumbnail-factory")
+    try:
+        with fichiers_surs.dossier(echecs) as fd:
+            for nom in os.listdir(fd):
+                if nom.endswith(".png"):
+                    try:
+                        os.unlink(nom, dir_fd=fd)
+                    except OSError:
+                        pass
+    except OSError:
+        pass        # aucun échec noté, ou un piège : rien à oublier
+    try:
+        fichiers_surs.mkdir(os.path.dirname(temoin))
+        with fichiers_surs.ouvrir(temoin, "w", encoding="utf-8") as f:
+            f.write("Aperçus d'images en échec oubliés une fois (Codebyr 1.16.5).\n")
+    except OSError:
+        pass
+
+
 def _lancer(espaces, esp, extra, fichier, session):
     """Le lancement proprement dit. `session` : compte dédié tenu, ou None."""
     home = session.home if session else espace_home(esp)
+    if not _espace_courant():
+        # Le Fichiers du bureau, lui aussi, a pu noter ces échecs.
+        _oublier_echecs_de_vignettes(os.path.expanduser("~"))
     # Dans un Espace, un fichier venu d'ailleurs s'ouvre sous cloche. Câblé au
     # lancement plutôt qu'à la création : un Espace existant en profite aussi,
     # sans quoi le correctif n'atteindrait que les Espaces créés après lui.
@@ -640,6 +681,7 @@ def _lancer(espaces, esp, extra, fichier, session):
         # contient quelque chose. Chaque Espace a le sien : sans cela, créer un
         # fichier texte y oblige à passer par un terminal.
         modeles.installer(home)
+        _oublier_echecs_de_vignettes(home)
         # La boîte d'envoi de CET Espace, et la relève de ce que les autres ont
         # déposé. Les deux se font ICI, depuis l'hôte : c'est le seul endroit
         # d'où l'on voit tous les Espaces, et le moment où l'on va justement
@@ -1454,6 +1496,7 @@ def cmd_interne_preparer(brut):
                 and not _ouvreur_associe(home):
             raise OSError("associations de fichiers non posées dans %s" % home)
         modeles.installer(home)
+        _oublier_echecs_de_vignettes(home)
         if charge.get("firefox"):
             if charge.get("filtre_reseau"):
                 _preparer_profil_firefox(home, PORT_FILTRE_INTERNE)

@@ -15,7 +15,10 @@ GNOME (menu du Sceau, liserés colorés) ne se recharge pas à chaud.
 **Les images ont de nouveau un aperçu dans Fichiers.** Photos, captures et
 dessins s'affichaient tous avec la même icône générique, dans les Espaces
 comme sur le bureau : l'outil qui fabrique ces aperçus n'était pas installé.
-Il l'est désormais, par la mise à jour comme dans l'image d'installation.
+Il l'est désormais, par la mise à jour comme dans l'image d'installation. Les
+aperçus que Fichiers avait notés en échec faute de cet outil — il ne
+réessayait plus jamais — sont oubliés une fois, à la prochaine ouverture de
+chaque Espace.
 
 ---
 

@@ -374,6 +374,9 @@ def main():
     # accordait l'écriture. La cible est ici un fichier d'essai, à root et en
     # 0600 — surtout pas /etc/shadow : si la correction manquait, c'est elle
     # qui recevrait le droit.
+    # L'Espace d'essai doit être FERMÉ : ouvert, son dossier d'exécution
+    # porterait déjà l'affichage, et le second essai n'y trouverait pas sa place.
+    lanceur(bureau, "close", ESPACE)
     cible = os.path.join(COIN, "cible-de-root")
     with open(cible, "w", encoding="utf-8") as f:
         f.write("fichier de root\n")
@@ -422,14 +425,23 @@ def main():
         os.makedirs(runtime_espace, mode=0o700, exist_ok=True)
         os.chown(runtime_espace, espace.pw_uid, espace.pw_gid)
         glisse = os.path.join(runtime_espace, os.environ.get("WAYLAND_DISPLAY", "wayland-0"))
-        os.symlink(cible, glisse)
-        os.lchown(glisse, espace.pw_uid, espace.pw_gid)
-        reponse = demander(os.environ.get("WAYLAND_DISPLAY", "wayland-0"))
-        recouverte = os.path.ismount(cible) or not os.path.isfile(cible)
-        reussi &= dire("un lien glissé chez l'Espace est refusé", reponse.get("ok") is False,
-                       reponse.get("erreur", "") if reponse.get("ok") is not False else "")
-        reussi &= dire("…et la cible n'est pas recouverte", not recouverte,
-                       "l'affichage du bureau est monté sur la cible" if recouverte else "")
+        try:
+            os.symlink(cible, glisse)
+            os.lchown(glisse, espace.pw_uid, espace.pw_gid)
+        except FileExistsError:
+            reussi &= dire("un lien glissé chez l'Espace est refusé", False,
+                           "l'Espace d'essai est encore ouvert : %s existe" % glisse)
+        else:
+            reponse = demander(os.environ.get("WAYLAND_DISPLAY", "wayland-0"))
+            recouverte = os.path.ismount(cible) or not os.path.isfile(cible)
+            reussi &= dire("un lien glissé chez l'Espace est refusé", reponse.get("ok") is False,
+                           reponse.get("erreur", "") if reponse.get("ok") is not False else "")
+            reussi &= dire("…et la cible n'est pas recouverte", not recouverte,
+                           "l'affichage du bureau est monté sur la cible" if recouverte else "")
+            try:
+                os.unlink(glisse)       # si le service ne l'a pas déjà rangé
+            except OSError:
+                pass
         if os.path.ismount(cible):
             subprocess.run(["/usr/bin/umount", cible], capture_output=True)
     try:

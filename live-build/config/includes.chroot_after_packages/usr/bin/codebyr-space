@@ -127,16 +127,66 @@ def cmd_list(espaces):
         print("  \033[1m%-12s\033[0m %s  %s%s" % (e["id"], e["couleur"], e["nom"], tag))
 
 
+PROFIL_CODEBYR = "codebyr.default"
+FORME_PROFIL = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]{0,63}")
+
+
+def profil_par_defaut(texte):
+    """Le dossier de profil que Firefox ouvrira, lu dans profiles.ini, ou None.
+
+    Firefox est lancé avec MOZ_LEGACY_PROFILES=1 : il prend le profil marqué
+    « Default=1 », ou le seul qui existe. Le fichier est dans le dossier de
+    l'Espace, qui peut l'écrire : on n'en retient qu'un nom de dossier SIMPLE,
+    relatif — ni « / », ni « .. » —, sans quoi un Espace ferait écrire le
+    lanceur hors de chez lui.
+    """
+    import configparser
+    lecteur = configparser.ConfigParser(interpolation=None, strict=False)
+    try:
+        lecteur.read_string(texte)
+    except configparser.Error:
+        return None
+    profils = [lecteur[s] for s in lecteur.sections() if s.startswith("Profile")]
+    choisis = [p for p in profils if p.get("Default") == "1"] or \
+              (profils if len(profils) == 1 else [])
+    for p in choisis:
+        chemin = p.get("Path", "")
+        if p.get("IsRelative", "1") == "1" and FORME_PROFIL.fullmatch(chemin):
+            return chemin
+    return None
+
+
+def _profil_firefox(home):
+    """Le dossier du profil que Firefox UTILISE dans cet Espace, prêt à écrire.
+
+    Sans profiles.ini, on pose le nôtre, dès le premier lancement : c'est
+    alors le profil de Codebyr qu'ouvrira Firefox. Avec un profiles.ini — que
+    Firefox a pu écrire lui-même, s'il a été ouvert avant qu'une banque soit
+    déclarée —, on s'installe dans le profil qu'il désigne. Écrire dans
+    codebyr.default revenait à poser le bouclier dans un profil que personne
+    n'ouvre : constaté le 29/09/2026 sur la VM, aucune alerte dans Navigation.
+    Changer Firefox de profil, lui, ferait perdre marque-pages et historique.
+    """
+    ffbase = os.path.join(home, ".mozilla", "firefox")
+    fichiers_surs.mkdir(ffbase)
+    ini = os.path.join(ffbase, "profiles.ini")
+    try:
+        with fichiers_surs.ouvrir(ini, encoding="utf-8") as f:
+            nom = profil_par_defaut(f.read()) or PROFIL_CODEBYR
+    except FileNotFoundError:
+        with fichiers_surs.ouvrir(ini, "w", encoding="utf-8") as f:
+            f.write("[Profile0]\nName=codebyr\nIsRelative=1\nPath=%s\n"
+                    "Default=1\n\n[General]\nStartWithLastProfile=1\nVersion=2\n"
+                    % PROFIL_CODEBYR)
+        nom = PROFIL_CODEBYR
+    ffdir = os.path.join(ffbase, nom)
+    fichiers_surs.mkdir(ffdir)
+    return ffdir
+
+
 def _preparer_profil_firefox(home, port):
     """Pré-configure le profil Firefox de l'Espace pour passer par le filtre réseau."""
-    ffbase = os.path.join(home, ".mozilla", "firefox")
-    ffdir = os.path.join(ffbase, "codebyr.default")
-    fichiers_surs.mkdir(ffdir)
-    ini = os.path.join(ffbase, "profiles.ini")
-    if not os.path.exists(ini):
-        with fichiers_surs.ouvrir(ini, "w", encoding="utf-8") as f:
-            f.write("[Profile0]\nName=codebyr\nIsRelative=1\nPath=codebyr.default\n"
-                    "Default=1\n\n[General]\nStartWithLastProfile=1\nVersion=2\n")
+    ffdir = _profil_firefox(home)
     prefs = [
         'user_pref("network.proxy.type", 1);',
         'user_pref("network.proxy.http", "127.0.0.1");',
@@ -411,17 +461,16 @@ def _installer_bouclier_pour(home, doms):
     ne peut pas lire le registre de l'utilisateur, on ne lui transmet que la
     liste dont il a besoin.
     """
-    if not doms or not os.path.isdir(BOUCLIER_DIR):
+    if not os.path.isdir(BOUCLIER_DIR):
         return
-    ffbase = os.path.join(home, ".mozilla", "firefox")
-    ffdir = os.path.join(ffbase, "codebyr.default")
+    # Le profil d'abord, même sans banque déclarée : Firefox ouvre ainsi celui
+    # de Codebyr dès son premier lancement, et le bouclier y trouvera sa place
+    # le jour où une banque le sera.
+    ffdir = _profil_firefox(home)
+    if not doms:
+        return
     extdir = os.path.join(ffdir, "extensions")
     fichiers_surs.mkdir(extdir)
-    ini = os.path.join(ffbase, "profiles.ini")
-    if not os.path.exists(ini):
-        with fichiers_surs.ouvrir(ini, "w", encoding="utf-8") as f:
-            f.write("[Profile0]\nName=codebyr\nIsRelative=1\nPath=codebyr.default\n"
-                    "Default=1\n\n[General]\nStartWithLastProfile=1\nVersion=2\n")
 
     # Domaines fournis en donnée (l'extension reste statique → signable).
     _ecrire_stockage_manage(home, doms)

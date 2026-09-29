@@ -156,6 +156,94 @@ class Detection(unittest.TestCase):
         self.assertGreater(r["comparees"], 300)
 
 
+class ProfilUtilise(unittest.TestCase):
+    """Le bouclier doit aller dans le profil que Firefox OUVRE.
+
+    Constaté le 29/09/2026 sur la VM : aucune alerte dans Navigation, pas même
+    sur « mabanque.com ». Firefox y avait été ouvert avant qu'une banque soit
+    déclarée ; il s'était créé son propre profil, et le bouclier était déposé
+    dans « codebyr.default », que personne n'ouvrait. La liste des banques
+    étant vide par défaut, c'était le cas de quiconque ouvrait le navigateur
+    avant de déclarer la sienne.
+    """
+
+    def setUp(self):
+        import outils
+        self.space = outils.charger("codebyr-space")
+
+    def test_le_profil_marque_par_defaut(self):
+        texte = ("[Install4F96D1932A9F858E]\nDefault=autre.default\n\n"
+                 "[Profile1]\nName=codebyr\nIsRelative=1\nPath=codebyr.default\n\n"
+                 "[Profile0]\nName=default-esr\nIsRelative=1\nPath=ab12cd.default-esr\n"
+                 "Default=1\n\n[General]\nStartWithLastProfile=1\nVersion=2\n")
+        self.assertEqual(self.space.profil_par_defaut(texte), "ab12cd.default-esr")
+
+    def test_le_seul_profil_quand_aucun_n_est_marque(self):
+        texte = "[Profile0]\nName=x\nIsRelative=1\nPath=xy.default\n"
+        self.assertEqual(self.space.profil_par_defaut(texte), "xy.default")
+
+    def test_un_chemin_qui_sortirait_du_dossier_est_ignore(self):
+        # profiles.ini est écrit par l'Espace : il ne doit pas pouvoir faire
+        # écrire le lanceur hors de chez lui.
+        for chemin, relatif in (("../../.config/autostart", "1"), ("/home/romtouf", "0"),
+                                ("a/b", "1"), ("..", "1"), ("", "1")):
+            texte = "[Profile0]\nIsRelative=%s\nPath=%s\nDefault=1\n" % (relatif, chemin)
+            self.assertIsNone(self.space.profil_par_defaut(texte), chemin)
+        self.assertIsNone(self.space.profil_par_defaut("pas un fichier ini [[["))
+
+
+@unittest.skipUnless(os.name == "posix", "fichiers_surs travaille par descripteur de dossier")
+class InstallationDansLeProfil(unittest.TestCase):
+
+    def setUp(self):
+        import tempfile
+        import outils
+        self.space = outils.charger("codebyr-space")
+        self._tmp = tempfile.TemporaryDirectory()
+        self.home = os.path.join(self._tmp.name, "home")
+        os.makedirs(self.home)
+        bouclier = os.path.join(self._tmp.name, "antiphishing")
+        os.makedirs(os.path.join(bouclier, "signed"))
+        with open(os.path.join(bouclier, "signed", "essai-1.3.xpi"), "wb") as f:
+            f.write(b"PK xpi d'essai")
+        self.space.BOUCLIER_DIR = bouclier
+        self.ff = os.path.join(self.home, ".mozilla", "firefox")
+
+    def tearDown(self):
+        self._tmp.cleanup()
+
+    def _xpi(self, profil):
+        return os.path.join(self.ff, profil, "extensions", "antiphishing@codebyr.io.xpi")
+
+    def test_premier_lancement_sans_banque_le_profil_de_codebyr_est_pose(self):
+        self.space._installer_bouclier_pour(self.home, [])
+        with open(os.path.join(self.ff, "profiles.ini"), encoding="utf-8") as f:
+            self.assertIn("Path=codebyr.default", f.read())
+        self.assertFalse(os.path.exists(self._xpi("codebyr.default")))
+
+    def test_le_bouclier_va_dans_le_profil_que_firefox_s_est_cree(self):
+        os.makedirs(os.path.join(self.ff, "ab12cd.default-esr"))
+        ini = ("[Profile0]\nName=default-esr\nIsRelative=1\nPath=ab12cd.default-esr\n"
+               "Default=1\n\n[General]\nStartWithLastProfile=1\nVersion=2\n")
+        with open(os.path.join(self.ff, "profiles.ini"), "w", encoding="utf-8") as f:
+            f.write(ini)
+        self.space._installer_bouclier_pour(self.home, ["mabanque.fr"])
+        self.assertTrue(os.path.isfile(self._xpi("ab12cd.default-esr")))
+        self.assertFalse(os.path.exists(self._xpi("codebyr.default")))
+        with open(os.path.join(self.ff, "ab12cd.default-esr", "user.js"), encoding="utf-8") as f:
+            self.assertIn("extensions.autoDisableScopes", f.read())
+        with open(os.path.join(self.ff, "profiles.ini"), encoding="utf-8") as f:
+            self.assertEqual(f.read(), ini, "le choix de profil de Firefox est gardé")
+
+    def test_un_profiles_ini_piege_ne_fait_rien_ecrire_ailleurs(self):
+        os.makedirs(self.ff)
+        with open(os.path.join(self.ff, "profiles.ini"), "w", encoding="utf-8") as f:
+            f.write("[Profile0]\nIsRelative=1\nPath=../../dehors\nDefault=1\n")
+        self.space._installer_bouclier_pour(self.home, ["mabanque.fr"])
+        self.assertTrue(os.path.isfile(self._xpi("codebyr.default")))
+        self.assertFalse(os.path.exists(os.path.join(self.home, "dehors")))
+
+
 class XpiSigne(unittest.TestCase):
 
     def _xpi(self):

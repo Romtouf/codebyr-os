@@ -18,6 +18,14 @@ exactement comme celle de votre banque, et le bouclier ne la reconnaissait pas.
 Il la lit désormais comme vous la voyez, accents et lettres d'autres alphabets
 compris, et son avertissement indique comment l'adresse s'écrit réellement.
 
+**Le bouclier s'active aussi quand la banque est déclarée après coup.** Si le
+navigateur d'un Espace avait été ouvert avant que vous déclariez votre banque
+— la liste est vide à l'installation —, Firefox s'était créé son propre
+profil, et le bouclier était déposé dans un autre, que personne n'ouvrait. Il
+ne s'affichait donc jamais dans cet Espace. Il va désormais dans le profil
+que Firefox utilise vraiment ; vos marque-pages et votre historique restent
+où ils sont.
+
 ---
 
 ## 1.16.2 — 29 septembre 2026

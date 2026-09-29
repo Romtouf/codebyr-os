@@ -1,6 +1,6 @@
 # Chantiers — Codebyr OS
 
-Mise à jour de lecture : **28 septembre 2026**, version publiée **1.16.1**.
+Mise à jour de lecture : **29 septembre 2026**, version publiée **1.16.2**.
 
 Ce document est la carte du projet : ce qui est fait, ce qui reste, et pourquoi.
 Les estimations d'effort des lignes anciennes n'ont pas été refaites.
@@ -17,6 +17,18 @@ réseau décrit comme limité au navigateur, la Phase 6 décochée). Corrigé en
 1.16.1, et surtout rendu impossible à refaire en silence : `publish-apt.sh`
 exige une CI verte, `tests/test_coherence.py` confronte les documents entre
 eux.
+
+**Ce que l'audit technique du 29 septembre 2026 a appris** : une élévation de
+privilèges réelle, présente depuis la 1.15.0 — le service root des comptes
+suivait les liens posés dans le dossier d'exécution du bureau, et tout compte
+du bureau pouvait se donner l'écriture sur `/etc/shadow`. Reproduite, corrigée
+par descripteur épinglé, validée sur la VM et publiée en 1.16.2 le jour même.
+Le même audit a mis au jour des Espaces créés qui ne s'ouvraient pas (nom long
+ou commençant par un chiffre), un bouclier aveugle aux adresses déguisées par
+d'autres alphabets (signé, pour la 1.16.3), et trois documents périmés. Deux de
+ses propositions ont été écartées ou reportées, raisons écrites : un profil
+AppArmor pour `codebyr-space`, et la liste d'autorisation des appels système
+sans mesure préalable.
 
 Le chantier « un UID Unix par Espace » est clos depuis la 1.16.0 : un Espace
 peut tourner sous son propre compte, avec ses applications Flatpak et la carte

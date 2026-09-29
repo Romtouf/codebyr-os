@@ -10,7 +10,7 @@ GNOME (menu du Sceau, liserés colorés) ne se recharge pas à chaud.
 
 ---
 
-## 1.16.2 — non publiée
+## 1.16.2 — 29 septembre 2026
 
 **Correctif de sécurité important.** Le service qui prépare les Espaces tourne
 avec tous les droits. Pour présenter l'affichage et le son du bureau à un

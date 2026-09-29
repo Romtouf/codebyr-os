@@ -14,9 +14,11 @@ installée sur machine réelle. Voir la [feuille de route](#feuille-de-route).
 
 ![Bureau Codebyr OS — vue d'ensemble GNOME, fond d'écran au Sceau, dock des applications](site/captures/01-bureau.png)
 
-## Où en est le projet — 28 septembre 2026
+## Où en est le projet — 29 septembre 2026
 
-Version publiée : **1.16.1** (voir le [CHANGELOG](CHANGELOG.md)). Le lot de
+Version publiée : **1.16.2** (voir le [CHANGELOG](CHANGELOG.md)) — elle ferme
+une élévation de privilèges du service des comptes d'Espaces, présente depuis
+la 1.15.0 (détail dans [SECURITY.md](SECURITY.md)). Le lot de
 sécurité de septembre est publié (frontières des fichiers, restauration non
 destructive, aucun repli sans isolation, réseau restreint par namespace, filtre
 d'appels système).

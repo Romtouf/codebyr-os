@@ -26,9 +26,9 @@ une mise à jour de `base-files` ; le dépôt APT porte une date de péremption,
 une version ne peut plus être publiée sans CI verte. Détail dans l'historique
 ci-dessous.
 
-**En préparation, 1.16.2** : le service root qui prépare les Espaces suivait
-les liens symboliques posés dans le dossier d'exécution du bureau. Tout compte
-du bureau pouvait s'en servir pour devenir root. Détail dans l'historique
+**Publié en 1.16.2** : le service root qui prépare les Espaces suivait les
+liens symboliques posés dans le dossier d'exécution du bureau. Tout compte du
+bureau pouvait s'en servir pour devenir root. Détail dans l'historique
 ci-dessous.
 
 Le modèle ci-dessous décrit aussi des versions antérieures ; ne pas déduire

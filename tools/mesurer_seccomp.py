@@ -10,9 +10,8 @@ avoir mesuré que les applications réelles s'en passent.
     sudo python3 tools/mesurer_seccomp.py relever     # le relevé
     sudo python3 tools/mesurer_seccomp.py desactiver
 
-En mode mesure, les appels candidats au refus (A_MESURER) et tout appel
-inconnu de la liste figée (CONNUS) restent PERMIS, mais le noyau les
-journalise. Le relevé lit ce journal depuis le démarrage : il dit quel
+En mode mesure, les appels écartés (ECARTES) et tout appel inconnu de la
+liste figée (CONNUS) sont PERMIS, mais le noyau les journalise. Le relevé lit ce journal depuis le démarrage : il dit quel
 programme a appelé quoi, et combien de fois. Un Espace déjà ouvert garde le
 filtre qu'il avait : fermez-le avant d'activer.
 
@@ -88,7 +87,7 @@ def relever():
         print("Aucun appel journalisé depuis le démarrage.")
         print("Le mode mesure est-il actif (« activer »), et les Espaces ouverts APRÈS ?")
         return 0
-    candidats = set(filtre_syscalls.A_MESURER) if filtre_syscalls else set()
+    candidats = set(filtre_syscalls.ECARTES) if filtre_syscalls else set()
     connus = set(filtre_syscalls.CONNUS) if filtre_syscalls else set()
     print("%-26s %8s  %s" % ("Appel", "au moins", "Programmes"))
     for numero, fois in appels.most_common():
@@ -98,7 +97,7 @@ def relever():
         qui = ", ".join("%s (%d)" % pq for pq in programmes[numero].most_common(4))
         print("%-26s %8d  %s%s" % (appel, fois, qui, marque))
     silencieux = sorted(candidats - {nom(n) for n in appels})
-    print("\nCandidats jamais appelés pendant la mesure (%d) :" % len(silencieux))
+    print("\nÉcartés jamais appelés pendant la mesure (%d) :" % len(silencieux))
     print("  " + " ".join(silencieux))
     return 0
 

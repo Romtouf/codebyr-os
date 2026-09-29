@@ -5,11 +5,12 @@ d'inspection interprocessus. Ce n'est pas une liste exhaustive d'appels sûrs.
 libseccomp génère les contrôles d'architecture et le BPF, jamais un assemblage
 manuel dépendant des numéros de syscalls de la machine.
 
-── VERS UNE LISTE D'AUTORISATION ──────────────────────────────────────────
-Partir de « tout est permis » laisse passer, par défaut, l'appel qu'un futur
-noyau ajoutera. La bascule — n'autoriser que ce qui est connu — se prépare en
-MESURANT, comme le reste du projet : CONNUS, A_MESURER et MESURE ci-dessous,
-et tools/mesurer_seccomp.py pour relever ce que les applications appellent.
+── UNE LISTE D'AUTORISATION, DEPUIS LA 1.16.4 ──────────────────────────────
+Partir de « tout est permis » laissait passer, par défaut, l'appel qu'un futur
+noyau ajoutera. Le filtre n'autorise plus que les appels CONNUS, moins les
+refus et les écartés. La bascule a été préparée en MESURANT ce que les
+applications réelles des Espaces appellent (MESURE, tools/mesurer_seccomp.py),
+et le même outil sert à mesurer une application nouvelle.
 """
 import ctypes
 import errno
@@ -49,8 +50,8 @@ REFUSES = (
 # Tous les appels x86_64 que connaissait libseccomp 2.6.0 (Debian 13), relevés
 # le 29/09/2026. Liste FIGÉE, et c'est tout son intérêt : lue à l'exécution,
 # elle grandirait avec chaque bibliothèque et laisserait entrer les appels de
-# demain. Après la bascule, le Blindage n'autorisera que ceux-ci, moins les
-# refus : un appel ajouté par un futur noyau recevra ENOSYS, la réponse qui
+# demain. Le Blindage n'autorise que ceux-ci, moins les refus et les écartés :
+# un appel ajouté par un futur noyau reçoit ENOSYS, la réponse qui
 # fait se rabattre la glibc sur l'appel plus ancien qu'elle sait remplacer.
 CONNUS = (
     "read", "write", "open", "close", "stat", "fstat", "lstat", "poll",
@@ -127,27 +128,27 @@ CONNUS = (
     "getxattrat", "listxattrat", "removexattrat",
 )
 
-# Candidats au refus : ce qu'une application de bureau n'a pas de raison
-# d'appeler. On ne les refusera qu'après avoir MESURÉ que les applications
-# réelles des Espaces s'en passent — les vignettes de Fichiers, par exemple,
-# passent par glycin, qui monte son propre bac à sable (mount, pivot_root).
-A_MESURER = (
+# Écartés : connus, mais qu'aucune application des Espaces n'a appelés pendant
+# les deux mesures du 29/09/2026 sur la VM (Firefox et une vidéo, Fichiers et
+# ses vignettes, une application Flatpak, la console). Ils reçoivent ENOSYS,
+# comme un appel inconnu. Six candidats de départ ont servi, et restent donc
+# permis : quotactl (Firefox, pour la place disque), mount et pivot_root (bwrap
+# imbriqué : Flatpak, vignettes de Fichiers — avec eux toute la famille des
+# montages, que libmount 2.41 emploie aussi), name_to_handle_at, fanotify_init
+# et fanotify_mark (localsearch, la recherche de fichiers de GNOME). Et
+# personality, jamais vu, reste permis : il ne sert qu'à lire ou régler un
+# modèle d'exécution, et quelques programmes anciens le demandent.
+ECARTES = (
     # administration de la machine : heure, noyau, quotas, journal, console
     "acct", "adjtimex", "clock_adjtime", "clock_settime", "settimeofday",
     "sethostname", "setdomainname", "iopl", "ioperm", "modify_ldt",
-    "quotactl", "quotactl_fd", "syslog", "vhangup", "lookup_dcookie",
+    "quotactl_fd", "syslog", "vhangup", "lookup_dcookie",
     "sysfs", "_sysctl", "ustat", "uselib",
-    # montages : un Espace n'en pose pas, sauf un bac à sable imbriqué
-    "mount", "umount2", "pivot_root", "fsopen", "fsconfig", "fsmount",
-    "fspick", "move_mount", "open_tree", "mount_setattr", "statmount",
-    "listmount",
-    # surveillance et désignation de fichiers hors de leur chemin
-    "name_to_handle_at", "fanotify_init", "fanotify_mark",
     # mémoire NUMA et placement de pages d'autres processus
     "mbind", "set_mempolicy", "get_mempolicy", "set_mempolicy_home_node",
     "migrate_pages", "move_pages", "remap_file_pages",
-    # divers : exécution d'un autre modèle, mémoire secrète, attributs LSM
-    "personality", "memfd_secret", "lsm_set_self_attr",
+    # mémoire secrète, attributs LSM
+    "memfd_secret", "lsm_set_self_attr",
     # jamais implémentés par Linux : ENOSYS quoi qu'il arrive
     "create_module", "get_kernel_syms", "query_module", "nfsservctl",
     "getpmsg", "putpmsg", "afs_syscall", "tuxcall", "security", "vserver",
@@ -155,19 +156,32 @@ A_MESURER = (
 )
 
 # Mode mesure, posé par l'administrateur (« sudo touch »), jamais par un
-# Espace : /etc y est en lecture seule. Les candidats y restent PERMIS, mais le
-# noyau journalise chaque appel (SCMP_ACT_LOG) — rien ne casse pendant qu'on
-# regarde, et nul besoin de ptrace, que ce filtre refuse justement. Ce mode ne
-# desserre rien : hors de lui aussi, tout ce qui n'est pas refusé passe.
+# Espace : /etc y est en lecture seule. Les écartés — et tout appel absent de
+# CONNUS — y sont PERMIS, mais le noyau journalise chaque appel (SCMP_ACT_LOG) :
+# on voit ce qu'une application nouvelle réclamerait, sans rien casser ni
+# recourir à ptrace, que ce filtre refuse justement. Les refus, eux, tiennent.
 MESURE = "/etc/codebyr/seccomp-mesure"
 
 SCMP_ACT_ALLOW = 0x7fff0000
 SCMP_ACT_LOG = 0x7ffc0000
 SCMP_ACT_ERRNO = 0x00050000
+SCMP_FLTATR_CTL_OPTIMIZE = 8
+
+
+def autorises():
+    """Ce que le Blindage laisse passer : les appels connus, moins refus et écartés."""
+    return [n for n in CONNUS if n not in REFUSES and n not in ECARTES]
 
 
 def appliquer(mesure=None):
-    """Pose le filtre sur le processus courant ; tout ce qu'il lance en hérite."""
+    """Pose le filtre sur le processus courant ; tout ce qu'il lance en hérite.
+
+    LISTE D'AUTORISATION depuis la 1.16.4 : ce qui n'est pas autorisé reçoit
+    ENOSYS, « appel inexistant » — un appel ajouté par un futur noyau comme un
+    écarté. ENOSYS plutôt qu'EPERM : c'est la réponse qui fait se rabattre la
+    glibc, et les programmes bien écrits, sur l'appel plus ancien qu'ils
+    savent remplacer. Les refus, eux, gardent EPERM : ce sont des interdits.
+    """
     if mesure is None:
         mesure = os.path.exists(MESURE)
     lib = ctypes.CDLL("libseccomp.so.2", use_errno=True)
@@ -177,19 +191,19 @@ def appliquer(mesure=None):
     lib.seccomp_syscall_resolve_name.restype = ctypes.c_int
     lib.seccomp_rule_add.argtypes = [ctypes.c_void_p, ctypes.c_uint32,
                                     ctypes.c_int, ctypes.c_uint]
+    lib.seccomp_attr_set.argtypes = [ctypes.c_void_p, ctypes.c_int, ctypes.c_uint32]
     lib.seccomp_load.argtypes = [ctypes.c_void_p]
     lib.seccomp_release.argtypes = [ctypes.c_void_p]
-    contexte = lib.seccomp_init(SCMP_ACT_LOG if mesure else SCMP_ACT_ALLOW)
+    contexte = lib.seccomp_init(SCMP_ACT_LOG if mesure else SCMP_ACT_ERRNO | errno.ENOSYS)
     if not contexte:
         raise OSError("Création du filtre seccomp impossible")
     try:
+        # Plus de trois cents règles : en arbre binaire, chaque appel n'en
+        # examine qu'une dizaine au lieu de les parcourir toutes. Sans effet
+        # sur ce qui est permis ou refusé ; ignoré si libseccomp ne le sait pas.
+        lib.seccomp_attr_set(contexte, SCMP_FLTATR_CTL_OPTIMIZE, 2)
         regles = [(nom, SCMP_ACT_ERRNO | errno.EPERM) for nom in REFUSES]
-        if mesure:
-            # Ce qui n'est ni refusé ni candidat passe sans bruit. Le reste —
-            # les candidats, et tout appel absent de CONNUS — passe aussi,
-            # mais journalisé : c'est ce que tools/mesurer_seccomp.py relève.
-            regles += [(nom, SCMP_ACT_ALLOW) for nom in CONNUS
-                       if nom not in REFUSES and nom not in A_MESURER]
+        regles += [(nom, SCMP_ACT_ALLOW) for nom in autorises()]
         for nom, action in regles:
             numero = lib.seccomp_syscall_resolve_name(nom.encode("ascii"))
             if numero >= 0:

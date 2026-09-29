@@ -134,6 +134,56 @@ assert ctypes.get_errno() == errno.EPERM, ctypes.get_errno()
                                   capture_output=True, text=True, timeout=10)
         self.assertEqual(resultat.returncode, 0, resultat.stderr)
 
+    def test_un_appel_ecarte_recoit_enosys_comme_un_appel_inconnu(self):
+        """Liste d'autorisation (1.16.4) : hors des autorisés, ENOSYS.
+
+        acct(NULL) sans privilège recevrait EPERM du noyau ; ici, le filtre
+        répond avant lui. C'est ce qui distingue « refusé par le filtre » de
+        « refusé par le noyau ».
+        """
+        code = '''import ctypes, errno
+from filtre_syscalls import appliquer
+appliquer(mesure=False)
+lib = ctypes.CDLL(None, use_errno=True)
+assert lib.syscall(163, 0) == -1 and ctypes.get_errno() == errno.ENOSYS, ctypes.get_errno()  # acct
+mode = ctypes.c_int(0)
+assert lib.syscall(239, ctypes.byref(mode), 0, 0, 0, 0) == -1  # get_mempolicy
+assert ctypes.get_errno() == errno.ENOSYS, ctypes.get_errno()
+# Les refus gardent EPERM : ce sont des interdits, pas des absences.
+assert lib.ptrace(0, 0, 0, 0) == -1 and ctypes.get_errno() == errno.EPERM
+# personality, jamais vu mais gardé : la lecture du modèle d'exécution passe.
+assert lib.syscall(135, 0xffffffff) >= 0, ctypes.get_errno()
+'''
+        resultat = subprocess.run([sys.executable, "-B", "-c", code],
+                                  env=dict(os.environ, PYTHONPATH=LIB),
+                                  capture_output=True, text=True, timeout=10)
+        self.assertEqual(resultat.returncode, 0, resultat.stderr)
+
+    def test_un_vrai_programme_tourne_sous_la_liste_d_autorisation(self):
+        # Fils d'exécution, chiffrement, base de données, sous-processus,
+        # réseau local : si la liste oubliait un appel courant, c'est ici que
+        # ça casserait — pas chez un utilisateur.
+        code = '''import hashlib, os, socket, sqlite3, ssl, subprocess, sys, tempfile, threading
+from filtre_syscalls import appliquer
+appliquer(mesure=False)
+res = []
+t = threading.Thread(target=lambda: res.append(hashlib.sha256(b"x" * 10**6).hexdigest()))
+t.start(); t.join()
+ssl.create_default_context()
+with tempfile.TemporaryDirectory() as d:
+    db = sqlite3.connect(os.path.join(d, "e.db")); db.execute("create table t(x)"); db.commit()
+a, b = socket.socketpair(); a.sendall(b"ok"); assert b.recv(2) == b"ok"
+sortie = subprocess.run([sys.executable, "-c", "print(40 + 2)"], capture_output=True, text=True)
+assert sortie.stdout.strip() == "42", sortie
+assert subprocess.run(["sh", "-c", "ls / > /dev/null && date > /dev/null"]).returncode == 0
+print("tout a tourné")
+'''
+        resultat = subprocess.run([sys.executable, "-B", "-c", code],
+                                  env=dict(os.environ, PYTHONPATH=LIB),
+                                  capture_output=True, text=True, timeout=60)
+        self.assertEqual(resultat.returncode, 0, resultat.stderr)
+        self.assertIn("tout a tourné", resultat.stdout)
+
     def test_le_mode_mesure_journalise_sans_rien_desserrer_ni_casser(self):
         """Le mode mesure laisse passer les candidats, et garde les refus.
 

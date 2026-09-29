@@ -10,6 +10,18 @@ GNOME (menu du Sceau, liserés colorés) ne se recharge pas à chaud.
 
 ---
 
+## 1.16.4 — non publiée
+
+**Le Blindage n'autorise plus que ce qu'il connaît.** Dans un Espace blindé,
+un filtre refusait jusqu'ici une liste d'opérations dangereuses, et laissait
+passer tout le reste — y compris les opérations qu'une future version de Linux
+inventera, que personne n'aura examinées. C'est désormais l'inverse : seules
+les opérations connues et utiles passent, tout le reste est refusé. La liste a
+été établie en observant ce que les applications réelles des Espaces
+demandent, avant de rien interdire.
+
+---
+
 ## 1.16.3 — 29 septembre 2026
 
 **Le bouclier anti-hameçonnage voit les adresses déguisées.** Une adresse

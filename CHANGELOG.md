@@ -10,7 +10,7 @@ GNOME (menu du Sceau, liserés colorés) ne se recharge pas à chaud.
 
 ---
 
-## 1.16.4 — non publiée
+## 1.16.4 — 29 septembre 2026
 
 **Le Blindage n'autorise plus que ce qu'il connaît.** Dans un Espace blindé,
 un filtre refusait jusqu'ici une liste d'opérations dangereuses, et laissait

@@ -26,7 +26,7 @@ une mise à jour de `base-files` ; le dépôt APT porte une date de péremption,
 une version ne peut plus être publiée sans CI verte. Détail dans l'historique
 ci-dessous.
 
-**En préparation, 1.16.4** : le filtre d'appels système du Blindage devient une
+**Publié en 1.16.4** : le filtre d'appels système du Blindage devient une
 liste d'autorisation — tout appel qu'il ne connaît pas est refusé.
 
 **Publié en 1.16.3** : le bouclier anti-hameçonnage était muet sur toutes

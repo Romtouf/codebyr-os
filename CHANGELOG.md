@@ -10,7 +10,7 @@ GNOME (menu du Sceau, liserés colorés) ne se recharge pas à chaud.
 
 ---
 
-## 1.16.5 — non publiée
+## 1.16.5 — 29 septembre 2026
 
 **Les images ont de nouveau un aperçu dans Fichiers.** Photos, captures et
 dessins s'affichaient tous avec la même icône générique, dans les Espaces

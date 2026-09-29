@@ -30,6 +30,12 @@ acl
 # jamais et chaque démarrage l'attendait 90 secondes (constaté le 28/09/2026).
 systemd-cryptsetup
 
+# gdk-pixbuf-thumbnailer : les vignettes des images (PNG, JPEG, SVG, WebP…)
+# dans Fichiers. Nautilus ne fait que le recommander, et --apt-recommends false
+# ne pardonne rien : aucune image n'avait d'aperçu (constaté le 29/09/2026).
+# Dépendance du paquet codebyr-tools depuis la 1.16.5.
+libgdk-pixbuf2.0-bin
+
 # Bus de session PRIVÉ par Espace (dbus-run-session). Load-bearing pour la
 # sécurité : le bus de session de l'hôte n'est plus exposé au bac à sable, ce
 # bus privé est donc le seul que voit l'application. Listé explicitement car

@@ -366,6 +366,25 @@ class LanceursGraphiques(unittest.TestCase):
                 self.assertTrue(os.path.exists(svg), "%s : icône absente (%s)" % (nom, icone))
 
 
+class LesVignettesDesImages(unittest.TestCase):
+    """Sans gdk-pixbuf-thumbnailer, aucune image n'a d'aperçu dans Fichiers.
+
+    Nautilus ne fait que le recommander, et l'image est construite sans les
+    recommandations : dans Codebyr, chaque PNG, JPEG ou SVG s'affichait avec
+    l'icône générique, bureau compris. Constaté le 29/09/2026 sur la VM.
+    """
+
+    def test_le_paquet_en_depend(self):
+        with open(BUILD_DEB, encoding="utf-8") as f:
+            depends = re.search(r"^Depends: (.*)$", f.read(), re.MULTILINE).group(1)
+        self.assertIn("libgdk-pixbuf2.0-bin", [d.strip() for d in depends.split(",")])
+
+    def test_l_image_l_embarque(self):
+        with open(os.path.join(RACINE, "live-build", "config", "package-lists",
+                               "codebyr.list.chroot"), encoding="utf-8") as f:
+            self.assertIn("libgdk-pixbuf2.0-bin", f.read().split())
+
+
 if __name__ == "__main__":
     unittest.main()
 

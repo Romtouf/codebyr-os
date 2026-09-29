@@ -165,7 +165,11 @@ TAILLE="$(du -sk "$STAGE" | cut -f1)"
 #     (que l'image de démarrage ouvre seule). Debian 13 l'a sorti dans un
 #     paquet à part, et l'image ne l'avait pas : l'espace d'échange chiffré
 #     ne s'ouvrait jamais, et chaque démarrage l'attendait 90 secondes en vain.
-#     Constaté le 28/09/2026.
+#     Constaté le 28/09/2026 ;
+#   · libgdk-pixbuf2.0-bin — gdk-pixbuf-thumbnailer, qui fabrique les vignettes
+#     des images (PNG, JPEG, SVG, WebP…) dans Fichiers. Nautilus ne fait que le
+#     recommander : aucune image n'avait d'aperçu, nulle part dans Codebyr.
+#     Constaté le 29/09/2026.
 mkdir -p "$STAGE/DEBIAN"
 cat > "$STAGE/DEBIAN/control" <<EOF
 Package: codebyr-tools
@@ -173,7 +177,7 @@ Version: $VERSION
 Architecture: all
 Maintainer: Codebyr OS <romain.formationoc@gmail.com>
 Installed-Size: $TAILLE
-Depends: python3 (>= 3.12), libseccomp2, python3-gi, gir1.2-gtk-4.0, gir1.2-adw-1, bubblewrap, dbus-user-session, firefox-esr | firefox, python3-nautilus, acl, libnotify-bin, systemd-cryptsetup
+Depends: python3 (>= 3.12), libseccomp2, python3-gi, gir1.2-gtk-4.0, gir1.2-adw-1, bubblewrap, dbus-user-session, firefox-esr | firefox, python3-nautilus, acl, libnotify-bin, systemd-cryptsetup, libgdk-pixbuf2.0-bin
 Recommends: flatpak, gnome-shell
 Section: admin
 Priority: optional

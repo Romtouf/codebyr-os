@@ -21,7 +21,7 @@ from outils import RACINE
 
 # Dossiers qui ne sont pas des sources : artefacts, caches, copies de travail.
 IGNORES = {".git", "dist", "archives", "essais-retires", "apt-repo", ".kilo",
-           ".ruff_cache", "__pycache__", "node_modules", "captures_ecran", "captures",
+           ".ruff_cache", "__pycache__", "node_modules", "captures",
            "fonts"}
 
 URL = re.compile(r"https?://([A-Za-z0-9.-]+)")
@@ -96,6 +96,21 @@ class LaDetteAnnoncee(unittest.TestCase):
         if all(e.get("compte") == "dedie" for e in registre["espaces"]):
             dette = _lire("CONTRIBUTING.md").split("## Dette technique connue")[1]
             self.assertNotRegex(dette.split("\n## ")[0], r"(?i)un seul compte")
+
+
+class LesImages(unittest.TestCase):
+
+    def test_chaque_image_du_readme_existe(self):
+        # Les captures vivaient en double (captures_ecran/ et site/captures/),
+        # identiques jusqu'au jour où l'une serait refaite sans l'autre. Une
+        # seule source depuis le 29/09/2026 : site/captures/. Ce test voit
+        # une image déplacée ou supprimée sans que le README suive.
+        readme = _lire("README.md")
+        images = re.findall(r'!\[[^\]]*\]\(([^)\s]+)\)|<img src="([^"]+)"', readme)
+        chemins = [a or b for a, b in images if not (a or b).startswith("http")]
+        self.assertTrue(chemins, "aucune image locale trouvée dans le README")
+        manquantes = [c for c in chemins if not os.path.isfile(os.path.join(RACINE, c))]
+        self.assertEqual(manquantes, [])
 
 
 class LaVersionAnnoncee(unittest.TestCase):

@@ -5,8 +5,9 @@ Site vitrine statique, sans dépendance de build. Destiné à **https://os.codeb
 - `index.html` — structure et contenu ;
 - `styles.css` — design (tokens fidèles à la charte : couleur *Sentinelle*, neutres à biais cyan, couleurs d'Espaces strictement fonctionnelles) ;
 - `app.js` — bascule de thème (clair/sombre), révélations au défilement, divers ;
-- `captures/` — captures d'écran du système (copie de `../captures_ecran/`, pour que le
-  dossier `site/` reste autonome et déployable tel quel).
+- `captures/` — captures d'écran du système, source UNIQUE : le README du dépôt
+  les prend ici aussi. Elles restent dans `site/` pour que ce dossier soit
+  autonome et déployable tel quel (Docker ne suit pas un lien vers l'extérieur).
 
 ## Déploiement (Docker + Nginx Proxy Manager)
 

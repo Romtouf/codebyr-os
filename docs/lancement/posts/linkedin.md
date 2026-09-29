@@ -5,10 +5,10 @@ créneau où LinkedIn pousse le plus.
 
 **Images à joindre** (LinkedIn favorise les posts avec visuels — 3 à 4 captures) :
 
-1. `captures_ecran/01-bureau.png` — le bureau (l'aperçu, la plus « belle »)
-2. `captures_ecran/02-menu-sceau.png` — les Espaces colorés
-3. `captures_ecran/05-lisere-fenetre.png` — le liseré coloré d'une fenêtre
-4. `captures_ecran/04-lien-jetable.png` — « Ouvrir un lien en Jetable »
+1. `site/captures/01-bureau.png` — le bureau (l'aperçu, la plus « belle »)
+2. `site/captures/02-menu-sceau.png` — les Espaces colorés
+3. `site/captures/05-lisere-fenetre.png` — le liseré coloré d'une fenêtre
+4. `site/captures/04-lien-jetable.png` — « Ouvrir un lien en Jetable »
 
 ⚠️ **Le lien** : LinkedIn réduit fortement la portée des posts contenant un lien
 externe dans le corps du texte. Deux options :

@@ -2,10 +2,10 @@
 
 **Captures à joindre** (dans cet ordre — la 1re est celle qu'on voit en aperçu) :
 
-1. `captures_ecran/02-menu-sceau.png` — le menu du Sceau, les Espaces colorés
-2. `captures_ecran/05-lisere-fenetre.png` — le liseré coloré d'une fenêtre
-3. `captures_ecran/04-lien-jetable.png` — « Ouvrir un lien en Jetable »
-4. `captures_ecran/06-config-bouclier.png` — le bouclier anti-hameçonnage
+1. `site/captures/02-menu-sceau.png` — le menu du Sceau, les Espaces colorés
+2. `site/captures/05-lisere-fenetre.png` — le liseré coloré d'une fenêtre
+3. `site/captures/04-lien-jetable.png` — « Ouvrir un lien en Jetable »
+4. `site/captures/06-config-bouclier.png` — le bouclier anti-hameçonnage
 
 ## Version française (Mastodon : framapiaf/mastodon.social, X)
 

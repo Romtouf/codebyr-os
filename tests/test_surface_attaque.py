@@ -397,16 +397,22 @@ class ReglagesNoyau(unittest.TestCase):
         # démarrage : la protection manque, simplement. Seul legacy_tiocsti a
         # le droit d'être inconnu (noyaux antérieurs à 6.2, d'où son « - »).
         #
-        # Les réglages « net.core.bpf_jit_* » n'existent que dans l'espace de
-        # noms réseau INITIAL : un conteneur — celui de la CI — ne les voit
-        # pas, et ce test y échouait depuis leur ajout. On ne les ignore que
-        # si leur famille entière manque (bpf_jit_enable compris) : une faute
-        # de frappe dans leur nom échoue toujours sur une machine ordinaire.
-        famille_bpf_visible = os.path.exists("/proc/sys/net/core/bpf_jit_enable")
+        # Deux familles n'existent pas partout où tournent ces tests :
+        #  · « net.core.bpf_jit_* », seulement dans l'espace de noms réseau
+        #    INITIAL : un conteneur — celui de la CI — ne les voit pas ;
+        #  · « kernel.kexec_* », seulement si le noyau sait faire kexec — ce
+        #    qu'un bac à sable comme gVisor ne simule pas (constaté par
+        #    l'audit du 29/09/2026 : un échec, sur ce seul réglage).
+        # On ne les ignore que si un TÉMOIN de la famille, qui dépend de la
+        # même option du noyau, manque aussi : une faute de frappe dans leur
+        # nom échoue toujours sur une machine ordinaire.
+        temoins = {"net.core.bpf_jit_": "/proc/sys/net/core/bpf_jit_enable",
+                   "kernel.kexec_": "/sys/kernel/kexec_loaded"}
         for cle in self.ATTENDUS:
             if cle == "dev.tty.legacy_tiocsti":
                 continue
-            if cle.startswith("net.core.bpf_jit_") and not famille_bpf_visible:
+            if any(cle.startswith(famille) and not os.path.exists(temoin)
+                   for famille, temoin in temoins.items()):
                 continue
             with self.subTest(cle=cle):
                 self.assertTrue(os.path.exists("/proc/sys/" + cle.replace(".", "/")), cle)

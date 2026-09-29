@@ -10,9 +10,9 @@ Un Espace tourne sous son propre compte quand le registre le demande :
 
     {"id": "travail", ..., "compte": "dedie"}
 
-Rien ne le demande par défaut. Tant que ce chantier n'est pas terminé, c'est un
-réglage d'essai, et chaque geste qui n'est pas encore prêt est REFUSÉ avec une
-explication, jamais tenté à moitié (voir GESTES_PAS_ENCORE_PRETS).
+C'est le défaut depuis la 1.16.1, pour chaque Espace livré ou créé, l'invité
+excepté. Chaque geste qui n'est pas encore prêt sous ce mode est REFUSÉ avec
+une explication, jamais tenté à moitié (voir GESTES_PAS_ENCORE_PRETS).
 
 Ce qui fonctionne : ouvrir et fermer, déménagement des données et retour,
 envoi de fichiers dans les deux sens par les boîtes de l'Espace, examen d'une
@@ -66,6 +66,15 @@ def incompatibilites(esp, fichier=None, est_flatpak=False):
     raisons = []
     if not demande(esp):
         return raisons
+    # Un identifiant qu'aucun compte Unix ne peut porter : un Espace créé
+    # jusqu'en 1.16.1 avec un nom long ou commençant par un chiffre. Sans
+    # cette raison, le service le refusait sans que personne le voie.
+    if not comptes.espace_valide(esp.get("id")):
+        raisons.append(
+            "son identifiant « %s » ne peut pas nommer un compte : il doit commencer "
+            "par une lettre et tenir en %d caractères. Supprimez-le puis recréez-le, "
+            "ou désactivez « Compte séparé » pour lui dans Configuration Codebyr"
+            % (esp.get("id"), comptes.LONGUEUR_ESPACE))
     # Les applications Flatpak étaient refusées jusqu'en 1.15.0. Elles
     # s'ouvrent depuis la 1.16.0 : l'Espace a son bus de session, donc ses
     # portails, et son installation Flatpak à lui (voir codebyr-space,

@@ -30,7 +30,6 @@ import tarfile
 import tempfile
 import threading
 import time
-import unicodedata
 
 # Module partagé de lecture/écriture du registre (voir /usr/share/codebyr/).
 # CODEBYR_LIB permet de le charger ailleurs — tests, développement.
@@ -1678,7 +1677,9 @@ def _nettoyer_marqueurs():
 def cmd_close(espaces, esp_id):
     """Ferme toutes les fenêtres/processus ouverts d'un Espace."""
     esp = espaces.get(esp_id)
-    if compte_dedie.demande(esp):
+    # Même exception qu'à la suppression : un identifiant qu'aucun compte ne
+    # peut porter n'a jamais rien ouvert sous le service.
+    if compte_dedie.demande(esp) and comptes.espace_valide(esp_id):
         # Ses processus tournent sous un autre compte : le bureau n'a pas le
         # droit de leur envoyer un signal, et l'essai échouait sans un mot en
         # annonçant « 0 fenêtre fermée ». C'est au service de refermer.
@@ -2218,9 +2219,8 @@ def cmd_create(nom, couleur):
     if not re.fullmatch(r"#(?:[0-9A-Fa-f]{3}|[0-9A-Fa-f]{6})", couleur):
         sys.stderr.write("Couleur invalide : %r (attendu : #RRGGBB).\n" % couleur)
         return 2
-    base = unicodedata.normalize("NFKD", nom).encode("ascii", "ignore").decode().lower()
-    base = re.sub(r"[^a-z0-9]+", "-", base).strip("-") or "espace"
-    esp_id = registre.identifiant_libre(base)
+    # Un identifiant qu'un compte Unix peut porter : voir registre.identifiant_libre.
+    esp_id = registre.identifiant_libre(nom)
     # Sous son propre compte d'office, comme les Espaces livrés depuis la
     # 1.16.1 : un Espace créé par l'utilisateur n'a pas à être moins isolé que
     # les autres. Désactivable dans « Configuration Codebyr » ; sans effet pour
@@ -2243,7 +2243,9 @@ def cmd_delete(esp_id):
         return 2
     espaces = load_espaces()
     esp = espaces.get(esp_id)
-    if compte_dedie.demande(esp):
+    # Un identifiant qu'aucun compte ne peut porter n'a jamais eu de compte :
+    # rien à effacer de ce côté, et y passer rendait l'Espace insupprimable.
+    if compte_dedie.demande(esp) and comptes.espace_valide(esp_id):
         # Ses données d'abord, effacées par lui ; puis son compte, retiré par
         # le service. Dans l'autre ordre, un compte supprimé laisserait des
         # fichiers sans propriétaire, que le prochain compte créé avec le même

@@ -1,6 +1,9 @@
 # -*- coding: utf-8 -*-
 """Registre des Espaces — lecture, fusion et écriture.
 
+Le FORMAT (chaque clé, ses valeurs, son défaut) est décrit en un seul
+endroit, qui fait foi : docs/registre.md. L'extension GNOME y renvoie aussi.
+
 Module partagé par les outils Python de Codebyr (`codebyr-space`,
 `codebyr-config`, `codebyr-assistant`). Ils l'importent depuis
 /usr/share/codebyr ; la variable d'environnement CODEBYR_LIB permet de pointer
@@ -30,8 +33,13 @@ vue fusionnée le retransformerait en instantané figé, et le problème
 reviendrait par la porte de derrière. Les fonctions d'écriture ci-dessous
 travaillent donc toujours sur la « couche » utilisateur seule.
 """
+import itertools
 import json
 import os
+import re
+import unicodedata
+
+import comptes
 
 SYSTEME = "/etc/codebyr/espaces.json"
 UTILISATEUR = os.path.expanduser("~/.config/codebyr/espaces.json")
@@ -253,12 +261,22 @@ def normaliser_domaine(saisi):
     return d
 
 
-def identifiant_libre(base):
-    """Un identifiant d'Espace non utilisé, dérivé de « base »."""
+def identifiant_libre(nom):
+    """Un identifiant d'Espace non utilisé, tiré de son nom affiché.
+
+    Toujours dans la forme de comptes.FORME_ESPACE — une lettre en tête,
+    vingt caractères au plus, suffixe « -2 » compris —, celle qu'exige le
+    compte Unix de l'Espace. Jusqu'en 1.16.1, « 2025 Projets » donnait
+    « 2025-projets » : l'Espace se créait, puis refusait de s'ouvrir sous
+    compte séparé, qui est le défaut (constaté le 29/09/2026).
+    """
+    base = unicodedata.normalize("NFKD", str(nom or "")).encode("ascii", "ignore")
+    base = re.sub(r"[^a-z0-9]+", "-", base.decode().lower()).strip("-") or "espace"
+    if not "a" <= base[0] <= "z":
+        base = "e-" + base
     pris = set(espaces())
-    esp_id = base
-    n = 2
-    while esp_id in pris:
-        esp_id = "%s-%d" % (base, n)
-        n += 1
-    return esp_id
+    for n in itertools.count(1):
+        suffixe = "-%d" % n if n > 1 else ""
+        esp_id = base[:comptes.LONGUEUR_ESPACE - len(suffixe)].rstrip("-") + suffixe
+        if esp_id not in pris:
+            return esp_id

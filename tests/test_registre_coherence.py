@@ -17,7 +17,7 @@ import os
 import tempfile
 import unittest
 
-from outils import BIN, RACINE   # place le module partagé sur sys.path
+from outils import BIN, LIB, RACINE   # place le module partagé sur sys.path
 import registre                  # noqa: E402 — dépend de l'import ci-dessus
 
 EXTENSION = os.path.join(
@@ -235,8 +235,78 @@ class ReduireUnAncienInstantane(unittest.TestCase):
         self.assertIs(par_id["banque"]["audio"], True)
 
 
+class IdentifiantDUnNouvelEspace(unittest.TestCase):
+    """L'identifiant qu'on fabrique doit pouvoir nommer un compte Unix.
+
+    Constaté le 29/09/2026 : « 2025 Projets » donnait « 2025-projets », et
+    « Mes impôts & factures 2026 » vingt-quatre caractères. Chaque Espace se
+    créait, puis refusait de s'ouvrir sous compte séparé — le défaut depuis la
+    1.16.1 —, sans que personne le voie.
+    """
+
+    NOMS = ["2025 Projets", "Mes impôts & factures 2026", "Association des parents d'élèves",
+            "Été", "!!!", "", "Travail", "Ω", "a" * 40, "Projet-" + "x" * 30]
+
+    def setUp(self):
+        self._dossier = tempfile.TemporaryDirectory()
+        self._sys, self._usr = registre.SYSTEME, registre.UTILISATEUR
+        registre.SYSTEME = os.path.join(self._dossier.name, "systeme.json")
+        registre.UTILISATEUR = os.path.join(self._dossier.name, "utilisateur.json")
+
+    def tearDown(self):
+        registre.SYSTEME, registre.UTILISATEUR = self._sys, self._usr
+        self._dossier.cleanup()
+
+    def test_chaque_identifiant_fabrique_peut_nommer_un_compte(self):
+        import comptes
+        for nom in self.NOMS:
+            esp_id = registre.identifiant_libre(nom)
+            with self.subTest(nom=nom):
+                self.assertTrue(comptes.espace_valide(esp_id), esp_id)
+                comptes.nom_compte(1002, esp_id)      # ne lève pas
+
+    def test_quelques_formes_attendues(self):
+        self.assertEqual(registre.identifiant_libre("2025 Projets"), "e-2025-projets")
+        self.assertEqual(registre.identifiant_libre("Été"), "ete")
+        self.assertEqual(registre.identifiant_libre("!!!"), "espace")
+        self.assertEqual(registre.identifiant_libre("Mes impôts & factures 2026"),
+                         "mes-impots-factures")
+
+    def test_le_suffixe_tient_dans_la_longueur(self):
+        # Trois Espaces du même long nom : « -2 » et « -3 » entrent dans les
+        # vingt caractères, au lieu de les dépasser.
+        import comptes
+        nom = "Association des parents d'élèves"
+        vus = []
+        for _ in range(3):
+            esp_id = registre.identifiant_libre(nom)
+            registre.ajouter_espace({"id": esp_id, "nom": nom, "couleur": "#123456"})
+            vus.append(esp_id)
+        self.assertEqual(len(set(vus)), 3, vus)
+        self.assertTrue(all(comptes.espace_valide(v) for v in vus), vus)
+        self.assertTrue(vus[1].endswith("-2") and vus[2].endswith("-3"), vus)
+
+    def test_un_espace_deja_cree_hors_forme_dit_pourquoi_il_ne_s_ouvre_pas(self):
+        import compte_dedie
+        raisons = compte_dedie.incompatibilites({"id": "2025-projets", "nom": "2025 Projets",
+                                                 "compte": "dedie"})
+        self.assertEqual(len(raisons), 1)
+        self.assertIn("« 2025-projets »", raisons[0])
+        self.assertIn("Compte séparé", raisons[0])
+
+    def test_un_espace_hors_forme_reste_supprimable(self):
+        # Le supprimer passait par son compte — qui n'a jamais pu exister :
+        # l'Espace que le message invite à recréer ne pouvait pas partir.
+        with open(os.path.join(BIN, "codebyr-space"), encoding="utf-8") as f:
+            code = f.read()
+        for commande in ("def cmd_delete(", "def cmd_close("):
+            corps = code.split(commande)[1].split("\ndef ")[0]
+            self.assertIn("compte_dedie.demande(esp) and comptes.espace_valide(esp_id)", corps,
+                          commande)
+
+
 class LecteursCoherents(unittest.TestCase):
-    """Les quatre lecteurs du registre doivent appliquer la même règle."""
+    """Les deux lecteurs du registre doivent appliquer la même règle."""
 
     def _source(self, chemin):
         with open(chemin, encoding="utf-8") as f:
@@ -250,6 +320,29 @@ class LecteursCoherents(unittest.TestCase):
             self.assertNotIn("USER_REGISTRY if os.path.exists", code,
                              "%s applique encore l'ancienne règle « l'un OU "
                              "l'autre »" % nom)
+
+    def test_le_format_est_decrit_en_un_seul_endroit_qui_fait_foi(self):
+        # Audit du 29/09/2026 : le format n'était écrit nulle part, et les deux
+        # lecteurs divergeaient en silence (identifiant, couleur de repli).
+        doc = self._source(os.path.join(RACINE, "docs", "registre.md"))
+        for lecteur in (os.path.join(LIB, "registre.py"), EXTENSION):
+            self.assertIn("docs/registre.md", self._source(lecteur), lecteur)
+        # Chaque clé livrée y est décrite.
+        with open(os.path.join(RACINE, "live-build", "config", "includes.chroot_after_packages",
+                               "etc", "codebyr", "espaces.json"), encoding="utf-8") as f:
+            livre = json.load(f)
+        cles = {c for e in livre["espaces"] for c in e} | set(livre) - {"_commentaire"}
+        for cle in sorted(cles):
+            self.assertIn("`%s`" % cle, doc, "clé « %s » absente de docs/registre.md" % cle)
+        # La forme de l'identifiant est celle que le compte Unix exige.
+        import comptes
+        self.assertIn("`%s`" % comptes.FORME_ESPACE.pattern.replace("\\Z", ""), doc)
+
+    def test_la_couleur_de_repli_est_la_meme_partout(self):
+        doc = self._source(os.path.join(RACINE, "docs", "registre.md"))
+        self.assertIn("const COULEUR_DEFAUT = '#888888';", self._source(EXTENSION))
+        self.assertIn('e.get("couleur", "#888888")', self._source(os.path.join(BIN, "codebyr-config")))
+        self.assertIn("`#888888`", doc)
 
     def test_l_extension_gnome_fusionne_aussi(self):
         code = self._source(EXTENSION)

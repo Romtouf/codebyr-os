@@ -135,11 +135,12 @@ franchement vaut mieux que de laisser chacun le découvrir :
 
 ## Dette technique connue (assumée, écrite noir sur blanc)
 
-- **Registre des Espaces lu par quatre programmes** (trois en Python, un en
-  GJS) : impossible de partager du code entre Python et GJS, et les outils
-  Python restent volontairement autonomes. La règle (« la copie utilisateur
-  prime ») est donc vérifiée par un test (`tests/test_registre_coherence.py`)
-  plutôt que garantie par le langage.
+- **Registre des Espaces lu par deux programmes** : le module `registre.py`,
+  partagé par les trois outils Python, et l'extension GNOME, en GJS. Ils ne
+  peuvent pas partager de code. Le format fait foi en un seul endroit,
+  [docs/registre.md](docs/registre.md), et `tests/test_registre_coherence.py`
+  vérifie que les deux appliquent la même règle et que chaque clé livrée y est
+  décrite.
 - **Deux fonctions manquent sous compte séparé**, le mode par défaut depuis
   1.16.1 : « Ajouter une application » (un programme téléchargé) n'y est pas
   encore possible, et une application Flatpak n'y reçoit pas le fichier choisi

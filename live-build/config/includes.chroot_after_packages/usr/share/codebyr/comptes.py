@@ -32,9 +32,11 @@ import re
 
 # Le nom d'un compte Unix tient en 32 caractères ; « cbyr-<uid>-<espace> »
 # laisse la place à un identifiant d'Espace de 20 caractères, ce que la forme
-# ci-dessous impose déjà.
+# ci-dessous impose. C'est LA forme d'un identifiant d'Espace (docs/registre.md) :
+# registre.identifiant_libre ne fabrique que des identifiants qui la respectent.
 PREFIXE = "cbyr"
-FORME_ESPACE = re.compile(r"[a-z][a-z0-9-]{0,19}\Z")
+LONGUEUR_ESPACE = 20
+FORME_ESPACE = re.compile(r"[a-z][a-z0-9-]{0,%d}\Z" % (LONGUEUR_ESPACE - 1))
 FORME_AFFICHAGE = re.compile(r"wayland-[0-9]{1,3}\Z")
 
 # Racine des dossiers personnels des Espaces. Sous /var/lib et non sous le

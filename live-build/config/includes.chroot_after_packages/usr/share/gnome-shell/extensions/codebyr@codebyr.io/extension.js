@@ -52,7 +52,9 @@ function lireRegistre(chemin) {
 // Choisir « l'un OU l'autre », comme avant, figeait les défauts au jour où
 // l'utilisateur touchait son premier réglage : plus aucune valeur livrée par
 // une mise à jour ne pouvait plus l'atteindre. Même règle que le module Python
-// /usr/share/codebyr/registre.py — les deux sont vérifiés par les tests.
+// /usr/share/codebyr/registre.py — les deux sont vérifiés par les tests. Le
+// FORMAT de chaque clé est décrit en un seul endroit, qui fait foi :
+// docs/registre.md.
 // Le registre est relu à chaque fenêtre créée. Deux fichiers ouverts, décodés
 // et analysés en JSON pour chaque fenêtre qui s'ouvre — inutile, et c'est le
 // compositeur qui paie. On garde donc le résultat, invalidé dès que l'un des
@@ -81,7 +83,11 @@ function signatureRegistres() {
 // règles : la seule chose que l'on accepte est ce qu'une couleur doit être.
 // C'est vérifié ICI, à la lecture, et non à chaque usage : il y en a cinq, et
 // le sixième, un jour, oublierait de le faire.
-const COULEUR_DEFAUT = '#43C7DF';
+//
+// Le repli est le gris neutre des outils Python (docs/registre.md), et non
+// plus Sentinelle : un Espace mal décrit n'a pas à porter la couleur du
+// système lui-même.
+const COULEUR_DEFAUT = '#888888';
 const FORME_COULEUR = /^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/;
 
 function couleurSure(couleur) {

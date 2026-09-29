@@ -22,6 +22,14 @@ administrateur sans mot de passe. Jusqu'en 1.16.0, le compte invité le pouvait
 aussi. Le service ne suit plus aucun raccourci : il vérifie ce qu'il ouvre et
 travaille sur ce qu'il a vérifié. Le défaut existait depuis la 1.15.0.
 
+**Un Espace au nom long, ou commençant par un chiffre, s'ouvre.** « 2025
+Projets » ou « Mes impôts & factures 2026 » se créaient, puis refusaient de
+s'ouvrir sans rien dire : sous compte séparé, le défaut depuis la 1.16.1,
+l'identifiant d'un Espace doit commencer par une lettre et tenir en vingt
+caractères. Les nouveaux Espaces reçoivent un identifiant qui convient ; un
+Espace déjà créé ainsi dit pourquoi il ne s'ouvre pas, et peut être supprimé
+puis recréé.
+
 ---
 
 ## 1.16.1 — 28 septembre 2026

@@ -45,6 +45,97 @@
             return;
     } catch (e) { /* storage.local indisponible : on continue à protéger */ }
 
+    // Le navigateur donne le nom d'hôte sous sa forme ASCII, dite « punycode » :
+    // « mаbanque.fr », écrit avec un « а » cyrillique, arrive ici comme
+    // « xn--mbanque-3ve.fr », qui ne ressemble à rien — et le bouclier se
+    // taisait. On relit donc chaque étiquette comme l'utilisateur la VOIT
+    // (RFC 3492). Une forme invalide est rendue telle quelle.
+    function depunycode(etiquette) {
+        if (etiquette.indexOf("xn--") !== 0 || etiquette.length > 63)
+            return etiquette;
+        const code = etiquette.slice(4);
+        const base = 36, tmin = 1, tmax = 26;
+        const fin = code.lastIndexOf("-");
+        const sortie = fin >= 0 ? Array.from(code.slice(0, fin)) : [];
+        let n = 128, i = 0, biais = 72, pos = fin >= 0 ? fin + 1 : 0;
+        while (pos < code.length) {
+            const avant = i;
+            for (let w = 1, k = base; ; k += base) {
+                if (pos >= code.length)
+                    return etiquette;
+                const c = code.charCodeAt(pos++);
+                const chiffre = (c >= 48 && c <= 57) ? c - 22
+                              : (c >= 97 && c <= 122) ? c - 97 : base;
+                if (chiffre >= base)
+                    return etiquette;
+                i += chiffre * w;
+                const t = k <= biais ? tmin : k >= biais + tmax ? tmax : k - biais;
+                if (chiffre < t)
+                    break;
+                w *= base - t;
+            }
+            // Adaptation du biais (RFC 3492, § 6.1).
+            const total = sortie.length + 1;
+            let delta = Math.floor((i - avant) / (avant === 0 ? 700 : 2));
+            delta += Math.floor(delta / total);
+            let k = 0;
+            for (; delta > 455; k += base)
+                delta = Math.floor(delta / 35);
+            biais = k + Math.floor(36 * delta / (delta + 38));
+            n += Math.floor(i / total);
+            i %= total;
+            if (n > 0x10FFFF)
+                return etiquette;
+            sortie.splice(i++, 0, String.fromCodePoint(n));
+        }
+        return sortie.join("");
+    }
+
+    // Lettres d'autres alphabets qui se font passer pour des lettres latines :
+    // « раураl », tout en cyrillique, s'affiche comme « paypal ». La table
+    // s'en tient aux sosies qui trompent vraiment à l'écran. Elle est écrite
+    // en codes : dans une table de sosies, « а » et « a » ne se relisent pas.
+    // Les accents, eux, tombent avec la décomposition Unicode.
+    const SOSIES = {
+        // cyrillique : а с ԁ е һ і ј к ӏ о р ԛ ѕ у х ԝ ь
+        "а": "a", "с": "c", "ԁ": "d", "е": "e", "һ": "h",
+        "і": "i", "ј": "j", "к": "k", "ӏ": "l", "о": "o",
+        "р": "p", "ԛ": "q", "ѕ": "s", "у": "y", "х": "x",
+        "ԝ": "w", "ь": "b",
+        // grec : α ε η ι κ ν ο ρ τ υ χ γ ω
+        "α": "a", "ε": "e", "η": "n", "ι": "i", "κ": "k",
+        "ν": "v", "ο": "o", "ρ": "p", "τ": "t", "υ": "u",
+        "χ": "x", "γ": "y", "ω": "w",
+        // arménien : ս օ ո հ ց զ
+        "ս": "u", "օ": "o", "ո": "n", "հ": "h", "ց": "g",
+        "զ": "q",
+        // latin étendu : ı ɑ ɡ ɩ ȷ
+        "ı": "i", "ɑ": "a", "ɡ": "g", "ɩ": "i", "ȷ": "j"
+    };
+
+    // Ce que l'œil prend pour des lettres latines : « mаbánque » → « mabanque ».
+    // La décomposition NFKD défait aussi les pleines chasses et les ligatures.
+    function silhouette(nom) {
+        let s = "";
+        for (const c of nom.normalize("NFKD").replace(/\p{M}/gu, ""))
+            s += SOSIES[c] || c;
+        return s;
+    }
+
+    // Un nom tel qu'il s'AFFICHE. Le registre n'accepte que de l'ASCII : un
+    // domaine protégé accentué y est donc inscrit en punycode, lui aussi.
+    function lire(nom) {
+        return nom.split(".").map(depunycode).join(".");
+    }
+
+    // L'hôte tel qu'il s'affiche, et tel que l'œil le lit.
+    const hoteLu = lire(host);
+    const hoteVu = silhouette(hoteLu);
+
+    function officiel(h, p) {
+        return h === p || h.endsWith("." + p);
+    }
+
     // « www.mabanque.fr » → « mabanque » : le nom, sans le www ni l'extension.
     function coeur(d) {
         d = (d || "").toLowerCase().replace(/^www\./, "");
@@ -76,19 +167,25 @@
     //   c) le nom apparaît comme ÉTIQUETTE   mabanque.fr  → mabanque.piege.com
     //                                                     → mabanque-securite.com
     // Ce dernier point est la correction clé : chercher le nom n'importe où dans
-    // l'hôte faisait crier le bouclier sur « revolut.zendesk.com » ou sur toute
-    // page d'aide officielle hébergée sur un sous-domaine tiers.
+    // l'hôte faisait crier le bouclier sur « revolution.com » pour « revolut ».
+    // Une page d'aide officielle hébergée chez un tiers (« revolut.zendesk.com »)
+    // alerte en revanche, et c'est voulu : elle a la forme exacte de
+    // « mabanque.piege.com ». L'utilisateur la déclare légitime une fois.
+    //
+    // Les trois signaux portent sur la SILHOUETTE de l'hôte : « mаbanque.fr »
+    // en cyrillique est « mabanque.fr » pour l'œil, donc pour le bouclier.
     function imposteur() {
-        const etiquettes = host.split(".");
-        const coeurHote = coeur(host);
+        const etiquettes = hoteVu.split(".");
+        const coeurHote = coeur(hoteVu);
         for (let k = 0; k < PROTEGES.length; k++) {
             const p = String(PROTEGES[k]).toLowerCase().replace(/^\*\./, "");
             if (!p)
                 continue;
-            // Domaine officiel exact (ou sous-domaine) : ce n'est PAS un imposteur.
-            if (host === p || host.endsWith("." + p))
+            // Domaine officiel exact (ou sous-domaine) : ce n'est PAS un
+            // imposteur. Comparé tel qu'il circule ET tel qu'il s'affiche.
+            if (officiel(host, p) || officiel(hoteLu, lire(p)))
                 return null;
-            const cp = coeur(p);
+            const cp = coeur(silhouette(lire(p)));
             if (!cp || cp.length < 4)
                 continue;   // un nom trop court produit trop de collisions
 
@@ -151,6 +248,14 @@
             "Ce site (" + host + ") ressemble au site de votre banque (" + banque +
             ") mais ce n'en est pas le site officiel.",
             "font-size:17px;line-height:1.6;"));
+        // L'adresse affichée par le navigateur peut être identique à l'œil
+        // à celle de la banque : on dit pourquoi elle ne l'est pas.
+        if (hoteLu !== host)
+            carte.appendChild(bloc(
+                "Son adresse imite des lettres ordinaires avec des caractères " +
+                "d'un autre alphabet, ou accentués : sous son apparence, elle " +
+                "s'écrit « " + host + " ».",
+                "font-size:17px;line-height:1.6;margin-top:12px;"));
         carte.appendChild(bloc(
             "N'entrez jamais vos identifiants ici. Pour votre banque, utilisez " +
             "l'Espace Banque de Codebyr OS.",

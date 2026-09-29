@@ -22,6 +22,12 @@ administrateur sans mot de passe. Jusqu'en 1.16.0, le compte invité le pouvait
 aussi. Le service ne suit plus aucun raccourci : il vérifie ce qu'il ouvre et
 travaille sur ce qu'il a vérifié. Le défaut existait depuis la 1.15.0.
 
+**Le bouclier anti-hameçonnage voit les adresses déguisées.** Une adresse
+comme « mаbanque.fr », écrite avec un « а » de l'alphabet cyrillique, s'affiche
+exactement comme celle de votre banque, et le bouclier ne la reconnaissait pas.
+Il la lit désormais comme vous la voyez, accents et lettres d'autres alphabets
+compris, et son avertissement indique comment l'adresse s'écrit réellement.
+
 ---
 
 ## 1.16.1 — 28 septembre 2026

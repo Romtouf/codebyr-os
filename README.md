@@ -26,7 +26,9 @@ d'autorisation ; la 1.16.5 rend leur aperçu aux images dans Fichiers, et la
 d'un Espace à compte séparé. La 1.16.7 protège le lanceur de l'écran de
 bienvenue, modifiable par tous les comptes depuis la 1.13.0, et la 1.16.8
 ajoute deux protections du noyau au démarrage (détail dans
-[SECURITY.md](SECURITY.md)). Le lot de
+[SECURITY.md](SECURITY.md)). **L'ISO 1.16.8 est reproductible** : chacun peut
+la reconstruire depuis le code publié et retrouver la même empreinte (voir
+« Reconstruire l'ISO vous-même » plus bas). Le lot de
 sécurité de septembre est publié (frontières des fichiers, restauration non
 destructive, aucun repli sans isolation, réseau restreint par namespace, filtre
 d'appels système).

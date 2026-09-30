@@ -259,13 +259,12 @@ tests. Détail dans [SECURITY.md](../SECURITY.md).
    anti-hameçonnage est resté muet de la 1.6.0 à la 1.16.2 : chargé, signé,
    actif — et jamais vérifié en train d'alerter. Chaque protection mérite un
    essai qui la montre à l'œuvre, sur la VM ou dans un vrai programme.
-3. **Une ISO à jour.** La dernière publiée est la 1.16.1 : une installation
-   neuve démarre avec l'élévation de privilèges fermée en 1.16.2 et le
-   bouclier muet, jusqu'à sa première mise à jour. Reconstruire et signer une
-   ISO récente — et, tant qu'à faire, la rendre reproductible (ligne « ISO
-   reproductibles »). (« Ajouter une application » sous compte séparé, qui
-   était ici, est fait en 1.16.6 ; la liste d'autorisation du filtre d'appels
-   système, en 1.16.4.)
+3. **Un code qu'un second mainteneur peut reprendre.** `codebyr-space` fait
+   plus de 3 000 lignes : c'est le cœur du système et son point de fragilité.
+   Le découper en modules testables est la condition pour que quelqu'un
+   d'autre puisse le relire, le corriger, le maintenir. (L'ISO à jour, qui
+   était ici, est publiée : la 1.16.8, reproductible, le 30/09/2026 ;
+   « Ajouter une application » sous compte séparé est fait en 1.16.6.)
 
    *(`xdg-dbus-proxy`, ancien numéro deux, a été tranché le 13/09/2026 : les
    notifications passent par un relais, voir plus haut.)*

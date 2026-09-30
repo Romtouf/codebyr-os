@@ -20,6 +20,7 @@ from unittest import mock
 import outils
 from outils import LIB  # noqa: F401 — place les modules partagés
 import compte_dedie  # noqa: E402
+import programmes  # noqa: E402
 
 space = outils.charger("codebyr-space")
 
@@ -143,24 +144,24 @@ class AjouterUnProgrammeSousCompteSepare(unittest.TestCase):
     APPIMAGE = b"\x7fELF\x02\x01\x01\x00AI\x02" + b"\x00" * 5
 
     def test_la_nature_se_lit_dans_les_premiers_octets(self):
-        self.assertEqual(space.nature_programme(self.APPIMAGE), "appimage")
-        self.assertEqual(space.nature_programme(self.ELF), "elf")
-        self.assertEqual(space.nature_programme(b"#!/bin/sh\necho"), "script")
+        self.assertEqual(programmes.nature_programme(self.APPIMAGE), "appimage")
+        self.assertEqual(programmes.nature_programme(self.ELF), "elf")
+        self.assertEqual(programmes.nature_programme(b"#!/bin/sh\necho"), "script")
         for autre in (b"", b"%PDF-1.7", b"PK\x03\x04", b"\x89PNG\r\n"):
-            self.assertIsNone(space.nature_programme(autre), autre)
+            self.assertIsNone(programmes.nature_programme(autre), autre)
 
     def test_une_appimage_se_lance_sans_fuse(self):
         # Le Blindage interdit tout nouveau privilège : l'outil à privilèges
         # qui monte une AppImage par FUSE y échoue. Elle se décompresse.
-        self.assertEqual(space.commande_programme("/e/Téléchargements/Obsidian 1.6.AppImage",
+        self.assertEqual(programmes.commande_programme("/e/Téléchargements/Obsidian 1.6.AppImage",
                                                   "appimage", ["--no-sandbox"]),
                          "'/e/Téléchargements/Obsidian 1.6.AppImage' "
                          "--appimage-extract-and-run --no-sandbox")
-        self.assertEqual(space.commande_programme("/e/outil", "elf"), "/e/outil")
+        self.assertEqual(programmes.commande_programme("/e/outil", "elf"), "/e/outil")
 
     def test_seule_une_reponse_bien_formee_de_l_espace_est_crue(self):
         # Un chemin RELATIF au dossier de l'Espace, qui n'en sort pas.
-        self.assertTrue(space.programme_valide({"chemin": "Téléchargements/x.AppImage",
+        self.assertTrue(programmes.programme_valide({"chemin": "Téléchargements/x.AppImage",
                                                 "nature": "appimage"}))
         for tordu in (None, [], "x", {"chemin": "/e/x.AppImage", "nature": "appimage"},
                       {"chemin": "", "nature": "elf"},
@@ -168,7 +169,7 @@ class AjouterUnProgrammeSousCompteSepare(unittest.TestCase):
                       {"chemin": "Téléchargements/../../x", "nature": "elf"},
                       {"chemin": "x\n/bin/sh", "nature": "elf"},
                       {"chemin": "x", "nature": "binaire"}, {"nature": "elf"}):
-            self.assertFalse(space.programme_valide(tordu), repr(tordu))
+            self.assertFalse(programmes.programme_valide(tordu), repr(tordu))
 
     def test_l_ajout_inscrit_le_chemin_vu_dans_le_bac_a_sable(self):
         # 1.16.6~essai1 inscrivait le chemin RÉEL (/var/lib/codebyr/espaces/…) :
@@ -251,7 +252,7 @@ class LEspaceDresseLaListe(unittest.TestCase):
         trouves = {e["chemin"]: e["nature"] for e in json.loads(sortie)}
         self.assertEqual(trouves, {"Téléchargements/Jeu.AppImage": "appimage",
                                    "Partagé/installer.sh": "script"})
-        self.assertTrue(all(space.programme_valide(e) for e in json.loads(sortie)))
+        self.assertTrue(all(programmes.programme_valide(e) for e in json.loads(sortie)))
 
     def test_le_programme_choisi_est_rendu_executable_par_l_espace(self):
         chemin = os.path.join(self.dl, "Jeu.AppImage")

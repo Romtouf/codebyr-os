@@ -19,6 +19,8 @@ découpé en modules, un par sujet, chacun avec ses tests (audit, point 8).
 
 - Le Firefox d'un Espace — son profil, son filtre réseau, son bouclier
   anti-hameçonnage — vit désormais dans `navigateur.py`.
+- Reconnaître et lancer un programme ajouté au menu d'un Espace :
+  `programmes.py`.
 
 ---
 

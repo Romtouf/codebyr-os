@@ -20,7 +20,6 @@ import json
 import os
 import re
 import secrets
-import shlex
 import shutil
 import signal
 import socket
@@ -44,6 +43,7 @@ import fichiers_surs
 import modeles  # noqa: E402
 import navigateur  # noqa: E402
 import permissions_flatpak  # noqa: E402
+import programmes  # noqa: E402
 import provenance  # noqa: E402
 import registre  # noqa: E402
 import relais_notifications  # noqa: E402
@@ -2010,46 +2010,6 @@ INTERNE_PROGRAMME = "interne-programme"
 # navigateur télécharge, et là où arrivent les fichiers qu'on lui envoie.
 LIEUX_PROGRAMMES = ("Téléchargements", "Downloads", PARTAGE, "Applications",
                     "Bureau", "Desktop")
-MAX_PROGRAMMES = 100
-NATURES_PROGRAMME = ("appimage", "elf", "script")
-
-
-def nature_programme(tete):
-    """Ce que disent les premiers octets d'un fichier : un programme, ou None.
-
-    Décision pure. Une AppImage est un exécutable ELF marqué « AI » suivi de
-    l'octet 2 à la position 8 (AppImage de type 2) ; un script commence par
-    « #! ». Le nom du fichier n'entre pas en compte : il ne prouve rien.
-    """
-    if tete[:4] == b"\x7fELF":
-        return "appimage" if tete[8:11] == b"AI\x02" else "elf"
-    if tete[:2] == b"#!":
-        return "script"
-    return None
-
-
-def commande_programme(chemin, nature, extra=()):
-    """La commande inscrite au menu pour un programme ajouté.
-
-    Une AppImage se monte d'ordinaire par FUSE, à travers un outil à
-    privilèges — ce que le Blindage interdit (aucun nouveau privilège). Elle
-    prévoit elle-même l'autre voie : se décompresser et se lancer sans FUSE.
-    """
-    cmd = shlex.quote(chemin)
-    if nature == "appimage":
-        cmd += " --appimage-extract-and-run"
-    if extra:
-        cmd += " " + " ".join(shlex.quote(a) for a in extra)
-    return cmd
-
-
-def _lire_tete(chemin):
-    """Les premiers octets d'un fichier ORDINAIRE, sans suivre de lien ni attendre."""
-    fd = os.open(chemin, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK | os.O_CLOEXEC)
-    try:
-        return os.read(fd, 16) if stat.S_ISREG(os.fstat(fd).st_mode) else b""
-    finally:
-        os.close(fd)
 
 
 def cmd_interne_programmes():
@@ -2066,23 +2026,8 @@ def cmd_interne_programmes():
     if not compte:
         sys.stderr.write("codebyr-space : réservé au compte d'un Espace.\n")
         return 2
-    trouves = []
-    for lieu in LIEUX_PROGRAMMES:
-        racine = os.path.join(compte.pw_dir, lieu)
-        for dossier, sous, fichiers in os.walk(racine):
-            if dossier[len(racine):].count(os.sep) >= 2:
-                sous[:] = []
-            sous[:] = sorted(s for s in sous if not s.startswith("."))
-            for nom in sorted(fichiers):
-                chemin = os.path.join(dossier, nom)
-                try:
-                    nature = nature_programme(_lire_tete(chemin))
-                except OSError:
-                    continue
-                if nature and len(trouves) < MAX_PROGRAMMES:
-                    trouves.append({"chemin": os.path.relpath(chemin, compte.pw_dir),
-                                    "nature": nature})
-    print(json.dumps(trouves, ensure_ascii=False))
+    print(json.dumps(programmes.lister_programmes(compte.pw_dir, LIEUX_PROGRAMMES),
+                     ensure_ascii=False))
     return 0
 
 
@@ -2099,26 +2044,12 @@ def cmd_interne_programme(chemin):
     if not compte:
         sys.stderr.write("codebyr-space : réservé au compte d'un Espace.\n")
         return 2
-    if not chemin or os.path.isabs(chemin) or any(c in chemin for c in "\n\r\x00"):
-        sys.stderr.write("codebyr-space : chemin de programme mal formé.\n")
-        return 2
-    home = os.path.realpath(compte.pw_dir)
-    dossier = os.path.realpath(os.path.dirname(os.path.join(home, chemin)))
-    if os.path.commonpath([dossier, home]) != home:
-        sys.stderr.write("codebyr-space : ce programme n'est pas dans l'Espace.\n")
-        return 2
-    chemin = os.path.join(dossier, os.path.basename(chemin))
     try:
-        nature = nature_programme(_lire_tete(chemin))
-        if not nature:
-            sys.stderr.write("codebyr-space : ce fichier n'est pas un programme.\n")
-            return 2
-        os.chmod(chemin, stat.S_IMODE(os.lstat(chemin).st_mode) | 0o700)
-    except OSError as exc:
-        sys.stderr.write("codebyr-space : programme illisible (%s).\n" % exc)
-        return 1
-    print(json.dumps({"chemin": os.path.relpath(chemin, home), "nature": nature},
-                     ensure_ascii=False))
+        prepare = programmes.preparer_programme(compte.pw_dir, chemin)
+    except programmes.Refus as refus:
+        sys.stderr.write("codebyr-space : %s\n" % refus)
+        return refus.code
+    print(json.dumps(prepare, ensure_ascii=False))
     return 0
 
 
@@ -2141,33 +2072,6 @@ def _reponse_de_l_espace(esp, action, args=()):
         return None
 
 
-def programme_valide(entree):
-    """Une entrée venue de l'Espace est-elle un programme bien formé ?
-
-    Un chemin RELATIF au dossier de l'Espace, qui ne remonte pas au-dessus.
-    Chemin de l'Espace, donc Linux : posixpath, quel que soit le système où
-    tourne ce code (les tests passent aussi sous Windows).
-    """
-    import posixpath
-    if not (isinstance(entree, dict) and isinstance(entree.get("chemin"), str)
-            and entree.get("nature") in NATURES_PROGRAMME):
-        return False
-    chemin = entree["chemin"]
-    return (bool(chemin) and not posixpath.isabs(chemin)
-            and ".." not in chemin.split("/")
-            and not any(c in chemin for c in "\n\r\x00"))
-
-
-def chemin_dans_le_bac_a_sable(relatif):
-    """Où un fichier du dossier de l'Espace apparaît pour ses applications.
-
-    Le dossier d'un Espace à compte séparé est monté au chemin du dossier du
-    bureau (« chez », voir wrap_bwrap) : c'est ce chemin qu'il faut inscrire
-    au menu, pas celui où le dossier est rangé sur la machine.
-    """
-    return os.path.join(os.path.expanduser("~"), relatif)
-
-
 def cmd_programmes(esp_id):
     """Les programmes qu'on peut ajouter au menu d'un Espace à compte séparé.
 
@@ -2184,7 +2088,7 @@ def cmd_programmes(esp_id):
     liste = _reponse_de_l_espace(esp, INTERNE_PROGRAMMES)
     if not isinstance(liste, list):
         return 1
-    print(json.dumps([e for e in liste if programme_valide(e)], ensure_ascii=False))
+    print(json.dumps([e for e in liste if programmes.programme_valide(e)], ensure_ascii=False))
     return 0
 
 
@@ -2236,12 +2140,12 @@ def cmd_add_app(esp_id, nom, fichier, extra):
         # vérifie que le fichier est à lui et un programme, et qui le rend
         # exécutable. Sa réponse est une donnée, revérifiée ici.
         reponse = _reponse_de_l_espace(esp, INTERNE_PROGRAMME, args=(fichier,))
-        if not programme_valide(reponse):
+        if not programmes.programme_valide(reponse):
             sys.stderr.write("codebyr-space : l'Espace %s n'a pas pu préparer ce "
                              "programme.\n" % esp["nom"])
             return 1
-        cmd = commande_programme(chemin_dans_le_bac_a_sable(reponse["chemin"]),
-                                 reponse["nature"], extra)
+        cmd = programmes.commande_programme(
+            programmes.chemin_dans_le_bac_a_sable(reponse["chemin"]), reponse["nature"], extra)
         _enregistrer_app(esp_id, nom, cmd)
         print("« %s » ajoutée au menu de l'Espace %s." % (nom, esp["nom"]))
         print("  Commande : %s" % cmd)
@@ -2258,7 +2162,7 @@ def cmd_add_app(esp_id, nom, fichier, extra):
             try:
                 if stat.S_ISREG(os.fstat(fd).st_mode):
                     os.fchmod(fd, 0o755)
-                    nature = nature_programme(os.read(fd, 16))
+                    nature = programmes.nature_programme(os.read(fd, 16))
             finally:
                 os.close(fd)
         except OSError:
@@ -2274,7 +2178,7 @@ def cmd_add_app(esp_id, nom, fichier, extra):
     # La commande stockée est réinterprétée comme une ligne shell au lancement :
     # on protège le chemin (et les arguments) par des quotes, sans quoi un dossier
     # contenant une espace (« Antigravity IDE ») casse le lancement.
-    cmd = commande_programme(prog, nature, extra)
+    cmd = programmes.commande_programme(prog, nature, extra)
     _enregistrer_app(esp_id, nom, cmd)
     print("« %s » ajoutée au menu de l'Espace %s." % (nom, esp["nom"]))
     print("  Commande : %s" % cmd)

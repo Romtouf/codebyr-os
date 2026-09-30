@@ -67,7 +67,8 @@ class Frontieres(unittest.TestCase):
         cible.write_text('user_pref("network.proxy.http_port", 17890);\n'
                          'user_pref("network.proxy.http_port", 45678);\n'
                          'user_pref("browser.startup.page", 0);\n')
-        space._ajouter_prefs(str(cible), ['user_pref("network.proxy.http_port", 17890);'])
+        import navigateur
+        navigateur.ajouter_prefs(str(cible), ['user_pref("network.proxy.http_port", 17890);'])
         texte = cible.read_text()
         self.assertNotIn("45678", texte)
         self.assertEqual(texte.count("network.proxy.http_port"), 1)

@@ -10,6 +10,18 @@ GNOME (menu du Sceau, liserés colorés) ne se recharge pas à chaud.
 
 ---
 
+## 1.17.0 — non publiée
+
+**Rien ne change à l'usage : c'est le cœur du système qui se range.**
+`codebyr-space`, le programme qui ouvre les Espaces, dépassait 3 000 lignes :
+trop pour qu'une seconde personne puisse le relire et le maintenir. Il est
+découpé en modules, un par sujet, chacun avec ses tests (audit, point 8).
+
+- Le Firefox d'un Espace — son profil, son filtre réseau, son bouclier
+  anti-hameçonnage — vit désormais dans `navigateur.py`.
+
+---
+
 ## 1.16.8 — 30 septembre 2026
 
 **Le noyau démarre avec deux protections de plus** (`slab_nomerge`,

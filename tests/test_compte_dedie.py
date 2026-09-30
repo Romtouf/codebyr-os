@@ -398,7 +398,7 @@ class LOrdreDesChoses(unittest.TestCase):
         bloc = self.lancer.split("if session:")[1].split("elif not esp.get(\"ephemere\"):")[0]
         self.assertNotIn("_preparer_ouverture(", bloc)
         self.assertNotIn("modeles.installer(", bloc)
-        self.assertIn("and not session", self.lancer.split("_installer_bouclier(esp, home, espaces)")[0][-200:])
+        self.assertIn("and not session", self.lancer.split("navigateur.installer_bouclier(home, espaces)")[0][-200:])
 
 
 class LaPreparationDepuisLEspace(unittest.TestCase):

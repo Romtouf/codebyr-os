@@ -3,8 +3,8 @@
 
 Point d'attention particulier : le `.xpi` **signé par Mozilla** est un fichier
 scellé. Modifier `content.js` dans le dépôt ne change RIEN sur les machines
-tant que l'extension n'a pas été re-signée : `codebyr-space` installe le .xpi
-signé en priorité. Ce test compare donc les deux, pour qu'un correctif du
+tant que l'extension n'a pas été re-signée : c'est le .xpi signé que Firefox
+installe, par la politique du paquet. Ce test compare donc les deux, pour qu'un correctif du
 bouclier ne puisse pas rester lettre morte sans qu'on le voie.
 """
 import glob
@@ -33,15 +33,13 @@ class Manifeste(unittest.TestCase):
 
     def test_identifiant_stable(self):
         # Cet identifiant est celui du manifeste de stockage managé écrit par
-        # codebyr-space : les deux doivent coïncider, sinon l'extension ne
+        # navigateur.py : les deux doivent coïncider, sinon l'extension ne
         # reçoit jamais la liste des domaines protégés.
         self.assertEqual(
             self.manifeste["browser_specific_settings"]["gecko"]["id"],
             "antiphishing@codebyr.io")
-        with open(os.path.join(RACINE, "live-build", "config",
-                               "includes.chroot_after_packages", "usr", "bin",
-                               "codebyr-space"), encoding="utf-8") as f:
-            self.assertIn('BOUCLIER_ID = "antiphishing@codebyr.io"', f.read())
+        import navigateur
+        self.assertEqual(navigateur.BOUCLIER_ID, "antiphishing@codebyr.io")
 
     def test_permissions_minimales(self):
         self.assertEqual(self.manifeste["permissions"], ["storage"])
@@ -168,19 +166,20 @@ class ProfilUtilise(unittest.TestCase):
     """
 
     def setUp(self):
-        import outils
-        self.space = outils.charger("codebyr-space")
+        import outils  # noqa: F401 — place le module partagé sur sys.path
+        import navigateur
+        self.navigateur = navigateur
 
     def test_le_profil_marque_par_defaut(self):
         texte = ("[Install4F96D1932A9F858E]\nDefault=autre.default\n\n"
                  "[Profile1]\nName=codebyr\nIsRelative=1\nPath=codebyr.default\n\n"
                  "[Profile0]\nName=default-esr\nIsRelative=1\nPath=ab12cd.default-esr\n"
                  "Default=1\n\n[General]\nStartWithLastProfile=1\nVersion=2\n")
-        self.assertEqual(self.space.profil_par_defaut(texte), "ab12cd.default-esr")
+        self.assertEqual(self.navigateur.profil_par_defaut(texte), "ab12cd.default-esr")
 
     def test_le_seul_profil_quand_aucun_n_est_marque(self):
         texte = "[Profile0]\nName=x\nIsRelative=1\nPath=xy.default\n"
-        self.assertEqual(self.space.profil_par_defaut(texte), "xy.default")
+        self.assertEqual(self.navigateur.profil_par_defaut(texte), "xy.default")
 
     def test_un_chemin_qui_sortirait_du_dossier_est_ignore(self):
         # profiles.ini est écrit par l'Espace : il ne doit pas pouvoir faire
@@ -188,8 +187,8 @@ class ProfilUtilise(unittest.TestCase):
         for chemin, relatif in (("../../.config/autostart", "1"), ("/home/romtouf", "0"),
                                 ("a/b", "1"), ("..", "1"), ("", "1")):
             texte = "[Profile0]\nIsRelative=%s\nPath=%s\nDefault=1\n" % (relatif, chemin)
-            self.assertIsNone(self.space.profil_par_defaut(texte), chemin)
-        self.assertIsNone(self.space.profil_par_defaut("pas un fichier ini [[["))
+            self.assertIsNone(self.navigateur.profil_par_defaut(texte), chemin)
+        self.assertIsNone(self.navigateur.profil_par_defaut("pas un fichier ini [[["))
 
 
 @unittest.skipUnless(os.name == "posix", "fichiers_surs travaille par descripteur de dossier")
@@ -197,8 +196,10 @@ class InstallationDansLeProfil(unittest.TestCase):
 
     def setUp(self):
         import tempfile
-        import outils
-        self.space = outils.charger("codebyr-space")
+        import outils  # noqa: F401 — place le module partagé sur sys.path
+        import navigateur
+        self.navigateur = navigateur
+        self._bouclier_dir = navigateur.BOUCLIER_DIR
         self._tmp = tempfile.TemporaryDirectory()
         self.home = os.path.join(self._tmp.name, "home")
         os.makedirs(self.home)
@@ -206,10 +207,12 @@ class InstallationDansLeProfil(unittest.TestCase):
         os.makedirs(os.path.join(bouclier, "signed"))
         with open(os.path.join(bouclier, "signed", "essai-1.3.xpi"), "wb") as f:
             f.write(b"PK xpi d'essai")
-        self.space.BOUCLIER_DIR = bouclier
+        # Module partagé, donc chargé une seule fois : on rend la valeur après.
+        navigateur.BOUCLIER_DIR = bouclier
         self.ff = os.path.join(self.home, ".mozilla", "firefox")
 
     def tearDown(self):
+        self.navigateur.BOUCLIER_DIR = self._bouclier_dir
         self._tmp.cleanup()
 
     def _xpi(self, profil):
@@ -235,7 +238,7 @@ class InstallationDansLeProfil(unittest.TestCase):
                 f.write(b"PK copie")
 
     def test_premier_lancement_sans_banque_le_profil_de_codebyr_est_pose(self):
-        self.space._installer_bouclier_pour(self.home, [])
+        self.navigateur.installer_bouclier_pour(self.home, [])
         self.assertIn("Path=codebyr.default", self._lire(self.ff, "profiles.ini"))
         # Liste écrite même vide : une banque retirée ne reste pas protégée.
         self.assertEqual(self._domaines(), [])
@@ -243,14 +246,14 @@ class InstallationDansLeProfil(unittest.TestCase):
     def test_codebyr_ne_depose_plus_l_extension_c_est_firefox_qui_l_installe(self):
         # Par la politique du paquet (dossier distribution) : son circuit
         # d'installation est le seul qui accorde le droit de lire les pages.
-        self.space._installer_bouclier_pour(self.home, ["mabanque.fr"])
+        self.navigateur.installer_bouclier_pour(self.home, ["mabanque.fr"])
         self.assertFalse(os.path.exists(self._xpi("codebyr.default")))
         self.assertEqual(self._domaines(), ["mabanque.fr"])
 
     def test_le_garde_fou_de_firefox_contre_les_extensions_deposees_est_retabli(self):
         # Codebyr posait autoDisableScopes à 0 pour SON extension : toute autre
         # extension glissée dans le profil s'activait alors sans rien demander.
-        self.space._installer_bouclier_pour(self.home, ["mabanque.fr"])
+        self.navigateur.installer_bouclier_pour(self.home, ["mabanque.fr"])
         prefs = self._lire(self.ff, "codebyr.default", "user.js")
         self.assertIn('user_pref("extensions.autoDisableScopes", 3);', prefs)
         self.assertNotIn('"extensions.autoDisableScopes", 0', prefs)
@@ -258,7 +261,7 @@ class InstallationDansLeProfil(unittest.TestCase):
     def test_les_reglages_vont_dans_le_profil_que_firefox_s_est_cree(self):
         self._profil_existant("ab12cd.default-esr")
         ini = self._lire(self.ff, "profiles.ini")
-        self.space._installer_bouclier_pour(self.home, ["mabanque.fr"])
+        self.navigateur.installer_bouclier_pour(self.home, ["mabanque.fr"])
         self.assertIn("autoDisableScopes", self._lire(self.ff, "ab12cd.default-esr", "user.js"))
         self.assertFalse(os.path.exists(os.path.join(self.ff, "codebyr.default")))
         self.assertEqual(self._lire(self.ff, "profiles.ini"), ini, "le choix de Firefox est gardé")
@@ -271,21 +274,21 @@ class InstallationDansLeProfil(unittest.TestCase):
             {"id": "antiphishing@codebyr.io", "version": "1.3",
              "installTelemetryInfo": {"source": "app-profile", "method": "sideload"}}]},
             copie=True)
-        self.space._installer_bouclier_pour(self.home, ["mabanque.fr"])
+        self.navigateur.installer_bouclier_pour(self.home, ["mabanque.fr"])
         self.assertFalse(os.path.exists(self._xpi("ab12cd.default-esr")))
 
     def test_la_copie_installee_par_firefox_est_gardee(self):
         self._profil_existant("ab12cd.default-esr", {"addons": [
             {"id": "antiphishing@codebyr.io", "version": "1.3",
              "installTelemetryInfo": {"source": "enterprise-policy"}}]}, copie=True)
-        self.space._installer_bouclier_pour(self.home, ["mabanque.fr"])
+        self.navigateur.installer_bouclier_pour(self.home, ["mabanque.fr"])
         self.assertTrue(os.path.isfile(self._xpi("ab12cd.default-esr")))
 
     def test_un_profiles_ini_piege_ne_fait_rien_ecrire_ailleurs(self):
         os.makedirs(self.ff)
         with open(os.path.join(self.ff, "profiles.ini"), "w", encoding="utf-8") as f:
             f.write("[Profile0]\nIsRelative=1\nPath=../../dehors\nDefault=1\n")
-        self.space._installer_bouclier_pour(self.home, ["mabanque.fr"])
+        self.navigateur.installer_bouclier_pour(self.home, ["mabanque.fr"])
         self.assertTrue(os.path.isfile(os.path.join(self.ff, "codebyr.default", "user.js")))
         self.assertFalse(os.path.exists(os.path.join(self.home, "dehors")))
 

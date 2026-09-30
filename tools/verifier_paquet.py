@@ -70,7 +70,7 @@ def verifier_arbre(stage, racine):
             raise ValueError("Commande non exécutable : %s" % relatif)
         controles += 1
     for nom in ("fichiers_surs.py", "filtre_syscalls.py", "relais_reseau.py",
-                "permissions_flatpak.py"):
+                "permissions_flatpak.py", "navigateur.py"):
         if not (stage / "usr/share/codebyr" / nom).is_file():
             raise ValueError("Module de sécurité absent : " + nom)
     print("%d fichiers conformes aux sources ; permissions vérifiées." % controles)

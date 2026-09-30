@@ -574,6 +574,9 @@ class LIsoEstReproductible(unittest.TestCase):
     def test_debian_tel_qu_a_la_date_du_commit(self):
         for option in ("--mirror-bootstrap", "--mirror-chroot", "--mirror-chroot-security"):
             self.assertIn(option + ' "$SNAP/', self.build, option)
+        # La veille du commit : un lot de snapshot.debian.org encore en cours
+        # d'import à l'heure du commit apparaîtrait plus tard, daté d'avant.
+        self.assertIn("SOURCE_DATE_EPOCH - 86400", self.build)
         self.assertIn("Acquire::Check-Valid-Until=false", self.build)
         # Les index du miroir du jour ne partent pas dans l'image, et le
         # système de base ne vient pas du cache d'une construction ancienne.

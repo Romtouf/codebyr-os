@@ -45,7 +45,7 @@ fi
 #   · l'HEURE. live-build sait estampiller toute l'image d'une date unique,
 #     SOURCE_DATE_EPOCH : on lui donne celle du commit ;
 #   · l'état du MIROIR Debian, qui change chaque jour. On l'installe depuis
-#     snapshot.debian.org, tel qu'il était à la date du commit. L'image, elle,
+#     snapshot.debian.org, tel qu'il était la veille du commit. L'image, elle,
 #     garde les miroirs ordinaires pour ses mises à jour.
 #
 # CODEBYR_NON_COMMITE=1 construit le dossier de travail tel quel, pour essayer
@@ -70,9 +70,15 @@ else
 		VERSION live-build branding packaging | tar -x -C "$SOURCE"
 	SOURCE_DATE_EPOCH="$($GIT log -1 --format=%ct "$COMMIT")"
 	export SOURCE_DATE_EPOCH
-	SNAPSHOT="$(date -u -d "@$SOURCE_DATE_EPOCH" +%Y%m%dT%H%M%SZ)"
+	# Debian tel qu'il était 24 heures AVANT le commit. snapshot.debian.org
+	# publie par lots, toutes les quelques heures : un lot en cours d'import à
+	# l'heure du commit apparaît plus tard, daté d'avant. Construit aussitôt,
+	# le commit aurait eu un Debian ; reconstruit le lendemain, un autre. Un
+	# jour de marge ne laisse que des lots terminés.
+	SNAPSHOT="$(date -u -d "@$((SOURCE_DATE_EPOCH - 86400))" +%Y%m%dT%H%M%SZ)"
 	echo "==> Commit  : $COMMIT"
-	echo "==> Date    : $SNAPSHOT (SOURCE_DATE_EPOCH=$SOURCE_DATE_EPOCH, Debian tel qu'à cette date)"
+	echo "==> Date    : $(date -u -d "@$SOURCE_DATE_EPOCH" +%Y%m%dT%H%M%SZ) (SOURCE_DATE_EPOCH=$SOURCE_DATE_EPOCH)"
+	echo "==> Debian  : tel qu'au $SNAPSHOT (snapshot.debian.org)"
 fi
 SRC="$SOURCE/live-build"
 

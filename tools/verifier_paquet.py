@@ -2,9 +2,42 @@
 """Compare un .deb aux sources locales sans l'installer (Debian/WSL)."""
 import argparse
 import hashlib
+import io
 from pathlib import Path
 import subprocess
+import tarfile
 import tempfile
+
+
+def droits_fautifs(archive):
+    """Les entrées qu'un paquet installerait modifiables par un autre que root.
+
+    Lu dans l'archive elle-même, pas sur une copie extraite : extraire sous un
+    compte ordinaire applique son masque, qui peut cacher un 777. Et TOUTES
+    les entrées, pas une liste choisie : de 1.13.0 à 1.16.6, le lanceur de
+    session codebyr-bienvenue.desktop partait en 777, hors de la liste.
+    """
+    fautes = []
+    for entree in archive.getmembers():
+        if entree.issym() or entree.islnk():
+            continue
+        nom = entree.name
+        if entree.mode & 0o022:
+            fautes.append("%s (%o, inscriptible par groupe/autres)" % (nom, entree.mode & 0o7777))
+        elif entree.uid != 0 or entree.gid != 0:
+            fautes.append("%s (propriétaire %d:%d, pas root)" % (nom, entree.uid, entree.gid))
+    return fautes
+
+
+def verifier_droits(paquet):
+    contenu = subprocess.run(["dpkg-deb", "--fsys-tarfile", str(paquet)],
+                             check=True, capture_output=True).stdout
+    with tarfile.open(fileobj=io.BytesIO(contenu)) as archive:
+        fautes = droits_fautifs(archive)
+        total = len(archive.getmembers())
+    if fautes:
+        raise ValueError("Droits dangereux dans le paquet :\n  " + "\n  ".join(fautes))
+    print("%d entrées : aucune modifiable par un autre que root." % total)
 
 
 def verifier_arbre(stage, racine):
@@ -44,6 +77,7 @@ def verifier_arbre(stage, racine):
 
 
 def verifier(paquet, racine):
+    verifier_droits(paquet)
     with tempfile.TemporaryDirectory(prefix="codebyr-paquet-") as temporaire:
         subprocess.run(["dpkg-deb", "--extract", str(paquet), temporaire], check=True)
         verifier_arbre(Path(temporaire), racine)

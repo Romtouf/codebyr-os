@@ -6,8 +6,11 @@ oublié dans la liste de `build-deb.sh` n'atteindra jamais un poste existant,
 même après un « apt upgrade ». Le bug est silencieux — d'où ce test.
 """
 import glob
+import io
 import os
 import re
+import shutil
+import sys
 import unittest
 
 from outils import BIN, RACINE
@@ -489,3 +492,53 @@ class LeServiceDesComptes(unittest.TestCase):
                         if ligne.strip() and not ligne.lstrip().startswith("#")]
         self.assertFalse([l for l in installation if l.startswith("WantedBy=")], installation)
         self.assertIn("Also=codebyr-uid.socket", installation)
+
+
+@unittest.skipUnless(os.name == "posix" and shutil.which("dpkg-deb"),
+                     "construit un vrai paquet : Linux, avec dpkg-deb")
+class AucunFichierDuPaquetModifiableParTous(unittest.TestCase):
+    """1.16.7 : de 1.13.0 à 1.16.6, deux fichiers du paquet partaient en 777.
+
+    Le paquet publié se construit depuis le disque Windows, où tout apparaît
+    en 777. build-deb.sh ne normalisait que des dossiers choisis : le lanceur
+    de session /etc/xdg/autostart/codebyr-bienvenue.desktop, hors de la liste,
+    était modifiable par n'importe quel compte — l'invité compris — et exécuté
+    à l'ouverture de session de chacun. La CI ne pouvait pas le voir : elle
+    construit depuis un checkout git, où les droits sont justes. On reproduit
+    donc ici le disque Windows : une copie des sources, toute en 777.
+    """
+
+    def test_depuis_des_sources_en_777(self):
+        import subprocess
+        import tarfile
+        import tempfile
+        sys.path.insert(0, os.path.join(RACINE, "tools"))
+        try:
+            import verifier_paquet
+        finally:
+            sys.path.pop(0)
+        with tempfile.TemporaryDirectory() as tmp:
+            for chemin in ("VERSION", "packaging",
+                           os.path.join("live-build", "config", "includes.chroot_after_packages")):
+                source, copie = os.path.join(RACINE, chemin), os.path.join(tmp, chemin)
+                if os.path.isdir(source):
+                    shutil.copytree(source, copie, ignore=shutil.ignore_patterns(
+                        "dist", "apt-repo", "archives", "essais-retires"))
+                else:
+                    shutil.copy(source, copie)
+            for dossier, _sous, fichiers in os.walk(tmp):
+                os.chmod(dossier, 0o777)
+                for nom in fichiers:
+                    os.chmod(os.path.join(dossier, nom), 0o777)
+            subprocess.run(["bash", os.path.join(tmp, "packaging", "build-deb.sh"), "0.0.0"],
+                           env=dict(os.environ, CODEBYR_REPO=tmp), check=True,
+                           stdout=subprocess.DEVNULL)
+            deb = os.path.join(tmp, "packaging", "dist", "codebyr-tools_0.0.0_all.deb")
+            contenu = subprocess.run(["dpkg-deb", "--fsys-tarfile", deb],
+                                     check=True, capture_output=True).stdout
+            with tarfile.open(fileobj=io.BytesIO(contenu)) as archive:
+                self.assertEqual(verifier_paquet.droits_fautifs(archive), [])
+                modes = {m.name: m.mode & 0o7777 for m in archive.getmembers()}
+        self.assertEqual(modes["./etc/xdg/autostart/codebyr-bienvenue.desktop"], 0o644)
+        self.assertEqual(modes["./usr/bin/codebyr-space"], 0o755)
+        self.assertEqual(modes["./usr/lib/codebyr/codebyr-uid"], 0o755)

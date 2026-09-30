@@ -100,9 +100,17 @@ BUG_REPORT_URL="https://github.com/Romtouf/codebyr-os/issues"
 EOF
 
 # 2) Droits corrects. IMPORTANT : « cp -a » depuis un checkout Windows (9p)
-#    hérite parfois de dossiers en 777 → répertoires système inscriptibles par
-#    tous = faille. On normalise : dossiers 755, scripts 755, données 644.
-find "$STAGE/usr" "$STAGE/etc" -type d -exec chmod 755 {} + 2>/dev/null || true
+#    hérite de fichiers et de dossiers en 777 → inscriptibles par tous = faille.
+#
+#    TOUT part donc de 644 (fichiers) et 755 (dossiers) ; seuls les programmes
+#    reçoivent ensuite le bit d'exécution, un par un. La version précédente ne
+#    normalisait que des dossiers choisis : de 1.13.0 à 1.16.6, le lanceur de
+#    session /etc/xdg/autostart/codebyr-bienvenue.desktop et son icône partaient
+#    en 777. N'importe quel compte de la machine — l'invité, sans mot de passe —
+#    pouvait y écrire une commande, exécutée à l'ouverture de session de
+#    chacun. Constaté le 30/09/2026 en préparant l'ISO reproductible.
+find "$STAGE" -type d -exec chmod 755 {} +
+find "$STAGE" -type f -exec chmod 644 {} +
 find "$STAGE/usr/bin" -type f -exec chmod 755 {} + 2>/dev/null || true
 # Le service des comptes d'Espaces et le premier processus d'un Espace : root
 # exécute l'un, et l'autre est exécuté sous le compte de l'Espace. Sans le bit

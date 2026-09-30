@@ -10,6 +10,18 @@ GNOME (menu du Sceau, liserés colorés) ne se recharge pas à chaud.
 
 ---
 
+## 1.16.7 — non publiée
+
+**Correctif de sécurité : deux fichiers de Codebyr étaient modifiables par
+tous les comptes de la machine.** Depuis la 1.13.0, le lanceur de l'écran de
+bienvenue (`/etc/xdg/autostart/codebyr-bienvenue.desktop`) et son icône étaient
+installés sans protection. N'importe quel compte — l'invité, qui n'a pas de mot
+de passe, compris — pouvait y inscrire une commande, exécutée à l'ouverture de
+session de chacun. La mise à jour remet ces fichiers à leur contenu d'origine
+et les protège ; aucune action n'est nécessaire.
+
+---
+
 ## 1.16.6 — 30 septembre 2026
 
 **« Ajouter une application » fonctionne sous compte séparé.** C'était le

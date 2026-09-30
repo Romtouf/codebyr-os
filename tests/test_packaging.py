@@ -664,3 +664,55 @@ class LeNoyauDurciAuDemarrage(unittest.TestCase):
     def test_le_live_demarre_avec_les_memes(self):
         with open(os.path.join(RACINE, "live-build", "auto", "config"), encoding="utf-8") as f:
             self.assertIn(self.OPTIONS, f.read())
+
+
+class LInstalleurSansIndexApt(unittest.TestCase):
+    """1.16.8 : l'image ne porte plus d'index apt (ils rendaient l'ISO différente
+    chaque jour). Sans eux, apt ne connaît que les paquets installés : un nom
+    inconnu fait échouer toute une commande. L'installation s'est arrêtée sur
+    « code d'erreur 100 » à la première ISO reproductible.
+    """
+
+    CALAMARES = os.path.join(RACINE, "live-build", "config", "includes.chroot_after_packages")
+    # Installés par live-build lui-même (paquets du live), hors de nos listes.
+    IMPLICITES = {"live-boot", "live-config", "live-config-systemd"}
+
+    def _operations(self):
+        with open(os.path.join(self.CALAMARES, "etc", "calamares", "modules", "packages.conf"),
+                  encoding="utf-8") as f:
+            operations, courante = {}, None
+            for ligne in f:
+                if ligne.startswith("#") or not ligne.strip():
+                    continue
+                cle = re.match(r"\s*- (\w+):\s*$", ligne)
+                if cle:
+                    courante = operations.setdefault(cle.group(1), [])
+                    continue
+                nom = re.match(r"\s*- '([^']+)'\s*$", ligne)
+                if nom and courante is not None:
+                    courante.append(nom.group(1))
+        return operations
+
+    def test_remove_ne_nomme_que_des_paquets_de_l_image(self):
+        dans_l_image = set(self.IMPLICITES)
+        for liste in glob.glob(os.path.join(RACINE, "live-build", "config",
+                                            "package-lists", "*.list.chroot")):
+            with open(liste, encoding="utf-8") as f:
+                dans_l_image.update(l.split()[0] for l in f
+                                    if l.strip() and not l.lstrip().startswith("#"))
+        operations = self._operations()
+        self.assertIn("calamares", operations["remove"])
+        for paquet in operations["remove"]:
+            self.assertIn(paquet, dans_l_image,
+                          "%s n'est pas dans l'image : sans index apt, « remove » échouerait "
+                          "tout entier — le mettre dans try_remove" % paquet)
+        self.assertTrue(operations.get("try_remove"))
+
+    def test_le_recours_a_apt_met_d_abord_ses_index_a_jour(self):
+        with open(os.path.join(self.CALAMARES, "usr", "share", "calamares", "helpers",
+                               "calamares-bootloader-config"), encoding="utf-8") as f:
+            code = "\n".join(l for l in f.read().splitlines() if not l.lstrip().startswith("#"))
+        self.assertEqual(code.count("apt-get -y install"), 1,
+                         "tout apt-get install doit passer par installer_en_ligne")
+        fonction = code.split("installer_en_ligne() {", 1)[1].split("\n}", 1)[0]
+        self.assertLess(fonction.index("apt-get update"), fonction.index("apt-get -y install"))

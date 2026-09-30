@@ -183,9 +183,13 @@ sudo -E bash live-build/scripts/build.sh
 # → dist/codebyr-os-<version>-<date>-amd64.iso
 ```
 
-Le build recopie la configuration vers `/var/tmp/codebyr-build` (jamais de build
-sur un montage Windows/9p), télécharge les paquets Debian trixie, applique les
-hooks de branding/durcissement, et rapatrie l'ISO dans `dist/`.
+Le build construit le **commit courant** (les modifications non commitées n'y
+sont pas ; `CODEBYR_NON_COMMITE=1` les prend, pour un essai), recopie la
+configuration vers `/var/tmp/codebyr-build` (jamais de build sur un montage
+Windows/9p), installe Debian trixie tel qu'il était la veille du commit
+(snapshot.debian.org), applique les hooks de branding/durcissement, et rapatrie
+l'ISO dans `dist/`. Depuis la 1.16.8, deux constructions du même commit donnent
+**la même ISO, octet pour octet** — voir ci-dessous.
 
 ## Configuration requise
 
@@ -271,6 +275,31 @@ curl -O https://raw.githubusercontent.com/Romtouf/codebyr-os/main/codebyr-signin
 ```
 
 L'empreinte de l'ancre est également affichée sur <https://os.codebyr.dev>.
+
+### Reconstruire l'ISO vous-même (depuis la 1.16.8)
+
+La signature prouve que l'ISO vient du mainteneur ; elle ne prouve pas qu'elle
+sort du code publié. Pour cela, l'ISO est **reproductible** : reconstruite
+depuis le commit d'une version, elle est identique octet pour octet à celle de
+la release, quelle que soit la machine. Deux façons de le vérifier :
+
+- **Sans rien installer** : copiez le dépôt sur GitHub (*Fork*), puis dans
+  l'onglet *Actions* → « Construire l'ISO » → *Run workflow*, choisissez
+  l'étiquette de la version (`v1.16.8`…) et collez dans « SHA256 attendu »
+  l'empreinte du fichier `SHA256SUMS` de la release. La construction (environ
+  20 minutes) échoue si l'image obtenue diffère.
+- **Sur une machine Debian 13** :
+
+  ```bash
+  git clone https://github.com/Romtouf/codebyr-os && cd codebyr-os
+  git checkout v1.16.8
+  sudo apt install live-build rsync librsvg2-bin
+  sudo CODEBYR_REPO="$PWD" bash live-build/scripts/build.sh
+  sha256sum dist/*.iso      # → la même empreinte que SHA256SUMS
+  ```
+
+Il faut un clone git (pas une archive) : la date de l'image et l'état de Debian
+utilisé se déduisent du commit.
 
 ## Structure du dépôt
 

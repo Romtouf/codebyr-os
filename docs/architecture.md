@@ -193,9 +193,13 @@ passe utilisable). Le premier démarrage lance le tour de bienvenue.
 
 ## Chaîne de construction
 
-- **`live-build`** (outil officiel Debian) sous WSL2 ou Debian natif —
-  scriptable. *[visé]* : construction en CI et build reproductible (les ISO ne
-  le sont pas aujourd'hui : horodatage et miroir Debian du moment).
+- **`live-build`** (outil officiel Debian) sous WSL2 ou Debian natif, et en CI
+  (`construire-iso.yml`). **Reproductible depuis la 1.16.8** : l'image est
+  construite depuis le commit (`git archive`), datée de lui
+  (`SOURCE_DATE_EPOCH`), sur Debian tel qu'il était la veille
+  (snapshot.debian.org) ; ce qui dépendait encore de la machine ou de
+  l'instant est normalisé avant la mise en image (voir `build.sh`). Le même
+  commit construit sur le poste du mainteneur et en CI donne la même ISO.
 - Sortie : ISO hybride (live + installation) amd64.
 - Le branding (Plymouth, GRUB, GDM, fonds d'écran) est posé par les **hooks**
   de construction, pas par un paquet `codebyr-branding` (celui-ci n'existe pas).

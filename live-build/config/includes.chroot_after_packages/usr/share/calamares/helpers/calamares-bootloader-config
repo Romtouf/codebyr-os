@@ -11,12 +11,19 @@
 
 CHROOT=$(mount | grep proc | grep calamares | awk '{print $3}' | sed -e "s#/proc##g")
 
+# Le recours à apt, s'il faut vraiment télécharger. L'image ne porte pas
+# d'index apt (depuis la 1.16.8, pour que l'ISO soit reproductible) : sans
+# « update », apt ne connaîtrait aucun paquet à installer.
+installer_en_ligne() {
+    DEBIAN_FRONTEND=noninteractive chroot $CHROOT apt-get update || true
+    DEBIAN_FRONTEND=noninteractive chroot $CHROOT apt-get -y install "$@"
+}
+
 # Chiffrement intégral : permissions strictes de l'initramfs + outils LUKS.
 if [ "$(mount | grep $CHROOT" " | cut -c -16)" = "/dev/mapper/luks" ]; then
     echo "UMASK=0077" > $CHROOT/etc/initramfs-tools/conf.d/initramfs-permissions
     if ! chroot $CHROOT dpkg -s cryptsetup-initramfs >/dev/null 2>&1; then
-        DEBIAN_FRONTEND=noninteractive chroot $CHROOT \
-            apt-get -y install cryptsetup-initramfs cryptsetup keyutils
+        installer_en_ligne cryptsetup-initramfs cryptsetup keyutils
     fi
 fi
 
@@ -28,7 +35,7 @@ if [ -d /sys/firmware/efi/efivars ]; then
        chroot $CHROOT sh -c 'command -v grub-install && command -v efibootmgr' >/dev/null 2>&1; then
         echo "   composants déjà embarqués — rien à télécharger."
     else
-        DEBIAN_FRONTEND=noninteractive chroot $CHROOT apt-get -y install grub-efi
+        installer_en_ligne grub-efi
     fi
 else
     echo " * GRUB BIOS (i386-pc)..."
@@ -36,7 +43,7 @@ else
        chroot $CHROOT sh -c 'command -v grub-install' >/dev/null 2>&1; then
         echo "   composants déjà embarqués — rien à télécharger."
     else
-        DEBIAN_FRONTEND=noninteractive chroot $CHROOT apt-get -y install grub-pc
+        installer_en_ligne grub-pc
     fi
 fi
 

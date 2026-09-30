@@ -144,7 +144,6 @@ franchement vaut mieux que de laisser chacun le découvrir :
 - **Une fonction manque sous compte séparé**, le mode par défaut depuis
   1.16.1 : une application Flatpak n'y reçoit pas le fichier choisi dans
   « Ouvrir un fichier » — voir SECURITY.md.
-- **Les ISO ne sont pas reproductibles** (horodatage, état du miroir Debian).
 
 ## Où aider en priorité
 
@@ -154,7 +153,6 @@ franchement vaut mieux que de laisser chacun le découvrir :
 
 - Tests sur du matériel varié (UEFI/BIOS, GPU divers, Wi-Fi capricieux)
 - Traductions des outils Codebyr (l'infrastructure gettext reste à poser)
-- **Un UID Unix par Espace** — la seule façon de rendre la séparation vraie même
-  après une sortie de bac à sable (voir SECURITY.md, « Limites connues »)
-- ISO reproductibles, et construction de l'ISO en CI (la CI actuelle vérifie le
-  code et le paquet, pas l'image)
+- **Reconstruire l'ISO d'une version** et comparer son empreinte à celle de la
+  release (README, « Reconstruire l'ISO vous-même ») : depuis la 1.16.8, l'image
+  est reproductible, et chaque vérification indépendante compte

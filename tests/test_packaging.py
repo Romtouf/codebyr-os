@@ -585,9 +585,11 @@ class LIsoEstReproductible(unittest.TestCase):
 
     def test_le_systeme_est_normalise_avant_sa_mise_en_image(self):
         # Écarts relevés entre l'ISO de ce poste et celle de la CI, même commit.
-        etapes = re.search(r"lb bootstrap && lb chroot && (\w+) && lb installer && lb binary",
+        # Juste avant lb binary : « lb installer » relance apt update, qui
+        # refait pkgcache.bin (constaté à la deuxième comparaison).
+        etapes = re.search(r"lb bootstrap && lb chroot && lb installer && (\w+) && lb binary",
                            self.build)
-        self.assertTrue(etapes, "la normalisation doit tomber entre lb chroot et lb binary")
+        self.assertTrue(etapes, "la normalisation doit tomber juste avant lb binary")
         fonction = self.build.split("%s() {" % etapes.group(1), 1)[1].split("\n}\n", 1)[0]
         for attendu in ('"$racine/proc"', "var/cache/apt/*.bin",
                         "var/cache/swcatalog/cache/*", "shim-signed:amd64"):

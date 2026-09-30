@@ -218,9 +218,10 @@ echo "==> lb build  (téléchargement + assemblage — peut durer 20–40 min)"
 # est pire que son absence : on le désactive le jour où il a raison.
 rm -f "$WORK"/*.iso
 
-# Les étapes de « lb build », une à une : entre la préparation du système
-# (lb chroot) et sa mise en image (lb binary), on efface ce qui dépend de la
-# machine qui construit, ou de l'instant. Relevé le 30/09/2026 en comparant,
+# Les étapes de « lb build », une à une : juste avant la mise en image du
+# système (lb binary), on efface ce qui dépend de la machine qui construit, ou
+# de l'instant. Pas plus tôt : « lb installer », même sans installeur Debian,
+# remonte les sources apt et relance « apt update », qui refait pkgcache.bin. Relevé le 30/09/2026 en comparant,
 # pour le même commit, l'ISO construite sur ce poste à celle de la CI :
 #   · la date du dossier /proc, point de montage, qui variait d'une machine
 #     à l'autre (les autres points de montage suivent, par précaution) ;
@@ -245,7 +246,7 @@ normaliser_le_systeme() {
 
 # live-build renvoie parfois un code non-zéro sur une étape finale de nettoyage
 # alors que l'ISO est bien produite : on ne s'y fie pas, on vérifie l'ISO.
-{ lb bootstrap && lb chroot && normaliser_le_systeme && lb installer && lb binary && lb source; } \
+{ lb bootstrap && lb chroot && lb installer && normaliser_le_systeme && lb binary && lb source; } \
 	|| echo "==> live-build a renvoyé un code non-zéro — vérification de l'ISO…"
 
 # — Rapatriement de l'ISO —

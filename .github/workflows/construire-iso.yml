@@ -24,6 +24,10 @@ on:
         description: "Jours de conservation de l'ISO produite"
         required: false
         default: "3"
+      empreinte:
+        description: "SHA256 attendu (celui de l'ISO publiée pour ce commit) — vide : pas de comparaison"
+        required: false
+        default: ""
 
 permissions:
   contents: read
@@ -86,6 +90,24 @@ jobs:
           done
 
           echo "ISO conforme à la version $attendue."
+
+      - name: Comparer à l'ISO publiée
+        # La construction est reproductible (voir build.sh) : le même commit
+        # doit redonner la même image, octet pour octet. C'est ce qui permet à
+        # quiconque de vérifier, sans faire confiance au mainteneur, que l'ISO
+        # publiée sort bien du code publié.
+        if: ${{ inputs.empreinte != '' }}
+        env:
+          ATTENDUE: ${{ inputs.empreinte }}
+        run: |
+          set -e
+          obtenue=$(sha256sum dist/*.iso | cut -d' ' -f1)
+          echo "commit   : $(git -c safe.directory='*' rev-parse HEAD)"
+          echo "attendue : $ATTENDUE"
+          echo "obtenue  : $obtenue"
+          [ "$obtenue" = "$ATTENDUE" ] || {
+            echo "::error::l'ISO reconstruite diffère de l'empreinte attendue"; exit 1; }
+          echo "Identique, octet pour octet."
 
       - uses: actions/upload-artifact@v7
         with:

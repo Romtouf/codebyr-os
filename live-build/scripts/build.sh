@@ -31,6 +31,51 @@ if [ "$(id -u)" -ne 0 ]; then
 	exit 1
 fi
 
+# — Construction REPRODUCTIBLE : l'image d'un commit, pas d'un poste —
+#
+# Deux constructions du même commit doivent donner la même ISO, octet pour
+# octet : c'est ce qui permet à quiconque de vérifier que l'image publiée sort
+# bien du code publié. Trois choses variaient d'une construction à l'autre :
+#
+#   · les SOURCES. Le dossier de travail peut contenir des modifications non
+#     commitées, et, lu depuis le disque Windows (9p), chaque fichier y apparaît
+#     en 777 avec la date de son dernier passage sur ce poste. On construit donc
+#     depuis le COMMIT, extrait par « git archive » : mêmes octets, mêmes droits
+#     (ceux que git enregistre), même date — celle du commit — partout ;
+#   · l'HEURE. live-build sait estampiller toute l'image d'une date unique,
+#     SOURCE_DATE_EPOCH : on lui donne celle du commit ;
+#   · l'état du MIROIR Debian, qui change chaque jour. On l'installe depuis
+#     snapshot.debian.org, tel qu'il était à la date du commit. L'image, elle,
+#     garde les miroirs ordinaires pour ses mises à jour.
+#
+# CODEBYR_NON_COMMITE=1 construit le dossier de travail tel quel, pour essayer
+# une modification avant de la commiter. Cette image-là n'est PAS reproductible
+# et ne doit jamais être publiée.
+GIT="git -C $REPO -c safe.directory=*"
+if [ "${CODEBYR_NON_COMMITE:-0}" = "1" ]; then
+	SOURCE="$REPO"
+	SNAPSHOT=""
+	echo "==> Dossier de travail, commité ou non : image NON reproductible (essai seulement)." >&2
+else
+	COMMIT="$($GIT rev-parse HEAD)"
+	if [ -n "$($GIT status --porcelain -- VERSION live-build branding packaging)" ]; then
+		echo "==> ATTENTION : des modifications non commitées ne seront PAS dans l'image" >&2
+		echo "    (CODEBYR_NON_COMMITE=1 pour les essayer)." >&2
+	fi
+	SOURCE="$(mktemp -d /var/tmp/codebyr-source.XXXXXX)"
+	trap 'rm -rf "$SOURCE"' EXIT
+	# tar.umask : les droits de l'archive sont ceux de git (644, ou 755 pour un
+	# programme), pas ceux que le masque du poste ferait sortir.
+	$GIT -c tar.umask=0022 archive --format=tar "$COMMIT" \
+		VERSION live-build branding packaging | tar -x -C "$SOURCE"
+	SOURCE_DATE_EPOCH="$($GIT log -1 --format=%ct "$COMMIT")"
+	export SOURCE_DATE_EPOCH
+	SNAPSHOT="$(date -u -d "@$SOURCE_DATE_EPOCH" +%Y%m%dT%H%M%SZ)"
+	echo "==> Commit  : $COMMIT"
+	echo "==> Date    : $SNAPSHOT (SOURCE_DATE_EPOCH=$SOURCE_DATE_EPOCH, Debian tel qu'à cette date)"
+fi
+SRC="$SOURCE/live-build"
+
 echo "==> Source  : $SRC"
 echo "==> Travail : $WORK   (FS natif — obligatoire)"
 echo "==> Sortie  : $DIST"
@@ -46,14 +91,14 @@ rsync -a --delete \
 # includes.chroot_after_packages = copié après l'install, juste avant les hooks.
 BGDIR="$WORK/config/includes.chroot_after_packages/usr/share/backgrounds/codebyr"
 mkdir -p "$BGDIR"
-cp -f "$REPO/branding/wallpapers/codebyr-clair.svg"  "$BGDIR/"
-cp -f "$REPO/branding/wallpapers/codebyr-sombre.svg" "$BGDIR/"
+cp -f "$SOURCE/branding/wallpapers/codebyr-clair.svg"  "$BGDIR/"
+cp -f "$SOURCE/branding/wallpapers/codebyr-sombre.svg" "$BGDIR/"
 
 # — Fond de menu de démarrage : rasterisé depuis branding/boot-splash.svg —
-if command -v rsvg-convert >/dev/null 2>&1 && [ -f "$REPO/branding/boot-splash.svg" ]; then
+if command -v rsvg-convert >/dev/null 2>&1 && [ -f "$SOURCE/branding/boot-splash.svg" ]; then
 	for d in "$WORK/config/bootloaders/syslinux_common" "$WORK/config/bootloaders/grub-pc"; do
 		mkdir -p "$d"
-		rsvg-convert -w 800 -h 600 "$REPO/branding/boot-splash.svg" -o "$d/splash.png"
+		rsvg-convert -w 800 -h 600 "$SOURCE/branding/boot-splash.svg" -o "$d/splash.png"
 	done
 	echo "==> Fond de démarrage Codebyr généré (splash.png)"
 fi
@@ -63,7 +108,7 @@ fi
 #   Construit ici pour être toujours cohérent avec la version courante du dépôt.
 # Version relevée UNE FOIS, avant toute construction : c'est elle qui sera
 # embarquée dans l'image, et c'est donc elle qui doit la nommer à la fin.
-VER_EMBARQUEE="$(tr -d ' \t\r\n' < "$REPO/VERSION")"
+VER_EMBARQUEE="$(tr -d ' \t\r\n' < "$SOURCE/VERSION")"
 
 # Cette version doit aussi NOMMER le système à l'intérieur de l'image, et pas
 # seulement le fichier ISO. Les hooks de branding la figeaient en dur : l'ISO
@@ -74,10 +119,10 @@ mkdir -p "$WORK/config/includes.chroot_after_packages/etc/codebyr"
 printf '%s\n' "$VER_EMBARQUEE" \
 	> "$WORK/config/includes.chroot_after_packages/etc/codebyr/version"
 
-if [ -f "$REPO/packaging/build-deb.sh" ]; then
+if [ -f "$SOURCE/packaging/build-deb.sh" ]; then
 	echo "==> Construction du paquet codebyr-tools $VER_EMBARQUEE (embarqué pour les MAJ)"
-	CODEBYR_REPO="$REPO" bash "$REPO/packaging/build-deb.sh" >/dev/null
-	DEBSRC="$REPO/packaging/dist/codebyr-tools_${VER_EMBARQUEE}_all.deb"
+	CODEBYR_REPO="$SOURCE" bash "$SOURCE/packaging/build-deb.sh" >/dev/null
+	DEBSRC="$SOURCE/packaging/dist/codebyr-tools_${VER_EMBARQUEE}_all.deb"
 	if [ -f "$DEBSRC" ]; then
 		mkdir -p "$WORK/config/includes.chroot_after_packages/opt/codebyr"
 		cp -f "$DEBSRC" "$WORK/config/includes.chroot_after_packages/opt/codebyr/"
@@ -122,8 +167,35 @@ if [ -d "$WORK/.build" ] && [ -n "$(ls -A "$WORK/.build" 2>/dev/null)" ]; then
 fi
 
 # — Construction —
+#
+# En mode reproductible, trois réglages de plus :
+#   · le miroir figé à la date du commit, pour construire (--mirror-bootstrap,
+#     --mirror-chroot, --mirror-chroot-security). Les index de sécurité d'une
+#     date passée portent une échéance de 7 jours : apt la dépasserait dès
+#     qu'on reconstruit une version ancienne, d'où Check-Valid-Until=false —
+#     la signature, elle, reste vérifiée ;
+#   · --apt-indices false : en fin de construction, live-build retélécharge
+#     les index apt depuis le miroir DU JOUR et les laisse dans l'image. La
+#     machine installée les récupère à sa première mise à jour ;
+#   · le système de base (debootstrap) refait à chaque fois : live-build le
+#     garde en cache (cache/bootstrap) et le réutilise d'une construction à
+#     l'autre, mis à niveau. Celui de ce poste datait du 12/09/2026 ; la CI,
+#     elle, part de rien. Le cache des PAQUETS reste : chaque fichier y est
+#     vérifié par son empreinte, il ne change rien au résultat.
+LB_OPTIONS=()
+if [ -n "$SNAPSHOT" ]; then
+	SNAP="http://snapshot.debian.org/archive"
+	LB_OPTIONS=(
+		--mirror-bootstrap "$SNAP/debian/$SNAPSHOT/"
+		--mirror-chroot "$SNAP/debian/$SNAPSHOT/"
+		--mirror-chroot-security "$SNAP/debian-security/$SNAPSHOT/"
+		--apt-options "--yes -o Acquire::Retries=5 -o Acquire::Check-Valid-Until=false"
+		--apt-indices false
+	)
+	rm -rf "$WORK/cache/bootstrap"
+fi
 echo "==> lb config"
-lb config
+lb config "${LB_OPTIONS[@]}"
 echo "==> lb build  (téléchargement + assemblage — peut durer 20–40 min)"
 # Preuve qu'on ne signera pas un reliquat : on EFFACE toute ISO présente avant
 # de construire. Ce qui se trouvera là ensuite ne peut venir que d'ici.
@@ -156,7 +228,15 @@ fi
 # entre-temps (correctif publié pendant ce temps), relire le fichier ici
 # baptiserait l'image d'une version qu'elle ne contient pas. Une étiquette qui
 # ment sur son contenu est pire que pas d'étiquette du tout.
-OUT="$DIST/codebyr-os-${VER_EMBARQUEE}-$(date +%Y%m%d)-amd64.iso"
+# La date du nom est celle de l'image (SOURCE_DATE_EPOCH, fixée par live-build
+# s'il ne l'a pas reçue), pas celle du jour : reconstruire un commit plus tard
+# doit redonner le même nom.
+OUT="$DIST/codebyr-os-${VER_EMBARQUEE}-$(date -u -d "@${SOURCE_DATE_EPOCH:-$(date +%s)}" +%Y%m%d)-amd64.iso"
 cp -f "$ISO" "$OUT"
 sync
 echo "==> ISO prête : $OUT  ($(du -h "$OUT" | cut -f1))"
+if [ -n "$SNAPSHOT" ]; then
+	echo "    Commit $COMMIT, Debian au $SNAPSHOT."
+	echo "    SHA256 $(sha256sum "$OUT" | cut -d' ' -f1)"
+	echo "    Reconstruire ce commit ailleurs doit redonner cette empreinte."
+fi

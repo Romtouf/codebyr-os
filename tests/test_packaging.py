@@ -542,3 +542,52 @@ class AucunFichierDuPaquetModifiableParTous(unittest.TestCase):
         self.assertEqual(modes["./etc/xdg/autostart/codebyr-bienvenue.desktop"], 0o644)
         self.assertEqual(modes["./usr/bin/codebyr-space"], 0o755)
         self.assertEqual(modes["./usr/lib/codebyr/codebyr-uid"], 0o755)
+
+
+class LIsoEstReproductible(unittest.TestCase):
+    """Deux constructions du même commit doivent donner la même ISO.
+
+    C'est la seule façon, pour qui ne fait pas confiance au mainteneur, de
+    vérifier que l'image publiée sort du code publié. Chaque réglage gardé ici
+    a fait varier l'image quand il manquait.
+    """
+
+    def setUp(self):
+        with open(os.path.join(RACINE, "live-build", "scripts", "build.sh"),
+                  encoding="utf-8") as f:
+            self.build = f.read()
+
+    def test_l_image_sort_du_commit_pas_du_dossier_de_travail(self):
+        # Lu depuis le disque Windows, tout est en 777 et daté du passage sur
+        # ce poste ; et le dossier peut contenir des modifications non commitées.
+        self.assertIn("archive --format=tar", self.build)
+        self.assertIn("tar.umask=0022", self.build)
+        self.assertIn('SRC="$SOURCE/live-build"', self.build)
+        self.assertIn('CODEBYR_REPO="$SOURCE"', self.build)
+
+    def test_une_seule_date_celle_du_commit(self):
+        self.assertIn("--format=%ct", self.build)
+        self.assertIn("export SOURCE_DATE_EPOCH", self.build)
+        # Le nom de l'ISO ne dépend pas du jour de la construction.
+        self.assertNotIn("$(date +%Y%m%d)", self.build)
+
+    def test_debian_tel_qu_a_la_date_du_commit(self):
+        for option in ("--mirror-bootstrap", "--mirror-chroot", "--mirror-chroot-security"):
+            self.assertIn(option + ' "$SNAP/', self.build, option)
+        self.assertIn("Acquire::Check-Valid-Until=false", self.build)
+        # Les index du miroir du jour ne partent pas dans l'image, et le
+        # système de base ne vient pas du cache d'une construction ancienne.
+        self.assertIn("--apt-indices false", self.build)
+        self.assertIn('rm -rf "$WORK/cache/bootstrap"', self.build)
+
+    def test_aucun_hook_ne_telecharge(self):
+        # Ce qu'un hook télécharge change d'un jour à l'autre : le catalogue
+        # Flathub, pré-chargé jusqu'en 1.16.6, rendait l'image différente à
+        # chaque construction.
+        for hook in sorted(glob.glob(os.path.join(RACINE, "live-build", "config",
+                                                  "hooks", "normal", "*.hook.chroot"))):
+            with open(hook, encoding="utf-8") as f:
+                code = "\n".join(l for l in f.read().splitlines()
+                                 if not l.lstrip().startswith("#"))
+            for commande in ("flatpak update", "flatpak remote-add", "curl ", "wget "):
+                self.assertNotIn(commande, code, "%s : %s" % (os.path.basename(hook), commande))

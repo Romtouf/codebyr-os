@@ -4,21 +4,16 @@
 # Le dépôt Flathub est fourni STATIQUEMENT par
 # /etc/flatpak/remotes.d/flathub.flatpakrepo (include) : flatpak le charge
 # automatiquement comme remote système — aucun accès réseau requis au build.
+#
+# Le catalogue Flathub n'est PLUS pré-chargé dans l'image. Il change chaque
+# jour : deux constructions du même commit auraient donné deux ISO différentes,
+# et personne n'aurait pu vérifier que l'image publiée sort du code publié.
+# « Logiciels » le télécharge à son premier lancement en ligne — ce qu'il
+# faisait déjà quand la construction n'avait pas de réseau.
 set -e
 
 command -v flatpak >/dev/null 2>&1 || { echo "0900 : flatpak ABSENT !" >&2; exit 1; }
 command -v gnome-software >/dev/null 2>&1 || { echo "0900 : gnome-software ABSENT !" >&2; exit 1; }
 [ -f /etc/flatpak/remotes.d/flathub.flatpakrepo ] || { echo "0900 : flathub.flatpakrepo ABSENT !" >&2; exit 1; }
-
-# Pré-charger le catalogue Flathub (appstream) : la page d'accueil de
-# « Logiciels » a ainsi du contenu dès le premier démarrage, même si le
-# réseau n'est pas encore connecté à l'ouverture de session.
-# Best-effort : sans réseau au build, l'image reste valide (catalogue
-# téléchargé au premier lancement en ligne, comme avant).
-if flatpak update --appstream --noninteractive >/dev/null 2>&1; then
-    echo "0900-logiciels : catalogue Flathub pré-chargé."
-else
-    echo "0900-logiciels : pré-chargement du catalogue impossible (réseau) — chargé au 1er lancement."
-fi
 
 echo "0900-logiciels : boutique prête (GNOME Logiciels + Flatpak + Flathub préconfiguré)."

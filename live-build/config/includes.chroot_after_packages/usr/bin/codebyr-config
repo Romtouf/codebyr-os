@@ -752,7 +752,7 @@ class Fenetre(Adw.ApplicationWindow):
             description="Ce programme apparaîtra dans le menu du Sceau de l'Espace "
                         "« %s »." % esp.get("nom", ""))
         nom_row = Adw.EntryRow(title="Nom affiché")
-        nom_row.set_text(os.path.splitext(os.path.basename(chemin))[0].capitalize())
+        nom_row.set_text(applications.nom_propose(chemin))
         grp.add(nom_row)
         sw = Adw.SwitchRow(
             title="Application Electron / Chromium",

@@ -119,3 +119,35 @@ def resoudre(desktop_id, dossiers=None):
         if parts:
             return parts
     return [desktop_id.replace(".desktop", "")]
+
+
+# Ce qui, dans le nom d'un programme téléchargé, dit pour quelle machine il est
+# fait — pas ce qu'il est : « LocalSend-1.18.2-linux-x86-64.AppImage ».
+EXTENSIONS_PROGRAMME = (".appimage", ".sh", ".run", ".bin")
+MARQUES_DE_PLATEFORME = re.compile(
+    r"(linux|x86|x86_64|x64|amd64|arm64|aarch64|armhf|i386|i686|64bit|32bit)$",
+    re.IGNORECASE)
+MARQUE_DE_VERSION = re.compile(r"v?\d", re.IGNORECASE)
+
+
+def nom_propose(fichier):
+    """Le nom à proposer au menu pour un programme téléchargé.
+
+    « LocalSend-1.18.2-linux-x86-64.AppImage » devient « LocalSend » : le nom
+    s'arrête au premier morceau qui est une version ou une plateforme. Une
+    majuscule est ajoutée à un nom tout en minuscules, sans toucher aux
+    autres (« LocalSend » ne devient pas « Localsend »). C'est une proposition :
+    la personne peut la changer avant d'ajouter.
+    """
+    base = os.path.basename(fichier)
+    racine, ext = os.path.splitext(base)
+    if ext.lower() in EXTENSIONS_PROGRAMME:
+        base = racine
+    morceaux = [m for m in re.split(r"[-_ ]+", base) if m]
+    garde = []
+    for m in morceaux:
+        if garde and (MARQUE_DE_VERSION.match(m) or MARQUES_DE_PLATEFORME.match(m)):
+            break
+        garde.append(m)
+    nom = " ".join(garde) or base
+    return nom[:1].upper() + nom[1:] if nom.islower() else nom

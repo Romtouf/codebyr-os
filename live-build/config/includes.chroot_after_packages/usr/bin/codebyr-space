@@ -2264,7 +2264,9 @@ def cmd_interne_programmes():
     Sous compte séparé, le bureau ne voit pas le dossier de l'Espace : c'est
     tout l'objet du compte. Le choix se fait donc sur une liste que l'Espace
     dresse lui-même, là où l'on met un programme (Téléchargements, Partagé…),
-    à deux niveaux au plus, sans suivre de lien. Une ligne JSON en sortie.
+    à deux niveaux au plus, sans suivre de lien. Une ligne JSON en sortie, les
+    chemins RELATIFS au dossier de l'Espace : c'est sous un autre chemin que
+    ce dossier apparaît dans le bac à sable (voir « chez », wrap_bwrap).
     """
     compte = _compte_d_espace_courant()
     if not compte:
@@ -2284,7 +2286,8 @@ def cmd_interne_programmes():
                 except OSError:
                     continue
                 if nature and len(trouves) < MAX_PROGRAMMES:
-                    trouves.append({"chemin": chemin, "nature": nature})
+                    trouves.append({"chemin": os.path.relpath(chemin, compte.pw_dir),
+                                    "nature": nature})
     print(json.dumps(trouves, ensure_ascii=False))
     return 0
 
@@ -2292,20 +2295,21 @@ def cmd_interne_programmes():
 def cmd_interne_programme(chemin):
     """Prépare UN programme de l'Espace pour son menu : vérifié, rendu exécutable.
 
-    Le chemin vient du bureau, qui l'a pris dans la liste ci-dessus. Il doit
-    désigner un fichier ordinaire du dossier de l'Espace, et un programme ;
-    l'Espace, qui en est le propriétaire, le rend exécutable. Une ligne JSON en
-    sortie : le chemin tel que l'Espace le voit, et sa nature.
+    Le chemin vient du bureau, qui l'a pris dans la liste ci-dessus : relatif
+    au dossier de l'Espace. Il doit désigner un fichier ordinaire de ce
+    dossier, et un programme ; l'Espace, qui en est le propriétaire, le rend
+    exécutable. Une ligne JSON en sortie : le chemin, relatif lui aussi, et
+    sa nature.
     """
     compte = _compte_d_espace_courant()
     if not compte:
         sys.stderr.write("codebyr-space : réservé au compte d'un Espace.\n")
         return 2
-    if not os.path.isabs(chemin) or any(c in chemin for c in "\n\r\x00"):
+    if not chemin or os.path.isabs(chemin) or any(c in chemin for c in "\n\r\x00"):
         sys.stderr.write("codebyr-space : chemin de programme mal formé.\n")
         return 2
     home = os.path.realpath(compte.pw_dir)
-    dossier = os.path.realpath(os.path.dirname(chemin))
+    dossier = os.path.realpath(os.path.dirname(os.path.join(home, chemin)))
     if os.path.commonpath([dossier, home]) != home:
         sys.stderr.write("codebyr-space : ce programme n'est pas dans l'Espace.\n")
         return 2
@@ -2319,7 +2323,8 @@ def cmd_interne_programme(chemin):
     except OSError as exc:
         sys.stderr.write("codebyr-space : programme illisible (%s).\n" % exc)
         return 1
-    print(json.dumps({"chemin": chemin, "nature": nature}, ensure_ascii=False))
+    print(json.dumps({"chemin": os.path.relpath(chemin, home), "nature": nature},
+                     ensure_ascii=False))
     return 0
 
 
@@ -2345,14 +2350,28 @@ def _reponse_de_l_espace(esp, action, args=()):
 def programme_valide(entree):
     """Une entrée venue de l'Espace est-elle un programme bien formé ?
 
-    Un chemin DE L'ESPACE, donc Linux : posixpath, quel que soit le système où
+    Un chemin RELATIF au dossier de l'Espace, qui ne remonte pas au-dessus.
+    Chemin de l'Espace, donc Linux : posixpath, quel que soit le système où
     tourne ce code (les tests passent aussi sous Windows).
     """
     import posixpath
-    return (isinstance(entree, dict) and isinstance(entree.get("chemin"), str)
-            and posixpath.isabs(entree["chemin"])
-            and not any(c in entree["chemin"] for c in "\n\r\x00")
-            and entree.get("nature") in NATURES_PROGRAMME)
+    if not (isinstance(entree, dict) and isinstance(entree.get("chemin"), str)
+            and entree.get("nature") in NATURES_PROGRAMME):
+        return False
+    chemin = entree["chemin"]
+    return (bool(chemin) and not posixpath.isabs(chemin)
+            and ".." not in chemin.split("/")
+            and not any(c in chemin for c in "\n\r\x00"))
+
+
+def chemin_dans_le_bac_a_sable(relatif):
+    """Où un fichier du dossier de l'Espace apparaît pour ses applications.
+
+    Le dossier d'un Espace à compte séparé est monté au chemin du dossier du
+    bureau (« chez », voir wrap_bwrap) : c'est ce chemin qu'il faut inscrire
+    au menu, pas celui où le dossier est rangé sur la machine.
+    """
+    return os.path.join(os.path.expanduser("~"), relatif)
 
 
 def cmd_programmes(esp_id):
@@ -2427,7 +2446,8 @@ def cmd_add_app(esp_id, nom, fichier, extra):
             sys.stderr.write("codebyr-space : l'Espace %s n'a pas pu préparer ce "
                              "programme.\n" % esp["nom"])
             return 1
-        cmd = commande_programme(reponse["chemin"], reponse["nature"], extra)
+        cmd = commande_programme(chemin_dans_le_bac_a_sable(reponse["chemin"]),
+                                 reponse["nature"], extra)
         _enregistrer_app(esp_id, nom, cmd)
         print("« %s » ajoutée au menu de l'Espace %s." % (nom, esp["nom"]))
         print("  Commande : %s" % cmd)

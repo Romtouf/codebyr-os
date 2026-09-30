@@ -159,30 +159,49 @@ class AjouterUnProgrammeSousCompteSepare(unittest.TestCase):
         self.assertEqual(space.commande_programme("/e/outil", "elf"), "/e/outil")
 
     def test_seule_une_reponse_bien_formee_de_l_espace_est_crue(self):
-        self.assertTrue(space.programme_valide({"chemin": "/e/x.AppImage", "nature": "appimage"}))
-        for tordu in (None, [], "x", {"chemin": "x.AppImage", "nature": "appimage"},
-                      {"chemin": "/e/x\n/bin/sh", "nature": "elf"},
-                      {"chemin": "/e/x", "nature": "binaire"}, {"nature": "elf"}):
+        # Un chemin RELATIF au dossier de l'Espace, qui n'en sort pas.
+        self.assertTrue(space.programme_valide({"chemin": "Téléchargements/x.AppImage",
+                                                "nature": "appimage"}))
+        for tordu in (None, [], "x", {"chemin": "/e/x.AppImage", "nature": "appimage"},
+                      {"chemin": "", "nature": "elf"},
+                      {"chemin": "../../../usr/bin/x", "nature": "elf"},
+                      {"chemin": "Téléchargements/../../x", "nature": "elf"},
+                      {"chemin": "x\n/bin/sh", "nature": "elf"},
+                      {"chemin": "x", "nature": "binaire"}, {"nature": "elf"}):
             self.assertFalse(space.programme_valide(tordu), repr(tordu))
 
-    def test_l_ajout_inscrit_ce_que_l_espace_a_prepare(self):
-        reponse = {"chemin": "/var/lib/codebyr/espaces/1002/travail/Téléchargements/Jeu.AppImage",
-                   "nature": "appimage"}
+    def test_l_ajout_inscrit_le_chemin_vu_dans_le_bac_a_sable(self):
+        # 1.16.6~essai1 inscrivait le chemin RÉEL (/var/lib/codebyr/espaces/…) :
+        # dans le bac à sable, le dossier de l'Espace est monté au chemin du
+        # bureau, et le menu échouait sur « No such file or directory ».
+        reponse = {"chemin": "Téléchargements/Jeu.AppImage", "nature": "appimage"}
         with mock.patch.object(space, "load_espaces", return_value={"travail": DEDIE}), \
                 mock.patch.object(space, "_reponse_de_l_espace", return_value=reponse) as ordre, \
-                mock.patch.object(space, "_enregistrer_app") as inscrire:
+                mock.patch.object(space, "_enregistrer_app") as inscrire, \
+                mock.patch.object(space.os.path, "expanduser", return_value="/home/ana"):
             code = space.cmd_add_app("travail", "Jeu", reponse["chemin"], ["--no-sandbox"])
         self.assertEqual(code, 0)
         self.assertEqual(ordre.call_args[0][1], space.INTERNE_PROGRAMME)
+        attendu = space.os.path.join("/home/ana", "Téléchargements/Jeu.AppImage")
         inscrire.assert_called_once_with(
-            "travail", "Jeu", "'%s' --appimage-extract-and-run --no-sandbox" % reponse["chemin"])
+            "travail", "Jeu", "'%s' --appimage-extract-and-run --no-sandbox" % attendu)
+
+    def test_le_bac_a_sable_monte_l_espace_au_chemin_du_bureau(self):
+        # Ce que suppose chemin_dans_le_bac_a_sable : si wrap_bwrap montait un
+        # jour le dossier ailleurs, les programmes ajoutés ne se lanceraient plus.
+        source = _source()
+        self.assertIn('runtime_home = os.path.expanduser("~")', source)
+        with open(os.path.join(outils.LIB, "bac_a_sable.py"), encoding="utf-8") as f:
+            bac = f.read()
+        self.assertIn('chez = chez or os.path.expanduser("~")', bac)
+        self.assertIn('"--bind", home, chez', bac)
 
     def test_une_reponse_tordue_n_inscrit_rien(self):
         with mock.patch.object(space, "load_espaces", return_value={"travail": DEDIE}), \
                 mock.patch.object(space, "_reponse_de_l_espace",
-                                  return_value={"chemin": "relatif", "nature": "elf"}), \
+                                  return_value={"chemin": "/var/lib/x", "nature": "elf"}), \
                 mock.patch.object(space, "_enregistrer_app") as inscrire:
-            self.assertEqual(space.cmd_add_app("travail", "Jeu", "/x", []), 1)
+            self.assertEqual(space.cmd_add_app("travail", "Jeu", "x", []), 1)
         inscrire.assert_not_called()
 
 
@@ -227,15 +246,20 @@ class LEspaceDresseLaListe(unittest.TestCase):
         os.symlink(dehors, os.path.join(self.dl, "lien"))
         code, sortie = self._sortie(space.cmd_interne_programmes)
         self.assertEqual(code, 0)
-        trouves = {os.path.basename(e["chemin"]): e["nature"] for e in json.loads(sortie)}
-        self.assertEqual(trouves, {"Jeu.AppImage": "appimage", "installer.sh": "script"})
+        # Relatifs au dossier de l'Espace : le bureau les place lui-même au
+        # chemin où ce dossier apparaît dans le bac à sable.
+        trouves = {e["chemin"]: e["nature"] for e in json.loads(sortie)}
+        self.assertEqual(trouves, {"Téléchargements/Jeu.AppImage": "appimage",
+                                   "Partagé/installer.sh": "script"})
+        self.assertTrue(all(space.programme_valide(e) for e in json.loads(sortie)))
 
     def test_le_programme_choisi_est_rendu_executable_par_l_espace(self):
         chemin = os.path.join(self.dl, "Jeu.AppImage")
         self._poser(chemin, AjouterUnProgrammeSousCompteSepare.APPIMAGE, 0o644)
-        code, sortie = self._sortie(space.cmd_interne_programme, chemin)
+        code, sortie = self._sortie(space.cmd_interne_programme, "Téléchargements/Jeu.AppImage")
         self.assertEqual(code, 0)
-        self.assertEqual(json.loads(sortie), {"chemin": chemin, "nature": "appimage"})
+        self.assertEqual(json.loads(sortie), {"chemin": "Téléchargements/Jeu.AppImage",
+                                              "nature": "appimage"})
         self.assertTrue(os.stat(chemin).st_mode & 0o100)
 
     def test_ce_qui_n_est_pas_un_programme_de_l_espace_est_refuse(self):
@@ -244,8 +268,9 @@ class LEspaceDresseLaListe(unittest.TestCase):
         dehors = os.path.join(self._tmp.name, "dehors")
         self._poser(dehors, AjouterUnProgrammeSousCompteSepare.ELF)
         os.symlink(self._tmp.name, os.path.join(self.dl, "sortie"))
-        for chemin in (texte, dehors, os.path.join(self.dl, "sortie", "dehors"),
-                       "relatif", os.path.join(self.dl, "x\n")):
+        for chemin in ("Téléchargements/notes.txt", dehors, "../dehors",
+                       "Téléchargements/../../dehors", "Téléchargements/sortie/dehors",
+                       "", "Téléchargements/x\n", "Téléchargements", os.path.join(self.dl, "x")):
             code, sortie = self._sortie(space.cmd_interne_programme, chemin)
             self.assertNotEqual(code, 0, chemin)
             self.assertEqual(sortie, "", chemin)

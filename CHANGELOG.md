@@ -18,6 +18,10 @@ le programme avec le navigateur de l'Espace — ou envoyez-le-lui —, puis, dan
 « Configuration Codebyr », choisissez-le dans la liste des programmes que
 l'Espace a trouvés chez lui : il apparaît dans son menu.
 
+**Un nom plus propre est proposé pour le menu.** « LocalSend-1.18.2-linux-x86-64.AppImage »
+proposait « Localsend- » ; c'est maintenant « LocalSend », sans la version ni
+la plateforme. Le nom reste modifiable avant l'ajout.
+
 **Les AppImage s'ouvrent dans les Espaces.** C'est la forme la plus courante
 d'un programme téléchargé, et elle ne pouvait pas s'y lancer : elle a besoin,
 pour se monter, d'un outil que la protection des Espaces interdit à juste

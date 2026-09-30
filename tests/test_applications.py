@@ -161,6 +161,24 @@ class Resolution(unittest.TestCase):
                          ["absent"])
 
 
+class NomProposePourUnProgramme(unittest.TestCase):
+    """1.16.6 : « LocalSend-1.18.2-linux-x86-64.AppImage » proposait « Localsend- »."""
+
+    def test_version_et_plateforme_sont_retirees(self):
+        for fichier, attendu in (
+                ("Téléchargements/LocalSend-1.18.2-linux-x86-64.AppImage", "LocalSend"),
+                ("Obsidian-1.6.7.AppImage", "Obsidian"),
+                ("kdenlive-24.02.1-x86_64.appimage", "Kdenlive"),
+                ("balenaEtcher-1.18.11-x64.AppImage", "balenaEtcher"),
+                ("Stretchly-v1.15.1.AppImage", "Stretchly"),
+                ("FreeCAD_0.21.2-2023-12-17-conda-Linux-x86_64-py310.AppImage", "FreeCAD"),
+                ("super_tux_kart-1.4-linux.run", "Super tux kart"),
+                ("installer.sh", "Installer"),
+                ("nvim", "Nvim"),
+                ("3DSlicer-5.6.AppImage", "3DSlicer")):
+            self.assertEqual(applications.nom_propose(fichier), attendu, fichier)
+
+
 class UtiliseeParLaConfiguration(unittest.TestCase):
 
     def test_codebyr_config_passe_par_le_module(self):
@@ -168,6 +186,7 @@ class UtiliseeParLaConfiguration(unittest.TestCase):
         with open(os.path.join(BIN, "codebyr-config"), encoding="utf-8") as f:
             code = f.read()
         self.assertIn("applications.installees()", code)
+        self.assertIn("applications.nom_propose(chemin)", code)
         self.assertNotIn("def apps_installees", code,
                          "la détection ne doit plus être dupliquée dans l'interface")
 

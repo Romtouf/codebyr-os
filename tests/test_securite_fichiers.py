@@ -8,6 +8,7 @@ import unittest
 from unittest.mock import Mock, patch
 
 import outils
+import chemins  # noqa: E402 — module partagé (voir outils)
 import fichiers_surs
 import modeles
 
@@ -23,7 +24,7 @@ class Frontieres(unittest.TestCase):
         self.data = self.root / "espaces"
         self.espaces = {e: {"id": e, "nom": e} for e in ("navigation", "travail")}
         self.addCleanup(patch.stopall)
-        patch.object(space, "DATA_ROOT", str(self.data)).start()
+        patch.object(chemins, "DONNEES", str(self.data)).start()
         patch.object(space, "cmd_close", return_value=0).start()
         self.secret = self.root / "hote" / "secret"
         self.secret.parent.mkdir()
@@ -50,7 +51,7 @@ class Frontieres(unittest.TestCase):
         (boite / "injection").write_text("attaque")
         home = self.data / "travail" / "home"
         home.mkdir(parents=True)
-        (home / space.PARTAGE).symlink_to(self.secret.parent, target_is_directory=True)
+        (home / chemins.PARTAGE).symlink_to(self.secret.parent, target_is_directory=True)
         self.assertEqual(space.relever_envois(self.espaces), 0)
         self.assertFalse((self.secret.parent / "injection").exists())
 

@@ -31,18 +31,21 @@ from gi.repository import GObject, Nautilus  # noqa: E402
 # registre.
 sys.path.insert(0, os.environ.get("CODEBYR_LIB", "/usr/share/codebyr"))
 try:
+    import chemins
     import provenance
     import registre
 except ImportError:      # pragma: no cover — modules partagés absents
+    chemins = None
     provenance = None
     registre = None
 
 SPACE = "/usr/bin/codebyr-space"
 ATTRIBUT = "codebyr::origine"
 
-# Même racine que codebyr-space. Un fichier encore dans son Espace n'a pas
-# besoin d'attribut : son emplacement dit d'où il vient.
-DONNEES = os.path.expanduser("~/.local/share/codebyr/espaces")
+# Même racine que codebyr-space, lue au même endroit. Un fichier encore dans
+# son Espace n'a pas besoin d'attribut : son emplacement dit d'où il vient.
+# Sans les modules partagés, l'extension ne fait rien (provenance vaut None).
+DONNEES = chemins.DONNEES if chemins else None
 
 
 def _noms():

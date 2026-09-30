@@ -18,6 +18,7 @@ import unittest
 from unittest import mock
 
 import outils
+import chemins  # noqa: E402 — module partagé (voir outils)
 from outils import LIB  # noqa: F401 — place les modules partagés
 import compte_dedie  # noqa: E402
 import programmes  # noqa: E402
@@ -465,7 +466,7 @@ class LesBoites(unittest.TestCase):
                                return_value="/var/lib/codebyr/envois/1000/travail"):
             self.assertEqual(space._boite_de_depart(DEDIE, "travail"),
                              "/var/lib/codebyr/envois/1000/travail")
-        self.assertTrue(space._boite_de_depart(ORDINAIRE, "perso").startswith(space.DATA_ROOT))
+        self.assertTrue(space._boite_de_depart(ORDINAIRE, "perso").startswith(chemins.DONNEES))
 
     @unittest.skipUnless(POSIX, "fichiers_surs est réservé à Linux")
     def test_la_releve_depose_dans_la_boite_d_arrivee_lisible_par_l_espace(self):
@@ -478,7 +479,7 @@ class LesBoites(unittest.TestCase):
             arrivee = os.path.join(t, "arrivees", "travail")
             os.makedirs(arrivee)
             espaces = {"perso": ORDINAIRE, "travail": DEDIE}
-            with mock.patch.object(space, "DATA_ROOT", donnees), \
+            with mock.patch.object(chemins, "DONNEES", donnees), \
                     mock.patch.object(space.comptes, "chemin_arrivees", return_value=arrivee):
                 remis = space.relever_envois(espaces)
             self.assertEqual(remis, 1)
@@ -496,7 +497,7 @@ class LesBoites(unittest.TestCase):
             os.makedirs(depart)
             with open(os.path.join(depart, "rapport.txt"), "w") as f:
                 f.write("x")
-            with mock.patch.object(space, "DATA_ROOT", t), \
+            with mock.patch.object(chemins, "DONNEES", t), \
                     mock.patch.object(space.comptes, "chemin_arrivees",
                                       return_value=os.path.join(t, "absente")):
                 self.assertEqual(space.relever_envois({"perso": ORDINAIRE, "travail": DEDIE}), 0)
@@ -539,7 +540,7 @@ class LesBoites(unittest.TestCase):
                 xattr = False
             recus = space._recueillir_arrivees(home, arrivee)
             self.assertEqual(recus, 2)
-            partage = os.path.join(home, space.PARTAGE)
+            partage = os.path.join(home, chemins.PARTAGE)
             self.assertTrue(os.path.exists(os.path.join(partage, "note.txt")))
             # Le lot arrive sous le même nom : le lanceur ouvre la pièce jointe
             # à un chemin qu'il connaît d'avance.
@@ -562,7 +563,7 @@ class LesBoites(unittest.TestCase):
                 f.write("secret")
             os.symlink(secret, os.path.join(arrivee, "piege.txt"))
             space._recueillir_arrivees(home, arrivee)
-            self.assertFalse(os.path.exists(os.path.join(home, space.PARTAGE, "piege.txt")))
+            self.assertFalse(os.path.exists(os.path.join(home, chemins.PARTAGE, "piege.txt")))
 
     def test_la_piece_jointe_passe_par_la_boite_d_arrivee(self):
         lancer = _fonction(_source(), "_lancer", "_rundir")
@@ -661,7 +662,7 @@ class LeJournalDesRefus(unittest.TestCase):
                 vu["dossier"] = os.path.isdir(os.path.join(t, "donnees", "travail"))
                 return mock.Mock()
 
-            with mock.patch.object(space, "DATA_ROOT", os.path.join(t, "donnees")), \
+            with mock.patch.object(chemins, "DONNEES", os.path.join(t, "donnees")), \
                     mock.patch.object(space.subprocess, "Popen", side_effect=demarrage), \
                     mock.patch.object(space, "_prevenir"):
                 space._demarrer_filtre_reseau(esp, os.path.join(t, "home"), ["firefox-esr"],
@@ -824,7 +825,7 @@ class LeDemenagement(unittest.TestCase):
             session = mock.Mock(ordres="/nulle-part", home=os.path.join(t, "dedie", "1000", "travail"),
                                 compte="cbyr-1000-travail")
             os.makedirs(session.home)
-            with mock.patch.object(space, "DATA_ROOT", os.path.join(t, "espaces")), \
+            with mock.patch.object(chemins, "DONNEES", os.path.join(t, "espaces")), \
                     mock.patch.object(space, "_prevenir"), \
                     mock.patch.object(compte_dedie, "executer", return_value=1):
                 ouvert = space._demenager_vers_compte_dedie(DEDIE, session)
@@ -836,7 +837,7 @@ class LeDemenagement(unittest.TestCase):
 
     def test_un_espace_jamais_ouvert_n_a_rien_a_demenager(self):
         with tempfile.TemporaryDirectory() as t, \
-                mock.patch.object(space, "DATA_ROOT", t), \
+                mock.patch.object(chemins, "DONNEES", t), \
                 mock.patch.object(compte_dedie, "executer") as executer:
             self.assertTrue(space._demenager_vers_compte_dedie(DEDIE, mock.Mock()))
         executer.assert_not_called()
@@ -846,7 +847,7 @@ class LeDemenagement(unittest.TestCase):
             os.makedirs(os.path.join(t, "travail"))
             with open(os.path.join(t, "travail", space.MARQUEUR_DEMENAGEMENT), "w") as f:
                 f.write("{}")
-            with mock.patch.object(space, "DATA_ROOT", t), \
+            with mock.patch.object(chemins, "DONNEES", t), \
                     mock.patch.object(compte_dedie, "Session",
                                       side_effect=compte_dedie.Indisponible("absent")):
                 self.assertFalse(space._rapatrier_depuis_compte_dedie(ORDINAIRE | {"id": "travail"}))
@@ -893,7 +894,7 @@ class LesGestesSurLesDonnees(unittest.TestCase):
         # d'effacer.
         effacer = _fonction(self.source, "_effacer_compte_dedie", "cmd_interne_preparer")
         self.assertLess(effacer.index("_geste_dans_l_espace("),
-                        effacer.index("shutil.rmtree(os.path.join(DATA_ROOT"))
+                        effacer.index("shutil.rmtree(os.path.join(chemins.DONNEES"))
 
     def test_la_suppression_efface_avant_de_retirer_le_compte(self):
         supprimer = _fonction(self.source, "cmd_delete", "cmd_nettoyer_registre")

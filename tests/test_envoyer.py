@@ -14,6 +14,7 @@ import tempfile
 import unittest
 
 from outils import BIN, LIB  # noqa: F401 — place le module partagé sur sys.path
+import chemins  # noqa: E402 — module partagé (voir outils)
 import outils
 
 space = outils.charger("codebyr-space")
@@ -80,9 +81,9 @@ class BoiteDEnvoi(unittest.TestCase):
     def setUp(self):
         self.hote = tempfile.mkdtemp()
         self.addCleanup(shutil.rmtree, self.hote, True)
-        self._racine = space.DATA_ROOT
-        space.DATA_ROOT = self.hote
-        self.addCleanup(setattr, space, "DATA_ROOT", self._racine)
+        self._racine = chemins.DONNEES
+        chemins.DONNEES = self.hote
+        self.addCleanup(setattr, chemins, "DONNEES", self._racine)
         self.espaces = {"travail": {"id": "travail", "nom": "Travail"},
                         "navigation": {"id": "navigation", "nom": "Navigation"},
                         "jetable": {"id": "jetable", "nom": "Jetable",
@@ -93,7 +94,7 @@ class BoiteDEnvoi(unittest.TestCase):
         os.makedirs(dossier, exist_ok=True)
         with open(os.path.join(dossier, nom), "w", encoding="utf-8") as f:
             f.write("x")
-        return os.path.join(self.hote, dest, "home", space.PARTAGE, nom)
+        return os.path.join(self.hote, dest, "home", chemins.PARTAGE, nom)
 
     def test_remise(self):
         attendu = self._deposer("navigation", "travail")
@@ -136,9 +137,11 @@ class SasPartage(unittest.TestCase):
         """Il l'était à deux endroits — c'est ainsi qu'un système se désaccorde."""
         with open(os.path.join(BIN, "codebyr-space"), encoding="utf-8") as f:
             source = f.read()
-        self.assertEqual(source.count('"Partagé"'), 1,
-                         "le dossier partagé doit venir de la constante PARTAGE")
-        self.assertIn('PARTAGE = "Partagé"', source)
+        self.assertEqual(source.count('"Partagé"'), 0,
+                         "le dossier partagé doit venir de chemins.PARTAGE")
+        self.assertIn("chemins.PARTAGE", source)
+        with open(os.path.join(LIB, "chemins.py"), encoding="utf-8") as f:
+            self.assertEqual(f.read().count('PARTAGE = "Partagé"'), 1)
 
 
 class DistinctionAvecLeJetable(unittest.TestCase):

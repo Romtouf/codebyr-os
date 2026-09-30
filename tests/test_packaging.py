@@ -716,3 +716,39 @@ class LInstalleurSansIndexApt(unittest.TestCase):
                          "tout apt-get install doit passer par installer_en_ligne")
         fonction = code.split("installer_en_ligne() {", 1)[1].split("\n}", 1)[0]
         self.assertLess(fonction.index("apt-get update"), fonction.index("apt-get -y install"))
+
+
+class LesCheminsDesEspacesSontEcritsUneFois(unittest.TestCase):
+    """1.17.0 : la racine des données des Espaces était écrite six fois, dans
+    trois programmes, sans que rien ne vérifie qu'elles restent d'accord."""
+
+    INCLUDES = os.path.join(RACINE, "live-build", "config", "includes.chroot_after_packages")
+
+    def test_aucune_autre_copie_du_chemin(self):
+        copies = []
+        for dossier, _sous, fichiers in os.walk(self.INCLUDES):
+            for nom in fichiers:
+                chemin = os.path.join(dossier, nom)
+                if nom == "chemins.py" or chemin.endswith(os.path.join("apparmor.d", "codebyr-net-proxy")):
+                    continue
+                try:
+                    with open(chemin, encoding="utf-8") as f:
+                        if ".local/share/codebyr/espaces" in f.read():
+                            copies.append(os.path.relpath(chemin, self.INCLUDES))
+                except (UnicodeDecodeError, OSError):
+                    continue
+        self.assertEqual(copies, [], "passer par chemins.py")
+
+    def test_le_profil_apparmor_suit_chemins(self):
+        # AppArmor ne peut pas importer de module : il porte le chemin dans sa
+        # syntaxe, et doit désigner exactement le fichier que le filtre écrit.
+        sys.path.insert(0, os.path.join(self.INCLUDES, "usr", "share", "codebyr"))
+        try:
+            import chemins
+        finally:
+            sys.path.pop(0)
+        relatif = os.path.relpath(chemins.DONNEES, os.path.expanduser("~")).replace(os.sep, "/")
+        attendu = "owner @{HOME}/%s/*/%s w," % (relatif, os.path.basename(chemins.refus_reseau("x")))
+        with open(os.path.join(self.INCLUDES, "etc", "apparmor.d", "codebyr-net-proxy"),
+                  encoding="utf-8") as f:
+            self.assertIn(attendu, f.read())

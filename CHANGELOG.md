@@ -21,6 +21,8 @@ découpé en modules, un par sujet, chacun avec ses tests (audit, point 8).
   anti-hameçonnage — vit désormais dans `navigateur.py`.
 - Reconnaître et lancer un programme ajouté au menu d'un Espace :
   `programmes.py`.
+- Où vivent les données des Espaces : `chemins.py`. Ce chemin était écrit six
+  fois dans trois programmes ; il l'est désormais une seule.
 
 ---
 

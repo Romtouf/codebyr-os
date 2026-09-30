@@ -20,6 +20,7 @@ import tempfile
 import unittest
 
 from outils import BIN, LIB  # noqa: F401 — place les modules partagés sur sys.path
+import chemins  # noqa: E402 — module partagé (voir outils)
 import outils
 
 space = outils.charger("codebyr-space")
@@ -34,20 +35,20 @@ class Restauration(unittest.TestCase):
     def setUp(self):
         self.base = tempfile.mkdtemp()
         self.addCleanup(shutil.rmtree, self.base, True)
-        self._racine, self._sauvegardes = space.DATA_ROOT, space.BACKUP_DIR
-        self.addCleanup(setattr, space, "DATA_ROOT", self._racine)
-        self.addCleanup(setattr, space, "BACKUP_DIR", self._sauvegardes)
-        space.DATA_ROOT = os.path.join(self.base, "espaces")
-        space.BACKUP_DIR = os.path.join(self.base, "sauvegardes")
-        os.makedirs(space.BACKUP_DIR)
-        self.home = os.path.join(space.DATA_ROOT, "travail", "home")
+        self._racine, self._sauvegardes = chemins.DONNEES, chemins.SAUVEGARDES
+        self.addCleanup(setattr, chemins, "DONNEES", self._racine)
+        self.addCleanup(setattr, chemins, "SAUVEGARDES", self._sauvegardes)
+        chemins.DONNEES = os.path.join(self.base, "espaces")
+        chemins.SAUVEGARDES = os.path.join(self.base, "sauvegardes")
+        os.makedirs(chemins.SAUVEGARDES)
+        self.home = os.path.join(chemins.DONNEES, "travail", "home")
         os.makedirs(self.home)
         with open(os.path.join(self.home, "essai.txt"), "w",
                   encoding="utf-8") as f:
             f.write("contenu")
 
     def _archiver(self, ajouter=None):
-        chemin = os.path.join(space.BACKUP_DIR, "travail-test.tar.gz")
+        chemin = os.path.join(chemins.SAUVEGARDES, "travail-test.tar.gz")
         with tarfile.open(chemin, "w:gz") as tar:
             tar.add(self.home, arcname=".")
             if ajouter:
@@ -93,7 +94,7 @@ class Restauration(unittest.TestCase):
     def test_les_anciennes_donnees_sont_conservees(self):
         """Une restauration ne doit jamais être une perte sèche."""
         space.cmd_import(ESPACES, "travail", self._archiver())
-        frères = os.listdir(os.path.join(space.DATA_ROOT, "travail"))
+        frères = os.listdir(os.path.join(chemins.DONNEES, "travail"))
         self.assertTrue([n for n in frères if n.startswith("avant-restauration-")],
                         frères)
 

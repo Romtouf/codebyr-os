@@ -37,6 +37,7 @@ sys.path.insert(0, os.environ.get("CODEBYR_LIB", "/usr/share/codebyr"))
 import applications  # noqa: E402
 import autotest  # noqa: E402
 import bac_a_sable  # noqa: E402
+import chemins  # noqa: E402
 import compte_dedie  # noqa: E402
 import comptes  # noqa: E402
 import fichiers_surs
@@ -47,15 +48,6 @@ import programmes  # noqa: E402
 import provenance  # noqa: E402
 import registre  # noqa: E402
 import relais_notifications  # noqa: E402
-
-DATA_ROOT = os.path.expanduser("~/.local/share/codebyr/espaces")
-# Le sas d'un Espace : c'est là qu'atterrit tout fichier venu du dehors. Nom
-# écrit à un seul endroit — il l'était à deux, ce qui est la façon habituelle
-# dont deux moitiés d'un même système finissent par ne plus se parler.
-PARTAGE = "Partagé"
-# Sous-dossier de « Partagé » où arrive une pièce jointe examinée dans un Espace
-# à compte dédié (voir _lancer).
-PIECE_JOINTE = "Pièce jointe du"
 
 
 def journal(message):
@@ -103,7 +95,7 @@ def espace_home(esp):
         except OSError:
             pass
         return tempfile.mkdtemp(prefix="codebyr-jetable-%s-" % esp["id"])
-    home = os.path.join(DATA_ROOT, esp["id"], "home")
+    home = os.path.join(chemins.DONNEES, esp["id"], "home")
     fichiers_surs.mkdir(home)
     return home
 
@@ -229,9 +221,9 @@ def journal_refus(esp_id):
     « Configuration Codebyr » le relit pour proposer de les autoriser : c'est la
     réponse au cas concret « ma banque ne s'affiche plus » (site bancaire qui
     charge un CDN, un prestataire 3-D Secure ou un captcha sur un autre domaine).
-    Convention de chemin partagée avec codebyr-config — si elle change ici,
-    elle change là-bas."""
-    return os.path.join(DATA_ROOT, esp_id, "domaines-refuses.txt")
+    Chemin écrit une seule fois, dans chemins.py : codebyr-config le lit au même
+    endroit, et le profil AppArmor du filtre le suit (vérifié par un test)."""
+    return chemins.refus_reseau(esp_id)
 
 
 def _demarrer_filtre_reseau(esp, home, app_cmd, chemin_socket=None, compte_dedie_=False):
@@ -518,7 +510,7 @@ def _lancer(espaces, esp, extra, fichier, session):
                 # Horodaté ET tiré au sort : deux pièces jointes ouvertes dans la
                 # même seconde ne doivent pas se retrouver dans le même lot, où
                 # la seconde prendrait un autre nom que celui qu'on ouvrira.
-                dossier = "%s %s-%s" % (PIECE_JOINTE, time.strftime("%Y-%m-%d %Hh%M%S"),
+                dossier = "%s %s-%s" % (chemins.PIECE_JOINTE, time.strftime("%Y-%m-%d %Hh%M%S"),
                                        secrets.token_hex(2))
                 lot = os.path.join(session.arrivees, dossier)
                 fichiers_surs.mkdir(lot)
@@ -527,12 +519,12 @@ def _lancer(espaces, esp, extra, fichier, session):
                     # traversent la boîte d'arrivée.
                     os.fchmod(fd, 0o777)
                 nom = fichiers_surs.copier_unique(fichier, lot, nom, mode=0o644)
-                relatif = os.path.join(PARTAGE, dossier, nom)
+                relatif = os.path.join(chemins.PARTAGE, dossier, nom)
             else:
-                partage = os.path.join(home, PARTAGE)
+                partage = os.path.join(home, chemins.PARTAGE)
                 fichiers_surs.mkdir(partage)
                 nom = fichiers_surs.copier_unique(fichier, partage, nom)
-                relatif = os.path.join(PARTAGE, nom)
+                relatif = os.path.join(chemins.PARTAGE, nom)
         except OSError as exc:
             sys.stderr.write("codebyr-space : copie du fichier impossible (%s)\n" % exc)
             return 1
@@ -901,7 +893,7 @@ def _recueillir_arrivees(home, arrivees):
             noms = sorted(os.listdir(fd))
     except FileNotFoundError:
         return 0
-    partage = os.path.join(home, PARTAGE)
+    partage = os.path.join(home, chemins.PARTAGE)
     recus = 0
 
     def recueillir(chemin, dossier_cible, nom):
@@ -956,7 +948,7 @@ MARGE_DEMENAGEMENT = 200 * 1024 * 1024
 
 def _marqueur_demenagement(esp_id):
     """Côté bureau : « les données de cet Espace sont parties vers son compte »."""
-    return os.path.join(DATA_ROOT, esp_id, MARQUEUR_DEMENAGEMENT)
+    return os.path.join(chemins.DONNEES, esp_id, MARQUEUR_DEMENAGEMENT)
 
 
 def _commande_interne(action, *args):
@@ -1065,7 +1057,7 @@ def _demenager_vers_compte_dedie(esp, session):
 
     Renvoie True si l'Espace peut s'ouvrir.
     """
-    ancien = os.path.join(DATA_ROOT, esp["id"], "home")
+    ancien = os.path.join(chemins.DONNEES, esp["id"], "home")
     if os.path.exists(_marqueur_demenagement(esp["id"])):
         return True
     try:
@@ -1121,7 +1113,7 @@ def _rapatrier_depuis_compte_dedie(esp):
         sys.stderr.write("codebyr-space : les données récentes de %s sont restées "
                          "dans son compte dédié, et %s.\n" % (esp["nom"], exc))
         return False
-    parent = os.path.join(DATA_ROOT, esp["id"])
+    parent = os.path.join(chemins.DONNEES, esp["id"])
     home = os.path.join(parent, "home")
     sauvegarde = None
     try:
@@ -1185,9 +1177,9 @@ def _exporter_compte_dedie(esp, dest=None):
     même façon. Écrite d'abord sous un nom provisoire : une sauvegarde
     interrompue ne doit jamais passer pour une sauvegarde complète.
     """
-    os.makedirs(BACKUP_DIR, exist_ok=True)
+    os.makedirs(chemins.SAUVEGARDES, exist_ok=True)
     chemin = dest or os.path.join(
-        BACKUP_DIR, "%s-%s.tar.gz" % (esp["id"], time.strftime("%Y%m%d-%H%M")))
+        chemins.SAUVEGARDES, "%s-%s.tar.gz" % (esp["id"], time.strftime("%Y%m%d-%H%M")))
     provisoire = chemin + ".partielle"
 
     def compresser(flux):
@@ -1248,7 +1240,7 @@ def _effacer_compte_dedie(espaces, esp):
         sys.stderr.write("codebyr-space : effacement de %s incomplet (%s).\n"
                          % (esp["nom"], "; ".join(erreurs) or "code %s" % code))
         return False
-    shutil.rmtree(os.path.join(DATA_ROOT, esp["id"]), ignore_errors=True)
+    shutil.rmtree(os.path.join(chemins.DONNEES, esp["id"]), ignore_errors=True)
     return True
 
 
@@ -1306,9 +1298,6 @@ def cmd_interne_preparer(brut):
 
 INTERNE_IMPORTER = "interne-importer"
 INTERNE_EXPORTER = "interne-exporter"
-# Dans le dossier d'un Espace à compte dédié : ce que Codebyr y tient pour
-# lui-même, jamais emporté dans un déménagement ni une sauvegarde.
-DOSSIER_INTERNE = ".codebyr"
 MIGRATION_FAITE = 3
 
 
@@ -1337,7 +1326,7 @@ def cmd_interne_importer():
         sys.stderr.write("codebyr-space : réservé au compte d'un Espace.\n")
         return 2
     home = compte.pw_dir
-    interne = os.path.join(home, DOSSIER_INTERNE)
+    interne = os.path.join(home, chemins.DOSSIER_INTERNE)
     marqueur = os.path.join(interne, "migration.json")
     if os.path.exists(marqueur):
         sys.stderr.write("codebyr-space : données déjà déménagées dans cet Espace.\n")
@@ -1349,7 +1338,7 @@ def cmd_interne_importer():
             _extraire_archive(tar, stage, _filtre_dossier_d_espace)
         mis_de_cote = os.path.join(interne, "avant-migration-%s" % time.strftime("%Y%m%d-%H%M%S"))
         for nom in sorted(os.listdir(stage)):
-            if nom == DOSSIER_INTERNE:
+            if nom == chemins.DOSSIER_INTERNE:
                 continue
             cible = os.path.join(home, nom)
             if os.path.lexists(cible):
@@ -1384,7 +1373,7 @@ def cmd_interne_restaurer():
         sys.stderr.write("codebyr-space : réservé au compte d'un Espace.\n")
         return 2
     home = compte.pw_dir
-    interne = os.path.join(home, DOSSIER_INTERNE)
+    interne = os.path.join(home, chemins.DOSSIER_INTERNE)
     fichiers_surs.mkdir(interne)
     stage = tempfile.mkdtemp(prefix="restauration-", dir=interne)
     try:
@@ -1395,11 +1384,11 @@ def cmd_interne_restaurer():
         mis_de_cote, poses = [], []
         try:
             for nom in sorted(os.listdir(home)):
-                if nom != DOSSIER_INTERNE:
+                if nom != chemins.DOSSIER_INTERNE:
                     os.rename(os.path.join(home, nom), os.path.join(cote, nom))
                     mis_de_cote.append(nom)
             for nom in sorted(os.listdir(stage)):
-                if nom != DOSSIER_INTERNE:
+                if nom != chemins.DOSSIER_INTERNE:
                     os.rename(os.path.join(stage, nom), os.path.join(home, nom))
                     poses.append(nom)
         except OSError:
@@ -1466,8 +1455,8 @@ def cmd_interne_contagion():
     origines = []
     total = 0
     for dossier, sous, fichiers in os.walk(compte.pw_dir):
-        if dossier == compte.pw_dir and DOSSIER_INTERNE in sous:
-            sous.remove(DOSSIER_INTERNE)
+        if dossier == compte.pw_dir and chemins.DOSSIER_INTERNE in sous:
+            sous.remove(chemins.DOSSIER_INTERNE)
         for nom in fichiers:
             total += 1
             origines.append(provenance.origine(os.path.join(dossier, nom)))
@@ -1490,7 +1479,7 @@ def cmd_interne_rendu():
     if not compte:
         sys.stderr.write("codebyr-space : réservé au compte d'un Espace.\n")
         return 2
-    marqueur = os.path.join(compte.pw_dir, DOSSIER_INTERNE, "migration.json")
+    marqueur = os.path.join(compte.pw_dir, chemins.DOSSIER_INTERNE, "migration.json")
     try:
         if os.path.exists(marqueur):
             os.rename(marqueur, marqueur.replace(
@@ -1515,7 +1504,7 @@ def cmd_interne_exporter():
     try:
         with tarfile.open(fileobj=sys.stdout.buffer, mode="w|") as tar:
             for nom in sorted(os.listdir(home)):
-                if nom == DOSSIER_INTERNE:
+                if nom == chemins.DOSSIER_INTERNE:
                     continue
                 tar.add(os.path.join(home, nom), arcname="./" + nom,
                         filter=_entree_archivable)
@@ -1654,7 +1643,7 @@ def cmd_purge(espaces, esp_id):
         journal("Espace %s : données effacées (compte dédié)" % esp_id)
         return 0
     cmd_close(espaces, esp_id)   # on ferme d'abord les fenêtres ouvertes
-    d = os.path.join(DATA_ROOT, esp_id)
+    d = os.path.join(chemins.DONNEES, esp_id)
     if os.path.isdir(d):
         shutil.rmtree(d, ignore_errors=True)
         print("Données de l'Espace %s effacées." % esp["nom"])
@@ -1664,7 +1653,6 @@ def cmd_purge(espaces, esp_id):
     return 0
 
 
-BACKUP_DIR = os.path.expanduser("~/Espaces-Codebyr")
 
 
 def cmd_export(espaces, esp_id, dest=None):
@@ -1675,13 +1663,13 @@ def cmd_export(espaces, esp_id, dest=None):
         return 2
     if compte_dedie.demande(esp):
         return _exporter_compte_dedie(esp, dest)
-    home = os.path.join(DATA_ROOT, esp_id, "home")
+    home = os.path.join(chemins.DONNEES, esp_id, "home")
     if not os.path.isdir(home):
         print("L'Espace %s est vide — rien à sauvegarder." % esp["nom"])
         return 0
-    os.makedirs(BACKUP_DIR, exist_ok=True)
+    os.makedirs(chemins.SAUVEGARDES, exist_ok=True)
     path = dest or os.path.join(
-        BACKUP_DIR, "%s-%s.tar.gz" % (esp_id, time.strftime("%Y%m%d-%H%M")))
+        chemins.SAUVEGARDES, "%s-%s.tar.gz" % (esp_id, time.strftime("%Y%m%d-%H%M")))
     with tarfile.open(path, "w:gz") as tar:
         tar.add(home, arcname=".")
     print("Espace %s sauvegardé : %s" % (esp["nom"], path))
@@ -1770,7 +1758,7 @@ def cmd_import(espaces, esp_id, source=None):
         sys.stderr.write("Espace inconnu : %s\n" % esp_id)
         return 2
     if not source:
-        cands = sorted(glob.glob(os.path.join(BACKUP_DIR, "%s-*.tar.gz" % esp_id)))
+        cands = sorted(glob.glob(os.path.join(chemins.SAUVEGARDES, "%s-*.tar.gz" % esp_id)))
         if not cands:
             print("Aucune sauvegarde trouvée pour %s." % esp["nom"])
             return 1
@@ -1782,7 +1770,7 @@ def cmd_import(espaces, esp_id, source=None):
         return _restaurer_compte_dedie(espaces, esp, source)
     # Extraire avant de fermer ou toucher aux données existantes. Le dossier
     # temporaire est un frère du home, inaccessible depuis le bac à sable.
-    parent = os.path.join(DATA_ROOT, esp_id)
+    parent = os.path.join(chemins.DONNEES, esp_id)
     fichiers_surs.mkdir(parent)
     home = os.path.join(parent, "home")
     sauvegarde = None
@@ -1836,7 +1824,7 @@ def _flatpak_dir_dedie(home):
     rien à faire dans une archive — c'est déjà le choix fait pour les Espaces
     ordinaires, où l'installation vit à côté du dossier personnel.
     """
-    return os.path.join(home, DOSSIER_INTERNE, "flatpak")
+    return os.path.join(home, chemins.DOSSIER_INTERNE, "flatpak")
 
 
 def _env_flatpak_dedie(esp, session, env):
@@ -1869,7 +1857,7 @@ def _env_flatpak_dedie(esp, session, env):
 
 def _espace_flatpak_dir(esp_id):
     """Répertoire d'installation Flatpak DÉDIÉ à un Espace (binaires isolés)."""
-    return os.path.join(DATA_ROOT, esp_id, "flatpak")
+    return os.path.join(chemins.DONNEES, esp_id, "flatpak")
 
 
 def _flatpak_env(esp_id):
@@ -2008,7 +1996,7 @@ INTERNE_PROGRAMMES = "interne-programmes"
 INTERNE_PROGRAMME = "interne-programme"
 # Où un Espace garde un programme qu'on veut ajouter à son menu : là où son
 # navigateur télécharge, et là où arrivent les fichiers qu'on lui envoie.
-LIEUX_PROGRAMMES = ("Téléchargements", "Downloads", PARTAGE, "Applications",
+LIEUX_PROGRAMMES = ("Téléchargements", "Downloads", chemins.PARTAGE, "Applications",
                     "Bureau", "Desktop")
 
 
@@ -2151,7 +2139,7 @@ def cmd_add_app(esp_id, nom, fichier, extra):
         print("  Commande : %s" % cmd)
         return 0
     cible = os.path.abspath(os.path.expanduser(fichier))
-    esp_home = os.path.join(DATA_ROOT, esp_id, "home")
+    esp_home = os.path.join(chemins.DONNEES, esp_id, "home")
     nature = None
     if os.path.isfile(cible):
         # Rendu exécutable par son DESCRIPTEUR, ouvert sans suivre de lien : le
@@ -2279,7 +2267,7 @@ def cmd_delete(esp_id):
     if not registre.supprimer_espace(esp_id):
         print("Espace introuvable : %s" % esp_id)
         return 1
-    d = os.path.join(DATA_ROOT, esp_id)
+    d = os.path.join(chemins.DONNEES, esp_id)
     if os.path.isdir(d):
         shutil.rmtree(d, ignore_errors=True)
     print("Espace supprimé : %s" % esp_id)
@@ -2330,7 +2318,7 @@ def _action_launch(espaces, args):
 # Boîte d'envoi : le seul passage par lequel un fichier sort d'un Espace.
 #
 # Le bac à sable monte le dossier de l'Espace PAR-DESSUS « ~ ». À l'intérieur,
-# DATA_ROOT désigne donc un dossier fantôme du bac à sable, sans rapport avec
+# chemins.DONNEES désigne donc un dossier fantôme du bac à sable, sans rapport avec
 # les vrais Espaces. « envoyer » y copiait le fichier et annonçait « Copié » :
 # il n'arrivait jamais. Constaté le 24/08/2026.
 #
@@ -2341,7 +2329,7 @@ ENVOI_INTERNE = os.path.expanduser("~/.codebyr-envoi")
 
 def boite_envoi(esp_id):
     """Boîte d'envoi d'un Espace, vue depuis l'HÔTE."""
-    return os.path.join(DATA_ROOT, esp_id, "envoi")
+    return os.path.join(chemins.DONNEES, esp_id, "envoi")
 
 
 def _boite_de_depart(esp, esp_id):
@@ -2391,7 +2379,7 @@ def relever_envois(espaces):
                     with fichiers_surs.dossier(dossier) as source_fd:
                         noms = os.listdir(source_fd)
                         if mode is None:
-                            cible = os.path.join(DATA_ROOT, dest, "home", PARTAGE)
+                            cible = os.path.join(chemins.DONNEES, dest, "home", chemins.PARTAGE)
                             fichiers_surs.mkdir(cible)
                         for nom in noms:
                             if nom.startswith(".codebyr-"):
@@ -2488,7 +2476,7 @@ def _deposer_pour_envoi(esp, depart, source):
             "version antérieure\nde Codebyr. Fermez-le et rouvrez-le.\n")
         return 1
     try:
-        origine = provenance.origine(source, DATA_ROOT) or depart
+        origine = provenance.origine(source, chemins.DONNEES) or depart
         fichiers_surs.copier_unique(source, dossier, os.path.basename(source), origine,
                                     mode=0o640)
     except OSError as exc:
@@ -2499,7 +2487,7 @@ def _deposer_pour_envoi(esp, depart, source):
     journal("dépôt pour l'Espace %s" % esp["id"])
     _prevenir("En route vers %s" % esp["nom"],
               "Le fichier y sera déposé dans « %s » à la prochaine ouverture "
-              "de cet Espace." % PARTAGE)
+              "de cet Espace." % chemins.PARTAGE)
     print("Déposé pour %s — remis à la prochaine ouverture de cet Espace."
           % esp["nom"])
     return 0
@@ -2524,7 +2512,7 @@ def _envoyer_vers_compte_dedie(esp, source):
                   % esp["nom"])
         return 1
     try:
-        origine = provenance.origine(source, DATA_ROOT)
+        origine = provenance.origine(source, chemins.DONNEES)
         fichiers_surs.copier_unique(source, boite, os.path.basename(source), origine,
                                     mode=0o644)
     except OSError as exc:
@@ -2535,8 +2523,8 @@ def _envoyer_vers_compte_dedie(esp, source):
     journal("envoi vers l'Espace %s" % esp["id"])
     _prevenir("En route vers %s" % esp["nom"],
               "Le fichier sera dans le dossier « %s » à la prochaine ouverture "
-              "de cet Espace." % PARTAGE)
-    print("Déposé pour %s — dans « %s » à sa prochaine ouverture." % (esp["nom"], PARTAGE))
+              "de cet Espace." % chemins.PARTAGE)
+    print("Déposé pour %s — dans « %s » à sa prochaine ouverture." % (esp["nom"], chemins.PARTAGE))
     return 0
 
 
@@ -2578,10 +2566,10 @@ def cmd_envoyer(espaces, esp_id, fichier):
     if compte_dedie.demande(esp):
         return _envoyer_vers_compte_dedie(esp, source)
 
-    partage = os.path.join(espace_home(esp), PARTAGE)
+    partage = os.path.join(espace_home(esp), chemins.PARTAGE)
     try:
         fichiers_surs.mkdir(partage)
-        origine = provenance.origine(source, DATA_ROOT)
+        origine = provenance.origine(source, chemins.DONNEES)
         nom = fichiers_surs.copier_unique(source, partage, os.path.basename(source), origine)
     except OSError as exc:
         sys.stderr.write("Copie impossible (%s)\n" % exc)
@@ -2593,8 +2581,8 @@ def cmd_envoyer(espaces, esp_id, fichier):
     journal("envoi vers l'Espace %s" % esp["id"])
     _prevenir("Envoyé dans %s" % esp["nom"],
               "Le fichier vous attend dans le dossier « %s » de cet Espace."
-              % PARTAGE)
-    print("Copié dans %s → %s/%s" % (esp["nom"], PARTAGE, nom))
+              % chemins.PARTAGE)
+    print("Copié dans %s → %s/%s" % (esp["nom"], chemins.PARTAGE, nom))
     return 0
 
 
@@ -2604,7 +2592,7 @@ def cmd_provenance(espaces, chemin):
     if not os.path.exists(cible):
         sys.stderr.write("Fichier introuvable : %s\n" % chemin)
         return 2
-    venue = provenance.origine(cible, DATA_ROOT)
+    venue = provenance.origine(cible, chemins.DONNEES)
     if not venue:
         print("Origine inconnue — ce fichier n'a jamais transité par un Espace,"
               "\nou il a perdu sa marque (clé USB, pièce jointe, partage réseau).")
@@ -2647,7 +2635,7 @@ def cmd_ouvrir(espaces, chemin, lanceur=None):
         return 2
 
     courant = _espace_courant()
-    venue = provenance.origine(cible, DATA_ROOT)
+    venue = provenance.origine(cible, chemins.DONNEES)
     choix = decider_ouverture(venue, courant)
 
     if lanceur is None:
@@ -2693,7 +2681,7 @@ def cmd_adopter(espaces, chemin):
             "peut appartenir\nà quelque part. Lancez cette commande depuis "
             "l'Espace où vous voulez le garder.\n")
         return 2
-    venue = provenance.origine(cible, DATA_ROOT)
+    venue = provenance.origine(cible, chemins.DONNEES)
     if not provenance.doit_isoler(venue, courant):
         print("Ce fichier est déjà chez lui : rien à faire.")
         return 0
@@ -2736,11 +2724,11 @@ def cmd_contagion(espaces, esp_id):
         origines = [o for o in lu[0].get("origines", [])
                     if o is None or provenance.identifiant_valide(o)]
     else:
-        racine = os.path.join(DATA_ROOT, esp_id, "home")
+        racine = os.path.join(chemins.DONNEES, esp_id, "home")
         for dossier, _, fichiers in os.walk(racine):
             for nom in fichiers:
                 total += 1
-                origines.append(provenance.origine(os.path.join(dossier, nom), DATA_ROOT))
+                origines.append(provenance.origine(os.path.join(dossier, nom), chemins.DONNEES))
     compte = provenance.resumer(origines, esp_id)
     print("Espace %s — %d fichier(s) au total." % (esp["nom"], total))
     if not compte:

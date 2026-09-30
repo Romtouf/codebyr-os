@@ -29,6 +29,7 @@ GLib.set_application_name("Configuration Codebyr")
 sys.path.insert(0, os.environ.get("CODEBYR_LIB", "/usr/share/codebyr"))
 import applications  # noqa: E402
 import bac_a_sable  # noqa: E402
+import chemins  # noqa: E402
 import compte_dedie  # noqa: E402
 import interface  # noqa: E402
 import registre  # noqa: E402
@@ -271,8 +272,7 @@ class Fenetre(Adw.ApplicationWindow):
         Elles ne suivent pas le déménagement : leur installation vit hors du
         dossier de l'Espace, dans un dossier auquel son compte n'a pas accès.
         """
-        if os.path.isdir(os.path.expanduser(
-                "~/.local/share/codebyr/espaces/%s/flatpak" % esp.get("id"))):
+        if os.path.isdir(chemins.flatpak(esp.get("id"))):
             return True
         return any("flatpak" in (a.get("cmd") or "") for a in esp.get("apps", []))
 
@@ -298,9 +298,8 @@ class Fenetre(Adw.ApplicationWindow):
     # ---- Section « Sites bloqués » (mode apprentissage du filtre réseau) ----
     def _journal_refus(self, esp_id):
         """Journal des domaines refusés par le filtre, écrit par codebyr-net-proxy.
-        Convention de chemin partagée avec codebyr-space.journal_refus()."""
-        return os.path.expanduser(
-            "~/.local/share/codebyr/espaces/%s/domaines-refuses.txt" % esp_id)
+        Chemin écrit une seule fois, dans chemins.py (codebyr-space aussi le lit)."""
+        return chemins.refus_reseau(esp_id)
 
     def _lire_refus(self, esp_id):
         try:
@@ -468,8 +467,7 @@ class Fenetre(Adw.ApplicationWindow):
         if (esp is not None and cmd.startswith("flatpak run ")
                 and shutil.which("flatpak")):
             appid = cmd.split()[-1]
-            d = os.path.expanduser(
-                "~/.local/share/codebyr/espaces/%s/flatpak/app/%s" % (esp.get("id"), appid))
+            d = os.path.join(chemins.flatpak(esp.get("id")), "app", appid)
             # Sous compte séparé, l'installation vit chez l'Espace : ce dossier
             # n'existe pas, et le bureau n'a pas le droit d'aller voir. C'est
             # « codebyr-space » qui demandera la désinstallation à l'Espace.
@@ -650,8 +648,7 @@ class Fenetre(Adw.ApplicationWindow):
             self._chercher_programmes_de_l_espace(esp)
             return
         dialog = Gtk.FileDialog(title="Choisir un programme")
-        dl = os.path.expanduser(
-            "~/.local/share/codebyr/espaces/%s/home/Téléchargements" % esp.get("id"))
+        dl = os.path.join(chemins.home(esp.get("id")), "Téléchargements")
         if os.path.isdir(dl):
             dialog.set_initial_folder(Gio.File.new_for_path(dl))
         dialog.open(self, None, self._programme_choisi, esp)

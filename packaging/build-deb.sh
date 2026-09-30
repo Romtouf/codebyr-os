@@ -52,6 +52,7 @@ for chemin in \
 	etc/skel \
 	etc/codebyr/espaces.json \
 	etc/sysctl.d/91-codebyr-noyau.conf \
+	etc/default/grub.d/90-codebyr-noyau.cfg \
 	etc/apparmor.d/codebyr-net-proxy \
 	etc/apparmor.d/codebyr-uid
 do
@@ -140,6 +141,9 @@ find "$STAGE/etc/skel" -type d -exec chmod 755 {} + 2>/dev/null || true
 # Même raison que pour les scripts : un réglage noyau suivi d'un « \r » serait
 # rejeté par systemd-sysctl, en silence pour qui ne lit pas le journal.
 [ -d "$STAGE/etc/sysctl.d" ] && sed -i 's/\r$//' "$STAGE"/etc/sysctl.d/*.conf
+# Options du noyau : un « \r » collé à la dernière la rendrait invalide, et le
+# noyau l'ignorerait sans rien dire.
+[ -d "$STAGE/etc/default/grub.d" ] && sed -i 's/\r$//' "$STAGE"/etc/default/grub.d/*.cfg
 # Profils AppArmor : un « \r » y est une erreur de syntaxe, et un profil qui ne
 # se charge pas laisse le programme NON confiné, sans rien qui le signale.
 if [ -d "$STAGE/etc/apparmor.d" ]; then

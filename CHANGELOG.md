@@ -10,6 +10,16 @@ GNOME (menu du Sceau, liserés colorés) ne se recharge pas à chaud.
 
 ---
 
+## 1.16.8 — non publiée
+
+**Le noyau démarre avec deux protections de plus** (`slab_nomerge`,
+`page_alloc.shuffle=1`), qui rendent plus difficile l'exploitation d'une faille
+de la mémoire du noyau. Elles s'appliquent au prochain redémarrage, pour un
+coût de quelques mégaoctets de mémoire. Les autres protections recommandées
+étaient déjà actives dans le noyau de Debian 13.
+
+---
+
 ## 1.16.7 — 30 septembre 2026
 
 **Correctif de sécurité : deux fichiers de Codebyr étaient modifiables par

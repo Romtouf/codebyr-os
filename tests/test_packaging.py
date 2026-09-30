@@ -625,3 +625,37 @@ class LIsoEstReproductible(unittest.TestCase):
                                  if not l.lstrip().startswith("#"))
             for commande in ("flatpak update", "flatpak remote-add", "curl ", "wget "):
                 self.assertNotIn(commande, code, "%s : %s" % (os.path.basename(hook), commande))
+
+
+class LeNoyauDurciAuDemarrage(unittest.TestCase):
+    """1.16.8 : options de durcissement du noyau (audit, point 11).
+
+    Livrées par le paquet, pour atteindre aussi les machines déjà
+    installées, et sur la ligne de démarrage du live.
+    """
+
+    OPTIONS = "slab_nomerge page_alloc.shuffle=1"
+    CFG = os.path.join(RACINE, "live-build", "config", "includes.chroot_after_packages",
+                       "etc", "default", "grub.d", "90-codebyr-noyau.cfg")
+
+    def test_les_options_s_ajoutent_a_celles_de_la_machine(self):
+        with open(self.CFG, encoding="utf-8") as f:
+            lignes = [l for l in f.read().splitlines() if l.strip() and not l.startswith("#")]
+        # Une seule affectation, qui reprend la valeur précédente : rien de ce
+        # que la machine avait (installeur, administrateur) n'est effacé.
+        self.assertEqual(lignes, ['GRUB_CMDLINE_LINUX="$GRUB_CMDLINE_LINUX %s"' % self.OPTIONS])
+
+    def test_le_paquet_les_livre_et_regenere_grub(self):
+        self.assertIn("etc/default/grub.d/90-codebyr-noyau.cfg", chemins_du_paquet())
+        with open(os.path.join(RACINE, "packaging", "codebyr-tools.postinst"),
+                  encoding="utf-8") as f:
+            postinst = f.read()
+        self.assertIn("/usr/sbin/update-grub", postinst)
+        # Seulement sur une machine installée, et seulement si le fichier a changé.
+        bloc = postinst.split("GRUB_CODEBYR=", 1)[1].split("fi\n", 1)[0]
+        for garde in ("/boot/grub/grub.cfg", "/run/systemd/system", '-nt /boot/grub/grub.cfg'):
+            self.assertIn(garde, bloc)
+
+    def test_le_live_demarre_avec_les_memes(self):
+        with open(os.path.join(RACINE, "live-build", "auto", "config"), encoding="utf-8") as f:
+            self.assertIn(self.OPTIONS, f.read())

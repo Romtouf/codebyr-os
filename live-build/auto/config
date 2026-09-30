@@ -14,7 +14,7 @@ lb config noauto \
 	--firmware-chroot false \
 	--firmware-binary false \
 	--apt-recommends false \
-	--bootappend-live "boot=live components locales=fr_FR.UTF-8 keyboard-layouts=fr live-config.hostname=codebyr quiet splash" \
+	--bootappend-live "boot=live components locales=fr_FR.UTF-8 keyboard-layouts=fr live-config.hostname=codebyr slab_nomerge page_alloc.shuffle=1 quiet splash" \
 	--iso-application "Codebyr OS" \
 	--iso-volume "Codebyr OS trixie" \
 	--iso-preparer "Codebyr — live-build" \

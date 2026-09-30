@@ -63,9 +63,12 @@ Debian stable durcie par les hooks de construction (`0200-hardening`) :
 - **Wayland uniquement** (isolation des entrées clavier/écran entre fenêtres —
   indispensable au modèle de sécurité).
 - **`sysctl` durcis** : `kptr_restrict`, `dmesg_restrict`, `yama.ptrace_scope`,
-  protections liens/fifos/regular. *[visé]* : options de ligne de commande
-  noyau (`lockdown=`, `init_on_alloc=`…) — `GRUB_CMDLINE_LINUX` ne contient
-  rien de tel aujourd'hui, et `lockdown` n'a de sens qu'avec Secure Boot.
+  protections liens/fifos/regular. **Options de démarrage du noyau** (depuis
+  1.16.8) : `slab_nomerge` et `page_alloc.shuffle=1`, livrées par le paquet
+  dans `/etc/default/grub.d/90-codebyr-noyau.cfg` et sur la ligne du live.
+  Le noyau Debian fait déjà `init_on_alloc=1`, `randomize_kstack_offset=on`
+  et `vsyscall=none` ; il se verrouille seul (`lockdown=integrity`) sous
+  Secure Boot. `init_on_free=1` est écarté pour son coût.
 
 ### codebyr-space — l'orchestrateur d'Espaces  *[implémenté]*
 

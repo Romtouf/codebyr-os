@@ -81,6 +81,19 @@ case "$1" in
 			/usr/lib/systemd/systemd-sysctl "$SYSCTL_CODEBYR" 2>/dev/null || true
 		fi
 
+		# Options du noyau au démarrage (/etc/default/grub.d/90-codebyr-noyau.cfg).
+		# Elles n'agissent qu'une fois inscrites dans la configuration de GRUB,
+		# et au redémarrage suivant. On ne régénère que si le fichier est plus
+		# récent que grub.cfg : pas à chaque mise à jour. Ni dans un chroot de
+		# construction ni sur le live (pas de /boot/grub/grub.cfg) : là,
+		# l'installeur régénère GRUB lui-même et lit ce fichier.
+		GRUB_CODEBYR=/etc/default/grub.d/90-codebyr-noyau.cfg
+		if [ -f "$GRUB_CODEBYR" ] && [ -f /boot/grub/grub.cfg ] && [ -x /usr/sbin/update-grub ] \
+				&& [ -d /run/systemd/system ] && [ "$GRUB_CODEBYR" -nt /boot/grub/grub.cfg ]; then
+			/usr/sbin/update-grub >/dev/null 2>&1 \
+				|| echo "codebyr : update-grub a échoué — relancez-le à la main." >&2
+		fi
+
 		# Profil AppArmor du filtre réseau. Au démarrage, apparmor.service
 		# charge tout /etc/apparmor.d ; sur une machine déjà en marche, un
 		# nouveau profil n'agit qu'une fois chargé — d'où cette ligne.

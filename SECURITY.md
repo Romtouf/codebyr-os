@@ -26,7 +26,7 @@ une mise à jour de `base-files` ; le dépôt APT porte une date de péremption,
 une version ne peut plus être publiée sans CI verte. Détail dans l'historique
 ci-dessous.
 
-**En préparation, 1.16.7** : de 1.13.0 à 1.16.6, le lanceur de session de
+**Publié en 1.16.7** : de 1.13.0 à 1.16.6, le lanceur de session de
 l'écran de bienvenue était modifiable par tous les comptes de la machine —
 l'invité compris — et exécuté à l'ouverture de session de chacun. Détail dans
 l'historique ci-dessous.

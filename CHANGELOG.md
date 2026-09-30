@@ -10,7 +10,7 @@ GNOME (menu du Sceau, liserés colorés) ne se recharge pas à chaud.
 
 ---
 
-## 1.16.7 — non publiée
+## 1.16.7 — 30 septembre 2026
 
 **Correctif de sécurité : deux fichiers de Codebyr étaient modifiables par
 tous les comptes de la machine.** Depuis la 1.13.0, le lanceur de l'écran de

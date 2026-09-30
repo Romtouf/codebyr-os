@@ -1,6 +1,6 @@
 # Chantiers — Codebyr OS
 
-Mise à jour de lecture : **30 septembre 2026**, version publiée **1.16.6**.
+Mise à jour de lecture : **30 septembre 2026**, version publiée **1.16.7**.
 
 Ce document est la carte du projet : ce qui est fait, ce qui reste, et pourquoi.
 Les estimations d'effort des lignes anciennes n'ont pas été refaites.

@@ -12,6 +12,7 @@ import unittest
 from unittest import mock
 
 import outils
+import envois  # noqa: E402 — module partagé (voir outils)
 import flatpak_espace  # noqa: E402
 import permissions_flatpak as pf
 
@@ -177,8 +178,8 @@ class LeLanceur(unittest.TestCase):
         with mock.patch.object(space.shutil, "which", return_value="/usr/bin/bwrap"), \
                 mock.patch.object(space, "_preparer_ouverture"), \
                 mock.patch.object(space.modeles, "installer"), \
-                mock.patch.object(space, "relever_envois"), \
-                mock.patch.object(space, "boite_envoi",
+                mock.patch.object(envois, "relever_envois"), \
+                mock.patch.object(envois, "boite_envoi",
                                   return_value=os.path.join(dossier.name, "envoi")), \
                 mock.patch.object(space, "espace_home", return_value=dossier.name), \
                 mock.patch.object(flatpak_espace, "app_dans_espace", return_value=False), \

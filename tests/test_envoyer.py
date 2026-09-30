@@ -16,6 +16,7 @@ import unittest
 from outils import BIN, LIB  # noqa: F401 — place le module partagé sur sys.path
 import chemins  # noqa: E402 — module partagé (voir outils)
 import outils
+import envois  # noqa: E402 — module partagé (voir outils)
 
 space = outils.charger("codebyr-space")
 
@@ -90,7 +91,7 @@ class BoiteDEnvoi(unittest.TestCase):
                                     "ephemere": True}}
 
     def _deposer(self, source, dest, nom="doc.pdf"):
-        dossier = os.path.join(space.boite_envoi(source), dest)
+        dossier = os.path.join(envois.boite_envoi(source), dest)
         os.makedirs(dossier, exist_ok=True)
         with open(os.path.join(dossier, nom), "w", encoding="utf-8") as f:
             f.write("x")
@@ -98,14 +99,14 @@ class BoiteDEnvoi(unittest.TestCase):
 
     def test_remise(self):
         attendu = self._deposer("navigation", "travail")
-        self.assertEqual(space.relever_envois(self.espaces), 1)
+        self.assertEqual(envois.relever_envois(self.espaces), 1)
         self.assertTrue(os.path.exists(attendu))
 
     def test_la_boite_est_videe(self):
         """Sans quoi le fichier serait remis à chaque ouverture d'Espace."""
         self._deposer("navigation", "travail")
-        space.relever_envois(self.espaces)
-        self.assertEqual(space.relever_envois(self.espaces), 0)
+        envois.relever_envois(self.espaces)
+        self.assertEqual(envois.relever_envois(self.espaces), 0)
 
     def test_destination_inventee_ignoree(self):
         """Le nom du dossier vient d'une zone écrite DEPUIS un Espace.
@@ -115,19 +116,19 @@ class BoiteDEnvoi(unittest.TestCase):
         """
         self._deposer("navigation", "..")
         self._deposer("navigation", "inexistant")
-        self.assertEqual(space.relever_envois(self.espaces), 0)
+        self.assertEqual(envois.relever_envois(self.espaces), 0)
 
     def test_pas_de_remise_vers_un_jetable(self):
         """Son dossier vit en mémoire : y déposer reviendrait à jeter."""
         self._deposer("navigation", "jetable")
-        self.assertEqual(space.relever_envois(self.espaces), 0)
+        self.assertEqual(envois.relever_envois(self.espaces), 0)
 
     def test_collision_a_la_remise(self):
         """Deux envois du même nom : le second ne doit pas écraser le premier."""
         attendu = self._deposer("navigation", "travail")
-        space.relever_envois(self.espaces)
+        envois.relever_envois(self.espaces)
         self._deposer("navigation", "travail")
-        space.relever_envois(self.espaces)
+        envois.relever_envois(self.espaces)
         dossier = os.path.dirname(attendu)
         self.assertEqual(len(os.listdir(dossier)), 2, os.listdir(dossier))
 

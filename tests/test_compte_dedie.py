@@ -18,6 +18,7 @@ import unittest
 from unittest import mock
 
 import outils
+import envois  # noqa: E402 — module partagé (voir outils)
 import chemins  # noqa: E402 — module partagé (voir outils)
 from outils import LIB  # noqa: F401 — place les modules partagés
 import compte_dedie  # noqa: E402
@@ -473,9 +474,9 @@ class LesBoites(unittest.TestCase):
     def test_le_bureau_releve_un_espace_dedie_hors_de_son_dossier(self):
         with mock.patch.object(space.comptes, "chemin_envois",
                                return_value="/var/lib/codebyr/envois/1000/travail"):
-            self.assertEqual(space._boite_de_depart(DEDIE, "travail"),
+            self.assertEqual(envois.boite_de_depart(DEDIE, "travail"),
                              "/var/lib/codebyr/envois/1000/travail")
-        self.assertTrue(space._boite_de_depart(ORDINAIRE, "perso").startswith(chemins.DONNEES))
+        self.assertTrue(envois.boite_de_depart(ORDINAIRE, "perso").startswith(chemins.DONNEES))
 
     @unittest.skipUnless(POSIX, "fichiers_surs est réservé à Linux")
     def test_la_releve_depose_dans_la_boite_d_arrivee_lisible_par_l_espace(self):
@@ -490,7 +491,7 @@ class LesBoites(unittest.TestCase):
             espaces = {"perso": ORDINAIRE, "travail": DEDIE}
             with mock.patch.object(chemins, "DONNEES", donnees), \
                     mock.patch.object(space.comptes, "chemin_arrivees", return_value=arrivee):
-                remis = space.relever_envois(espaces)
+                remis = envois.relever_envois(espaces)
             self.assertEqual(remis, 1)
             depose = os.path.join(arrivee, "rapport.txt")
             self.assertTrue(os.path.exists(depose))
@@ -509,7 +510,7 @@ class LesBoites(unittest.TestCase):
             with mock.patch.object(chemins, "DONNEES", t), \
                     mock.patch.object(space.comptes, "chemin_arrivees",
                                       return_value=os.path.join(t, "absente")):
-                self.assertEqual(space.relever_envois({"perso": ORDINAIRE, "travail": DEDIE}), 0)
+                self.assertEqual(envois.relever_envois({"perso": ORDINAIRE, "travail": DEDIE}), 0)
             self.assertTrue(os.path.exists(os.path.join(depart, "rapport.txt")),
                             "le fichier doit attendre, pas disparaître")
 
@@ -943,7 +944,7 @@ class LeMasqueDesACL(unittest.TestCase):
             with open(source, "w") as f:
                 f.write("x")
             boite = os.path.join(t, "boite")
-            with mock.patch.object(space, "ENVOI_INTERNE", boite), \
+            with mock.patch.object(envois, "ENVOI_INTERNE", boite), \
                     mock.patch.object(space, "_prevenir"):
                 self.assertEqual(space._deposer_pour_envoi(ORDINAIRE, "travail", source), 0)
             dossier = os.path.join(boite, "perso")
@@ -951,8 +952,9 @@ class LeMasqueDesACL(unittest.TestCase):
             self.assertEqual(os.stat(os.path.join(dossier, "note.txt")).st_mode & 0o777, 0o640)
 
     def test_une_destination_illisible_se_dit_au_journal(self):
-        relever = _fonction(_source(), "relever_envois", "_espace_courant")
-        self.assertIn('journal("relève impossible de %s vers %s : %s"', relever)
+        # Sortie de codebyr-space en 1.17.0 : la relève vit dans envois.py.
+        relever = _source_module("envois").split("def relever_envois(")[1]
+        self.assertIn('journal.noter("relève impossible de %s vers %s : %s"', relever)
 
 
 class LeReglageDansLaConfiguration(unittest.TestCase):

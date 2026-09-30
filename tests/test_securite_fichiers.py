@@ -8,6 +8,7 @@ import unittest
 from unittest.mock import Mock, patch
 
 import outils
+import envois  # noqa: E402 — module partagé (voir outils)
 import chemins  # noqa: E402 — module partagé (voir outils)
 import fichiers_surs
 import modeles
@@ -34,7 +35,7 @@ class Frontieres(unittest.TestCase):
         boite = self.data / "navigation" / "envoi"
         boite.mkdir(parents=True)
         (boite / "travail").symlink_to(self.secret.parent, target_is_directory=True)
-        self.assertEqual(space.relever_envois(self.espaces), 0)
+        self.assertEqual(envois.relever_envois(self.espaces), 0)
         self.assertEqual(self.secret.read_text(), "secret à préserver")
 
     def test_fichier_symbolique_et_lien_dur_refuses(self):
@@ -42,7 +43,7 @@ class Frontieres(unittest.TestCase):
         boite.mkdir(parents=True)
         (boite / "lien").symlink_to(self.secret)
         os.link(self.secret, boite / "dur")
-        self.assertEqual(space.relever_envois(self.espaces), 0)
+        self.assertEqual(envois.relever_envois(self.espaces), 0)
         self.assertTrue(self.secret.exists())
 
     def test_destination_symbolique_refusee(self):
@@ -52,7 +53,7 @@ class Frontieres(unittest.TestCase):
         home = self.data / "travail" / "home"
         home.mkdir(parents=True)
         (home / chemins.PARTAGE).symlink_to(self.secret.parent, target_is_directory=True)
-        self.assertEqual(space.relever_envois(self.espaces), 0)
+        self.assertEqual(envois.relever_envois(self.espaces), 0)
         self.assertFalse((self.secret.parent / "injection").exists())
 
     def test_ecriture_ne_tronque_pas_un_lien_dur(self):

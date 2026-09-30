@@ -41,8 +41,10 @@ import bac_a_sable  # noqa: E402
 import chemins  # noqa: E402
 import compte_dedie  # noqa: E402
 import comptes  # noqa: E402
+import envois  # noqa: E402
 import fichiers_surs
 import flatpak_espace  # noqa: E402
+from journal import noter as journal  # noqa: E402
 import modeles  # noqa: E402
 import navigateur  # noqa: E402
 import permissions_flatpak  # noqa: E402
@@ -50,22 +52,6 @@ import programmes  # noqa: E402
 import provenance  # noqa: E402
 import registre  # noqa: E402
 import relais_notifications  # noqa: E402
-
-
-def journal(message):
-    """Trace une action dans le journal système (« journalctl -t codebyr »).
-
-    Sans trace, un utilisateur qui signale « ça n'a pas marché » ne peut être
-    aidé par personne. On note l'Espace et l'action — jamais le nom du fichier
-    ouvert ni l'adresse visitée : ce serait consigner sur disque exactement ce
-    que les Espaces servent à cloisonner."""
-    try:
-        import syslog
-        syslog.openlog("codebyr", syslog.LOG_PID, syslog.LOG_USER)
-        syslog.syslog(syslog.LOG_INFO, message)
-        syslog.closelog()
-    except Exception:
-        pass    # un journal absent ne doit jamais empêcher un lancement
 
 
 def load_espaces():
@@ -463,7 +449,7 @@ def _lancer(espaces, esp, extra, fichier, session):
         # apparaît au même endroit que pour un Espace ordinaire.
         envoi = session.envois
         if not _espace_courant():
-            relever_envois(espaces)
+            envois.relever_envois(espaces)
     elif not esp.get("ephemere"):
         _preparer_ouverture(home)
         # « Nouveau document » n'existe dans Fichiers que si le dossier Modèles
@@ -475,13 +461,13 @@ def _lancer(espaces, esp, extra, fichier, session):
         # déposé. Les deux se font ICI, depuis l'hôte : c'est le seul endroit
         # d'où l'on voit tous les Espaces, et le moment où l'on va justement
         # chercher ses fichiers.
-        envoi = boite_envoi(esp["id"])
+        envoi = envois.boite_envoi(esp["id"])
         try:
             fichiers_surs.mkdir(envoi)
         except OSError:
             envoi = None
         if not _espace_courant():
-            relever_envois(espaces)
+            envois.relever_envois(espaces)
     # Le dossier personnel tel que l'application le voit : celui de l'Espace
     # est monté par bubblewrap au chemin du bureau (voir wrap_bwrap, « chez »).
     # Il n'y a pas d'autre cas : aucun Espace ne s'ouvre sans bac à sable —
@@ -2135,116 +2121,6 @@ def _action_launch(espaces, args):
     return cmd_launch(espaces, esp_id, extra, fichier)
 
 
-# Boîte d'envoi : le seul passage par lequel un fichier sort d'un Espace.
-#
-# Le bac à sable monte le dossier de l'Espace PAR-DESSUS « ~ ». À l'intérieur,
-# chemins.DONNEES désigne donc un dossier fantôme du bac à sable, sans rapport avec
-# les vrais Espaces. « envoyer » y copiait le fichier et annonçait « Copié » :
-# il n'arrivait jamais. Constaté le 24/08/2026.
-#
-# L'Espace dépose donc dans SA boîte, montée à un chemin fixe ; l'hôte relève
-# et distribue. Un Espace n'écrit jamais chez un autre.
-ENVOI_INTERNE = os.path.expanduser("~/.codebyr-envoi")
-
-
-def boite_envoi(esp_id):
-    """Boîte d'envoi d'un Espace, vue depuis l'HÔTE."""
-    return os.path.join(chemins.DONNEES, esp_id, "envoi")
-
-
-def _boite_de_depart(esp, esp_id):
-    """La boîte d'où partent les fichiers d'un Espace, selon son compte.
-
-    Sous compte dédié, elle est hors du dossier du bureau, tenue par root, et
-    le bureau peut la relever SANS ouvrir l'Espace (voir comptes.py).
-    """
-    if compte_dedie.demande(esp):
-        return comptes.chemin_envois(os.getuid(), esp_id)
-    return boite_envoi(esp_id)
-
-
-def relever_envois(espaces):
-    """Distribue ce que les Espaces ont déposé. Renvoie le nombre remis.
-
-    Appelé depuis l'hôte, au lancement de n'importe quel Espace : c'est le
-    moment où l'on va justement chercher ses fichiers, et cela évite un
-    service qui tournerait en permanence pour un geste occasionnel.
-    """
-    remis = 0
-    for source in list(espaces):
-        try:
-            racine = _boite_de_depart(espaces[source], source)
-        except ValueError:
-            continue            # identifiant qu'un compte dédié ne peut pas porter
-        try:
-            with fichiers_surs.dossier(racine) as racine_fd:
-                destinations = os.listdir(racine_fd)
-            for dest in destinations:
-                if dest not in espaces or espaces[dest].get("ephemere"):
-                    continue
-                # Vers un Espace dédié : sa boîte d'arrivée, qu'il recueillera
-                # à sa prochaine ouverture. Lisible par lui — le mode est posé
-                # sur la copie avant qu'elle ne prenne son nom.
-                mode = None
-                if compte_dedie.demande(espaces[dest]):
-                    try:
-                        cible = comptes.chemin_arrivees(os.getuid(), dest)
-                    except ValueError:
-                        continue
-                    if not os.path.isdir(cible):
-                        continue    # jamais ouvert sous son compte : ça attend
-                    mode = 0o644
-                dossier = os.path.join(racine, dest)
-                try:
-                    with fichiers_surs.dossier(dossier) as source_fd:
-                        noms = os.listdir(source_fd)
-                        if mode is None:
-                            cible = os.path.join(chemins.DONNEES, dest, "home", chemins.PARTAGE)
-                            fichiers_surs.mkdir(cible)
-                        for nom in noms:
-                            if nom.startswith(".codebyr-"):
-                                continue
-                            try:
-                                # Le descripteur conserve le dossier même si son
-                                # nom est remplacé pendant la remise.
-                                # ouvrir() refuse /proc/self/fd (liens), donc
-                                # copier depuis un fd ouvert relativement ici.
-                                entree = os.open(nom, os.O_RDONLY | os.O_NOFOLLOW |
-                                                os.O_NONBLOCK, dir_fd=source_fd)
-                                try:
-                                    import stat
-                                    st = os.fstat(entree)
-                                    if not stat.S_ISREG(st.st_mode) or st.st_nlink != 1:
-                                        continue
-                                    # Copie privée : jamais de déplacement d'un
-                                    # chemin fourni par l'Espace vers l'hôte.
-                                    with tempfile.TemporaryDirectory(prefix="codebyr-envoi-") as t:
-                                        copie = os.path.join(t, "document")
-                                        with os.fdopen(os.dup(entree), "rb") as src, open(copie, "wb") as dst:
-                                            shutil.copyfileobj(src, dst)
-                                        fichiers_surs.copier_unique(copie, cible, nom, source, mode=mode)
-                                    actuel = os.stat(nom, dir_fd=source_fd, follow_symlinks=False)
-                                    if (actuel.st_dev, actuel.st_ino) == (st.st_dev, st.st_ino):
-                                        os.unlink(nom, dir_fd=source_fd)
-                                    remis += 1
-                                finally:
-                                    os.close(entree)
-                            except OSError:
-                                continue
-                except OSError as exc:
-                    # Une destination listée mais illisible n'est pas normale :
-                    # les fichiers y attendent, et quelqu'un doit pouvoir le
-                    # savoir. Ce silence a caché qu'aucun envoi ne partait d'un
-                    # Espace à compte dédié (14/09/2026).
-                    journal("relève impossible de %s vers %s : %s" % (source, dest, exc))
-                    continue
-        except OSError:
-            continue
-    if remis:
-        journal("remise de %d fichier(s) entre Espaces" % remis)
-    return remis
-
-
 def _espace_courant():
     """L'Espace depuis lequel cette commande est lancée, ou None.
 
@@ -2276,7 +2152,7 @@ def nom_libre(dossier, nom, existe=os.path.exists):
 
 def _deposer_pour_envoi(esp, depart, source):
     """Dépose un fichier dans la boîte d'envoi, vue de l'INTÉRIEUR d'un Espace."""
-    dossier = os.path.join(ENVOI_INTERNE, esp["id"])
+    dossier = os.path.join(envois.ENVOI_INTERNE, esp["id"])
     try:
         fichiers_surs.mkdir(dossier)
         # Les droits sont posés EXPLICITEMENT, par le descripteur. Dans la

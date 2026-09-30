@@ -27,6 +27,8 @@ découpé en modules, un par sujet, chacun avec ses tests (audit, point 8).
   environnement : `flatpak_espace.py`.
 - Ce qu'on accepte de sortir d'une archive d'Espace (sauvegarde, déménagement
   vers un compte séparé et retour) : `archives.py`.
+- Les boîtes d'envoi, par lesquelles un fichier passe d'un Espace à un autre :
+  `envois.py` ; le journal système commun à tous : `journal.py`.
 
 ---
 

@@ -16,7 +16,7 @@ installée sur machine réelle. Voir la [feuille de route](#feuille-de-route).
 
 ## Où en est le projet — 30 septembre 2026
 
-Version publiée : **1.16.7** (voir le [CHANGELOG](CHANGELOG.md)). La 1.16.2 a
+Version publiée : **1.16.8** (voir le [CHANGELOG](CHANGELOG.md)). La 1.16.2 a
 fermé une élévation de privilèges du service des comptes d'Espaces, présente
 depuis la 1.15.0 ; la 1.16.3 remet en marche le bouclier anti-hameçonnage, muet
 depuis la 1.6.0, et lui fait reconnaître les adresses déguisées par d'autres
@@ -24,7 +24,8 @@ alphabets ; la 1.16.4 fait du filtre d'appels système du Blindage une liste
 d'autorisation ; la 1.16.5 rend leur aperçu aux images dans Fichiers, et la
 1.16.6 permet d'ajouter un programme téléchargé — AppImage comprise — au menu
 d'un Espace à compte séparé. La 1.16.7 protège le lanceur de l'écran de
-bienvenue, modifiable par tous les comptes depuis la 1.13.0 (détail dans
+bienvenue, modifiable par tous les comptes depuis la 1.13.0, et la 1.16.8
+ajoute deux protections du noyau au démarrage (détail dans
 [SECURITY.md](SECURITY.md)). Le lot de
 sécurité de septembre est publié (frontières des fichiers, restauration non
 destructive, aucun repli sans isolation, réseau restreint par namespace, filtre

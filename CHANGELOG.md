@@ -10,7 +10,7 @@ GNOME (menu du Sceau, liserés colorés) ne se recharge pas à chaud.
 
 ---
 
-## 1.16.8 — non publiée
+## 1.16.8 — 30 septembre 2026
 
 **Le noyau démarre avec deux protections de plus** (`slab_nomerge`,
 `page_alloc.shuffle=1`), qui rendent plus difficile l'exploitation d'une faille

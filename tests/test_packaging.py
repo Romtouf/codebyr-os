@@ -651,10 +651,15 @@ class LeNoyauDurciAuDemarrage(unittest.TestCase):
                   encoding="utf-8") as f:
             postinst = f.read()
         self.assertIn("/usr/sbin/update-grub", postinst)
-        # Seulement sur une machine installée, et seulement si le fichier a changé.
+        # Seulement sur une machine installée, et seulement si grub.cfg ne porte
+        # pas encore les options — les MÊMES que le fichier livré. Pas de
+        # comparaison de dates : dpkg donne au fichier celle du paquet.
         bloc = postinst.split("GRUB_CODEBYR=", 1)[1].split("fi\n", 1)[0]
-        for garde in ("/boot/grub/grub.cfg", "/run/systemd/system", '-nt /boot/grub/grub.cfg'):
+        for garde in ("/boot/grub/grub.cfg", "/run/systemd/system",
+                      "! grep -q '%s' /boot/grub/grub.cfg" % self.OPTIONS):
             self.assertIn(garde, bloc)
+        self.assertNotIn("-nt", bloc)
+        self.assertNotIn("-newer", bloc)
 
     def test_le_live_demarre_avec_les_memes(self):
         with open(os.path.join(RACINE, "live-build", "auto", "config"), encoding="utf-8") as f:

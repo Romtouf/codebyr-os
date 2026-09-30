@@ -83,13 +83,17 @@ case "$1" in
 
 		# Options du noyau au démarrage (/etc/default/grub.d/90-codebyr-noyau.cfg).
 		# Elles n'agissent qu'une fois inscrites dans la configuration de GRUB,
-		# et au redémarrage suivant. On ne régénère que si le fichier est plus
-		# récent que grub.cfg : pas à chaque mise à jour. Ni dans un chroot de
-		# construction ni sur le live (pas de /boot/grub/grub.cfg) : là,
-		# l'installeur régénère GRUB lui-même et lit ce fichier.
+		# et au redémarrage suivant. On ne régénère que si grub.cfg ne les porte
+		# pas encore : pas à chaque mise à jour. Surtout pas en comparant les
+		# dates — dpkg donne au fichier celle du PAQUET : sur une machine dont le
+		# noyau a été mis à jour depuis, grub.cfg serait « plus récent » et les
+		# options n'arriveraient jamais. Ni dans un chroot de construction ni sur
+		# le live (pas de /boot/grub/grub.cfg) : là, l'installeur régénère GRUB
+		# lui-même et lit ce fichier.
 		GRUB_CODEBYR=/etc/default/grub.d/90-codebyr-noyau.cfg
 		if [ -f "$GRUB_CODEBYR" ] && [ -f /boot/grub/grub.cfg ] && [ -x /usr/sbin/update-grub ] \
-				&& [ -d /run/systemd/system ] && [ "$GRUB_CODEBYR" -nt /boot/grub/grub.cfg ]; then
+				&& [ -d /run/systemd/system ] \
+				&& ! grep -q 'slab_nomerge page_alloc.shuffle=1' /boot/grub/grub.cfg; then
 			/usr/sbin/update-grub >/dev/null 2>&1 \
 				|| echo "codebyr : update-grub a échoué — relancez-le à la main." >&2
 		fi

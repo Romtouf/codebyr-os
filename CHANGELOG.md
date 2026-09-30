@@ -10,7 +10,7 @@ GNOME (menu du Sceau, liserés colorés) ne se recharge pas à chaud.
 
 ---
 
-## 1.16.6 — non publiée
+## 1.16.6 — 30 septembre 2026
 
 **« Ajouter une application » fonctionne sous compte séparé.** C'était le
 dernier geste refusé dans ce mode, qui est celui de tous les Espaces. Téléchargez

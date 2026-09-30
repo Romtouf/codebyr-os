@@ -26,7 +26,7 @@ une mise à jour de `base-files` ; le dépôt APT porte une date de péremption,
 une version ne peut plus être publiée sans CI verte. Détail dans l'historique
 ci-dessous.
 
-**En préparation, 1.16.6** : « Ajouter une application » sous compte séparé,
+**Publié en 1.16.6** : « Ajouter une application » sous compte séparé,
 fait par l'Espace lui-même ; et un programme ajouté à un Espace ordinaire
 n'est plus rendu exécutable en suivant un lien.
 

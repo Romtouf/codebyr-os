@@ -1,6 +1,6 @@
 # Chantiers — Codebyr OS
 
-Mise à jour de lecture : **30 septembre 2026**, version publiée **1.16.8**.
+Mise à jour de lecture : **30 septembre 2026**, version publiée **1.17.0**.
 
 Ce document est la carte du projet : ce qui est fait, ce qui reste, et pourquoi.
 Les estimations d'effort des lignes anciennes n'ont pas été refaites.
@@ -183,7 +183,7 @@ Voir `usr/share/codebyr/relais_notifications.py`.
 
 | | Point | Détail | Effort |
 |---|---|---|---|
-| ⚪ | **`codebyr-space` : 2 800 lignes, dont `_lancer` à elle seule ~300** | Le bac à sable en est sorti (1.5), le registre aussi. Le lancement mêle encore préparation, compte dédié, Flatpak, filtre réseau et notifications dans une seule fonction : c'est là que le prochain défaut se cachera | M |
+| 🟡 | **`codebyr-space` : 3 168 → 2 550 lignes en 1.17.0 (audit, point 8) — 6 étapes sur 8** | Publié le 30/09/2026, validé sur une VM neuve (Firefox et bouclier, ajout de programme, envoi entre Espaces, sauvegarde et restauration, application Flatpak sous compte séparé). Sortis en modules partagés, à l'identique : `navigateur.py` (profil Firefox, filtre, bouclier), `programmes.py`, `chemins.py` (la racine des données, écrite six fois dans trois programmes, ne l'est plus qu'une), `flatpak_espace.py`, `archives.py`, `envois.py`, `journal.py`. **Restent** : les ordres donnés aux Espaces à compte séparé (~600 lignes très imbriquées) et `_lancer` (~400 lignes), à redécouper en étapes nommées ; et `nom_libre`, code mort (fichiers_surs.copier_unique fait la même chose, sans course) | M |
 | ⚪ | **Commentaires-journaux** | Beaucoup de commentaires racontent la découverte d'un défaut (« Constaté le … »). Précieux pour le pourquoi, mais ils alourdissent le code et vieilliront mal : leur place serait le CHANGELOG ou une fiche de décision, le code n'en gardant que la règle | S |
 
 ---

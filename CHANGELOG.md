@@ -10,7 +10,7 @@ GNOME (menu du Sceau, liserés colorés) ne se recharge pas à chaud.
 
 ---
 
-## 1.17.0 — non publiée
+## 1.17.0 — 30 septembre 2026
 
 **Rien ne change à l'usage : c'est le cœur du système qui se range.**
 `codebyr-space`, le programme qui ouvre les Espaces, dépassait 3 000 lignes :

@@ -22,7 +22,11 @@ if ! id user >/dev/null 2>&1; then
 		--groups sudo,audio,video,netdev,plugdev,cdrom,dip,users \
 		--comment "Codebyr" user
 fi
-echo 'user:live' | chpasswd
+# Empreinte FIXE du mot de passe « live » (openssl passwd -6 -salt codebyrlive
+# live). « chpasswd » tirait un sel au hasard : /etc/shadow, donc l'ISO, changeait
+# à chaque construction, et personne n'aurait pu vérifier que l'image publiée
+# sort du code publié. Le mot de passe est public, son sel peut l'être aussi.
+usermod -p '$6$codebyrlive$VzlRV780803NdL4ulrVO4tW6KP.7ufs7Qm.2lRbYOOWuAYAojmrWBLNgtPhczO5QkqUZhkYk23Dz1ZgLN.k/z/' user
 
 # — Connexion automatique GDM (le bureau s'ouvre directement) —
 mkdir -p /etc/gdm3

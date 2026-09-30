@@ -583,6 +583,35 @@ class LIsoEstReproductible(unittest.TestCase):
         self.assertIn("--apt-indices false", self.build)
         self.assertIn('rm -rf "$WORK/cache/bootstrap"', self.build)
 
+    def test_le_systeme_est_normalise_avant_sa_mise_en_image(self):
+        # Écarts relevés entre l'ISO de ce poste et celle de la CI, même commit.
+        etapes = re.search(r"lb bootstrap && lb chroot && (\w+) && lb installer && lb binary",
+                           self.build)
+        self.assertTrue(etapes, "la normalisation doit tomber entre lb chroot et lb binary")
+        fonction = self.build.split("%s() {" % etapes.group(1), 1)[1].split("\n}\n", 1)[0]
+        for attendu in ('"$racine/proc"', "var/cache/apt/*.bin",
+                        "var/cache/swcatalog/cache/*", "shim-signed:amd64"):
+            self.assertIn(attendu, fonction)
+        self.assertNotIn("lb build ||", self.build)
+
+    def _hook(self, nom):
+        with open(os.path.join(RACINE, "live-build", "config", "hooks", "normal", nom),
+                  encoding="utf-8") as f:
+            return "\n".join(l for l in f.read().splitlines() if not l.lstrip().startswith("#"))
+
+    def test_le_mot_de_passe_du_live_a_une_empreinte_fixe(self):
+        # chpasswd tire un sel au hasard : /etc/shadow changeait à chaque fois.
+        hook = self._hook("0300-live-session.hook.chroot")
+        self.assertNotIn("chpasswd", hook)
+        self.assertIn("usermod -p '$6$codebyrlive$", hook)
+
+    def test_le_cache_clavier_est_refait_apres_la_disposition(self):
+        # Sinon setupcon glisse dans l'initrd un fichier au nom tiré au hasard.
+        hook = self._hook("0500-debrand.hook.chroot")
+        self.assertIn("setupcon --force --save-only", hook)
+        self.assertLess(hook.index("/etc/default/keyboard"),
+                        hook.index("setupcon --force --save-only"))
+
     def test_aucun_hook_ne_telecharge(self):
         # Ce qu'un hook télécharge change d'un jour à l'autre : le catalogue
         # Flathub, pré-chargé jusqu'en 1.16.6, rendait l'image différente à

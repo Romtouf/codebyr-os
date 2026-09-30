@@ -31,6 +31,15 @@ XKBVARIANT=""
 XKBOPTIONS="caps:shiftlock"
 BACKSPACE="guess"
 EOF
+# Le cache clavier de la console doit être plus RÉCENT que ce fichier. Sinon,
+# en préparant l'image de démarrage, setupcon le juge périmé, recompile la
+# disposition dans un fichier temporaire au nom tiré au hasard, et le recopie
+# tel quel dans l'initrd (etc/console-setup/tmpkbd.XXXXXX) : deux constructions,
+# deux initrd. Le cache refait porte en outre « caps:shiftlock », que l'ancien
+# ignorait.
+if command -v setupcon >/dev/null 2>&1; then
+	setupcon --force --save-only
+fi
 
 # — Remplace l'emblème/logo Debian par le Sceau Codebyr (là où il s'afficherait) —
 LOGO=/usr/share/icons/hicolor/scalable/apps/codebyr-logo.svg

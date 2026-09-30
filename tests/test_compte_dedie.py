@@ -22,6 +22,7 @@ import chemins  # noqa: E402 — module partagé (voir outils)
 from outils import LIB  # noqa: F401 — place les modules partagés
 import compte_dedie  # noqa: E402
 import programmes  # noqa: E402
+import flatpak_espace  # noqa: E402
 
 space = outils.charger("codebyr-space")
 
@@ -37,6 +38,11 @@ def _source():
 
 def _fonction(source, nom, suivante):
     return source.split("def %s(" % nom)[1].split("def %s(" % suivante)[0]
+
+
+def _source_module(nom):
+    with open(os.path.join(outils.LIB, nom + ".py"), encoding="utf-8") as f:
+        return f.read()
 
 
 class LaDemande(unittest.TestCase):
@@ -284,16 +290,18 @@ class LesApplicationsFlatpakDansUnEspaceDedie(unittest.TestCase):
 
     def setUp(self):
         self.source = _source()
+        # Sorties de codebyr-space en 1.17.0 (découpage, audit point 8).
+        self.flatpak = _source_module("flatpak_espace")
 
     def test_un_identifiant_tordu_n_entre_jamais_dans_une_commande(self):
         # C'est le seul morceau de ces ordres qui vienne de l'extérieur, et il
         # sert à la fois de nom de paquet et de bout de chemin.
         for appid in ("org.gnome.Calculator", "io.codebyr.App2", "a.b-c.d_e"):
-            self.assertTrue(space.FORME_APPID.match(appid), appid)
+            self.assertTrue(flatpak_espace.FORME_APPID.match(appid), appid)
         for appid in ("", "sans-point", "org.gnome.Calculator; rm -rf /",
                       "../../etc/passwd", "org/gnome/App", "-org.x.y",
                       "org.x.y\nz", "org.x.y ", ".org.x"):
-            self.assertIsNone(space.FORME_APPID.match(appid), repr(appid))
+            self.assertIsNone(flatpak_espace.FORME_APPID.match(appid), repr(appid))
 
     def test_l_ordre_interne_est_reserve_au_compte_d_un_espace(self):
         # Lancé depuis le bureau, il écrirait dans le dossier du bureau en
@@ -307,27 +315,27 @@ class LesApplicationsFlatpakDansUnEspaceDedie(unittest.TestCase):
 
     def test_l_installation_passe_par_l_espace_et_pas_par_le_bureau(self):
         installer = _fonction(self.source, "cmd_install", "cmd_add_app")
-        avant = installer.split("_flatpak_env(esp_id)")[0]
+        avant = installer.split("flatpak_espace.env_ordinaire(esp_id)")[0]
         self.assertIn("compte_dedie.demande(esp)", avant)
         self.assertIn("_flatpak_dans_l_espace(esp, \"installer\", appid)", avant)
 
     def test_l_installation_d_un_espace_dedie_reste_hors_des_sauvegardes(self):
         # Le dossier interne est le seul que l'export laisse de côté : des
         # binaires retéléchargeables n'ont rien à faire dans une archive.
-        dossier = _fonction(self.source, "_flatpak_dir_dedie", "_env_flatpak_dedie")
-        self.assertIn("DOSSIER_INTERNE", dossier)
+        dossier = _fonction(self.flatpak, "dossier_dedie", "env_dedie")
+        self.assertIn("chemins.DOSSIER_INTERNE", dossier)
 
     def test_l_environnement_flatpak_est_construit_jamais_herite(self):
         # Celui du bureau désigne SON dossier d'exécution et SON bus, auxquels
         # le compte de l'Espace n'a aucun droit.
-        env = _fonction(self.source, "_env_flatpak_dedie", "_espace_flatpak_dir")
+        env = _fonction(self.flatpak, "env_dedie", "env_ordinaire")
         for interdit in ("dict(os.environ)", "os.environ.copy()", "dict(env)"):
             self.assertNotIn(interdit, env, interdit)
         self.assertIn("session.runtime", env)
         self.assertIn("session.home", env)
 
     def test_l_application_flatpak_parle_au_bus_de_son_espace(self):
-        env = _fonction(self.source, "_env_flatpak_dedie", "_espace_flatpak_dir")
+        env = _fonction(self.flatpak, "env_dedie", "env_ordinaire")
         self.assertIn("DBUS_SESSION_BUS_ADDRESS", env)
         self.assertIn('os.path.join(runtime, "bus")', env)
 
@@ -340,7 +348,7 @@ class LesApplicationsFlatpakDansUnEspaceDedie(unittest.TestCase):
         # fait que décider si l'application est compatible avec l'Espace.
         bloc = lancer.split("if est_flatpak:")[-1].split("else:")[0]
         self.assertLess(bloc.index("if session:"),
-                        bloc.index("_flatpak_app_dans_espace"))
+                        bloc.index("flatpak_espace.app_dans_espace"))
 
 
 class JamaisDeReplieSousLeCompteDuBureau(unittest.TestCase):
@@ -772,7 +780,7 @@ class LaRegleDesDonneesDEspace(unittest.TestCase):
     def test_la_restauration_ordinaire_garde_sa_regle_stricte(self):
         # Seul ce qui change de compte bénéficie de la règle d'Espace.
         source = _source()
-        importer = source.split("def cmd_import(")[1].split("\nFLATHUB_REPO")[0]
+        importer = source.split("def cmd_import(")[1].split("\nINTERNE_FLATPAK")[0]
         self.assertIn("_extraire_archive(tar, neuf)\n", importer)
 
 

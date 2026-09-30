@@ -12,6 +12,7 @@ import unittest
 from unittest import mock
 
 import outils
+import flatpak_espace  # noqa: E402
 import permissions_flatpak as pf
 
 space = outils.charger("codebyr-space")
@@ -180,7 +181,7 @@ class LeLanceur(unittest.TestCase):
                 mock.patch.object(space, "boite_envoi",
                                   return_value=os.path.join(dossier.name, "envoi")), \
                 mock.patch.object(space, "espace_home", return_value=dossier.name), \
-                mock.patch.object(space, "_flatpak_app_dans_espace", return_value=False), \
+                mock.patch.object(flatpak_espace, "app_dans_espace", return_value=False), \
                 mock.patch.object(space.permissions_flatpak, "lire_permissions",
                                   return_value=permissions), \
                 mock.patch.object(space, "_prevenir") as prevenir, \

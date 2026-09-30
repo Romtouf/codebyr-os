@@ -23,6 +23,8 @@ découpé en modules, un par sujet, chacun avec ses tests (audit, point 8).
   `programmes.py`.
 - Où vivent les données des Espaces : `chemins.py`. Ce chemin était écrit six
   fois dans trois programmes ; il l'est désormais une seule.
+- Les applications Flatpak d'un Espace — où elles s'installent, avec quel
+  environnement : `flatpak_espace.py`.
 
 ---
 

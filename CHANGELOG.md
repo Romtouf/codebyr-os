@@ -25,6 +25,8 @@ découpé en modules, un par sujet, chacun avec ses tests (audit, point 8).
   fois dans trois programmes ; il l'est désormais une seule.
 - Les applications Flatpak d'un Espace — où elles s'installent, avec quel
   environnement : `flatpak_espace.py`.
+- Ce qu'on accepte de sortir d'une archive d'Espace (sauvegarde, déménagement
+  vers un compte séparé et retour) : `archives.py`.
 
 ---
 

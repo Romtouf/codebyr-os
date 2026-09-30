@@ -35,6 +35,7 @@ import time
 # CODEBYR_LIB permet de le charger ailleurs — tests, développement.
 sys.path.insert(0, os.environ.get("CODEBYR_LIB", "/usr/share/codebyr"))
 import applications  # noqa: E402
+import archives  # noqa: E402
 import autotest  # noqa: E402
 import bac_a_sable  # noqa: E402
 import chemins  # noqa: E402
@@ -1035,7 +1036,7 @@ def _emballer(dossier, noms):
         with tarfile.open(fileobj=flux, mode="w|") as tar:
             for nom in noms:
                 tar.add(os.path.join(dossier, nom), arcname="./" + nom,
-                        filter=_entree_archivable)
+                        filter=archives.entree_archivable)
     return produire
 
 
@@ -1124,7 +1125,7 @@ def _rapatrier_depuis_compte_dedie(esp):
 
             def deballer(flux):
                 with tarfile.open(fileobj=flux, mode="r|") as tar:
-                    _extraire_archive(tar, neuf, _filtre_dossier_d_espace)
+                    archives.extraire_archive(tar, neuf, archives.filtre_dossier_d_espace)
 
             code, erreurs = _ordre_interne(session, INTERNE_EXPORTER, consommer=deballer)
             if code != 0 or erreurs:
@@ -1315,7 +1316,7 @@ def cmd_interne_importer():
 
     Exécuté PAR l'Espace, sous son compte : il n'écrit que dans son propre
     dossier, et ce qu'il reçoit passe par la même règle que toute restauration
-    (voir _extraire_archive).
+    (voir archives.extraire_archive).
 
     Une seule fois : un second déménagement écraserait ce que l'Espace a fait
     depuis le premier. Code MIGRATION_FAITE si c'est déjà fait. Rien de ce qui
@@ -1336,7 +1337,7 @@ def cmd_interne_importer():
     stage = tempfile.mkdtemp(prefix="import-", dir=interne)
     try:
         with tarfile.open(fileobj=sys.stdin.buffer, mode="r|*") as tar:
-            _extraire_archive(tar, stage, _filtre_dossier_d_espace)
+            archives.extraire_archive(tar, stage, archives.filtre_dossier_d_espace)
         mis_de_cote = os.path.join(interne, "avant-migration-%s" % time.strftime("%Y%m%d-%H%M%S"))
         for nom in sorted(os.listdir(stage)):
             if nom == chemins.DOSSIER_INTERNE:
@@ -1379,7 +1380,7 @@ def cmd_interne_restaurer():
     stage = tempfile.mkdtemp(prefix="restauration-", dir=interne)
     try:
         with tarfile.open(fileobj=sys.stdin.buffer, mode="r|*") as tar:
-            _extraire_archive(tar, stage, _filtre_dossier_d_espace)
+            archives.extraire_archive(tar, stage, archives.filtre_dossier_d_espace)
         cote = os.path.join(interne, "avant-restauration-%s" % time.strftime("%Y%m%d-%H%M%S"))
         os.makedirs(cote, mode=0o700)
         mis_de_cote, poses = [], []
@@ -1508,7 +1509,7 @@ def cmd_interne_exporter():
                 if nom == chemins.DOSSIER_INTERNE:
                     continue
                 tar.add(os.path.join(home, nom), arcname="./" + nom,
-                        filter=_entree_archivable)
+                        filter=archives.entree_archivable)
     except (OSError, tarfile.TarError) as exc:
         sys.stderr.write("codebyr-space : export refusé (%s)\n" % exc)
         return 1
@@ -1677,81 +1678,6 @@ def cmd_export(espaces, esp_id, dest=None):
     return 0
 
 
-ARCHIVE_ENTREES_MAX = 100000
-ARCHIVE_TAILLE_MAX = 20 * 1024**3
-
-
-def _filtre_dossier_d_espace(membre, destination):
-    """Règle d'extraction pour les données d'un Espace qui changent de compte.
-
-    La règle « data » de tarfile refuse tout lien vers un chemin absolu. Les
-    applications en posent pourtant dans un dossier personnel, et un seul
-    d'entre eux faisait échouer le déménagement entier : l'Espace ne se serait
-    plus ouvert.
-
-    Le lien SYMBOLIQUE est donc accepté quelle que soit sa cible : ce n'est
-    qu'un nom, et tarfile refuse ensuite d'écrire À TRAVERS lui (il résout le
-    chemin de chaque entrée suivante). Dans le bac à sable, une cible absolue
-    se résout dans la vue de l'Espace, jamais sur le système.
-
-    Le lien DUR, lui, reste tenu à l'intérieur : il donne accès au fichier
-    lui-même. Une archive produite par un Espace compromis pourrait sinon
-    poser, au retour vers le bureau, un lien dur vers la clé SSH de
-    l'utilisateur — que l'Espace relirait à sa prochaine ouverture.
-    """
-    if membre.issym():
-        return tarfile.tar_filter(membre, destination)
-    return tarfile.data_filter(membre, destination)
-
-
-def _extraire_archive(tar, destination, filtre="data"):
-    """Extrait une archive d'Espace, entrée par entrée, selon UNE règle.
-
-    Partagée par la restauration et par le déménagement vers un compte dédié :
-    deux copies de cette règle finiraient par diverger, et c'est précisément
-    le genre de règle qu'on ne veut voir diverger nulle part.
-
-    Entrée par entrée plutôt que d'un bloc : cela fonctionne aussi sur un
-    FLUX, qu'on ne peut pas relire. Une archive refusée en cours de route
-    laisse une extraction partielle — l'appelant extrait donc toujours dans un
-    dossier de préparation qu'il jette en cas d'erreur.
-    """
-    entrees = 0
-    taille = 0
-    for membre in tar:
-        entrees += 1
-        taille += membre.size
-        if entrees > ARCHIVE_ENTREES_MAX or taille > ARCHIVE_TAILLE_MAX:
-            raise ValueError("Archive trop volumineuse (100 000 entrées / 20 Gio maximum)")
-        # Les liens sont ACCEPTÉS, les fichiers spéciaux refusés.
-        #
-        # Refuser tout lien paraissait prudent ; cela rendait la restauration
-        # impossible sur un vrai Espace. Un dossier personnel avec un profil
-        # Firefox contient des liens symboliques : « Revenir à un instantané »
-        # échouait donc toujours, sur une archive produite par Codebyr
-        # lui-même. On pouvait sauvegarder, jamais restaurer. Constaté le
-        # 12/09/2026 sur une VM.
-        #
-        # Ce qu'il fallait refuser n'est pas le lien, c'est le lien qui SORT de
-        # l'Espace. « filter="data" » s'en charge : chemins absolus, traversées
-        # par « .. » et cibles hors destination sont rejetés par tarfile
-        # lui-même, et lèvent une erreur que l'on attrape.
-        if not (membre.isfile() or membre.isdir() or membre.issym() or membre.islnk()):
-            raise ValueError("Archive contenant un fichier spécial")
-        tar.extract(membre, destination, filter=filtre)
-
-
-def _entree_archivable(info):
-    """Filtre d'archivage : les fichiers spéciaux ne partent pas.
-
-    Un tube nommé dans un dossier d'Espace ferait refuser l'archive entière à
-    l'arrivée, et le déménagement avec : on ne l'emporte pas.
-    """
-    if info.isfile() or info.isdir() or info.issym() or info.islnk():
-        return info
-    return None
-
-
 def cmd_import(espaces, esp_id, source=None):
     """Restaure un Espace depuis une archive (portabilité entre machines)."""
     esp = espaces.get(esp_id)
@@ -1780,7 +1706,7 @@ def cmd_import(espaces, esp_id, source=None):
             neuf = os.path.join(stage, "home")
             os.mkdir(neuf, 0o700)
             with tarfile.open(source, "r:gz") as tar:
-                _extraire_archive(tar, neuf)
+                archives.extraire_archive(tar, neuf)
             cmd_close(espaces, esp_id)
             # Ne pas remplacer le dossier d'un Espace encore en activité.
             if _espace_courant() == esp_id:

@@ -23,6 +23,7 @@ from outils import LIB  # noqa: F401 — place les modules partagés
 import compte_dedie  # noqa: E402
 import programmes  # noqa: E402
 import flatpak_espace  # noqa: E402
+import archives  # noqa: E402
 
 space = outils.charger("codebyr-space")
 
@@ -717,7 +718,7 @@ class LaRegleDesDonneesDEspace(unittest.TestCase):
         self.addCleanup(__import__("shutil").rmtree, destination, True)
         with self._archive(construire) as tar:
             try:
-                space._extraire_archive(tar, destination, space._filtre_dossier_d_espace)
+                archives.extraire_archive(tar, destination, archives.filtre_dossier_d_espace)
             except (tarfile.TarError, ValueError, OSError) as exc:
                 return destination, exc
         return destination, None
@@ -781,7 +782,7 @@ class LaRegleDesDonneesDEspace(unittest.TestCase):
         # Seul ce qui change de compte bénéficie de la règle d'Espace.
         source = _source()
         importer = source.split("def cmd_import(")[1].split("\nINTERNE_FLATPAK")[0]
-        self.assertIn("_extraire_archive(tar, neuf)\n", importer)
+        self.assertIn("archives.extraire_archive(tar, neuf)\n", importer)
 
 
 class LeDemenagement(unittest.TestCase):

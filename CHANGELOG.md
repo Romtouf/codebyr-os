@@ -10,6 +10,35 @@ GNOME (menu du Sceau, liserés colorés) ne se recharge pas à chaud.
 
 ---
 
+## 1.17.2 — non publiée
+
+**Correctif de sécurité : un compte de la machine pouvait devenir
+administrateur à la mise à jour suivante** (depuis la 1.10.0). Pour remplir le
+dossier « Modèles » de chaque compte, la mise à jour suivait, en
+administrateur, le chemin que les réglages du compte déclaraient — et lui
+remettait ce qu'elle y trouvait. Un compte ordinaire, ou l'invité pendant sa
+session, pouvait y désigner un dossier du système et se le voir remettre. Ce
+travail se fait désormais sous l'identité du compte lui-même : il ne peut plus
+atteindre que ce qui était déjà à lui. Détails dans [SECURITY.md](SECURITY.md).
+
+**Codebyr se reconnaît dès le premier écran.**
+
+- L'image des comptes, sur l'écran de connexion et de verrouillage, est le
+  Sceau de Codebyr, et non plus la spirale de Debian. Les comptes existants la
+  reçoivent aussi — sauf ceux qui ont choisi leur propre image.
+- Au démarrage, le logo et « codebyr OS » restent au centre de l'écran : ils
+  glissaient vers la gauche quand l'écran changeait de définition en cours de
+  route. (Pour une machine déjà installée, la mise à jour régénère l'image de
+  démarrage : quelques secondes de plus, une seule fois.)
+- L'ouverture de session arrive sur le bureau, et non plus sur la vue
+  d'ensemble de GNOME, dont le dock venait se poser sur le bouton « Suivant »
+  de la fenêtre « Bienvenue ». La touche Super l'ouvre comme avant.
+- Dans l'installeur, la barre latérale montre le Sceau et le nom en entier :
+  le mot « codebyr » y était écrit dans la couleur du fond, et il ne restait
+  que « OS ». (Visible à partir de la prochaine ISO.)
+
+---
+
 ## 1.17.1 — 1er octobre 2026
 
 **Retirer « Compte séparé » à un Espace fait bien revenir ses fichiers.**

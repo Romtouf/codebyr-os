@@ -16,34 +16,59 @@
 // s'efface et le bloc de déverrouillage prend sa place : sinon les deux textes
 // se chevauchaient, chacun placé de son côté sans se savoir voisins.
 // Toutes les hauteurs découlent du logo, jamais de valeurs devinées.
+//
+// ── LA TAILLE DE L'ÉCRAN CHANGE EN COURS DE ROUTE ───────────────────────────
+// Plymouth démarre sur l'affichage du micrologiciel ; le pilote graphique
+// prend ensuite la main, souvent dans une autre résolution. Les positions,
+// calculées une fois au départ, restaient celles de l'ancien écran : le logo
+// et son libellé glissaient vers la gauche pendant le chargement. Constaté
+// le 01/10/2026 sur la VM. Tout est donc replacé dès que la taille change —
+// TOUT : le logo et son libellé d'abord (1.17.2~essai1), mais aussi le message
+// du bas et l'invite. Le message « cryptsetup: … set up successfully » arrive
+// juste avant le changement de définition, et glissait encore (même jour).
 
 Window.SetBackgroundTopColor(0.031, 0.059, 0.078);
 Window.SetBackgroundBottomColor(0.031, 0.059, 0.078);
 
-screen_w = Window.GetWidth();
-screen_h = Window.GetHeight();
-
 // — Le Sceau —
 logo.image = Image("logo.png");
 logo.sprite = Sprite(logo.image);
-logo.x = screen_w / 2 - logo.image.GetWidth() / 2;
-logo.y = screen_h / 2 - logo.image.GetHeight() / 2 - 24;
-logo.sprite.SetPosition(logo.x, logo.y, 0);
-
-// Première ligne de texte, juste sous le logo : le libellé du produit au repos,
-// le titre de l'invite pendant la saisie.
-ligne_1 = logo.y + logo.image.GetHeight() + 22;
-interligne = 34;
 
 // — Libellé « codebyr OS » —
 label.image = Image.Text("codebyr OS", 0.90, 0.93, 0.96);
 label.sprite = Sprite(label.image);
-label.sprite.SetPosition(screen_w / 2 - label.image.GetWidth() / 2, ligne_1, 0);
+
+interligne = 34;
+
+// Place le logo et le libellé au centre de l'écran tel qu'il est MAINTENANT.
+// Première ligne de texte, juste sous le logo : le libellé du produit au
+// repos, le titre de l'invite pendant la saisie.
+fun placer() {
+	global.screen_w = Window.GetWidth();
+	global.screen_h = Window.GetHeight();
+	global.logo_y = global.screen_h / 2 - logo.image.GetHeight() / 2 - 24;
+	logo.sprite.SetPosition(global.screen_w / 2 - logo.image.GetWidth() / 2, global.logo_y, 0);
+	global.ligne_1 = global.logo_y + logo.image.GetHeight() + 22;
+	label.sprite.SetPosition(global.screen_w / 2 - label.image.GetWidth() / 2, global.ligne_1, 0);
+}
+placer();
 
 // — Pulsation du logo, suspendue pendant la saisie —
 global.saisie = 0;
+global.message_affiche = 0;
 progress = 0;
 fun refresh_callback() {
+	if (Window.GetWidth() != global.screen_w || Window.GetHeight() != global.screen_h) {
+		placer();
+		// Ce qui est déjà à l'écran est redessiné à sa place dans le nouvel
+		// écran, avec le même contenu.
+		if (global.message_affiche == 1) {
+			message_callback(global.message_texte);
+		}
+		if (global.saisie == 1) {
+			display_password_callback(global.invite_texte, global.invite_nb_puces);
+		}
+	}
 	progress++;
 	if (global.saisie == 1) {
 		logo.sprite.SetOpacity(1);
@@ -74,6 +99,8 @@ fun effacer_invite() {
 // anglais et se termine par un identifiant illisible : on écrit le nôtre.
 fun display_password_callback(prompt, puces) {
 	global.saisie = 1;
+	global.invite_texte = prompt;
+	global.invite_nb_puces = puces;
 	label.sprite.SetOpacity(0);       // le libellé cède la place
 
 	global.invite_titre = ligne("Phrase de passe du disque",
@@ -106,6 +133,8 @@ Plymouth.SetDisplayNormalFunction(display_normal_callback);
 // — Messages système (fsck, phrase de passe refusée…) —
 // Placés en bas, hors du bloc de déverrouillage.
 fun message_callback(texte) {
+	global.message_texte = texte;
+	global.message_affiche = 1;
 	global.message = ligne(texte, 0.6, 0.66, 0.72, screen_h - 64);
 }
 Plymouth.SetMessageFunction(message_callback);

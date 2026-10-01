@@ -25,13 +25,31 @@ retirer_la_deviation() {
 	rm -f "$DEBIAN_OS_RELEASE"
 }
 
+# L'avatar par défaut des nouveaux comptes (voir le preinst), rendu à
+# desktop-base de la même façon.
+DEBIAN_FACE=/etc/skel/.face.desktop-base
+rendre_l_avatar() {
+	[ "$(dpkg-divert --listpackage /etc/skel/.face)" = "codebyr-tools" ] || return 0
+	if [ -e "$DEBIAN_FACE" ]; then
+		cp -a "$DEBIAN_FACE" /etc/skel/.face.codebyr-retour
+		mv -f /etc/skel/.face.codebyr-retour /etc/skel/.face
+	fi
+	dpkg-divert --package codebyr-tools --remove --no-rename \
+		--divert "$DEBIAN_FACE" /etc/skel/.face >/dev/null
+	rm -f "$DEBIAN_FACE"
+}
+
 case "$1" in
 	remove|abort-install|disappear)
 		retirer_la_deviation
+		rendre_l_avatar
 		;;
 	abort-upgrade)
 		if dpkg --compare-versions "$2" lt 1.16.1; then
 			retirer_la_deviation
+		fi
+		if dpkg --compare-versions "$2" lt 1.17.2; then
+			rendre_l_avatar
 		fi
 		;;
 esac

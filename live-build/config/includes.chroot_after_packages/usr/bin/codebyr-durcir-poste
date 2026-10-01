@@ -14,7 +14,74 @@
 # Usage : codebyr-durcir-poste   (root requis)
 set -e
 
+# ── Travaux dans un dossier personnel : SOUS L'IDENTITÉ de son propriétaire ──
+# Tout ce qui écrit dans un dossier personnel se fait au nom de celui à qui il
+# appartient, jamais en root : chaque chemin qu'on y suit — un lien, un dossier
+# déclaré dans ses réglages — c'est lui qui l'a choisi.
+#
+# Jusqu'à la 1.17.1, root y créait le dossier des modèles et le lui remettait
+# (« chown »), au chemin que ses réglages déclaraient. Il suffisait d'y écrire
+# « $HOME/../../etc » pour se voir remettre /etc à la mise à jour suivante —
+# c'est-à-dire tout le système, depuis n'importe quel compte de la machine,
+# l'invité compris. Sous l'identité de l'utilisateur, un tel chemin ne mène
+# qu'où il pouvait déjà écrire.
+#
+# Le script se relance lui-même pour ces travaux, par setpriv (voir
+# sous_l_identite plus bas) : root n'y entre jamais.
+if [ "${1:-}" = "--sous-l-identite" ]; then
+	[ "$(id -u)" != "0" ] || exit 0
+	dossier="${3:-}"
+	[ -d "$dossier" ] || exit 0
+	case "${2:-}" in
+		modeles)
+			# Le nom du dossier dépend de la langue : on suit la déclaration
+			# de xdg-user-dirs quand elle existe, sinon le nom français.
+			cible="$(sed -n 's/^XDG_TEMPLATES_DIR="\?\$HOME\/\([^"]*\)"\?/\1/p' \
+				"$dossier/.config/user-dirs.dirs" 2>/dev/null | head -n1)"
+			[ -n "$cible" ] || cible="Modèles"
+			mkdir -p "$dossier/$cible" 2>/dev/null || exit 0
+			for m in /usr/share/codebyr/modeles/*; do
+				[ -f "$m" ] || continue
+				place="$dossier/$cible/$(basename "$m")"
+				# Jamais d'écrasement : qui a personnalisé le sien l'a fait exprès.
+				if [ -e "$place" ] || [ -L "$place" ]; then continue; fi
+				cp "$m" "$place" 2>/dev/null || true
+			done
+			;;
+		avatar)
+			# Seul l'avatar resté celui de Debian, octet pour octet, est
+			# remplacé : une photo choisie par l'utilisateur ne l'est jamais.
+			face="$dossier/.face"
+			if [ ! -f "$face" ] || [ -L "$face" ]; then exit 0; fi
+			cmp -s "$face" /etc/skel/.face.desktop-base || exit 0
+			[ -f /etc/skel/.face ] || exit 0
+			if cp /etc/skel/.face "$face.codebyr-neuf" 2>/dev/null \
+					&& mv -f "$face.codebyr-neuf" "$face" 2>/dev/null; then
+				echo "codebyr : avatar Debian de « $(id -un) » remplacé par le Sceau."
+			else
+				rm -f "$face.codebyr-neuf" 2>/dev/null || true
+			fi
+			;;
+	esac
+	exit 0
+fi
+
 [ "$(id -u)" = "0" ] || { echo "codebyr-durcir-poste : root requis." >&2; exit 0; }
+
+# Lance l'un des travaux ci-dessus sous l'identité d'un compte :
+#   sous_l_identite <uid> <gid> <travail> <dossier personnel>
+# setpriv change les trois identifiants (réel, effectif, sauvegardé) : le
+# noyau retire alors toutes les capacités de root. « --no-new-privs » : aucun
+# programme lancé ensuite ne peut en regagner. « --reset-env » : rien de
+# l'environnement de root ne passe, ni la lecture de /etc/passwd en cours
+# (entrée « /dev/null »). Sans setpriv, on ne fait rien plutôt que de le faire
+# en root.
+SCRIPT="$(readlink -f "$0" 2>/dev/null || echo "$0")"
+sous_l_identite() {
+	[ -x /usr/bin/setpriv ] || return 0
+	/usr/bin/setpriv --reuid="$1" --regid="$2" --clear-groups --no-new-privs --reset-env \
+		-- /bin/sh "$SCRIPT" --sous-l-identite "$3" "$4" < /dev/null || true
+}
 
 PAM_GDM="/etc/pam.d/gdm-password"
 MARQUEUR="Codebyr — Mode invité"
@@ -43,26 +110,23 @@ done < /etc/passwd
 # système qui vise des gens qui n'ouvriront jamais de terminal.
 #
 # /etc/skel ne sert qu'aux comptes créés APRÈS ; on remplit donc aussi ceux qui
-# existent déjà. On n'écrase jamais un modèle présent : celui qui a personnalisé
-# le sien l'a fait exprès.
-while IFS=: read -r nom _ uid _ _ home _; do
+# existent déjà — sous leur identité (voir « --sous-l-identite » plus haut).
+#
+# ── 1 ter) Avatar ───────────────────────────────────────────────────────────
+# Les comptes créés avant la 1.17.2 ont reçu de /etc/skel la spirale Debian
+# comme avatar, sur l'écran de connexion et de verrouillage. Ils reçoivent le
+# Sceau — sauf ceux qui ont choisi leur image.
+#
+# Le dossier doit appartenir au compte : un dossier personnel partagé ou
+# confié à un autre n'est pas le sien à remplir.
+while IFS=: read -r nom _ uid gid _ home _; do
 	[ "$uid" -ge 1000 ] 2>/dev/null || continue
 	[ "$uid" -lt 65534 ] || continue
 	case "$home" in /home/*) ;; *) continue ;; esac
 	[ -d "$home" ] || continue
-	# Le nom du dossier dépend de la langue : on suit la déclaration de
-	# xdg-user-dirs quand elle existe, sinon le nom français par défaut.
-	cible="$(sed -n 's/^XDG_TEMPLATES_DIR="\?\$HOME\/\([^"]*\)"\?/\1/p' \
-		"$home/.config/user-dirs.dirs" 2>/dev/null | head -n1)"
-	[ -n "$cible" ] || cible="Modèles"
-	mkdir -p "$home/$cible" 2>/dev/null || continue
-	for m in /usr/share/codebyr/modeles/*; do
-		[ -f "$m" ] || continue
-		[ -e "$home/$cible/$(basename "$m")" ] && continue
-		cp "$m" "$home/$cible/" 2>/dev/null || true
-		chown "$uid" "$home/$cible/$(basename "$m")" 2>/dev/null || true
-	done
-	chown "$uid" "$home/$cible" 2>/dev/null || true
+	[ "$(stat -c '%u' "$home" 2>/dev/null)" = "$uid" ] || continue
+	sous_l_identite "$uid" "$gid" modeles "$home"
+	sous_l_identite "$uid" "$gid" avatar "$home"
 done < /etc/passwd
 
 # ── 2) Compte invité : plus aucun mot de passe utilisable ────────────────────

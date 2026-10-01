@@ -48,6 +48,7 @@ for chemin in \
 	usr/share/applications/io.codebyr.Bienvenue.desktop \
 	usr/share/icons/hicolor/scalable/apps/io.codebyr.Bienvenue.svg \
 	usr/share/glib-2.0/schemas/90_codebyr.gschema.override \
+	usr/share/plymouth/themes/codebyr \
 	etc/xdg/autostart/codebyr-bienvenue.desktop \
 	etc/skel \
 	etc/codebyr/espaces.json \
@@ -99,6 +100,19 @@ HOME_URL="https://os.codebyr.dev/"
 SUPPORT_URL="https://github.com/Romtouf/codebyr-os/issues/new/choose"
 BUG_REPORT_URL="https://github.com/Romtouf/codebyr-os/issues"
 EOF
+
+# 1 quater) Avatar par défaut des nouveaux comptes : le Sceau, à la place de la
+#    spirale Debian que desktop-base livre en /etc/skel/.face (détournée par le
+#    preinst, comme l'identité du système).
+#
+#    Posé ICI, dans le paquet, et jamais par l'image : celle-ci copie ses
+#    fichiers AVANT d'installer le paquet (hook 1000). Le preinst aurait alors
+#    rangé le Sceau comme « copie de desktop-base » — et, ce fichier étant une
+#    conffile de desktop-base, chaque mise à jour de desktop-base l'aurait cru
+#    modifié et posé une question, qu'unattended-upgrades ne pose pas : il
+#    aurait laissé desktop-base de côté, pour toujours.
+mkdir -p "$STAGE/etc/skel"
+cp "$SRC/usr/share/codebyr/avatar.svg" "$STAGE/etc/skel/.face"
 
 # 2) Droits corrects. IMPORTANT : « cp -a » depuis un checkout Windows (9p)
 #    hérite de fichiers et de dossiers en 777 → inscriptibles par tous = faille.

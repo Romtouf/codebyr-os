@@ -24,6 +24,20 @@ set -e
 # /usr/lib/os-release est celui de Codebyr, et la copie de base-files est
 # tenue à jour par dpkg lui-même.
 DEBIAN_OS_RELEASE=/usr/lib/os-release.debian
+
+# L'avatar par défaut des nouveaux comptes (/etc/skel/.face) appartient à
+# desktop-base : c'est la spirale Debian, que GNOME montrait sur l'écran de
+# connexion et de verrouillage. Détourné de la même façon, pour livrer le
+# Sceau ; la copie de desktop-base est rangée à côté (.face.desktop-base).
+#
+# C'est une conffile de desktop-base. dpkg suit la déviation : une mise à jour
+# de desktop-base compare et remplace la copie rangée, sans question (vérifié
+# le 01/10/2026 sur une copie du système de l'ISO 1.16.8). unattended-upgrades,
+# lui, lit /etc/skel/.face sans la suivre : il ne laisserait desktop-base de
+# côté que si Debian changeait cette image — un nouveau thème, donc une
+# nouvelle version majeure, qu'il n'installe pas de toute façon.
+DEBIAN_FACE=/etc/skel/.face.desktop-base
+
 case "$1" in
 	install|upgrade)
 		if [ "$(dpkg-divert --listpackage /usr/lib/os-release)" != "codebyr-tools" ]; then
@@ -32,6 +46,13 @@ case "$1" in
 			fi
 			dpkg-divert --package codebyr-tools --add --no-rename \
 				--divert "$DEBIAN_OS_RELEASE" /usr/lib/os-release >/dev/null
+		fi
+		if [ "$(dpkg-divert --listpackage /etc/skel/.face)" != "codebyr-tools" ]; then
+			if [ -e /etc/skel/.face ] && [ ! -e "$DEBIAN_FACE" ]; then
+				cp -a /etc/skel/.face "$DEBIAN_FACE"
+			fi
+			dpkg-divert --package codebyr-tools --add --no-rename \
+				--divert "$DEBIAN_FACE" /etc/skel/.face >/dev/null
 		fi
 		;;
 esac

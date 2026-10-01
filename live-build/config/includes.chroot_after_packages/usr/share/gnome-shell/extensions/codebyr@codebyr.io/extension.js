@@ -1181,6 +1181,22 @@ class Indicateur extends PanelMenu.Button {
 
 export default class CodebyrExtension extends Extension {
     enable() {
+        // La session s'ouvre sur le bureau, pas sur la vue d'ensemble. GNOME y
+        // affiche le dock par-dessus tout, et donc par-dessus la fenêtre
+        // « Bienvenue » : l'icône d'une application venait se poser sur son
+        // bouton « Suivant ». Constaté le 01/10/2026.
+        //
+        // La vue d'ensemble n'est retirée que le temps du démarrage : GNOME ne
+        // l'ouvre que s'il la croit disponible à cet instant. Elle revient dès
+        // « startup-complete », et la touche Super l'ouvre comme d'habitude.
+        // Rien à faire quand l'extension est réactivée plus tard (après un
+        // déverrouillage, par exemple) : le démarrage est passé.
+        if (Main.layoutManager._startingUp) {
+            this._avecVueEnsemble = Main.sessionMode.hasOverview;
+            Main.sessionMode.hasOverview = false;
+            this._finDemarrage = Main.layoutManager.connect('startup-complete',
+                () => this._rendreVueEnsemble());
+        }
         this._espaces = chargerEspaces();
         this._apps = chargerApps();
         this._indicateur = new Indicateur(this);
@@ -1201,7 +1217,16 @@ export default class CodebyrExtension extends Extension {
         }
     }
 
+    _rendreVueEnsemble() {
+        if (this._finDemarrage) {
+            Main.layoutManager.disconnect(this._finDemarrage);
+            this._finDemarrage = null;
+            Main.sessionMode.hasOverview = this._avecVueEnsemble;
+        }
+    }
+
     disable() {
+        this._rendreVueEnsemble();
         this._coloriage?.detruire();
         this._coloriage = null;
         this.pressePapiers?.detruire();

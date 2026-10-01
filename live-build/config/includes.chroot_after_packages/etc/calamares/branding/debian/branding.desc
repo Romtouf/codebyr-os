@@ -32,9 +32,13 @@ strings:
 sidebar: widget
 navigation: widget
 
+# Trois images, trois fonds. La barre latérale est sombre et montre son logo
+# dans un carré de 80 × 80 : logo carré, nom en clair (logo-barre.svg). La page
+# d'accueil est claire : logo horizontal, nom en sombre (logo.svg). L'icône de
+# la fenêtre : le Sceau seul.
 images:
-    productLogo:         "logo.svg"
-    productIcon:         "logo.svg"
+    productLogo:         "logo-barre.svg"
+    productIcon:         "sceau.svg"
     productWelcome:      "logo.svg"
 
 slideshow:               "show.qml"

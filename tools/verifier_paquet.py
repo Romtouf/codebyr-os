@@ -44,7 +44,8 @@ def verifier_arbre(stage, racine):
     source = racine / "live-build/config/includes.chroot_after_packages"
     attendus = list((source / "usr/share/codebyr").rglob("*"))
     for arbre in ("usr/share/gnome-shell/extensions/codebyr@codebyr.io",
-                  "usr/share/nautilus-python", "etc/skel"):
+                  "usr/share/nautilus-python", "etc/skel",
+                  "usr/share/plymouth/themes/codebyr"):
         attendus += list((source / arbre).rglob("*"))
     attendus += [source / "etc/codebyr/espaces.json",
                  source / "usr/share/applications/io.codebyr.Ouvrir.desktop",
@@ -69,6 +70,11 @@ def verifier_arbre(stage, racine):
         if relatif.parts[:2] == ("usr", "bin") and not copie.stat().st_mode & 0o111:
             raise ValueError("Commande non exécutable : %s" % relatif)
         controles += 1
+    # L'avatar des nouveaux comptes n'est pas dans /etc/skel des sources : le
+    # paquet le fabrique (voir build-deb.sh, « 1 quater »).
+    face = stage / "etc/skel/.face"
+    if not face.is_file() or face.read_bytes() != (source / "usr/share/codebyr/avatar.svg").read_bytes():
+        raise ValueError("Avatar absent ou différent des sources : etc/skel/.face")
     for nom in ("fichiers_surs.py", "filtre_syscalls.py", "relais_reseau.py",
                 "permissions_flatpak.py", "navigateur.py"):
         if not (stage / "usr/share/codebyr" / nom).is_file():

@@ -25,6 +25,8 @@ import compte_dedie  # noqa: E402
 import programmes  # noqa: E402
 import flatpak_espace  # noqa: E402
 import archives  # noqa: E402
+import cote_espace  # noqa: E402
+import ordres_espace  # noqa: E402
 
 space = outils.charger("codebyr-space")
 
@@ -226,7 +228,7 @@ class LEspaceDresseLaListe(unittest.TestCase):
         os.makedirs(os.path.join(self.dl, "a", "b", "c"))
         os.makedirs(os.path.join(self.home, "Partagé"))
         compte = mock.Mock(pw_dir=self.home)
-        self._compte = mock.patch.object(space, "_compte_d_espace_courant", return_value=compte)
+        self._compte = mock.patch.object(cote_espace, "compte_courant", return_value=compte)
         self._compte.start()
 
     def tearDown(self):
@@ -309,8 +311,8 @@ class LesApplicationsFlatpakDansUnEspaceDedie(unittest.TestCase):
         # Lancé depuis le bureau, il écrirait dans le dossier du bureau en
         # croyant servir l'Espace.
         interne = _fonction(self.source, "cmd_interne_flatpak", "_flatpak_dans_l_espace")
-        self.assertIn("_compte_d_espace_courant()", interne)
-        self.assertLess(interne.index("_compte_d_espace_courant()"),
+        self.assertIn("cote_espace.compte_courant()", interne)
+        self.assertLess(interne.index("cote_espace.compte_courant()"),
                         interne.index("shutil.which"))
         self.assertIn('("installer", "desinstaller", "liste")', interne)
         self.assertIn("FORME_APPID.match(appid)", interne)
@@ -398,7 +400,7 @@ class LOrdreDesChoses(unittest.TestCase):
     def test_l_espace_prepare_son_profil_avant_que_le_filtre_existe(self):
         # Dans l'ordre inverse, un filtre absent laissait Banque avec Internet
         # en entier : le navigateur ne pointait vers aucun proxy.
-        self.assertLess(self.lancer.index("_preparer_depuis_l_espace("),
+        self.assertLess(self.lancer.index("ordres_espace.preparer_depuis_l_espace("),
                         self.lancer.index("_demarrer_filtre_reseau("))
 
     def test_la_socket_d_ordres_n_entre_jamais_dans_le_bac_a_sable(self):
@@ -453,7 +455,7 @@ class LaPreparationDepuisLEspace(unittest.TestCase):
         self.assertEqual(code, 1)
 
     def test_n_apparait_pas_dans_l_aide(self):
-        self.assertNotIn(space.INTERNE_PREPARER, space.ACTIONS)
+        self.assertNotIn(ordres_espace.INTERNE_PREPARER, space.ACTIONS)
 
 
 class LesBoites(unittest.TestCase):
@@ -548,7 +550,7 @@ class LesBoites(unittest.TestCase):
                 xattr = True
             except OSError:
                 xattr = False
-            recus = space._recueillir_arrivees(home, arrivee)
+            recus = cote_espace.recueillir_arrivees(home, arrivee)
             self.assertEqual(recus, 2)
             partage = os.path.join(home, chemins.PARTAGE)
             self.assertTrue(os.path.exists(os.path.join(partage, "note.txt")))
@@ -572,7 +574,7 @@ class LesBoites(unittest.TestCase):
             with open(secret, "w") as f:
                 f.write("secret")
             os.symlink(secret, os.path.join(arrivee, "piege.txt"))
-            space._recueillir_arrivees(home, arrivee)
+            cote_espace.recueillir_arrivees(home, arrivee)
             self.assertFalse(os.path.exists(os.path.join(home, chemins.PARTAGE, "piege.txt")))
 
     def test_la_piece_jointe_passe_par_la_boite_d_arrivee(self):
@@ -796,13 +798,13 @@ class LeDemenagement(unittest.TestCase):
         # La préparation complète les associations de l'Espace : elle doit
         # trouver celles qu'il avait déjà, donc arriver après ses données.
         lancer = _fonction(self.source, "_lancer", "_rundir")
-        self.assertLess(lancer.index("_demenager_vers_compte_dedie("),
-                        lancer.index("_preparer_depuis_l_espace("))
+        self.assertLess(lancer.index("ordres_espace.demenager_vers_compte_dedie("),
+                        lancer.index("ordres_espace.preparer_depuis_l_espace("))
 
     def test_le_retour_passe_avant_toute_ouverture_ordinaire(self):
         launch = _fonction(self.source, "cmd_launch", "_lancer")
         bloc = launch.split("if not compte_dedie.demande(esp):")[1]
-        self.assertLess(bloc.index("_rapatrier_depuis_compte_dedie("),
+        self.assertLess(bloc.index("ordres_espace.rapatrier_depuis_compte_dedie("),
                         bloc.index("_lancer(espaces, esp, extra, fichier, None)"))
 
     def test_le_dossier_dedie_apparait_au_meme_chemin_qu_avant(self):
@@ -816,13 +818,15 @@ class LeDemenagement(unittest.TestCase):
     def test_le_bout_du_tuyau_est_toujours_ferme(self):
         # Sans cela, un ordre qui échoue laissait l'emballeur attendre à jamais
         # un lecteur disparu (vu dans le WSL le 14/09/2026).
-        ordre = _fonction(self.source, "_ordre_interne", "_session_pour_un_geste")
+        # Sortis de codebyr-space en 1.17.1 : le transport vit dans ordres_espace.py.
+        ordres = _source_module("ordres_espace")
+        ordre = _fonction(ordres, "ordre_interne", "session_pour_un_geste")
         self.assertIn("finally:", ordre)
         self.assertIn("os.close(a_fermer)", ordre.split("finally:")[1][:200])
         # Et les gestes passent par là, sans recopier le motif du tuyau.
-        for geste in ("_demenager_vers_compte_dedie", "_rapatrier_depuis_compte_dedie",
-                      "_geste_dans_l_espace"):
-            corps = self.source.split("def %s(" % geste)[1].split("\ndef ")[0]
+        for geste in ("demenager_vers_compte_dedie", "rapatrier_depuis_compte_dedie",
+                      "geste_dans_l_espace"):
+            corps = ordres.split("def %s(" % geste)[1].split("\ndef ")[0]
             self.assertNotIn("os.pipe()", corps, geste)
 
     @unittest.skipUnless(POSIX, "fichiers_surs est réservé à Linux")
@@ -836,12 +840,11 @@ class LeDemenagement(unittest.TestCase):
                                 compte="cbyr-1000-travail")
             os.makedirs(session.home)
             with mock.patch.object(chemins, "DONNEES", os.path.join(t, "espaces")), \
-                    mock.patch.object(space, "_prevenir"), \
                     mock.patch.object(compte_dedie, "executer", return_value=1):
-                ouvert = space._demenager_vers_compte_dedie(DEDIE, session)
+                ouvert = ordres_espace.demenager_vers_compte_dedie(DEDIE, session, mock.Mock())
             self.assertFalse(ouvert)
             self.assertFalse(os.path.exists(os.path.join(t, "espaces", "travail",
-                                                         space.MARQUEUR_DEMENAGEMENT)))
+                                                         ordres_espace.MARQUEUR_DEMENAGEMENT)))
             with open(os.path.join(ancien, "note.txt")) as f:
                 self.assertEqual(f.read(), "précieux")
 
@@ -849,18 +852,18 @@ class LeDemenagement(unittest.TestCase):
         with tempfile.TemporaryDirectory() as t, \
                 mock.patch.object(chemins, "DONNEES", t), \
                 mock.patch.object(compte_dedie, "executer") as executer:
-            self.assertTrue(space._demenager_vers_compte_dedie(DEDIE, mock.Mock()))
+            self.assertTrue(ordres_espace.demenager_vers_compte_dedie(DEDIE, mock.Mock(), mock.Mock()))
         executer.assert_not_called()
 
     def test_sans_service_le_retour_refuse_plutot_que_de_montrer_l_etat_fige(self):
         with tempfile.TemporaryDirectory() as t:
             os.makedirs(os.path.join(t, "travail"))
-            with open(os.path.join(t, "travail", space.MARQUEUR_DEMENAGEMENT), "w") as f:
+            with open(os.path.join(t, "travail", ordres_espace.MARQUEUR_DEMENAGEMENT), "w") as f:
                 f.write("{}")
             with mock.patch.object(chemins, "DONNEES", t), \
                     mock.patch.object(compte_dedie, "Session",
                                       side_effect=compte_dedie.Indisponible("absent")):
-                self.assertFalse(space._rapatrier_depuis_compte_dedie(ORDINAIRE | {"id": "travail"}))
+                self.assertFalse(ordres_espace.rapatrier_depuis_compte_dedie(ORDINAIRE | {"id": "travail"}))
 
 
 class LesFluxDuPremierProcessus(unittest.TestCase):
@@ -897,13 +900,14 @@ class LesGestesSurLesDonnees(unittest.TestCase):
 
     def test_la_restauration_ferme_l_espace_d_abord(self):
         restaurer = _fonction(self.source, "_restaurer_compte_dedie", "_effacer_compte_dedie")
-        self.assertLess(restaurer.index("cmd_close("), restaurer.index("_geste_dans_l_espace("))
+        self.assertLess(restaurer.index("cmd_close("),
+                        restaurer.index("ordres_espace.geste_dans_l_espace("))
 
     def test_l_effacement_emporte_aussi_l_etat_fige_du_demenagement(self):
         # Sinon la prochaine ouverture ferait déménager à nouveau ce qu'on vient
         # d'effacer.
         effacer = _fonction(self.source, "_effacer_compte_dedie", "cmd_interne_preparer")
-        self.assertLess(effacer.index("_geste_dans_l_espace("),
+        self.assertLess(effacer.index("ordres_espace.geste_dans_l_espace("),
                         effacer.index("shutil.rmtree(os.path.join(chemins.DONNEES"))
 
     def test_la_suppression_efface_avant_de_retirer_le_compte(self):
@@ -912,7 +916,8 @@ class LesGestesSurLesDonnees(unittest.TestCase):
                         supprimer.index("compte_dedie.supprimer("))
 
     def test_une_restauration_a_moitie_faite_est_defaite(self):
-        restaurer = _fonction(self.source, "cmd_interne_restaurer", "cmd_interne_effacer")
+        # Sortie de codebyr-space en 1.17.1 : exécutée par l'Espace (cote_espace.py).
+        restaurer = _fonction(_source_module("cote_espace"), "restaurer", "effacer")
         self.assertIn("reversed(mis_de_cote)", restaurer)
         self.assertIn("reversed(poses)", restaurer)
 
@@ -998,3 +1003,23 @@ class LeReglageDansLaConfiguration(unittest.TestCase):
         # plutôt que de laisser croire à une perte ou à un bug.
         self.assertIn("applications Flatpak seront à réinstaller", self.source)
         self.assertNotIn("applications Flatpak ne s'ouvriront pas", self.source)
+
+
+class LeProgrammeQueLEspaceExecute(unittest.TestCase):
+    """1.17.1 : les ordres sont sortis de codebyr-space (ordres_espace.py).
+
+    Ils faisaient exécuter à l'Espace « os.path.realpath(__file__) », c'est-à-dire
+    codebyr-space. Recopié tel quel dans le module, ce nom aurait désigné le
+    MODULE : l'Espace l'aurait exécuté, et aucun ordre ne serait passé — plus de
+    déménagement, de sauvegarde, de restauration, ni d'application Flatpak.
+    """
+
+    def test_le_module_ne_se_designe_jamais_lui_meme(self):
+        code = "\n".join(l for l in _source_module("ordres_espace").splitlines()
+                         if not l.lstrip().startswith("#"))
+        self.assertNotIn("__file__", code)
+        self.assertIn('"/usr/bin/python3", PROGRAMME', _source_module("ordres_espace"))
+
+    def test_codebyr_space_s_y_inscrit(self):
+        self.assertIn("ordres_espace.PROGRAMME = os.path.realpath(__file__)", _source())
+        self.assertEqual(os.path.basename(ordres_espace.PROGRAMME), "codebyr-space")

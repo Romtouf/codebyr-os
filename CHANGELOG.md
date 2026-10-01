@@ -10,6 +10,17 @@ GNOME (menu du Sceau, liserés colorés) ne se recharge pas à chaud.
 
 ---
 
+## 1.17.1 — non publiée
+
+**Rien ne change à l'usage : le découpage de `codebyr-space` continue.**
+
+- Ce que le bureau demande à un Espace à compte séparé — déménager ses
+  données, les rapatrier, préparer son dossier — : `ordres_espace.py`.
+- Ce que l'Espace fait chez lui, sous son propre compte — recevoir ses
+  données, se restaurer, s'effacer, s'exporter — : `cote_espace.py`.
+
+---
+
 ## 1.17.0 — 30 septembre 2026
 
 **Rien ne change à l'usage : c'est le cœur du système qui se range.**

@@ -25,7 +25,8 @@
 // le 01/10/2026 sur la VM. Tout est donc replacé dès que la taille change —
 // TOUT : le logo et son libellé d'abord (1.17.2~essai1), mais aussi le message
 // du bas et l'invite. Le message « cryptsetup: … set up successfully » arrive
-// juste avant le changement de définition, et glissait encore (même jour).
+// juste avant le changement de définition, et glissait encore (même jour) ;
+// il est tu depuis (voir les messages système, en fin de fichier).
 
 // ── LANGUE ──────────────────────────────────────────────────────────────────
 // Ce script est le thème français. Le langage de Plymouth ne sait rien de la
@@ -142,9 +143,49 @@ Plymouth.SetDisplayNormalFunction(display_normal_callback);
 
 // — Messages système (fsck, phrase de passe refusée…) —
 // Placés en bas, hors du bloc de déverrouillage.
+//
+// Ceux de cryptsetup sont en anglais et portent le nom du volume
+// (« cryptsetup: luks-f49e6cb5-…: set up successfully ») : du texte technique,
+// entre le logo et l'écran de connexion. Le succès est tu — l'invite qui
+// s'efface et le démarrage qui reprend le disent déjà. Les deux refus qu'on
+// peut rencontrer sont dits dans la langue du système. Tout autre message
+// passe tel quel : rare, et précieux à qui dépanne.
+//
+// Les textes de cryptsetup viennent de Debian 13 (cryptsetup-initramfs,
+// scripts/local-top/cryptroot) ; s'ils changeaient, le message anglais
+// d'origine reviendrait — rien de pire.
+//
+// Le langage de Plymouth ne lit une chaîne qu'à travers String(…) : écrire
+// texte.Length() remplacerait la variable par un objet vide.
+fun commence_par(texte, debut) {
+	return String(texte).SubString(0, String(debut).Length()) == debut;
+}
+
+fun finit_par(texte, fin) {
+	n = String(texte).Length();
+	k = String(fin).Length();
+	if (n < k) {
+		return 0;
+	}
+	return String(texte).SubString(n - k, n) == fin;
+}
+
 fun message_callback(texte) {
 	global.message_texte = texte;
-	global.message_affiche = 1;
-	global.message = ligne(texte, 0.6, 0.66, 0.72, screen_h - 64);
+	if (commence_par(texte, "cryptsetup: ") && finit_par(texte, ": set up successfully")) {
+		global.message_affiche = 0;
+		global.message = NULL;
+	} else {
+		if (commence_par(texte, "cryptsetup: ERROR: ")
+		    && finit_par(texte, ": cryptsetup failed, bad password or options?")) {
+			texte = traduire("Phrase de passe incorrecte. Réessayez.");
+		}
+		if (commence_par(texte, "cryptsetup: ERROR: ")
+		    && finit_par(texte, ": maximum number of tries exceeded")) {
+			texte = traduire("Trop d'essais. Redémarrez l'ordinateur pour réessayer.");
+		}
+		global.message_affiche = 1;
+		global.message = ligne(texte, 0.6, 0.66, 0.72, screen_h - 64);
+	}
 }
 Plymouth.SetMessageFunction(message_callback);

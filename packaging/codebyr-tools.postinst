@@ -81,21 +81,35 @@ case "$1" in
 			/usr/lib/systemd/systemd-sysctl "$SYSCTL_CODEBYR" 2>/dev/null || true
 		fi
 
-		# Options du noyau au démarrage (/etc/default/grub.d/90-codebyr-noyau.cfg).
-		# Elles n'agissent qu'une fois inscrites dans la configuration de GRUB,
-		# et au redémarrage suivant. On ne régénère que si grub.cfg ne les porte
-		# pas encore : pas à chaque mise à jour. Surtout pas en comparant les
-		# dates — dpkg donne au fichier celle du PAQUET : sur une machine dont le
-		# noyau a été mis à jour depuis, grub.cfg serait « plus récent » et les
-		# options n'arriveraient jamais. Ni dans un chroot de construction ni sur
-		# le live (pas de /boot/grub/grub.cfg) : là, l'installeur régénère GRUB
-		# lui-même et lit ce fichier.
-		GRUB_CODEBYR=/etc/default/grub.d/90-codebyr-noyau.cfg
-		if [ -f "$GRUB_CODEBYR" ] && [ -f /boot/grub/grub.cfg ] && [ -x /usr/sbin/update-grub ] \
-				&& [ -d /run/systemd/system ] \
-				&& ! grep -q 'slab_nomerge page_alloc.shuffle=1' /boot/grub/grub.cfg; then
-			/usr/sbin/update-grub >/dev/null 2>&1 \
-				|| echo "codebyr : update-grub a échoué — relancez-le à la main." >&2
+		# Le démarrage selon Codebyr : options du noyau
+		# (/etc/default/grub.d/90-codebyr-noyau.cfg), menu caché et silence
+		# (91-codebyr-demarrage.cfg, /etc/grub.d/35_codebyr_menu et
+		# /etc/grub.d/10_linux). Rien n'agit avant d'être inscrit dans la
+		# configuration de GRUB (/boot/grub/grub.cfg), puis au redémarrage.
+		#
+		# On ne la régénère que si ces fichiers ont changé depuis la dernière
+		# fois (empreinte gardée dans /var/lib/codebyr, comme pour l'écran de
+		# démarrage), ou si grub.cfg ne porte pas les options du noyau : pas à
+		# chaque mise à jour. Surtout pas en comparant les dates — dpkg donne
+		# aux fichiers celle du PAQUET : sur une machine dont le noyau a été
+		# mis à jour depuis, grub.cfg serait « plus récent » et rien
+		# n'arriverait jamais. Ni dans un chroot de construction ni sur le live
+		# (pas de /boot/grub/grub.cfg) : là, l'installeur régénère GRUB
+		# lui-même et lit ces fichiers.
+		GRUB_CODEBYR="/etc/default/grub.d/90-codebyr-noyau.cfg /etc/default/grub.d/91-codebyr-demarrage.cfg /etc/grub.d/35_codebyr_menu /etc/grub.d/10_linux"
+		GRUB_TEMOIN=/var/lib/codebyr/grub.sha256
+		if [ -f /boot/grub/grub.cfg ] && [ -x /usr/sbin/update-grub ] \
+				&& [ -d /run/systemd/system ] && [ ! -d /run/live ]; then
+			GRUB_EMPREINTE="$(cat $GRUB_CODEBYR 2>/dev/null | sha256sum | cut -d' ' -f1)"
+			if [ "$(cat "$GRUB_TEMOIN" 2>/dev/null)" != "$GRUB_EMPREINTE" ] \
+					|| ! grep -q 'slab_nomerge page_alloc.shuffle=1' /boot/grub/grub.cfg; then
+				if /usr/sbin/update-grub >/dev/null 2>&1; then
+					mkdir -p /var/lib/codebyr
+					echo "$GRUB_EMPREINTE" > "$GRUB_TEMOIN"
+				else
+					echo "codebyr : update-grub a échoué — relancez-le à la main." >&2
+				fi
+			fi
 		fi
 
 		# Profil AppArmor du filtre réseau. Au démarrage, apparmor.service

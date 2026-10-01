@@ -38,6 +38,14 @@ DEBIAN_OS_RELEASE=/usr/lib/os-release.debian
 # nouvelle version majeure, qu'il n'installe pas de toute façon.
 DEBIAN_FACE=/etc/skel/.face.desktop-base
 
+# Le script qui écrit les entrées Linux du menu de GRUB (/etc/grub.d/10_linux)
+# appartient à grub-common, dont c'est une conffile. Détourné de la même façon,
+# vers un sous-dossier que grub-mkconfig ne parcourt pas (/etc/grub.d/debian/) :
+# celui de Codebyr l'appelle, et retire de ce qu'il écrit les messages
+# « Loading Linux … » de l'entrée par défaut (voir packaging/grub/10_linux).
+# Jamais une copie de celui de Codebyr, qui s'appellerait alors lui-même.
+DEBIAN_10_LINUX=/etc/grub.d/debian/10_linux
+
 case "$1" in
 	install|upgrade)
 		if [ "$(dpkg-divert --listpackage /usr/lib/os-release)" != "codebyr-tools" ]; then
@@ -53,6 +61,15 @@ case "$1" in
 			fi
 			dpkg-divert --package codebyr-tools --add --no-rename \
 				--divert "$DEBIAN_FACE" /etc/skel/.face >/dev/null
+		fi
+		if [ "$(dpkg-divert --listpackage /etc/grub.d/10_linux)" != "codebyr-tools" ]; then
+			mkdir -p /etc/grub.d/debian
+			if [ -e /etc/grub.d/10_linux ] && [ ! -e "$DEBIAN_10_LINUX" ] \
+					&& ! grep -q "codebyr:enveloppe-10_linux" /etc/grub.d/10_linux; then
+				cp -a /etc/grub.d/10_linux "$DEBIAN_10_LINUX"
+			fi
+			dpkg-divert --package codebyr-tools --add --no-rename \
+				--divert "$DEBIAN_10_LINUX" /etc/grub.d/10_linux >/dev/null
 		fi
 		;;
 esac

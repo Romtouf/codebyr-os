@@ -78,6 +78,21 @@ def verifier_arbre(stage, racine):
     face = stage / "etc/skel/.face"
     if not face.is_file() or face.read_bytes() != (source / "usr/share/codebyr/avatar.svg").read_bytes():
         raise ValueError("Avatar absent ou différent des sources : etc/skel/.face")
+    # Le démarrage : réglages et scripts de GRUB. Les scripts doivent être
+    # exécutables — sinon grub-mkconfig les saute en silence, et le menu ou
+    # les entrées Linux ne sont plus ceux de Codebyr. L'enveloppe de 10_linux
+    # n'est pas dans l'arborescence de l'image (voir build-deb.sh).
+    grub = [(source / "etc/default/grub.d/91-codebyr-demarrage.cfg",
+             stage / "etc/default/grub.d/91-codebyr-demarrage.cfg", False),
+            (source / "etc/grub.d/35_codebyr_menu", stage / "etc/grub.d/35_codebyr_menu", True),
+            (racine / "packaging/grub/10_linux", stage / "etc/grub.d/10_linux", True)]
+    for original, copie, executable in grub:
+        if not copie.is_file() or copie.read_bytes() != original.read_bytes().replace(b"\r\n", b"\n"):
+            raise ValueError("Absent ou différent des sources : %s" % copie.relative_to(stage))
+        if copie.stat().st_mode & 0o022:
+            raise ValueError("Inscriptible par groupe/autres : %s" % copie.relative_to(stage))
+        if executable and not copie.stat().st_mode & 0o111:
+            raise ValueError("Script de GRUB non exécutable : %s" % copie.relative_to(stage))
     # Une langue par fichier po/<langue>.po, compilée pour les programmes et
     # pour l'extension GNOME (packaging/traductions.py).
     for po in sorted((racine / "po").glob("*.po")):

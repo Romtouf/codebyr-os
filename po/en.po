@@ -1772,6 +1772,14 @@ msgstr "Disk passphrase"
 msgid "Tapez-la, puis appuyez sur Entrée"
 msgstr "Type it, then press Enter"
 
+#: usr/share/plymouth/themes/codebyr/codebyr.script
+msgid "Phrase de passe incorrecte. Réessayez."
+msgstr "Wrong passphrase. Try again."
+
+#: usr/share/plymouth/themes/codebyr/codebyr.script
+msgid "Trop d'essais. Redémarrez l'ordinateur pour réessayer."
+msgstr "Too many attempts. Restart the computer to try again."
+
 #: usr/share/codebyr/antiphishing/_locales/fr/messages.json
 msgid "Codebyr — Bouclier anti-hameçonnage"
 msgstr "Codebyr — Anti-phishing shield"

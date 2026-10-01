@@ -10,6 +10,31 @@ GNOME (menu du Sceau, liserés colorés) ne se recharge pas à chaud.
 
 ---
 
+## 1.19.0 — non publiée
+
+**Un démarrage sans couture.** Du logo du fabricant à l'écran de connexion,
+plus de menu ni de texte technique :
+
+- le menu de GRUB ne s'affiche plus 5 secondes à chaque démarrage. Il reste
+  à portée : **tapotez F4** (Fn + F4 sur la plupart des portables) dès le logo
+  du fabricant, pour démarrer un noyau précédent ou le mode de dépannage.
+  Quand un autre système est installé, Windows par exemple, le menu reste
+  visible pour choisir. Un délai réglé par vous dans `/etc/default/grub`
+  n'est jamais remplacé ;
+- les messages « Loading Linux … » et « Loading initial ramdisk … » ne
+  s'écrivent plus en blanc sur noir avant le logo de Codebyr ; le menu, quand
+  il s'ouvre, n'a plus le bleu de Debian ;
+- le noyau n'affiche plus à l'écran ses erreurs ordinaires — sur une machine
+  virtuelle VMware, il en écrivait une avant chaque démarrage. Elles restent
+  dans le journal ;
+- sous la phrase de passe du disque, plus de « cryptsetup: luks-…: set up
+  successfully ». Une phrase de passe fausse affiche « Phrase de passe
+  incorrecte. Réessayez. », dans la langue du système.
+
+Le temps gagné : les 5 secondes du menu, moins une, gardée pour F4.
+
+---
+
 ## 1.18.2 — 1er octobre 2026
 
 **L'écran de démarrage parle la langue du système.** Sur un disque chiffré,

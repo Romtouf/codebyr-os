@@ -54,6 +54,8 @@ for chemin in \
 	etc/codebyr/espaces.json \
 	etc/sysctl.d/91-codebyr-noyau.conf \
 	etc/default/grub.d/90-codebyr-noyau.cfg \
+	etc/default/grub.d/91-codebyr-demarrage.cfg \
+	etc/grub.d/35_codebyr_menu \
 	etc/apparmor.d/codebyr-net-proxy \
 	etc/apparmor.d/codebyr-uid
 do
@@ -114,6 +116,14 @@ EOF
 mkdir -p "$STAGE/etc/skel"
 cp "$SRC/usr/share/codebyr/avatar.svg" "$STAGE/etc/skel/.face"
 
+# 1 quater bis) Les entrées Linux du menu de GRUB, sans « Loading Linux … » :
+#    ce script remplace celui de grub-common, détourné par le preinst (voir
+#    packaging/grub/10_linux). Posé ICI, jamais par l'image, pour la même
+#    raison que l'avatar : le preinst aurait rangé ce script comme étant
+#    celui de Debian, et il se serait appelé lui-même.
+mkdir -p "$STAGE/etc/grub.d"
+sed 's/\r$//' "$REPO/packaging/grub/10_linux" > "$STAGE/etc/grub.d/10_linux"
+
 # 1 quinquies) Les langues autres que le français (po/<langue>.po), compilées
 #    pour les programmes (.mo, gettext) et pour l'extension GNOME (.json). Voir
 #    packaging/traductions.py. Obligatoires : sans elles, un testeur qui ne
@@ -166,6 +176,13 @@ find "$STAGE/etc/skel" -type d -exec chmod 755 {} + 2>/dev/null || true
 # Options du noyau : un « \r » collé à la dernière la rendrait invalide, et le
 # noyau l'ignorerait sans rien dire.
 [ -d "$STAGE/etc/default/grub.d" ] && sed -i 's/\r$//' "$STAGE"/etc/default/grub.d/*.cfg
+# Scripts de GRUB : update-grub les exécute à chaque nouveau noyau. Sans le
+# bit d'exécution, grub-mkconfig les saute en silence ; avec un « \r », il
+# échoue, et le noyau ne s'installe pas.
+if [ -d "$STAGE/etc/grub.d" ]; then
+	find "$STAGE/etc/grub.d" -type f -exec sed -i 's/\r$//' {} +
+	find "$STAGE/etc/grub.d" -type f -exec chmod 755 {} +
+fi
 # Profils AppArmor : un « \r » y est une erreur de syntaxe, et un profil qui ne
 # se charge pas laisse le programme NON confiné, sans rien qui le signale.
 if [ -d "$STAGE/etc/apparmor.d" ]; then

@@ -43,6 +43,10 @@ jobs:
           sh="$sh $(grep -rl '^#!/bin/sh' \
                 live-build/config/includes.chroot_after_packages/usr/bin/ \
                 | tr '\n' ' ')"
+          # Les scripts de GRUB (menu, entrées Linux) tournent à chaque
+          # update-grub : une faute, et plus aucun noyau ne s'installe.
+          sh="$sh $(ls live-build/config/includes.chroot_after_packages/etc/grub.d/* \
+                packaging/grub/* | tr '\n' ' ')"
           echo "python=$py" >> "$GITHUB_OUTPUT"
           echo "shell=$sh"  >> "$GITHUB_OUTPUT"
           echo "Python : $py"

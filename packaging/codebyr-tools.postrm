@@ -39,10 +39,40 @@ rendre_l_avatar() {
 	rm -f "$DEBIAN_FACE"
 }
 
+# Le script des entrées Linux de GRUB (voir le preinst), rendu à grub-common de
+# la même façon. La copie de retour porte un nom que grub-mkconfig ignore
+# (« .dpkg-… ») : il ne l'exécute pas, même le temps d'un instant.
+DEBIAN_10_LINUX=/etc/grub.d/debian/10_linux
+rendre_10_linux() {
+	[ "$(dpkg-divert --listpackage /etc/grub.d/10_linux)" = "codebyr-tools" ] || return 0
+	if [ -e "$DEBIAN_10_LINUX" ]; then
+		cp -a "$DEBIAN_10_LINUX" /etc/grub.d/10_linux.dpkg-codebyr-retour
+		mv -f /etc/grub.d/10_linux.dpkg-codebyr-retour /etc/grub.d/10_linux
+	fi
+	dpkg-divert --package codebyr-tools --remove --no-rename \
+		--divert "$DEBIAN_10_LINUX" /etc/grub.d/10_linux >/dev/null
+	rm -f "$DEBIAN_10_LINUX"
+	rmdir /etc/grub.d/debian 2>/dev/null || true
+}
+
+# Sans Codebyr, GRUB redevient celui de Debian : menu, messages, options du
+# noyau. Les fichiers de Codebyr sont déjà retirés ; seule la configuration
+# écrite (/boot/grub/grub.cfg) les porte encore. Pas dans un chroot.
+regenerer_grub() {
+	if [ -f /boot/grub/grub.cfg ] && [ -x /usr/sbin/update-grub ] && [ -d /run/systemd/system ]; then
+		/usr/sbin/update-grub >/dev/null 2>&1 \
+			|| echo "codebyr : update-grub a échoué — relancez-le à la main." >&2
+	fi
+}
+
 case "$1" in
 	remove|abort-install|disappear)
 		retirer_la_deviation
 		rendre_l_avatar
+		rendre_10_linux
+		if [ "$1" = remove ]; then
+			regenerer_grub
+		fi
 		;;
 	abort-upgrade)
 		if dpkg --compare-versions "$2" lt 1.16.1; then
@@ -50,6 +80,9 @@ case "$1" in
 		fi
 		if dpkg --compare-versions "$2" lt 1.17.2; then
 			rendre_l_avatar
+		fi
+		if dpkg --compare-versions "$2" lt 1.19.0; then
+			rendre_10_linux
 		fi
 		;;
 esac

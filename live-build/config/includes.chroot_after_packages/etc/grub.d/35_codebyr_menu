@@ -1,0 +1,50 @@
+#! /bin/sh
+# Codebyr OS — le menu de démarrage : ses couleurs, et son retour quand un autre
+# système est installé.
+#
+# /etc/default/grub.d/91-codebyr-demarrage.cfg cache le menu de GRUB : avec un
+# seul système, il n'y a rien à choisir. Avec deux, il faut choisir à chaque
+# démarrage, et une touche à presser au bon moment ne se devine pas.
+#
+# Ce script tourne après 30_os-prober, qui ajoute au menu les systèmes trouvés
+# sur les autres partitions. Il pose la même question à os-prober et, si la
+# réponse n'est pas vide, rend au menu sa place : visible, quelques secondes.
+# Ses lignes s'exécutent au démarrage APRÈS celles de 00_header, et c'est la
+# dernière valeur qui compte quand GRUB décide d'afficher son menu. Ubuntu
+# fait de même (30_os-prober, « adjust_timeout ») ; Debian a laissé cette
+# partie de côté.
+set -e
+
+# Seulement quand c'est Codebyr qui a caché le menu : le choix d'un
+# administrateur reste le sien.
+case "${CODEBYR_MENU_CACHE-}" in
+'' | *[!0-9]*) exit 0 ;;
+esac
+
+# Dans la console du micrologiciel, que 91-codebyr-demarrage.cfg a choisie,
+# 05_debian_theme peint le menu en cyan sur bleu : le vieux thème de Debian,
+# qu'il réserve à tout système qui ne s'appelle pas Ubuntu. Quand le menu
+# s'ouvre, il est sobre : gris clair sur noir, la ligne choisie en cyan, la
+# couleur de la saisie de la phrase de passe.
+if [ "${GRUB_TERMINAL_OUTPUT-}" = console ]; then
+	cat <<EOF
+set menu_color_normal=light-gray/black
+set menu_color_highlight=black/light-cyan
+EOF
+fi
+
+# Les mêmes conditions que 30_os-prober : s'il n'a pas cherché, il n'a rien
+# ajouté au menu.
+[ "x${GRUB_DISABLE_OS_PROBER}" != "xtrue" ] || exit 0
+command -v os-prober >/dev/null && command -v linux-boot-prober >/dev/null || exit 0
+
+autres="$(os-prober 2>/dev/null || true)"
+[ -n "$autres" ] || exit 0
+
+cat <<EOF
+# Un autre système est installé : le menu reste visible, pour choisir.
+if [ x\$feature_timeout_style = xy ] ; then
+  set timeout_style=menu
+fi
+set timeout=${CODEBYR_MENU_CACHE}
+EOF

@@ -1,0 +1,39 @@
+#! /bin/sh
+# Codebyr OS — les entrées Linux du menu de GRUB, sans « Loading Linux … ».
+#
+# Avant de démarrer Linux, GRUB écrit deux lignes, en blanc sur noir, entre le
+# logo du fabricant et celui de Codebyr : « Chargement de Linux 6.12… » puis
+# « Chargement du disque mémoire initial… ». Ubuntu les tait pour l'entrée par
+# défaut ; Debian a figé ce réglage dans son script (« quiet_boot="0" »), sans
+# option pour le changer.
+#
+# Ce fichier remplace donc celui de grub-common, DÉTOURNÉ par le preinst de
+# codebyr-tools vers /etc/grub.d/debian/10_linux — un sous-dossier, que
+# grub-mkconfig ne parcourt pas : le script de Debian ne tourne que d'ici. Il
+# fait tout le travail, et suit ses mises à jour. On retire seulement de sa
+# sortie les lignes « echo » de l'entrée par défaut (« gnulinux-simple-… ») :
+# ces deux messages, et rien d'autre. Les entrées des options avancées et du
+# dépannage les gardent — là, on veut voir.
+#
+# Livré par le paquet, jamais par l'image : celle-ci copie ses fichiers AVANT
+# d'installer le paquet, et le preinst aurait alors rangé CE script comme
+# étant celui de Debian — qui se serait appelé lui-même.
+set -e
+
+DEBIAN=/etc/grub.d/debian/10_linux
+
+# Sans le script de Debian, aucune entrée Linux : un menu sans système à
+# démarrer. Mieux vaut faire échouer update-grub, qui garde alors l'ancienne
+# configuration, que d'en écrire une qui ne démarre plus.
+if [ ! -x "$DEBIAN" ] || grep -q "codebyr:enveloppe-10_linux" "$DEBIAN"; then
+	echo "codebyr : $DEBIAN absent ou remplacé — entrées Linux non écrites." >&2
+	exit 1
+fi
+
+entrees="$("$DEBIAN" "$@")"
+printf '%s\n' "$entrees" | awk '
+	/^[[:space:]]*(menuentry|submenu)[[:space:]]/ { simple = ($0 ~ /gnulinux-simple-/) }
+	simple && /^[[:space:]]*echo[[:space:]]/ { next }
+	{ print }
+'
+# codebyr:enveloppe-10_linux

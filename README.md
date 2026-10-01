@@ -26,9 +26,10 @@ d'autorisation ; la 1.16.5 rend leur aperçu aux images dans Fichiers, et la
 d'un Espace à compte séparé. La 1.16.7 protège le lanceur de l'écran de
 bienvenue, modifiable par tous les comptes depuis la 1.13.0, et la 1.16.8
 ajoute deux protections du noyau au démarrage (détail dans
-[SECURITY.md](SECURITY.md)). **L'ISO 1.16.8 est reproductible** : chacun peut
-la reconstruire depuis le code publié et retrouver la même empreinte (voir
-« Reconstruire l'ISO vous-même » plus bas). Les 1.17.0 et 1.17.1 rangent le
+[SECURITY.md](SECURITY.md)). **Les ISO 1.16.8 et 1.18.2 sont reproductibles** :
+chacun peut les reconstruire depuis le code publié et retrouver la même
+empreinte (voir « Reconstruire l'ISO vous-même » plus bas). **L'ISO 1.18.2
+démarre aussi en anglais** (*boot menu → « Live session (English) »*). Les 1.17.0 et 1.17.1 rangent le
 cœur du système en modules ; la 1.17.1 fait aussi revenir les fichiers d'un
 Espace quand on lui retire « Compte séparé », comme promis. La 1.17.2
 ferme une élévation de privilèges par le remplissage du dossier « Modèles »,
@@ -186,7 +187,7 @@ Prérequis : un système Debian/Ubuntu (ou WSL2) avec `live-build`.
 
 ```bash
 # 1) Environnement (une fois) — voir live-build/scripts/provision-wsl.sh pour WSL2
-sudo apt install live-build rsync librsvg2-bin
+sudo apt install live-build rsync librsvg2-bin python3
 
 # 2) Construction (root requis, filesystem Linux natif requis)
 export CODEBYR_REPO=/chemin/vers/ce/depot
@@ -296,15 +297,15 @@ la release, quelle que soit la machine. Deux façons de le vérifier :
 
 - **Sans rien installer** : copiez le dépôt sur GitHub (*Fork*), puis dans
   l'onglet *Actions* → « Construire l'ISO » → *Run workflow*, choisissez
-  l'étiquette de la version (`v1.16.8`…) et collez dans « SHA256 attendu »
+  l'étiquette de la version (`v1.18.2`…) et collez dans « SHA256 attendu »
   l'empreinte du fichier `SHA256SUMS` de la release. La construction (environ
   20 minutes) échoue si l'image obtenue diffère.
 - **Sur une machine Debian 13** :
 
   ```bash
   git clone https://github.com/Romtouf/codebyr-os && cd codebyr-os
-  git checkout v1.16.8
-  sudo apt install live-build rsync librsvg2-bin
+  git checkout v1.18.2
+  sudo apt install live-build rsync librsvg2-bin python3
   sudo CODEBYR_REPO="$PWD" bash live-build/scripts/build.sh
   sha256sum dist/*.iso      # → la même empreinte que SHA256SUMS
   ```

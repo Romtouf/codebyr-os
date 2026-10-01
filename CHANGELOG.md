@@ -19,7 +19,7 @@ langue du système qui compte, celle choisie à l'installation, et non celle
 d'un compte : la question vient avant toute session. Un écran de démarrage
 choisi par vous n'est jamais remplacé.
 
-**Pour la prochaine ISO** (déjà prêts, ils n'arrivent que par elle) :
+**Dans l'ISO 1.18.2**, publiée le même jour (reproductible, comme la 1.16.8) :
 
 - une entrée « Live session (English) » au menu de démarrage : la session
   d'essai s'ouvre en anglais, clavier américain par défaut ;

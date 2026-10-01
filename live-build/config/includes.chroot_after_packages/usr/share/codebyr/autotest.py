@@ -33,6 +33,11 @@ import shutil
 import subprocess
 import sys
 
+from traduction import _, n_
+
+# Couleurs du terminal, hors des textes à traduire.
+ROUGE, VERT, NORMAL = "\033[31m", "\033[32m", "\033[0m"
+
 # — Ce que l'on contrôle, et l'incident qui l'a rendu nécessaire —
 TROUSSEAU = "/usr/share/keyrings/codebyr-archive-keyring.gpg"
 EXTENSION_JETABLE = "/usr/share/nautilus-python/extensions/codebyr-jetable.py"
@@ -60,10 +65,10 @@ def analyser_extension_jetable(fichier_present, greffon_present):
     sans le greffon python3-nautilus, le fichier est là et n'est jamais lu.
     """
     if not fichier_present:
-        return False, "l'extension n'est pas installée"
+        return False, _("l'extension n'est pas installée")
     if not greffon_present:
-        return False, "python3-nautilus absent — l'extension n'est jamais chargée"
-    return True, "extension présente et greffon installé"
+        return False, _("python3-nautilus absent — l'extension n'est jamais chargée")
+    return True, _("extension présente et greffon installé")
 
 
 def analyser_invite(champ_shadow):
@@ -76,10 +81,10 @@ def analyser_invite(champ_shadow):
                    n'existe pas (ce qui n'est pas une anomalie).
     """
     if champ_shadow is None:
-        return True, "pas de compte invité sur ce poste"
+        return True, _("pas de compte invité sur ce poste")
     if champ_shadow in SANS_MOT_DE_PASSE:
-        return True, "aucun mot de passe ne fonctionne (session locale seule)"
-    return False, "le compte invité a un mot de passe utilisable"
+        return True, _("aucun mot de passe ne fonctionne (session locale seule)")
+    return False, _("le compte invité a un mot de passe utilisable")
 
 
 def analyser_homes(dossiers):
@@ -92,10 +97,13 @@ def analyser_homes(dossiers):
     """
     ouverts = [nom for nom, mode in dossiers if mode & 0o077]
     if ouverts:
-        return False, "lisible(s) par d'autres comptes : " + ", ".join(sorted(ouverts))
+        return False, n_("lisible par d'autres comptes : {dossiers}",
+                         "lisibles par d'autres comptes : {dossiers}",
+                         len(ouverts)).format(dossiers=", ".join(sorted(ouverts)))
     if not dossiers:
-        return True, "aucun dossier personnel à vérifier"
-    return True, "%d dossier(s) personnel(s), tous privés" % len(dossiers)
+        return True, _("aucun dossier personnel à vérifier")
+    return True, n_("{n} dossier personnel, privé", "{n} dossiers personnels, tous privés",
+                    len(dossiers)).format(n=len(dossiers))
 
 
 def analyser_trousseau(empreintes):
@@ -106,10 +114,10 @@ def analyser_trousseau(empreintes):
     signature parfaitement valide, faute de connaître la clé.
     """
     if not empreintes:
-        return False, "trousseau illisible ou vide"
+        return False, _("trousseau illisible ou vide")
     if SOUS_CLE in empreintes:
-        return True, "connaît la sous-clé de signature en cours"
-    return False, ("ignore la sous-clé %s… — les mises à jour vont cesser"
+        return True, _("connaît la sous-clé de signature en cours")
+    return False, (_("ignore la sous-clé %s… — les mises à jour vont cesser")
                    % SOUS_CLE[:16])
 
 
@@ -125,10 +133,10 @@ def analyser_maj_automatiques(contenu, minuterie_active):
         ligne for ligne in texte.splitlines()
         if "Unattended-Upgrade" in ligne and not ligne.strip().startswith("//"))
     if not arme:
-        return False, "APT::Periodic::Unattended-Upgrade n'est pas à \"1\""
+        return False, _("APT::Periodic::Unattended-Upgrade n'est pas à \"1\"")
     if not minuterie_active:
-        return False, "réglage présent mais la minuterie apt-daily est inactive"
-    return True, "réglage et minuterie en place"
+        return False, _("réglage présent mais la minuterie apt-daily est inactive")
+    return True, _("réglage et minuterie en place")
 
 
 def analyser_bac_a_sable(bwrap, userns, dbus_run_session):
@@ -142,12 +150,12 @@ def analyser_bac_a_sable(bwrap, userns, dbus_run_session):
     if not bwrap:
         manques.append("bubblewrap")
     if not userns:
-        manques.append("espaces de noms utilisateur")
+        manques.append(_("espaces de noms utilisateur"))
     if not dbus_run_session:
         manques.append("dbus-run-session")
     if manques:
         return False, "manque : " + ", ".join(manques)
-    return True, "bubblewrap, espaces de noms et bus privé disponibles"
+    return True, _("bubblewrap, espaces de noms et bus privé disponibles")
 
 
 # ── Collecte — la seule partie qui touche à la machine ──────────────────────
@@ -252,12 +260,12 @@ def relever():
 
 
 LIBELLES = (
-    ("extension_jetable", "Clic droit « Ouvrir en Jetable »"),
-    ("invite", "Compte invité sans mot de passe"),
-    ("homes", "Dossiers personnels privés"),
-    ("trousseau", "Trousseau à jour pour les mises à jour"),
-    ("maj", "Mises à jour automatiques armées"),
-    ("bac_a_sable", "Bac à sable opérationnel"),
+    ("extension_jetable", _("Clic droit « Ouvrir en Jetable »")),
+    ("invite", _("Compte invité sans mot de passe")),
+    ("homes", _("Dossiers personnels privés")),
+    ("trousseau", _("Trousseau à jour pour les mises à jour")),
+    ("maj", _("Mises à jour automatiques armées")),
+    ("bac_a_sable", _("Bac à sable opérationnel")),
 )
 
 
@@ -269,20 +277,20 @@ def cmd_verifier_poste():
         # et « sudo » y est volontairement impossible (no_new_privs). Les
         # mesures ne diraient rien du poste.
         ecrire = sys.stderr.write
-        ecrire("Cet autotest porte sur LE POSTE, et doit être lancé "
-               "depuis le bureau.")
+        ecrire(_("Cet autotest porte sur LE POSTE, et doit être lancé "
+                 "depuis le bureau."))
         ecrire(os.linesep)
-        ecrire("Vous êtes dans l'Espace « %s » : les fichiers lus seraient "
-               "ceux du bac à sable," % depuis)
+        ecrire(_("Vous êtes dans l'Espace « %s » : les fichiers lus seraient "
+                 "ceux du bac à sable,") % depuis)
         ecrire(os.linesep)
-        ecrire("et « sudo » y est volontairement impossible.")
+        ecrire(_("et « sudo » y est volontairement impossible."))
         ecrire(os.linesep + os.linesep)
-        ecrire("Ouvrez un terminal ordinaire du bureau et relancez.")
+        ecrire(_("Ouvrez un terminal ordinaire du bureau et relancez."))
         ecrire(os.linesep)
         return 2
     resultats = relever()
-    print("Autotest du poste — ce qui est mesuré sur cette machine, "
-          "pas ce qui est promis.\n")
+    print(_("Autotest du poste — ce qui est mesuré sur cette machine, "
+            "pas ce qui est promis.\n"))
     echecs = 0
     indecis = 0
     for cle, libelle in LIBELLES:
@@ -296,14 +304,14 @@ def cmd_verifier_poste():
         print("  %s %-38s %s" % (etat, libelle, detail))
     print()
     if echecs:
-        print("\033[31m%d contrôle(s) en échec.\033[0m Ce sont des défauts qui ne "
-              "se voient pas" % echecs)
-        print("à l'usage : un poste concerné se comporte exactement comme "
-              "un poste sain.")
+        print(ROUGE + n_("{n} contrôle en échec.", "{n} contrôles en échec.",
+                         echecs).format(n=echecs) + NORMAL + " "
+              + _("Ce sont des défauts qui ne se voient pas\nà l'usage : un poste "
+                  "concerné se comporte exactement comme un poste sain."))
     elif indecis:
-        print("\033[32mTout ce qui a pu être mesuré est conforme.\033[0m "
-              "Relancez avec sudo")
-        print("pour les contrôles qui demandent les droits d'administration.")
+        print(VERT + _("Tout ce qui a pu être mesuré est conforme.") + NORMAL + " "
+              + _("Relancez avec sudo\npour les contrôles qui demandent les droits "
+                  "d'administration."))
     else:
-        print("\033[32mTout est conforme.\033[0m")
+        print(VERT + _("Tout est conforme.") + NORMAL)
     return 1 if echecs else 0

@@ -37,7 +37,32 @@ FICHIERS_TRADUITS = [
     "usr/bin/codebyr-assistant",
     "usr/bin/codebyr-bienvenue",
     "usr/bin/codebyr-config",
+    "usr/bin/codebyr-space",
+    "usr/share/codebyr/archives.py",
+    "usr/share/codebyr/autotest.py",
+    "usr/share/codebyr/bac_a_sable.py",
+    "usr/share/codebyr/compte_dedie.py",
+    "usr/share/codebyr/fichiers_surs.py",
+    "usr/share/codebyr/filtre_syscalls.py",
+    "usr/share/codebyr/navigateur.py",
+    "usr/share/codebyr/ordres_espace.py",
+    "usr/share/codebyr/permissions_flatpak.py",
 ]
+
+# Ce qui reste en français DANS un fichier traduit, et pourquoi. Le journal
+# (journal(), noter()) n'y figure pas : il est écarté d'office — il s'adresse
+# à qui dépanne, pas à qui utilise.
+LAISSES = {
+    # Erreur interne, jamais montrée : le processus est simplement ignoré.
+    "Processus terminé avant son enregistrement",
+    # Le nom d'une section que Flatpak écrit et que le code relit.
+    "Session Bus Policy",
+    # Une donnée transmise au bouclier, pas un texte affiché.
+    "Domaines bancaires protégés par Codebyr.",
+    # Diagnostics techniques de libseccomp, rapportés tels quels.
+    "Création du filtre seccomp impossible", "Règle seccomp impossible : %s",
+    "Chargement seccomp impossible",
+}
 
 
 def _lire(chemin):
@@ -72,6 +97,16 @@ class LaLangueChoisie(unittest.TestCase):
     def test_sinon_l_anglais_plutot_que_le_francais(self):
         self.assertEqual(traduction.choisir(["de_DE"], {"en"}), "en")
         self.assertEqual(traduction.choisir(["ja_JP"], {"en"}), "en")
+
+    def test_en_francais_aucun_fichier_n_est_consulte(self):
+        # Le service des comptes (AppArmor) et les bacs à sable importent ce
+        # module : en français ou sans langue, il ne doit rien ouvrir.
+        from unittest import mock
+        for environ in ({}, {"LANG": "C.UTF-8"}, {"LANG": "fr_FR.UTF-8"}):
+            with mock.patch("os.path.isfile", side_effect=AssertionError("consulté")), \
+                    mock.patch("builtins.open", side_effect=AssertionError("ouvert")):
+                catalogue = traduction.charger("/nulle/part", environ)
+            self.assertIsInstance(catalogue, gettext.NullTranslations)
 
     def test_le_pluriel_du_francais_sans_traduction(self):
         self.assertIsInstance(traduction._traduction, gettext.NullTranslations)
@@ -171,6 +206,13 @@ class LeFichierAnglais(unittest.TestCase):
                                  sorted(re.findall(r"\{\w*\}", traduit)), e.msgid)
                 self.assertEqual(re.findall(r"%[sd]", source), re.findall(r"%[sd]", traduit), e.msgid)
 
+    def test_plusieurs_valeurs_ont_des_marques_nommees(self):
+        # « %s … %s » fige l'ordre des valeurs : une traduction ne pourrait pas
+        # le changer. Une seule valeur peut garder « %s ».
+        for e in self.entrees:
+            for texte in [e.msgid] + ([e.pluriel] if e.pluriel else []):
+                self.assertLess(len(re.findall(r"%[sdr]", texte)), 2, texte)
+
     def test_aucune_traduction_ne_garde_le_francais_par_megarde(self):
         # Un nom propre (« Codebyr OS ») peut rester ; une phrase non.
         for e in self.entrees:
@@ -221,11 +263,15 @@ class LExtraction(unittest.TestCase):
 PHRASE = re.compile(r"^[«A-ZÀ-ÖØ-Ý][^\n]*\s[^\n]*[a-zà-ÿ]")
 
 
-def phrases_en_dur(code, nom):
-    """Les phrases écrites dans le code hors de _() et n_() (docstrings exclues)."""
+def phrases_en_dur(code, nom, laisses=frozenset()):
+    """Les phrases écrites dans le code hors de _() et n_() (docstrings, journal
+    et textes laissés exclus)."""
     arbre = ast.parse(code, nom)
     exclus = set()
     for noeud in ast.walk(arbre):
+        if (isinstance(noeud, ast.Call) and isinstance(noeud.func, (ast.Name, ast.Attribute))
+                and getattr(noeud.func, "id", getattr(noeud.func, "attr", "")) in ("journal", "noter")):
+            exclus.update(id(n) for n in ast.walk(noeud))
         if isinstance(noeud, (ast.Module, ast.ClassDef, ast.FunctionDef, ast.AsyncFunctionDef)):
             if (noeud.body and isinstance(noeud.body[0], ast.Expr)
                     and isinstance(noeud.body[0].value, ast.Constant)):
@@ -235,7 +281,7 @@ def phrases_en_dur(code, nom):
             exclus.update(id(a) for a in noeud.args)
     return [(n.lineno, n.value) for n in ast.walk(arbre)
             if isinstance(n, ast.Constant) and isinstance(n.value, str)
-            and id(n) not in exclus and PHRASE.match(n.value)]
+            and id(n) not in exclus and n.value not in laisses and PHRASE.match(n.value)]
 
 
 EXTENSION_JS = os.path.join(INCLUDES, traductions.EXTENSION, "extension.js")
@@ -337,7 +383,7 @@ class LesFichiersTraduits(unittest.TestCase):
     def test_aucune_phrase_affichee_n_echappe_a_la_traduction(self):
         for relatif in FICHIERS_TRADUITS:
             code = _lire(os.path.join(INCLUDES, relatif))
-            self.assertEqual(phrases_en_dur(code, relatif), [], relatif)
+            self.assertEqual(phrases_en_dur(code, relatif, LAISSES), [], relatif)
 
     def test_ils_chargent_la_traduction(self):
         for relatif in FICHIERS_TRADUITS:
@@ -375,6 +421,49 @@ class LesLanceurs(unittest.TestCase):
                 self.assertNotEqual(champs[cle], champs[cle + "[fr]"], "%s : %s non traduit" % (nom, cle))
                 self.assertNotIn(cle + "[en]", champs, "%s : l'anglais est la valeur par défaut" % nom)
             self.assertIn("Name", champs, nom)
+
+
+def fonctions_qui_masquent_la_traduction(code, nom):
+    """[(ligne, fonction)] des fonctions où « _ » (ou « n_ ») est une variable
+    locale ET où _() est appelée. En Python, une affectation fait du nom une
+    variable locale de TOUTE la fonction : « env, _ = … » plus bas, et chaque
+    _("…") de la fonction échoue, même ceux d'avant (UnboundLocalError)."""
+    trouvees = []
+    for f in ast.walk(ast.parse(code, nom)):
+        if not isinstance(f, (ast.FunctionDef, ast.AsyncFunctionDef, ast.Lambda)):
+            continue
+        a = f.args
+        locaux = {x.arg for x in a.args + a.kwonlyargs + a.posonlyargs}
+        locaux |= {x.arg for x in (a.vararg, a.kwarg) if x}
+        appelle = False
+        for bloc in (f.body if isinstance(f.body, list) else [f.body]):
+            for n in ast.walk(bloc):
+                if isinstance(n, ast.Name) and isinstance(n.ctx, ast.Store):
+                    locaux.add(n.id)
+                elif isinstance(n, ast.ExceptHandler) and n.name:
+                    locaux.add(n.name)
+                elif (isinstance(n, ast.Call) and isinstance(n.func, ast.Name)
+                      and n.func.id in ("_", "n_")):
+                    appelle = True
+        if appelle and locaux & {"_", "n_"}:
+            trouvees.append((f.lineno, getattr(f, "name", "lambda")))
+    return trouvees
+
+
+class AucuneVariableNeMasqueLaTraduction(unittest.TestCase):
+
+    def test_dans_aucun_fichier(self):
+        for relatif in traductions.sources(RACINE):
+            if relatif.endswith(".js"):
+                continue
+            code = _lire(os.path.join(INCLUDES, relatif))
+            self.assertEqual(fonctions_qui_masquent_la_traduction(code, relatif), [], relatif)
+
+    def test_le_garde_fou_voit_le_piege(self):
+        code = "def f():\n    print(_('a'))\n    env, _ = g()\n"
+        self.assertEqual(fonctions_qui_masquent_la_traduction(code, "x"), [(1, "f")])
+        self.assertEqual(fonctions_qui_masquent_la_traduction(
+            "def f():\n    env, _x = g()\n    print(_('a'))\n", "x"), [])
 
 
 class LesNomsDesApplications(unittest.TestCase):

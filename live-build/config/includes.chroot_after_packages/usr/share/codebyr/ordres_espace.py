@@ -26,6 +26,7 @@ import compte_dedie
 import fichiers_surs
 import journal
 import navigateur
+from traduction import _
 
 # Le programme que l'Espace exécute pour un ordre : codebyr-space, qui s'inscrit
 # ici au démarrage. Ce module ne peut pas se désigner lui-même (__file__) :
@@ -226,9 +227,9 @@ def demenager_vers_compte_dedie(esp, session, prevenir):
                          "(%d Mo à copier, %d Mo libres).\n"
                          % (esp["nom"], taille // 2**20, libre // 2**20))
         return False
-    prevenir("Espace %s : déménagement de ses données" % esp["nom"],
-             "Première ouverture sous son propre compte : ses fichiers le "
-             "suivent. Rien n'est effacé. Cela peut prendre un moment.")
+    prevenir(_("Espace %s : déménagement de ses données") % esp["nom"],
+             _("Première ouverture sous son propre compte : ses fichiers le "
+               "suivent. Rien n'est effacé. Cela peut prendre un moment."))
     code, erreurs = ordre_interne(session, INTERNE_IMPORTER,
                                   produire=emballer(ancien, noms))
     if code == MIGRATION_FAITE:
@@ -289,7 +290,7 @@ def rapatrier_depuis_compte_dedie(esp):
             with fichiers_surs.dossier(parent):
                 if os.path.lexists(home):
                     if os.path.islink(home):
-                        raise ValueError("Dossier personnel symbolique refusé")
+                        raise ValueError(_("Dossier personnel symbolique refusé"))
                     sauvegarde = tempfile.mkdtemp(prefix="avant-retour-", dir=parent)
                     os.rmdir(sauvegarde)
                     os.rename(home, sauvegarde)
@@ -310,8 +311,11 @@ def rapatrier_depuis_compte_dedie(esp):
     finally:
         session.rendre()
     journal.noter("Espace %s : données revenues de son compte dédié" % esp["id"])
-    print("Données de %s revenues de son compte dédié%s." % (
-        esp["nom"], " ; état précédent conservé : %s" % sauvegarde if sauvegarde else ""))
+    if sauvegarde:
+        print(_("Données de {espace} revenues de son compte dédié ; état précédent "
+                "conservé : {sauvegarde}.").format(espace=esp["nom"], sauvegarde=sauvegarde))
+    else:
+        print(_("Données de {espace} revenues de son compte dédié.").format(espace=esp["nom"]))
     return True
 
 

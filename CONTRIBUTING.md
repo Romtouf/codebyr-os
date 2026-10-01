@@ -112,7 +112,14 @@ de référence pour qui ne lit pas le français).
   `from traduction import _`), écrit tel quel. On le complète **après** :
   `_("Ouvrir « {nom} »").format(nom=nom)` — jamais `_(f"…")`, que l'outil
   refuse : une traduction a besoin de déplacer les mots autour de `{nom}`.
-- Les pluriels : `n_("{n} fichier", "{n} fichiers", n)`.
+- Une seule valeur peut garder `%s` ; à partir de deux, des marques nommées
+  (`{espace}`, `{application}`…), qu'une traduction peut déplacer.
+- Les pluriels : `n_("{n} fichier", "{n} fichiers", n)` — jamais « fichier(s) ».
+- Le journal (`journal()`, `noter()`) et les diagnostics « codebyr-space : … »
+  restent en français : ils s'adressent à qui dépanne.
+- Ne nommez jamais une variable `_` dans une fonction qui affiche un texte :
+  Python en ferait une variable locale de toute la fonction, et chaque `_("…")`
+  y échouerait. Un test le refuse.
 - Après avoir écrit ou modifié un texte :
   `python3 packaging/traductions.py extraire`, puis traduire les `msgstr`
   vides de `po/en.po`. `tests/test_traduction.py` échoue tant qu'il en reste.

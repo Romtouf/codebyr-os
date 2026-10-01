@@ -30,16 +30,18 @@ Le contrôle ne vaut donc que pour les Espaces ordinaires.
 import configparser
 import subprocess
 
+from traduction import _
+
 # Services de bus dont un seul appel suffit à exécuter hors de tout bac à sable,
 # ou à le faire faire au bureau. « talk » et « own » y donnent accès ; « see »
 # ne permet que de constater leur présence.
 BUS_QUI_FONT_SORTIR = {
     "org.freedesktop.Flatpak":
-        "lancer des programmes sur le bureau, hors de tout bac à sable",
+        _("lancer des programmes sur le bureau, hors de tout bac à sable"),
     "org.freedesktop.systemd1":
-        "lancer des programmes sur le bureau, hors de tout bac à sable",
+        _("lancer des programmes sur le bureau, hors de tout bac à sable"),
     "ca.desrt.dconf":
-        "modifier les réglages du bureau — dont la commande d'un raccourci clavier",
+        _("modifier les réglages du bureau — dont la commande d'un raccourci clavier"),
 }
 
 # Options de « flatpak run » qui AJOUTENT une permission à celles déclarées.
@@ -66,10 +68,10 @@ DOSSIERS_DECISIFS = (
 # Les dossiers XDG, traduits en chemins relatifs au dossier personnel.
 XDG_EN_CLAIR = {"xdg-config": ".config", "xdg-data": ".local/share"}
 
-TOUT_VOIR = "voir tous vos fichiers, ceux des autres Espaces compris"
-LE_BUS = "joindre le bus de session du bureau, donc y lancer des programmes"
-LE_DOSSIER = ("atteindre votre dossier personnel, où vivent les données de tous "
-              "les Espaces et les programmes lancés à l'ouverture de session")
+TOUT_VOIR = _("voir tous vos fichiers, ceux des autres Espaces compris")
+LE_BUS = _("joindre le bus de session du bureau, donc y lancer des programmes")
+LE_DOSSIER = (_("atteindre votre dossier personnel, où vivent les données de tous "
+                "les Espaces et les programmes lancés à l'ouverture de session"))
 
 
 def incompatibilite(esp, renforce, hors_ligne, sous_compte):
@@ -90,12 +92,12 @@ def incompatibilite(esp, renforce, hors_ligne, sous_compte):
       blindés depuis la 1.16.1.
     """
     if hors_ligne or (esp.get("reseau") or {}).get("mode") == "liste-blanche":
-        return "Son réseau dépend de ses propres permissions : le réseau restreint de cet Espace ne serait pas tenu."
+        return _("Son réseau dépend de ses propres permissions : le réseau restreint de cet Espace ne serait pas tenu.")
     if esp.get("ephemere"):
-        return "Un Espace jetable ne garde rien : l'application n'y a pas sa place."
+        return _("Un Espace jetable ne garde rien : l'application n'y a pas sa place.")
     if renforce and not sous_compte:
-        return ("Son bac à sable est celui de Flatpak, pas le Blindage de cet Espace. "
-                "Activez « Compte séparé » pour cet Espace : son compte la bornera.")
+        return (_("Son bac à sable est celui de Flatpak, pas le Blindage de cet Espace. "
+                  "Activez « Compte séparé » pour cet Espace : son compte la bornera."))
     return None
 
 
@@ -133,8 +135,8 @@ def options_accordees(argv):
         if not argument.startswith("-"):
             break           # l'application : ce qui suit est à elle
         if argument.split("=", 1)[0] in OPTIONS_QUI_ACCORDENT:
-            raisons.append("recevoir une permission ajoutée à sa ligne de "
-                           "commande (%s)" % argument)
+            raisons.append(_("recevoir une permission ajoutée à sa ligne de "
+                             "commande (%s)") % argument)
     return raisons
 
 

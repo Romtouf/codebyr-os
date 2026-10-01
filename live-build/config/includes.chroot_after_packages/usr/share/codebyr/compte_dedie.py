@@ -29,6 +29,7 @@ import os
 import socket
 
 import comptes
+from traduction import _
 
 SOCKET_SERVICE = os.environ.get("CODEBYR_UID_SOCKET", "/run/codebyr-uid.sock")
 TAILLE_MAX = 65536
@@ -71,10 +72,10 @@ def incompatibilites(esp, fichier=None, est_flatpak=False):
     # cette raison, le service le refusait sans que personne le voie.
     if not comptes.espace_valide(esp.get("id")):
         raisons.append(
-            "son identifiant « %s » ne peut pas nommer un compte : il doit commencer "
-            "par une lettre et tenir en %d caractères. Supprimez-le puis recréez-le, "
-            "ou désactivez « Compte séparé » pour lui dans Configuration Codebyr"
-            % (esp.get("id"), comptes.LONGUEUR_ESPACE))
+            _("son identifiant « {identifiant} » ne peut pas nommer un compte : il doit "
+              "commencer par une lettre et tenir en {n} caractères. Supprimez-le puis "
+              "recréez-le, ou désactivez « Compte séparé » pour lui dans Configuration "
+              "Codebyr").format(identifiant=esp.get("id"), n=comptes.LONGUEUR_ESPACE))
     # Les applications Flatpak étaient refusées jusqu'en 1.15.0. Elles
     # s'ouvrent depuis la 1.16.0 : l'Espace a son bus de session, donc ses
     # portails, et son installation Flatpak à lui (voir codebyr-space,
@@ -98,10 +99,10 @@ def refus_de_geste(action, esp):
     """Le message de refus d'un geste pas encore prêt, ou None s'il peut se faire."""
     if not demande(esp) or action not in GESTES_PAS_ENCORE_PRETS:
         return None
-    return ("L'Espace %s tourne sous son propre compte : Codebyr ne sait pas "
-            "encore %s. Retirez « \"compte\": \"dedie\" » de son réglage pour "
-            "retrouver ce geste." % (esp.get("nom", esp.get("id")),
-                                     GESTES_PAS_ENCORE_PRETS[action]))
+    return _("L'Espace {espace} tourne sous son propre compte : Codebyr ne sait pas "
+             "encore {geste}. Retirez « \"compte\": \"dedie\" » de son réglage pour "
+             "retrouver ce geste.").format(espace=esp.get("nom", esp.get("id")),
+                                         geste=GESTES_PAS_ENCORE_PRETS[action])
 
 
 def _parler(chemin, demande_, garder=False, descripteurs=()):
@@ -146,7 +147,7 @@ class Session:
     def __init__(self, esp_id, affichage, son, memoire, taches,
                  chemin=SOCKET_SERVICE, ephemere=False, carte=False):
         try:
-            reponse, self._client, _ = _parler(chemin, {
+            reponse, self._client, _descripteurs = _parler(chemin, {
                 "action": "ouvrir", "espace": esp_id, "affichage": affichage,
                 "son": bool(son), "memoire": memoire, "taches": taches,
                 "ephemere": bool(ephemere),
@@ -155,15 +156,15 @@ class Session:
                 "carte": bool(carte)},
                 garder=True)
         except FileNotFoundError:
-            raise Indisponible("le service des comptes d'Espaces n'est pas "
-                               "installé sur cette machine")
+            raise Indisponible(_("le service des comptes d'Espaces n'est pas "
+                                 "installé sur cette machine"))
         except (OSError, ValueError) as exc:
-            raise Indisponible("le service des comptes d'Espaces ne répond "
-                               "pas (%s)" % exc)
+            raise Indisponible(_("le service des comptes d'Espaces ne répond "
+                                 "pas (%s)") % exc)
         if not reponse.get("ok"):
             if self._client:
                 self._client.close()
-            raise Indisponible("le service a refusé d'ouvrir cet Espace (%s)"
+            raise Indisponible(_("le service a refusé d'ouvrir cet Espace (%s)")
                                % reponse.get("erreur", "sans détail"))
         self._client.settimeout(None)
         self.compte = reponse["compte"]
@@ -178,8 +179,8 @@ class Session:
             if self._client:
                 self._client.close()
             raise Indisponible(
-                "le service des comptes date d'avant la mise à jour ; "
-                "déconnectez-vous et reconnectez-vous")
+                _("le service des comptes date d'avant la mise à jour ; "
+                  "déconnectez-vous et reconnectez-vous"))
         self.depot = reponse["depot"]
         self.ordres = reponse["ordres"]
         self.envois = reponse.get("envois")
@@ -194,11 +195,11 @@ class Session:
 def fermer(esp_id, chemin=SOCKET_SERVICE):
     """Referme un Espace d'un geste : toutes ses applications s'arrêtent."""
     try:
-        reponse, _, _ = _parler(chemin, {"action": "fermer", "espace": esp_id})
+        reponse, _client, _descripteurs = _parler(chemin, {"action": "fermer", "espace": esp_id})
     except FileNotFoundError:
-        raise Indisponible("le service des comptes d'Espaces n'est pas installé")
+        raise Indisponible(_("le service des comptes d'Espaces n'est pas installé"))
     except (OSError, ValueError) as exc:
-        raise Indisponible("le service des comptes d'Espaces ne répond pas (%s)" % exc)
+        raise Indisponible(_("le service des comptes d'Espaces ne répond pas (%s)") % exc)
     return bool(reponse.get("ok"))
 
 
@@ -209,11 +210,11 @@ def supprimer(esp_id, chemin=SOCKET_SERVICE):
     devrait trouver que des dossiers vides.
     """
     try:
-        reponse, _, _ = _parler(chemin, {"action": "supprimer", "espace": esp_id})
+        reponse, _client, _descripteurs = _parler(chemin, {"action": "supprimer", "espace": esp_id})
     except FileNotFoundError:
-        raise Indisponible("le service des comptes d'Espaces n'est pas installé")
+        raise Indisponible(_("le service des comptes d'Espaces n'est pas installé"))
     except (OSError, ValueError) as exc:
-        raise Indisponible("le service des comptes d'Espaces ne répond pas (%s)" % exc)
+        raise Indisponible(_("le service des comptes d'Espaces ne répond pas (%s)") % exc)
     return bool(reponse.get("ok"))
 
 
@@ -243,10 +244,10 @@ def executer(ordres, argv, env, au_lancement=None, entree=None, sortie=None):
         reponse, client, reste = _parler(ordres, demande_, garder=True,
                                          descripteurs=descripteurs)
     except (OSError, ValueError) as exc:
-        raise Indisponible("l'Espace ne répond pas (%s)" % exc)
+        raise Indisponible(_("l'Espace ne répond pas (%s)") % exc)
     if not reponse.get("ok"):
         client.close()
-        raise Indisponible("l'Espace a refusé la commande (%s)"
+        raise Indisponible(_("l'Espace a refusé la commande (%s)")
                            % reponse.get("erreur", "sans détail"))
     try:
         if au_lancement:

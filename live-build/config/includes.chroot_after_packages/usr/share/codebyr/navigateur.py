@@ -14,6 +14,7 @@ import os
 import re
 
 import fichiers_surs
+from traduction import _, n_
 
 PROFIL_CODEBYR = "codebyr.default"
 FORME_PROFIL = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]{0,63}")
@@ -188,7 +189,9 @@ def installer_bouclier_pour(home, doms):
         'user_pref("extensions.enabledScopes", 15);',
     ])
     if doms:
-        print("Bouclier anti-hameçonnage : %d domaine(s) de banque protégé(s)." % len(doms))
+        print(n_("Bouclier anti-hameçonnage : {n} domaine de banque protégé.",
+                 "Bouclier anti-hameçonnage : {n} domaines de banque protégés.",
+                 len(doms)).format(n=len(doms)))
 
 
 def retirer_copie_deposee(ffdir):

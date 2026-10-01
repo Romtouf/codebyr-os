@@ -15,6 +15,7 @@ import sys
 import tempfile
 
 import comptes
+from traduction import _
 
 
 def wrap_bwrap(home, cmd, env, renforce=False, hors_ligne=False, audio=True,
@@ -223,7 +224,7 @@ def plafonner_ressources(run, memoire=MEMOIRE_DEFAUT, taches=TACHES_DEFAUT):
         return ["systemd-run", "--user", "--scope", "--quiet",
                 "-p", "MemoryMax=%s" % memoire, "-p", "MemorySwapMax=0",
                 "-p", "TasksMax=%d" % taches, "--"] + run
-    sys.stderr.write("Codebyr : plafonds mémoire/processus indisponibles (session systemd utilisateur absente).\n")
+    sys.stderr.write(_("Codebyr : plafonds mémoire/processus indisponibles (session systemd utilisateur absente).\n"))
     return run
 
 
@@ -244,7 +245,7 @@ def cmd_isolation():
         return "\033[32moui\033[0m" if v else "\033[31mnon\033[0m"
 
     bwrap = bool(shutil.which("bwrap"))
-    print("Capacités d'isolation de cette machine :")
+    print(_("Capacités d'isolation de cette machine :"))
     print("  Bac à sable bubblewrap ....... %s" % oui_non(bwrap))
     print("  Isolation utilisateur (user-ns) %s" % oui_non(user_ns_dispo()))
     print("  Coupure réseau par Espace .... %s" % oui_non(bwrap))
@@ -252,9 +253,9 @@ def cmd_isolation():
     print("  Bus de session privé ......... %s" % oui_non(bool(shutil.which("dbus-run-session"))))
     print()
     if bwrap:
-        print("Niveau : Blindage disponible (bac à sable + coupure réseau).")
+        print(_("Niveau : Blindage disponible (bac à sable + coupure réseau)."))
     else:
-        print("Niveau : réduit (dossiers séparés seulement).")
+        print(_("Niveau : réduit (dossiers séparés seulement)."))
     return 0
 
 
@@ -306,14 +307,14 @@ for cle, valeur in mesures.items():
 """
 
 CONTROLES = (
-    ("bus_hote", "Bus de session de l'hôte joignable"),
+    ("bus_hote", _("Bus de session de l'hôte joignable")),
     ("systemd_user", "systemd --user joignable"),
-    ("bus_systeme", "Bus système joignable"),
-    ("x11", "Socket X11 de l'hôte visible"),
-    ("son", "Son et micro (PipeWire)"),
-    ("gpu", "Carte graphique (accès direct)"),
-    ("reseau", "Accès au réseau"),
-    ("home_isole", "Dossier personnel bien isolé"),
+    ("bus_systeme", _("Bus système joignable")),
+    ("x11", _("Socket X11 de l'hôte visible")),
+    ("son", _("Son et micro (PipeWire)")),
+    ("gpu", _("Carte graphique (accès direct)")),
+    ("reseau", _("Accès au réseau")),
+    ("home_isole", _("Dossier personnel bien isolé")),
 )
 
 # Ce qu'on attend selon la situation. Les quatre premières lignes doivent être
@@ -323,22 +324,22 @@ CONTROLES = (
 # RETIRÉE — ailleurs, sa présence dépend du matériel (une machine virtuelle
 # n'en a souvent pas), et l'exiger ferait échouer à tort une machine saine.
 SITUATIONS = (
-    ("Espace ordinaire", {},
+    (_("Espace ordinaire"), {},
      {"bus_hote": False, "systemd_user": False, "bus_systeme": False, "x11": False,
       "son": True, "gpu": None, "reseau": True, "home_isole": True}),
-    ("Espace blindé (Navigation)", {"renforce": True},
+    (_("Espace blindé (Navigation)"), {"renforce": True},
      {"bus_hote": False, "systemd_user": False, "bus_systeme": False, "x11": False,
       "son": True, "gpu": None, "reseau": True, "home_isole": True}),
-    ("Espace blindé, sans micro ni carte graphique (Banque)",
+    (_("Espace blindé, sans micro ni carte graphique (Banque)"),
      {"renforce": True, "audio": False, "gpu": False},
      {"bus_hote": False, "systemd_user": False, "bus_systeme": False, "x11": False,
       "son": False, "gpu": False, "reseau": True, "home_isole": True}),
     # Un lien douteux : le réseau reste ouvert (il faut bien charger la page),
     # mais ni micro ni carte graphique — réglage du Jetable depuis la 1.16.1.
-    ("Lien en Jetable", {"renforce": True, "audio": False, "gpu": False},
+    (_("Lien en Jetable"), {"renforce": True, "audio": False, "gpu": False},
      {"bus_hote": False, "systemd_user": False, "bus_systeme": False, "x11": False,
       "son": False, "gpu": False, "reseau": True, "home_isole": True}),
-    ("Pièce jointe en Jetable", {"renforce": True, "hors_ligne": True, "gpu": False},
+    (_("Pièce jointe en Jetable"), {"renforce": True, "hors_ligne": True, "gpu": False},
      {"bus_hote": False, "systemd_user": False, "bus_systeme": False, "x11": False,
       "son": False, "gpu": False, "reseau": False, "home_isole": True}),
 )
@@ -392,7 +393,7 @@ def sonder(options):
 def cmd_verifier_isolation():
     """Vérifie sur pièces ce qu'un Espace peut réellement atteindre."""
     if not shutil.which("bwrap"):
-        sys.stderr.write("bubblewrap absent : aucun bac à sable à vérifier.\n")
+        sys.stderr.write(_("bubblewrap absent : aucun bac à sable à vérifier.\n"))
         return 2
     depuis = os.environ.get("CODEBYR_ESPACE", "").strip()
     if depuis:
@@ -407,20 +408,20 @@ def cmd_verifier_isolation():
         # endroit finit ignoré, et c'est justement celui qu'il faudra croire
         # le jour où il aura raison.
         ecrire = sys.stderr.write
-        ecrire("Cette vérification doit être lancée DEPUIS LE BUREAU, "
-               "pas depuis un Espace.")
+        ecrire(_("Cette vérification doit être lancée DEPUIS LE BUREAU, "
+                 "pas depuis un Espace."))
         ecrire(os.linesep)
-        ecrire("Vous êtes dans « %s » : la sonde s'exécuterait dans un bac "
-               "à sable imbriqué," % depuis)
+        ecrire(_("Vous êtes dans « %s » : la sonde s'exécuterait dans un bac "
+                 "à sable imbriqué,") % depuis)
         ecrire(os.linesep)
-        ecrire("et mesurerait les restrictions de cet Espace, pas celles "
-               "qu'on veut vérifier.")
+        ecrire(_("et mesurerait les restrictions de cet Espace, pas celles "
+                 "qu'on veut vérifier."))
         ecrire(os.linesep + os.linesep)
-        ecrire("Ouvrez un terminal ordinaire du bureau et relancez.")
+        ecrire(_("Ouvrez un terminal ordinaire du bureau et relancez."))
         ecrire(os.linesep)
         return 2
-    print("Vérification de l'isolation — une sonde est lancée dans un vrai "
-          "bac à sable.\n")
+    print(_("Vérification de l'isolation — une sonde est lancée dans un vrai "
+            "bac à sable.\n"))
     tout_va_bien = True
     for titre, options, attendu in SITUATIONS:
         mesures = sonder(options)

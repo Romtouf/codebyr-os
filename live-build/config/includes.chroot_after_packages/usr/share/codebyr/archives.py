@@ -11,6 +11,8 @@ genre de règle qu'on ne veut voir diverger nulle part.
 """
 import tarfile
 
+from traduction import _
+
 ARCHIVE_ENTREES_MAX = 100000
 ARCHIVE_TAILLE_MAX = 20 * 1024**3
 
@@ -52,7 +54,7 @@ def extraire_archive(tar, destination, filtre="data"):
         entrees += 1
         taille += membre.size
         if entrees > ARCHIVE_ENTREES_MAX or taille > ARCHIVE_TAILLE_MAX:
-            raise ValueError("Archive trop volumineuse (100 000 entrées / 20 Gio maximum)")
+            raise ValueError(_("Archive trop volumineuse (100 000 entrées / 20 Gio maximum)"))
         # Les liens sont ACCEPTÉS, les fichiers spéciaux refusés.
         #
         # Refuser tout lien paraissait prudent ; cela rendait la restauration
@@ -67,7 +69,7 @@ def extraire_archive(tar, destination, filtre="data"):
         # par « .. » et cibles hors destination sont rejetés par tarfile
         # lui-même, et lèvent une erreur que l'on attrape.
         if not (membre.isfile() or membre.isdir() or membre.issym() or membre.islnk()):
-            raise ValueError("Archive contenant un fichier spécial")
+            raise ValueError(_("Archive contenant un fichier spécial"))
         tar.extract(membre, destination, filter=filtre)
 
 

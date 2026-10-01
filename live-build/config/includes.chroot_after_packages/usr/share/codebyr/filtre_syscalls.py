@@ -17,6 +17,8 @@ import errno
 import os
 import sys
 
+from traduction import _
+
 REFUSES = (
     "ptrace", "process_vm_readv", "process_vm_writev", "kcmp",
     "bpf", "perf_event_open", "userfaultfd", "open_by_handle_at",
@@ -226,7 +228,7 @@ def main(args):
         appliquer()
         os.execvp(args[0], args)
     except OSError as exc:
-        print("Blindage indisponible : %s" % exc, file=sys.stderr)
+        print(_("Blindage indisponible : %s") % exc, file=sys.stderr)
         return 1
 
 

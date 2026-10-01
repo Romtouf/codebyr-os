@@ -64,16 +64,24 @@ def choisir(langues, disponibles):
     return REFERENCE if langues else None
 
 
-def _disponible(dossier, langue):
-    return os.path.isfile(os.path.join(dossier, langue, "LC_MESSAGES", DOMAINE + ".mo"))
+class _Disponibles:
+    """Les langues compilées, vérifiées seulement quand choisir() le demande.
+
+    Ce module est importé aussi par des processus confinés (le service des
+    comptes sous AppArmor, les bacs à sable) : en français ou sans langue, ils
+    ne touchent à aucun fichier de /usr/share/locale.
+    """
+
+    def __init__(self, dossier):
+        self.dossier = dossier
+
+    def __contains__(self, langue):
+        return os.path.isfile(os.path.join(self.dossier, langue, "LC_MESSAGES", DOMAINE + ".mo"))
 
 
 def charger(dossier=DOSSIER, environ=None):
     """La traduction de la session ; le texte du code si elle manque."""
-    langues = langues_preferees(environ)
-    candidats = {c for code in langues for c in (code, code.split("_")[0])}
-    candidats.add(REFERENCE)
-    langue = choisir(langues, {c for c in candidats if _disponible(dossier, c)})
+    langue = choisir(langues_preferees(environ), _Disponibles(dossier))
     if langue is None:
         return gettext.NullTranslations()
     try:

@@ -10,11 +10,13 @@ import secrets
 import shutil
 import stat
 
+from traduction import _
+
 
 @contextlib.contextmanager
 def dossier(chemin, creer=False):
     if os.name != "posix":
-        raise OSError("Accès sécurisé disponible uniquement sous Linux")
+        raise OSError(_("Accès sécurisé disponible uniquement sous Linux"))
     absolu = os.path.abspath(chemin)
     morceaux = [m for m in absolu.split("/")[1:] if m]
     fd = os.open("/", (os.O_RDONLY if not morceaux else os.O_PATH) | os.O_DIRECTORY)
@@ -65,7 +67,7 @@ def ouvrir(chemin, mode="r", encoding=None):
         try:
             st = os.fstat(inode)
             if not stat.S_ISREG(st.st_mode) or st.st_nlink != 1:
-                raise OSError("Fichier spécial ou lien dur refusé")
+                raise OSError(_("Fichier spécial ou lien dur refusé"))
             flux = os.fdopen(inode, "wb" if "b" in mode else "w",
                              encoding=encoding) if ecriture else os.fdopen(
                                  inode, mode, encoding=encoding)
@@ -126,4 +128,4 @@ def copier_unique(source, dossier_cible, nom, origine=None, mode=None):
             return candidat
         except FileExistsError:
             continue
-    raise OSError("Trop de fichiers du même nom")
+    raise OSError(_("Trop de fichiers du même nom"))

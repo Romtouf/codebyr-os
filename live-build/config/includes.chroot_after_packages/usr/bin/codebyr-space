@@ -46,6 +46,7 @@ import envois  # noqa: E402
 import fichiers_surs
 import flatpak_espace  # noqa: E402
 from journal import noter as journal  # noqa: E402
+from traduction import _, n_  # noqa: E402
 import modeles  # noqa: E402
 import navigateur  # noqa: E402
 import ordres_espace  # noqa: E402
@@ -80,11 +81,11 @@ def espace_home(esp):
         try:
             libre = shutil.disk_usage(tempfile.gettempdir()).free
             if libre < JETABLE_MINIMUM:
-                message = ("Il reste %d Mo de mémoire pour l'Espace jetable. "
-                           "Évitez d'y télécharger de gros fichiers."
+                message = (_("Il reste %d Mo de mémoire pour l'Espace jetable. "
+                             "Évitez d'y télécharger de gros fichiers.")
                            % (libre // (1024 * 1024)))
                 sys.stderr.write("codebyr-space : %s\n" % message)
-                _prevenir("Espace jetable : mémoire limitée", message)
+                _prevenir(_("Espace jetable : mémoire limitée"), message)
         except OSError:
             pass
         return tempfile.mkdtemp(prefix="codebyr-jetable-%s-" % esp["id"])
@@ -108,7 +109,7 @@ def build_command(esp, home, app_cmd):
 
 
 def cmd_list(espaces):
-    print("Espaces disponibles :")
+    print(_("Espaces disponibles :"))
     for e in espaces.values():
         tag = "  (éphémère)" if e.get("ephemere") else ""
         print("  \033[1m%-12s\033[0m %s  %s%s" % (e["id"], e["couleur"], e["nom"], tag))
@@ -271,11 +272,12 @@ def _demarrer_filtre_reseau(esp, home, app_cmd, chemin_socket=None, compte_dedie
                                  "--journal", journal_refus(esp["id"])] + domaines,
                                 pass_fds=(srv.fileno(),))
         if domaines:
-            print("Réseau restreint : seuls %d domaine(s) autorisé(s) dans %s."
-                  % (len(domaines), esp["nom"]))
+            print(n_("Réseau restreint : seul {n} domaine autorisé dans {espace}.",
+                     "Réseau restreint : seuls {n} domaines autorisés dans {espace}.",
+                     len(domaines)).format(n=len(domaines), espace=esp["nom"]))
         else:
-            print("Réseau restreint : AUCUN site autorisé dans %s pour l'instant. "
-                  "Ajoutez celui de votre banque dans « Configuration Codebyr »."
+            print(_("Réseau restreint : AUCUN site autorisé dans %s pour l'instant. "
+                    "Ajoutez celui de votre banque dans « Configuration Codebyr ».")
                   % esp["nom"])
             # En HTTPS, le navigateur affiche SA propre page d'erreur : notre
             # explication n'arrive jamais à l'écran. Or c'est le premier
@@ -283,10 +285,10 @@ def _demarrer_filtre_reseau(esp, home, app_cmd, chemin_socket=None, compte_dedie
             # il clique sur Banque, rien ne s'affiche, et il n'a aucune idée
             # de pourquoi. Une notification, elle, passe quel que soit le
             # protocole.
-            _prevenir("Espace %s : aucun site autorisé" % esp["nom"],
-                      "Ouvrez « Configuration Codebyr » pour déclarer votre "
-                      "banque. Tant qu'elle n'est pas déclarée, cet Espace "
-                      "n'ouvre aucun site — c'est voulu.")
+            _prevenir(_("Espace %s : aucun site autorisé") % esp["nom"],
+                      _("Ouvrez « Configuration Codebyr » pour déclarer votre "
+                        "banque. Tant qu'elle n'est pas déclarée, cet Espace "
+                        "n'ouvre aucun site — c'est voulu."))
         return proc
     except OSError as exc:
         sys.stderr.write("codebyr-space : filtre réseau indisponible (%s) — "
@@ -336,7 +338,7 @@ def _refuser_compte_dedie(esp, raison):
     silence, la protection qu'on lui a promise (voir compte_dedie.py).
     """
     sys.stderr.write("codebyr-space : %s ne s'ouvre pas — %s.\n" % (esp["nom"], raison))
-    _prevenir("Espace %s : ouverture refusée" % esp["nom"], raison[:1].upper() + raison[1:] + ".")
+    _prevenir(_("Espace %s : ouverture refusée") % esp["nom"], raison[:1].upper() + raison[1:] + ".")
     journal("Espace %s : compte dédié, ouverture refusée (%s)" % (esp["id"], raison))
     return 1
 
@@ -344,21 +346,21 @@ def _refuser_compte_dedie(esp, raison):
 def cmd_launch(espaces, esp_id, extra, fichier=None):
     esp = espaces.get(esp_id)
     if not esp:
-        sys.stderr.write("Espace inconnu : %s\n" % esp_id)
+        sys.stderr.write(_("Espace inconnu : %s\n") % esp_id)
         return 2
     if not shutil.which("bwrap"):
-        _prevenir("Isolation indisponible", "bubblewrap manque : lancement refusé. Réparez le paquet codebyr-tools.")
-        sys.stderr.write("bubblewrap absent : lancement refusé.\n")
+        _prevenir(_("Isolation indisponible"), _("bubblewrap manque : lancement refusé. Réparez le paquet codebyr-tools."))
+        sys.stderr.write(_("bubblewrap absent : lancement refusé.\n"))
         return 1
     if fichier and not os.path.isfile(fichier):
-        sys.stderr.write("Fichier introuvable : lancement refusé.\n")
+        sys.stderr.write(_("Fichier introuvable : lancement refusé.\n"))
         return 2
     if not compte_dedie.demande(esp):
         # Réglage « compte » retiré après un passage sous compte dédié : les
         # données récentes sont chez l'Espace, on les rapatrie d'abord.
         if not ordres_espace.rapatrier_depuis_compte_dedie(esp):
             return _refuser_compte_dedie(
-                esp, "ses données récentes n'ont pas pu revenir de son compte dédié")
+                esp, _("ses données récentes n'ont pas pu revenir de son compte dédié"))
         return _lancer(espaces, esp, extra, fichier, None)
 
     # Tout ce qui peut refuser l'ouverture se décide AVANT de demander le
@@ -429,7 +431,7 @@ def _oublier_echecs_de_vignettes(home):
     try:
         fichiers_surs.mkdir(os.path.dirname(temoin))
         with fichiers_surs.ouvrir(temoin, "w", encoding="utf-8") as f:
-            f.write("Aperçus d'images en échec oubliés une fois (Codebyr 1.16.5).\n")
+            f.write(_("Aperçus d'images en échec oubliés une fois (Codebyr 1.16.5).\n"))
     except OSError:
         pass
 
@@ -520,15 +522,15 @@ def _lancer(espaces, esp, extra, fichier, session):
         # qu'il avait déjà.
         if not ordres_espace.demenager_vers_compte_dedie(esp, session, _prevenir):
             return _refuser_compte_dedie(
-                esp, "ses données n'ont pas pu le suivre sous son propre compte "
-                "(elles sont intactes à leur ancien emplacement)")
+                esp, _("ses données n'ont pas pu le suivre sous son propre compte "
+                  "(elles sont intactes à leur ancien emplacement)"))
         # AVANT le filtre réseau, et c'est voulu : le profil du navigateur doit
         # pointer vers le filtre avant que celui-ci existe. Dans l'ordre
         # inverse, un filtre absent laissait Banque avec Internet en entier.
         if not ordres_espace.preparer_depuis_l_espace(session, espaces, app_cmd,
                                          liste_blanche and not hors_ligne):
             return _refuser_compte_dedie(
-                esp, "son dossier n'a pas pu être préparé (voir le journal)")
+                esp, _("son dossier n'a pas pu être préparé (voir le journal)"))
     notif_srv, notif, notif_tmp = _ouvrir_notifications(esp, session)
     proxy = None
     filtre = None
@@ -545,7 +547,7 @@ def _lancer(espaces, esp, extra, fichier, session):
         except OSError:
             if filtre_tmp:
                 filtre_tmp.cleanup()
-            _prevenir("Filtre indisponible", "Lancement refusé : le réseau restreint ne peut pas être établi.")
+            _prevenir(_("Filtre indisponible"), _("Lancement refusé : le réseau restreint ne peut pas être établi."))
             return 1
         cmd = ["python3", "/usr/share/codebyr/relais_reseau.py",
                "/run/codebyr-proxy", "17890", "--"] + cmd
@@ -557,7 +559,8 @@ def _lancer(espaces, esp, extra, fichier, session):
 
     # L'application, pas son enveloppe : « cmd » commence par dbus-run-session
     # ou par le relais du filtre, et le message nommait l'un ou l'autre.
-    print("Ouverture de « %s » dans l'Espace %s…" % (os.path.basename(app_cmd[0]), esp["nom"]))
+    print(_("Ouverture de « {application} » dans l'Espace {espace}…").format(
+        application=os.path.basename(app_cmd[0]), espace=esp["nom"]))
     journal("Espace %s : ouverture de %s%s%s"
             % (esp["id"], os.path.basename(app_cmd[0]),
                " [blindage]" if renforce else "",
@@ -615,7 +618,7 @@ def _lancer(espaces, esp, extra, fichier, session):
                 rc = compte_dedie.executer(session.ordres, run, env,
                                            au_lancement=marquer)
             except compte_dedie.Indisponible as exc:
-                _prevenir("Espace %s : ouverture impossible" % esp["nom"], str(exc))
+                _prevenir(_("Espace %s : ouverture impossible") % esp["nom"], str(exc))
                 rc = 1
         else:
             proc = subprocess.Popen(run, env=env)
@@ -650,7 +653,7 @@ def _lancer(espaces, esp, extra, fichier, session):
                 pass
         if ephemere and os.path.isdir(home) and home.startswith(tempfile.gettempdir()):
             shutil.rmtree(home, ignore_errors=True)
-            print("Espace jetable détruit.")
+            print(_("Espace jetable détruit."))
     return rc
 
 
@@ -739,7 +742,7 @@ def _flatpak_admise(esp, app_cmd, appid, renforce, hors_ligne, session):
     refus = permissions_flatpak.incompatibilite(esp, renforce, hors_ligne,
                                                 sous_compte=bool(session))
     if refus:
-        _prevenir("Application incompatible avec cet Espace", refus)
+        _prevenir(_("Application incompatible avec cet Espace"), refus)
         return False
     if not session:
         # Espace ordinaire : l'application ne passe pas par notre bac à sable,
@@ -749,10 +752,12 @@ def _flatpak_admise(esp, app_cmd, appid, renforce, hors_ligne, session):
         refus = flatpak_espace.sorties(esp, app_cmd, appid)
         if refus:
             nom_app = appid or os.path.basename(app_cmd[0])
-            _prevenir("%s ne s'ouvre pas dans %s" % (nom_app, esp["nom"]),
-                      "Elle pourrait %s. Ouvrez-la hors des Espaces, ou activez "
-                      "« Compte séparé » pour %s dans Configuration Codebyr : elle "
-                      "y serait bornée au compte de l'Espace." % (refus[0], esp["nom"]))
+            _prevenir(_("{application} ne s'ouvre pas dans {espace}").format(
+                          application=nom_app, espace=esp["nom"]),
+                      _("Elle pourrait {risque}. Ouvrez-la hors des Espaces, ou activez "
+                        "« Compte séparé » pour {espace} dans Configuration Codebyr : elle "
+                        "y serait bornée au compte de l'Espace.").format(
+                          risque=refus[0], espace=esp["nom"]))
             journal("Espace %s : application Flatpak %s refusée (%s)"
                     % (esp["id"], nom_app, " ; ".join(refus)))
             return False
@@ -830,17 +835,17 @@ def _envelopper_flatpak(esp, session, cmd, env, home, app_cmd, appid, renforce):
         # chercher chez l'Espace d'abord, puis sur la machine.
         env = flatpak_espace.env_dedie(esp, session, env)
         run = cmd
-        print("Application Flatpak dans l'Espace %s, sous son compte." % esp["nom"])
-        message = ("Ses accès aux fichiers et au réseau dépendent des "
-                   "permissions de cette application, dans les limites du "
-                   "compte de l'Espace.")
+        print(_("Application Flatpak dans l'Espace %s, sous son compte.") % esp["nom"])
+        message = (_("Ses accès aux fichiers et au réseau dépendent des "
+                     "permissions de cette application, dans les limites du "
+                     "compte de l'Espace."))
         if renforce:
             # Accepté dans un Espace blindé parce que le compte la borne
             # (voir permissions_flatpak.incompatibilite) : le 🛡 du menu
             # ne doit pas laisser croire qu'elle a le Blindage.
             message += (" Elle a le bac à sable de Flatpak, pas le "
                         "Blindage de l'Espace.")
-        _prevenir("Permissions Flatpak", message)
+        _prevenir(_("Permissions Flatpak"), message)
         journal("Espace %s : application Flatpak %s sous compte dédié%s"
                 % (esp["id"], appid or "?", " (Espace blindé)" if renforce else ""))
     elif appid and flatpak_espace.app_dans_espace(esp["id"], appid):
@@ -855,8 +860,8 @@ def _envelopper_flatpak(esp, session, cmd, env, home, app_cmd, appid, renforce):
                          "XDG_CACHE_HOME", "XDG_STATE_HOME"):
             env.pop(variable, None)
         run = cmd
-        print("Application Flatpak dédiée à %s : permissions Flatpak applicables." % esp["nom"])
-        _prevenir("Permissions Flatpak", "Installation dédiée ; les accès aux fichiers et au réseau dépendent des permissions de cette application.")
+        print(_("Application Flatpak dédiée à %s : permissions Flatpak applicables.") % esp["nom"])
+        _prevenir(_("Permissions Flatpak"), _("Installation dédiée ; les accès aux fichiers et au réseau dépendent des permissions de cette application."))
     else:
         # App Flatpak SYSTÈME : installée pour toute la machine. Elle a son
         # propre bac à sable Flatpak, mais ses données sont communes à tous
@@ -870,13 +875,14 @@ def _envelopper_flatpak(esp, session, cmd, env, home, app_cmd, appid, renforce):
         run = cmd
         nom_app = os.path.basename(app_cmd[-1] if len(app_cmd) >= 2
                                    else app_cmd[0])
-        print("Note : application Flatpak système — son propre bac à sable "
-              "Flatpak ; le liseré de l'Espace reste indicatif.")
+        print(_("Note : application Flatpak système — son propre bac à sable "
+                "Flatpak ; le liseré de l'Espace reste indicatif."))
         _prevenir(
-            "%s n'est pas cloisonnée dans %s" % (nom_app, esp["nom"]),
-            "Cette application est installée pour toute la machine : ses "
-            "données sont les mêmes dans tous les Espaces. Pour l'isoler, "
-            "installez-la DANS l'Espace depuis « Configuration Codebyr ».")
+            _("{application} n'est pas cloisonnée dans {espace}").format(
+                application=nom_app, espace=esp["nom"]),
+            _("Cette application est installée pour toute la machine : ses "
+              "données sont les mêmes dans tous les Espaces. Pour l'isoler, "
+              "installez-la DANS l'Espace depuis « Configuration Codebyr »."))
         journal("Espace %s : application Flatpak système %s (non cloisonnée)"
                 % (esp["id"], nom_app))
     return run, env
@@ -900,10 +906,10 @@ def _envelopper_bac_a_sable(esp, session, cmd, env, home, renforce, hors_ligne,
             # sur l'Espace ENTIER ; « systemd-run --user » ne traverserait
             # de toute façon pas le changement de compte.
             run = bac_a_sable.plafonner_ressources(run, *bac_a_sable.plafonds_de(esp))
-        detail = "Blindage actif" + (" · hors-ligne (aucun réseau)" if hors_ligne else "")
-        print("🛡  %s dans l'Espace %s." % (detail, esp["nom"]))
+        detail = _("Blindage actif") + (_(" · hors-ligne (aucun réseau)") if hors_ligne else "")
+        print(_("🛡  {detail} dans l'Espace {espace}.").format(detail=detail, espace=esp["nom"]))
     if not audio:
-        print("🎤 Son et micro coupés dans l'Espace %s." % esp["nom"])
+        print(_("🎤 Son et micro coupés dans l'Espace %s.") % esp["nom"])
     return run
 
 
@@ -948,7 +954,7 @@ def _exporter_compte_dedie(esp, dest=None):
                          % (esp["nom"], "; ".join(erreurs) or "code %s" % code))
         return 1
     os.replace(provisoire, chemin)
-    print("Espace %s sauvegardé : %s" % (esp["nom"], chemin))
+    print(_("Espace {espace} sauvegardé : {archive}").format(espace=esp["nom"], archive=chemin))
     return 0
 
 
@@ -960,7 +966,7 @@ def _restaurer_compte_dedie(espaces, esp, source):
     d'avant est mis de côté dans l'Espace (.codebyr/avant-restauration-…).
     """
     if _espace_courant() == esp["id"]:
-        sys.stderr.write("Fermez cet Espace puis restaurez depuis le bureau.\n")
+        sys.stderr.write(_("Fermez cet Espace puis restaurez depuis le bureau.\n"))
         return 1
     cmd_close(espaces, esp["id"])
 
@@ -972,10 +978,10 @@ def _restaurer_compte_dedie(espaces, esp, source):
     code, erreurs = ordres_espace.geste_dans_l_espace(esp, ordres_espace.INTERNE_RESTAURER,
                                                       produire=decompresser)
     if code != 0 or erreurs:
-        sys.stderr.write("Restauration refusée, anciennes données conservées : %s\n"
+        sys.stderr.write(_("Restauration refusée, anciennes données conservées : %s\n")
                          % ("; ".join(erreurs) or "code %s" % code))
         return 1
-    print("Espace %s restauré. L'état précédent est conservé dans l'Espace." % esp["nom"])
+    print(_("Espace %s restauré. L'état précédent est conservé dans l'Espace.") % esp["nom"])
     return 0
 
 
@@ -1116,11 +1122,11 @@ def cmd_close(espaces, esp_id):
             return 1
         _nettoyer_marqueurs()
         if not complet:
-            sys.stderr.write("Espace %s refermé, mais pas entièrement rangé "
-                             "(voir « journalctl -t codebyr-uid »).\n" % esp_id)
+            sys.stderr.write(_("Espace %s refermé, mais pas entièrement rangé "
+                               "(voir « journalctl -t codebyr-uid »).\n") % esp_id)
             journal("Espace %s : fermeture incomplète" % esp_id)
             return 1
-        print("Espace %s refermé." % esp_id)
+        print(_("Espace %s refermé.") % esp_id)
         journal("Espace %s : fermeture (compte dédié)" % esp_id)
         return 0
     rundir = _rundir()
@@ -1160,7 +1166,8 @@ def cmd_close(espaces, esp_id):
             except OSError:
                 pass
     _nettoyer_marqueurs()
-    print("Espace %s : %d fenêtre(s) fermée(s)." % (esp_id, ferme))
+    print(n_("Espace {espace} : {n} fenêtre fermée.", "Espace {espace} : {n} fenêtres fermées.",
+             ferme).format(espace=esp_id, n=ferme))
     journal("Espace %s : fermeture (%d fenêtre(s))" % (esp_id, ferme))
     return 0
 
@@ -1168,22 +1175,22 @@ def cmd_close(espaces, esp_id):
 def cmd_purge(espaces, esp_id):
     esp = espaces.get(esp_id)
     if not esp:
-        sys.stderr.write("Espace inconnu : %s\n" % esp_id)
+        sys.stderr.write(_("Espace inconnu : %s\n") % esp_id)
         return 2
     if compte_dedie.demande(esp):
         if not _effacer_compte_dedie(espaces, esp):
             return 1
-        print("Données de l'Espace %s effacées." % esp["nom"])
+        print(_("Données de l'Espace %s effacées.") % esp["nom"])
         journal("Espace %s : données effacées (compte dédié)" % esp_id)
         return 0
     cmd_close(espaces, esp_id)   # on ferme d'abord les fenêtres ouvertes
     d = os.path.join(chemins.DONNEES, esp_id)
     if os.path.isdir(d):
         shutil.rmtree(d, ignore_errors=True)
-        print("Données de l'Espace %s effacées." % esp["nom"])
+        print(_("Données de l'Espace %s effacées.") % esp["nom"])
         journal("Espace %s : données effacées" % esp_id)
     else:
-        print("Rien à effacer pour %s." % esp["nom"])
+        print(_("Rien à effacer pour %s.") % esp["nom"])
     return 0
 
 
@@ -1193,20 +1200,20 @@ def cmd_export(espaces, esp_id, dest=None):
     """Sauvegarde un Espace dans une archive portable (copiable sur clé USB)."""
     esp = espaces.get(esp_id)
     if not esp:
-        sys.stderr.write("Espace inconnu : %s\n" % esp_id)
+        sys.stderr.write(_("Espace inconnu : %s\n") % esp_id)
         return 2
     if compte_dedie.demande(esp):
         return _exporter_compte_dedie(esp, dest)
     home = os.path.join(chemins.DONNEES, esp_id, "home")
     if not os.path.isdir(home):
-        print("L'Espace %s est vide — rien à sauvegarder." % esp["nom"])
+        print(_("L'Espace %s est vide — rien à sauvegarder.") % esp["nom"])
         return 0
     os.makedirs(chemins.SAUVEGARDES, exist_ok=True)
     path = dest or os.path.join(
         chemins.SAUVEGARDES, "%s-%s.tar.gz" % (esp_id, time.strftime("%Y%m%d-%H%M")))
     with tarfile.open(path, "w:gz") as tar:
         tar.add(home, arcname=".")
-    print("Espace %s sauvegardé : %s" % (esp["nom"], path))
+    print(_("Espace {espace} sauvegardé : {archive}").format(espace=esp["nom"], archive=path))
     return 0
 
 
@@ -1214,16 +1221,16 @@ def cmd_import(espaces, esp_id, source=None):
     """Restaure un Espace depuis une archive (portabilité entre machines)."""
     esp = espaces.get(esp_id)
     if not esp:
-        sys.stderr.write("Espace inconnu : %s\n" % esp_id)
+        sys.stderr.write(_("Espace inconnu : %s\n") % esp_id)
         return 2
     if not source:
         cands = sorted(glob.glob(os.path.join(chemins.SAUVEGARDES, "%s-*.tar.gz" % esp_id)))
         if not cands:
-            print("Aucune sauvegarde trouvée pour %s." % esp["nom"])
+            print(_("Aucune sauvegarde trouvée pour %s.") % esp["nom"])
             return 1
         source = cands[-1]
     if not os.path.exists(source):
-        sys.stderr.write("Archive introuvable : %s\n" % source)
+        sys.stderr.write(_("Archive introuvable : %s\n") % source)
         return 1
     if compte_dedie.demande(esp):
         return _restaurer_compte_dedie(espaces, esp, source)
@@ -1242,11 +1249,11 @@ def cmd_import(espaces, esp_id, source=None):
             cmd_close(espaces, esp_id)
             # Ne pas remplacer le dossier d'un Espace encore en activité.
             if _espace_courant() == esp_id:
-                raise ValueError("Fermez cet Espace puis restaurez depuis le bureau")
+                raise ValueError(_("Fermez cet Espace puis restaurez depuis le bureau"))
             with fichiers_surs.dossier(parent):
                 if os.path.lexists(home):
                     if os.path.islink(home):
-                        raise ValueError("Dossier personnel symbolique refusé")
+                        raise ValueError(_("Dossier personnel symbolique refusé"))
                     sauvegarde = tempfile.mkdtemp(prefix="avant-restauration-", dir=parent)
                     os.rmdir(sauvegarde)
                     os.rename(home, sauvegarde)
@@ -1256,12 +1263,12 @@ def cmd_import(espaces, esp_id, source=None):
                     if sauvegarde:
                         os.rename(sauvegarde, home)
                     raise
-        print("Espace %s restauré." % esp["nom"])
+        print(_("Espace %s restauré.") % esp["nom"])
         if sauvegarde:
-            print("Anciennes données conservées : %s" % sauvegarde)
+            print(_("Anciennes données conservées : %s") % sauvegarde)
         return 0
     except (OSError, tarfile.TarError, ValueError) as exc:
-        sys.stderr.write("Restauration refusée, anciennes données conservées : %s\n" % exc)
+        sys.stderr.write(_("Restauration refusée, anciennes données conservées : %s\n") % exc)
         return 1
 
 
@@ -1298,7 +1305,7 @@ def cmd_interne_flatpak(args):
         sys.stderr.write("codebyr-space : ordre Flatpak mal formé.\n")
         return 2
     if not shutil.which("flatpak"):
-        sys.stderr.write("Flatpak n'est pas installé.\n")
+        sys.stderr.write(_("Flatpak n'est pas installé.\n"))
         return 2
     dossier = flatpak_espace.dossier_dedie(compte.pw_dir)
     os.makedirs(dossier, mode=0o700, exist_ok=True)
@@ -1328,7 +1335,7 @@ def cmd_interne_flatpak(args):
 def _flatpak_dans_l_espace(esp, geste, appid):
     """Fait faire le geste Flatpak par l'Espace. Renvoie (code, nom lu)."""
     if not flatpak_espace.FORME_APPID.match(appid or ""):
-        sys.stderr.write("Identifiant d'application invalide : %s\n" % appid)
+        sys.stderr.write(_("Identifiant d'application invalide : %s\n") % appid)
         return 2, ""
     recu = []
     code, erreurs = ordres_espace.geste_dans_l_espace(
@@ -1420,7 +1427,7 @@ def cmd_programmes(esp_id):
     """
     esp = load_espaces().get(esp_id)
     if not esp:
-        sys.stderr.write("Espace inconnu : %s\n" % esp_id)
+        sys.stderr.write(_("Espace inconnu : %s\n") % esp_id)
         return 2
     if not compte_dedie.demande(esp):
         sys.stderr.write("codebyr-space : réservé aux Espaces à compte séparé.\n")
@@ -1437,33 +1444,37 @@ def cmd_install(esp_id, appid):
     espaces = load_espaces()
     esp = espaces.get(esp_id)
     if not esp:
-        sys.stderr.write("Espace inconnu : %s\n" % esp_id)
+        sys.stderr.write(_("Espace inconnu : %s\n") % esp_id)
         return 2
     if not shutil.which("flatpak"):
-        sys.stderr.write("Flatpak n'est pas installé.\n")
+        sys.stderr.write(_("Flatpak n'est pas installé.\n"))
         return 2
     if compte_dedie.demande(esp):
         # L'installation se fait DANS l'Espace : son dossier n'appartient plus
         # au bureau, qui ne peut ni y écrire, ni savoir ce qui s'y trouve.
-        print("Installation de %s dans l'Espace %s, sous son compte "
-              "(le téléchargement peut être long)..." % (appid, esp["nom"]))
+        print(_("Installation de {application} dans l'Espace {espace}, sous son compte "
+                "(le téléchargement peut être long)...").format(application=appid,
+                                                              espace=esp["nom"]))
         code, nom = _flatpak_dans_l_espace(esp, "installer", appid)
         if code != 0:
             return code
         nom = nom or appid
         _enregistrer_app(esp_id, nom, "flatpak run " + appid)
-        print("« %s » installée dans l'Espace %s." % (nom, esp["nom"]))
+        print(_("« {application} » installée dans l'Espace {espace}.").format(
+            application=nom, espace=esp["nom"]))
         return 0
-    env, _ = flatpak_espace.env_ordinaire(esp_id)
+    env, _dossier = flatpak_espace.env_ordinaire(esp_id)
     flatpak_espace.assurer_flathub(env)
-    print("Installation de « %s » dans l'Espace %s…" % (appid, esp["nom"]))
+    print(_("Installation de « {application} » dans l'Espace {espace}…").format(
+        application=appid, espace=esp["nom"]))
     rc = subprocess.call(["flatpak", "--user", "install", "-y", "flathub", appid], env=env)
     if rc != 0:
-        sys.stderr.write("Échec de l'installation de %s.\n" % appid)
+        sys.stderr.write(_("Échec de l'installation de %s.\n") % appid)
         return rc
     nom = flatpak_espace.nom_lisible(env, appid) or appid
     _enregistrer_app(esp_id, nom, "flatpak run " + appid)
-    print("« %s » installée dans l'Espace %s." % (nom, esp["nom"]))
+    print(_("« {application} » installée dans l'Espace {espace}.").format(
+            application=nom, espace=esp["nom"]))
     return 0
 
 
@@ -1473,7 +1484,7 @@ def cmd_add_app(esp_id, nom, fichier, extra):
     espaces = load_espaces()
     esp = espaces.get(esp_id)
     if not esp:
-        sys.stderr.write("Espace inconnu : %s\n" % esp_id)
+        sys.stderr.write(_("Espace inconnu : %s\n") % esp_id)
         return 2
     if compte_dedie.demande(esp):
         # Le bureau ne voit pas le dossier de l'Espace : c'est l'Espace qui
@@ -1487,7 +1498,8 @@ def cmd_add_app(esp_id, nom, fichier, extra):
         cmd = programmes.commande_programme(
             programmes.chemin_dans_le_bac_a_sable(reponse["chemin"]), reponse["nature"], extra)
         _enregistrer_app(esp_id, nom, cmd)
-        print("« %s » ajoutée au menu de l'Espace %s." % (nom, esp["nom"]))
+        print(_("« {application} » ajoutée au menu de l'Espace {espace}.").format(
+            application=nom, espace=esp["nom"]))
         print("  Commande : %s" % cmd)
         return 0
     cible = os.path.abspath(os.path.expanduser(fichier))
@@ -1520,7 +1532,8 @@ def cmd_add_app(esp_id, nom, fichier, extra):
     # contenant une espace (« Antigravity IDE ») casse le lancement.
     cmd = programmes.commande_programme(prog, nature, extra)
     _enregistrer_app(esp_id, nom, cmd)
-    print("« %s » ajoutée au menu de l'Espace %s." % (nom, esp["nom"]))
+    print(_("« {application} » ajoutée au menu de l'Espace {espace}.").format(
+            application=nom, espace=esp["nom"]))
     print("  Commande : %s" % cmd)
     return 0
 
@@ -1530,10 +1543,10 @@ def cmd_apps(esp_id):
     espaces = load_espaces()
     esp = espaces.get(esp_id)
     if not esp:
-        sys.stderr.write("Espace inconnu : %s\n" % esp_id)
+        sys.stderr.write(_("Espace inconnu : %s\n") % esp_id)
         return 2
-    env, _ = flatpak_espace.env_ordinaire(esp_id)
-    print("Applications de l'Espace %s :" % esp["nom"])
+    env, _dossier = flatpak_espace.env_ordinaire(esp_id)
+    print(_("Applications de l'Espace %s :") % esp["nom"])
     subprocess.call(["flatpak", "--user", "list", "--app",
                      "--columns=application,name,version"], env=env)
     return 0
@@ -1544,17 +1557,18 @@ def cmd_remove_app(esp_id, appid):
     espaces = load_espaces()
     esp = espaces.get(esp_id)
     if not esp:
-        sys.stderr.write("Espace inconnu : %s\n" % esp_id)
+        sys.stderr.write(_("Espace inconnu : %s\n") % esp_id)
         return 2
     if compte_dedie.demande(esp):
-        rc, _ = _flatpak_dans_l_espace(esp, "desinstaller", appid)
+        rc, _nom = _flatpak_dans_l_espace(esp, "desinstaller", appid)
     else:
-        env, _ = flatpak_espace.env_ordinaire(esp_id)
+        env, _dossier = flatpak_espace.env_ordinaire(esp_id)
         rc = subprocess.call(["flatpak", "--user", "uninstall", "-y", appid], env=env)
     apps = [a for a in (esp.get("apps") or [])
             if a.get("cmd") != "flatpak run " + appid]
     registre.modifier_espace(esp_id, {"apps": apps})
-    print("« %s » retirée de l'Espace %s." % (appid, esp["nom"]))
+    print(_("« {application} » retirée de l'Espace {espace}.").format(
+        application=appid, espace=esp["nom"]))
     return rc
 
 
@@ -1562,7 +1576,7 @@ def cmd_create(nom, couleur):
     """Crée un Espace personnalisé (persistant), écrit dans le registre utilisateur."""
     nom = nom.strip()
     if not nom:
-        sys.stderr.write("Nom d'Espace vide.\n")
+        sys.stderr.write(_("Nom d'Espace vide.\n"))
         return 2
     if not couleur.startswith("#"):
         couleur = "#" + couleur
@@ -1571,7 +1585,7 @@ def cmd_create(nom, couleur):
     # registre ne doit pas contenir ce qu'on refuserait d'y lire.
     # fullmatch, et non match avec « $ » : « $ » tolère un saut de ligne final.
     if not re.fullmatch(r"#(?:[0-9A-Fa-f]{3}|[0-9A-Fa-f]{6})", couleur):
-        sys.stderr.write("Couleur invalide : %r (attendu : #RRGGBB).\n" % couleur)
+        sys.stderr.write(_("Couleur invalide : %r (attendu : #RRGGBB).\n") % couleur)
         return 2
     # Un identifiant qu'un compte Unix peut porter : voir registre.identifiant_libre.
     esp_id = registre.identifiant_libre(nom)
@@ -1584,7 +1598,7 @@ def cmd_create(nom, couleur):
         "app": "org.gnome.Nautilus.desktop", "ephemere": False,
         "compte": "dedie",
     })
-    print("Espace « %s » créé (%s)." % (nom, couleur))
+    print(_("Espace « {espace} » créé ({couleur}).").format(espace=nom, couleur=couleur))
     return 0
 
 
@@ -1593,7 +1607,7 @@ def cmd_delete(esp_id):
     sont pas supprimables — on interroge le registre système plutôt qu'une
     liste codée en dur, qui aurait fini par diverger de son contenu."""
     if registre.est_systeme(esp_id):
-        sys.stderr.write("L'Espace intégré « %s » ne peut pas être supprimé.\n" % esp_id)
+        sys.stderr.write(_("L'Espace intégré « %s » ne peut pas être supprimé.\n") % esp_id)
         return 2
     espaces = load_espaces()
     esp = espaces.get(esp_id)
@@ -1612,17 +1626,17 @@ def cmd_delete(esp_id):
             sys.stderr.write("codebyr-space : %s\n" % exc)
             return 1
         if not complet:
-            sys.stderr.write("Compte de l'Espace %s pas entièrement retiré "
-                             "(voir « journalctl -t codebyr-uid »).\n" % esp_id)
+            sys.stderr.write(_("Compte de l'Espace %s pas entièrement retiré "
+                               "(voir « journalctl -t codebyr-uid »).\n") % esp_id)
             return 1
     cmd_close(espaces, esp_id)
     if not registre.supprimer_espace(esp_id):
-        print("Espace introuvable : %s" % esp_id)
+        print(_("Espace introuvable : %s") % esp_id)
         return 1
     d = os.path.join(chemins.DONNEES, esp_id)
     if os.path.isdir(d):
         shutil.rmtree(d, ignore_errors=True)
-    print("Espace supprimé : %s" % esp_id)
+    print(_("Espace supprimé : %s") % esp_id)
     return 0
 
 
@@ -1638,13 +1652,14 @@ def cmd_nettoyer_registre():
     apres = registre.reduire_couche(dict(avant))
     n_apres = sum(len(e) for e in apres.get("espaces", []) if isinstance(e, dict))
     if n_apres == n_avant:
-        print("Vos réglages ne contiennent déjà que des différences. Rien à faire.")
+        print(_("Vos réglages ne contiennent déjà que des différences. Rien à faire."))
         return 0
     registre.ecrire_couche(avant)
-    print("Réglages nettoyés : %d valeur(s) recopiée(s) du système retirée(s)."
-          % (n_avant - n_apres))
-    print("Vos choix personnels sont intacts ; les valeurs par défaut vous "
-          "atteindront de nouveau.")
+    print(n_("Réglages nettoyés : {n} valeur recopiée du système retirée.",
+             "Réglages nettoyés : {n} valeurs recopiées du système retirées.",
+             n_avant - n_apres).format(n=n_avant - n_apres))
+    print(_("Vos choix personnels sont intacts ; les valeurs par défaut vous "
+            "atteindront de nouveau."))
     journal("Registre utilisateur réduit (%d valeurs retirées)" % (n_avant - n_apres))
     return 0
 
@@ -1696,23 +1711,23 @@ def _deposer_pour_envoi(esp, depart, source):
             os.fchmod(fd, 0o770)
     except OSError:
         sys.stderr.write(
-            "Boîte d'envoi indisponible : cet Espace a été ouvert par une "
-            "version antérieure\nde Codebyr. Fermez-le et rouvrez-le.\n")
+            _("Boîte d'envoi indisponible : cet Espace a été ouvert par une "
+              "version antérieure\nde Codebyr. Fermez-le et rouvrez-le.\n"))
         return 1
     try:
         origine = provenance.origine(source, chemins.DONNEES) or depart
         fichiers_surs.copier_unique(source, dossier, os.path.basename(source), origine,
                                     mode=0o640)
     except OSError as exc:
-        sys.stderr.write("Copie impossible (%s)\n" % exc)
-        _prevenir("Envoi impossible",
-                  "Le fichier n'a pas pu être remis à %s." % esp["nom"])
+        sys.stderr.write(_("Copie impossible (%s)\n") % exc)
+        _prevenir(_("Envoi impossible"),
+                  _("Le fichier n'a pas pu être remis à %s.") % esp["nom"])
         return 1
     journal("dépôt pour l'Espace %s" % esp["id"])
-    _prevenir("En route vers %s" % esp["nom"],
-              "Le fichier y sera déposé dans « %s » à la prochaine ouverture "
-              "de cet Espace." % chemins.PARTAGE)
-    print("Déposé pour %s — remis à la prochaine ouverture de cet Espace."
+    _prevenir(_("En route vers %s") % esp["nom"],
+              _("Le fichier y sera déposé dans « %s » à la prochaine ouverture "
+                "de cet Espace.") % chemins.PARTAGE)
+    print(_("Déposé pour %s — remis à la prochaine ouverture de cet Espace.")
           % esp["nom"])
     return 0
 
@@ -1729,10 +1744,10 @@ def _envoyer_vers_compte_dedie(esp, source):
     except ValueError:
         boite = None
     if not boite or not os.path.isdir(boite):
-        sys.stderr.write("L'Espace %s n'a pas encore été ouvert sous son propre "
-                         "compte : ouvrez-le une première fois.\n" % esp["nom"])
-        _prevenir("Envoi impossible pour l'instant",
-                  "Ouvrez une première fois l'Espace %s, puis renvoyez le fichier."
+        sys.stderr.write(_("L'Espace %s n'a pas encore été ouvert sous son propre "
+                           "compte : ouvrez-le une première fois.\n") % esp["nom"])
+        _prevenir(_("Envoi impossible pour l'instant"),
+                  _("Ouvrez une première fois l'Espace %s, puis renvoyez le fichier.")
                   % esp["nom"])
         return 1
     try:
@@ -1740,15 +1755,16 @@ def _envoyer_vers_compte_dedie(esp, source):
         fichiers_surs.copier_unique(source, boite, os.path.basename(source), origine,
                                     mode=0o644)
     except OSError as exc:
-        sys.stderr.write("Copie impossible (%s)\n" % exc)
-        _prevenir("Envoi impossible",
-                  "Le fichier n'a pas pu être déposé pour %s." % esp["nom"])
+        sys.stderr.write(_("Copie impossible (%s)\n") % exc)
+        _prevenir(_("Envoi impossible"),
+                  _("Le fichier n'a pas pu être déposé pour %s.") % esp["nom"])
         return 1
     journal("envoi vers l'Espace %s" % esp["id"])
-    _prevenir("En route vers %s" % esp["nom"],
-              "Le fichier sera dans le dossier « %s » à la prochaine ouverture "
-              "de cet Espace." % chemins.PARTAGE)
-    print("Déposé pour %s — dans « %s » à sa prochaine ouverture." % (esp["nom"], chemins.PARTAGE))
+    _prevenir(_("En route vers %s") % esp["nom"],
+              _("Le fichier sera dans le dossier « %s » à la prochaine ouverture "
+                "de cet Espace.") % chemins.PARTAGE)
+    print(_("Déposé pour {espace} — dans « {dossier} » à sa prochaine ouverture.").format(
+        espace=esp["nom"], dossier=chemins.PARTAGE))
     return 0
 
 
@@ -1765,17 +1781,17 @@ def cmd_envoyer(espaces, esp_id, fichier):
     """
     esp = espaces.get(esp_id)
     if not esp:
-        sys.stderr.write("Espace inconnu : %s\n" % esp_id)
+        sys.stderr.write(_("Espace inconnu : %s\n") % esp_id)
         return 2
     if esp.get("ephemere"):
         # Le dossier d'un Espace jetable vit en mémoire et disparaît avec lui :
         # y « classer » un document reviendrait à le jeter.
-        sys.stderr.write("Un Espace jetable ne conserve rien : utilisez plutôt "
-                         "« codebyr-space launch %s --fichier … ».\n" % esp_id)
+        sys.stderr.write(_("Un Espace jetable ne conserve rien : utilisez plutôt "
+                           "« codebyr-space launch %s --fichier … ».\n") % esp_id)
         return 2
     source = os.path.abspath(os.path.expanduser(fichier))
     if not os.path.isfile(source):
-        sys.stderr.write("Fichier introuvable (ou ce n'est pas un fichier) : %s\n"
+        sys.stderr.write(_("Fichier introuvable (ou ce n'est pas un fichier) : %s\n")
                          % fichier)
         return 2
 
@@ -1796,17 +1812,18 @@ def cmd_envoyer(espaces, esp_id, fichier):
         origine = provenance.origine(source, chemins.DONNEES)
         nom = fichiers_surs.copier_unique(source, partage, os.path.basename(source), origine)
     except OSError as exc:
-        sys.stderr.write("Copie impossible (%s)\n" % exc)
-        _prevenir("Envoi impossible",
-                  "Le fichier n'a pas pu être copié dans %s." % esp["nom"])
+        sys.stderr.write(_("Copie impossible (%s)\n") % exc)
+        _prevenir(_("Envoi impossible"),
+                  _("Le fichier n'a pas pu être copié dans %s.") % esp["nom"])
         return 1
 
     # Le journal note l'Espace et l'action, jamais le nom du fichier.
     journal("envoi vers l'Espace %s" % esp["id"])
-    _prevenir("Envoyé dans %s" % esp["nom"],
-              "Le fichier vous attend dans le dossier « %s » de cet Espace."
+    _prevenir(_("Envoyé dans %s") % esp["nom"],
+              _("Le fichier vous attend dans le dossier « %s » de cet Espace.")
               % chemins.PARTAGE)
-    print("Copié dans %s → %s/%s" % (esp["nom"], chemins.PARTAGE, nom))
+    print(_("Copié dans {espace} → {dossier}/{fichier}").format(
+        espace=esp["nom"], dossier=chemins.PARTAGE, fichier=nom))
     return 0
 
 
@@ -1814,19 +1831,19 @@ def cmd_provenance(espaces, chemin):
     """Dit d'où vient un fichier, et si l'ouvrir ici mérite une cloche."""
     cible = os.path.abspath(os.path.expanduser(chemin))
     if not os.path.exists(cible):
-        sys.stderr.write("Fichier introuvable : %s\n" % chemin)
+        sys.stderr.write(_("Fichier introuvable : %s\n") % chemin)
         return 2
     venue = provenance.origine(cible, chemins.DONNEES)
     if not venue:
-        print("Origine inconnue — ce fichier n'a jamais transité par un Espace,"
-              "\nou il a perdu sa marque (clé USB, pièce jointe, partage réseau).")
+        print(_("Origine inconnue — ce fichier n'a jamais transité par un Espace,"
+                "\nou il a perdu sa marque (clé USB, pièce jointe, partage réseau)."))
         return 0
     esp = espaces.get(venue)
-    print("Vient de l'Espace : %s" % (esp["nom"] if esp else venue))
+    print(_("Vient de l'Espace : %s") % (esp["nom"] if esp else venue))
     courant = _espace_courant()
     if courant and provenance.doit_isoler(venue, courant):
         ici = espaces.get(courant)
-        print("Vous êtes dans %s : l'ouvrir ici ferait franchir une frontière."
+        print(_("Vous êtes dans %s : l'ouvrir ici ferait franchir une frontière.")
               % (ici["nom"] if ici else courant))
     return 0
 
@@ -1855,7 +1872,7 @@ def cmd_ouvrir(espaces, chemin, lanceur=None):
     """
     cible = os.path.abspath(os.path.expanduser(chemin))
     if not os.path.isfile(cible):
-        sys.stderr.write("Fichier introuvable : %s\n" % chemin)
+        sys.stderr.write(_("Fichier introuvable : %s\n") % chemin)
         return 2
 
     courant = _espace_courant()
@@ -1870,9 +1887,9 @@ def cmd_ouvrir(espaces, chemin, lanceur=None):
     if choix == "jetable":
         autre = espaces.get(venue)
         journal("ouverture sous cloche d'un fichier venu de %s" % venue)
-        _prevenir("Ouvert sous cloche",
-                  "Ce fichier vient de l'Espace %s. Il s'ouvre isolé et sans "
-                  "réseau, et disparaîtra à la fermeture."
+        _prevenir(_("Ouvert sous cloche"),
+                  _("Ce fichier vient de l'Espace %s. Il s'ouvre isolé et sans "
+                    "réseau, et disparaîtra à la fermeture.")
                   % (autre["nom"] if autre else venue))
         try:
             lanceur(["/usr/bin/codebyr-jetable", cible])
@@ -1880,7 +1897,7 @@ def cmd_ouvrir(espaces, chemin, lanceur=None):
             # Échouer ici empêcherait d'ouvrir un document parfaitement
             # légitime. On le dit, et on ouvre normalement.
             sys.stderr.write("codebyr-space : Jetable indisponible (%s)\n" % exc)
-            _prevenir("Ouverture refusée", "Le Jetable est indisponible. Le fichier reste fermé.")
+            _prevenir(_("Ouverture refusée"), _("Le Jetable est indisponible. Le fichier reste fermé."))
             return 1
 
     if choix == "normale":
@@ -1896,28 +1913,28 @@ def cmd_adopter(espaces, chemin):
     """Après examen : ce fichier appartient désormais à l'Espace courant."""
     cible = os.path.abspath(os.path.expanduser(chemin))
     if not os.path.isfile(cible):
-        sys.stderr.write("Fichier introuvable : %s\n" % chemin)
+        sys.stderr.write(_("Fichier introuvable : %s\n") % chemin)
         return 2
     courant = _espace_courant()
     if not courant:
         sys.stderr.write(
-            "Adopter n'a de sens que DANS un Espace : c'est là qu'un fichier "
-            "peut appartenir\nà quelque part. Lancez cette commande depuis "
-            "l'Espace où vous voulez le garder.\n")
+            _("Adopter n'a de sens que DANS un Espace : c'est là qu'un fichier "
+              "peut appartenir\nà quelque part. Lancez cette commande depuis "
+              "l'Espace où vous voulez le garder.\n"))
         return 2
     venue = provenance.origine(cible, chemins.DONNEES)
     if not provenance.doit_isoler(venue, courant):
-        print("Ce fichier est déjà chez lui : rien à faire.")
+        print(_("Ce fichier est déjà chez lui : rien à faire."))
         return 0
     if not provenance.adopter(cible, courant):
-        sys.stderr.write("Marque impossible à écrire (système de fichiers "
-                         "sans attributs étendus ?).\n")
+        sys.stderr.write(_("Marque impossible à écrire (système de fichiers "
+                           "sans attributs étendus ?).\n"))
         return 1
     esp = espaces.get(courant)
     journal("adoption d'un fichier venu de %s dans %s" % (venue, courant))
-    print("Adopté dans %s : ce fichier s'ouvrira désormais normalement ici."
+    print(_("Adopté dans %s : ce fichier s'ouvrira désormais normalement ici.")
           % (esp["nom"] if esp else courant))
-    print("(Il redeviendra étranger si vous l'envoyez vers un autre Espace.)")
+    print(_("(Il redeviendra étranger si vous l'envoyez vers un autre Espace.)"))
     return 0
 
 
@@ -1930,7 +1947,7 @@ def cmd_contagion(espaces, esp_id):
     """
     esp = espaces.get(esp_id)
     if not esp:
-        sys.stderr.write("Espace inconnu : %s\n" % esp_id)
+        sys.stderr.write(_("Espace inconnu : %s\n") % esp_id)
         return 2
     origines = []
     total = 0
@@ -1949,20 +1966,21 @@ def cmd_contagion(espaces, esp_id):
                     if o is None or provenance.identifiant_valide(o)]
     else:
         racine = os.path.join(chemins.DONNEES, esp_id, "home")
-        for dossier, _, fichiers in os.walk(racine):
+        for dossier, _sous, fichiers in os.walk(racine):
             for nom in fichiers:
                 total += 1
                 origines.append(provenance.origine(os.path.join(dossier, nom), chemins.DONNEES))
     compte = provenance.resumer(origines, esp_id)
-    print("Espace %s — %d fichier(s) au total." % (esp["nom"], total))
+    print(n_("Espace {espace} — {n} fichier au total.", "Espace {espace} — {n} fichiers au total.",
+             total).format(espace=esp["nom"], n=total))
     if not compte:
-        print("Aucun fichier venu d'un autre Espace.")
+        print(_("Aucun fichier venu d'un autre Espace."))
         return 0
     for venue, combien in sorted(compte.items(), key=lambda c: -c[1]):
         autre = espaces.get(venue)
         print("  %3d venu(s) de %s" % (combien, autre["nom"] if autre else venue))
-    print("\nCes fichiers ont franchi une frontière. Pour en examiner un sous "
-          "cloche :\n  codebyr-space launch %s --fichier <chemin>" % esp_id)
+    print(_("\nCes fichiers ont franchi une frontière. Pour en examiner un sous "
+            "cloche :\n  codebyr-space launch %s --fichier <chemin>") % esp_id)
     return 0
 
 
@@ -2050,12 +2068,12 @@ def main(argv):
     if action == INTERNE_PROGRAMME and len(args) == 1:
         return cmd_interne_programme(args[0])
     if action not in ACTIONS:
-        sys.stderr.write("Action inconnue : %s\n" % action)
-        sys.stderr.write("Actions : %s\n" % ", ".join(sorted(ACTIONS)))
+        sys.stderr.write(_("Action inconnue : %s\n") % action)
+        sys.stderr.write(_("Actions : %s\n") % ", ".join(sorted(ACTIONS)))
         return 2
     minimum, usage, executer = ACTIONS[action]
     if len(args) < minimum:
-        sys.stderr.write("Usage : codebyr-space %s\n" % usage)
+        sys.stderr.write(_("Usage : codebyr-space %s\n") % usage)
         return 2
     try:
         espaces = load_espaces()
@@ -2065,12 +2083,12 @@ def main(argv):
             refus = compte_dedie.refus_de_geste(action, espaces.get(args[0]))
             if refus:
                 sys.stderr.write("codebyr-space : %s\n" % refus)
-                _prevenir("Geste pas encore disponible", refus)
+                _prevenir(_("Geste pas encore disponible"), refus)
                 return 1
         return executer(espaces, args)
     except (OSError, ValueError) as exc:
         sys.stderr.write("codebyr-space : opération refusée (%s)\n" % exc)
-        _prevenir("Opération interrompue", "Un accès sûr aux données n'a pas pu être établi. Consultez le terminal pour le détail.")
+        _prevenir(_("Opération interrompue"), _("Un accès sûr aux données n'a pas pu être établi. Consultez le terminal pour le détail."))
         return 1
 
 

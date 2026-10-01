@@ -574,6 +574,808 @@ msgstr "Could not add this program."
 msgid "« {adresse} » n'est pas une adresse de site valable."
 msgstr "“{adresse}” is not a valid site address."
 
+#: usr/bin/codebyr-space
+msgid "Il reste %d Mo de mémoire pour l'Espace jetable. Évitez d'y télécharger de gros fichiers."
+msgstr "Only %d MB of memory left for the Disposable Space. Avoid downloading large files there."
+
+#: usr/bin/codebyr-space
+msgid "Espace jetable : mémoire limitée"
+msgstr "Disposable Space: limited memory"
+
+#: usr/bin/codebyr-space
+msgid "Espaces disponibles :"
+msgstr "Available Spaces:"
+
+#: usr/bin/codebyr-space
+msgid "Réseau restreint : seul {n} domaine autorisé dans {espace}."
+msgid_plural "Réseau restreint : seuls {n} domaines autorisés dans {espace}."
+msgstr[0] "Restricted network: only {n} domain allowed in {espace}."
+msgstr[1] "Restricted network: only {n} domains allowed in {espace}."
+
+#: usr/bin/codebyr-space
+msgid "Réseau restreint : AUCUN site autorisé dans %s pour l'instant. Ajoutez celui de votre banque dans « Configuration Codebyr »."
+msgstr "Restricted network: NO site allowed in %s yet. Add your bank's site in “Codebyr Settings”."
+
+#: usr/bin/codebyr-space
+msgid "Espace %s : aucun site autorisé"
+msgstr "%s Space: no site allowed"
+
+#: usr/bin/codebyr-space
+msgid "Ouvrez « Configuration Codebyr » pour déclarer votre banque. Tant qu'elle n'est pas déclarée, cet Espace n'ouvre aucun site — c'est voulu."
+msgstr "Open “Codebyr Settings” to declare your bank. Until it is declared, this Space opens no site — that is intentional."
+
+#: usr/bin/codebyr-space
+msgid "Espace %s : ouverture refusée"
+msgstr "%s Space: opening refused"
+
+#: usr/bin/codebyr-space
+msgid "Espace inconnu : %s\n"
+msgstr "Unknown Space: %s\n"
+
+#: usr/bin/codebyr-space
+msgid "Isolation indisponible"
+msgstr "Isolation unavailable"
+
+#: usr/bin/codebyr-space
+msgid "bubblewrap manque : lancement refusé. Réparez le paquet codebyr-tools."
+msgstr "bubblewrap is missing: launch refused. Repair the codebyr-tools package."
+
+#: usr/bin/codebyr-space
+msgid "bubblewrap absent : lancement refusé.\n"
+msgstr "bubblewrap missing: launch refused.\n"
+
+#: usr/bin/codebyr-space
+msgid "Fichier introuvable : lancement refusé.\n"
+msgstr "File not found: launch refused.\n"
+
+#: usr/bin/codebyr-space
+msgid "ses données récentes n'ont pas pu revenir de son compte dédié"
+msgstr "its recent data could not come back from its dedicated account"
+
+#: usr/bin/codebyr-space
+msgid "Aperçus d'images en échec oubliés une fois (Codebyr 1.16.5).\n"
+msgstr "Failed image previews forgotten once (Codebyr 1.16.5).\n"
+
+#: usr/bin/codebyr-space
+msgid "ses données n'ont pas pu le suivre sous son propre compte (elles sont intactes à leur ancien emplacement)"
+msgstr "its data could not follow it to its own account (it is intact in its former location)"
+
+#: usr/bin/codebyr-space
+msgid "son dossier n'a pas pu être préparé (voir le journal)"
+msgstr "its folder could not be prepared (see the log)"
+
+#: usr/bin/codebyr-space
+msgid "Filtre indisponible"
+msgstr "Filter unavailable"
+
+#: usr/bin/codebyr-space
+msgid "Lancement refusé : le réseau restreint ne peut pas être établi."
+msgstr "Launch refused: the restricted network cannot be set up."
+
+#: usr/bin/codebyr-space
+msgid "Ouverture de « {application} » dans l'Espace {espace}…"
+msgstr "Opening “{application}” in the {espace} Space…"
+
+#: usr/bin/codebyr-space
+msgid "Espace %s : ouverture impossible"
+msgstr "%s Space: could not open"
+
+#: usr/bin/codebyr-space
+msgid "Espace jetable détruit."
+msgstr "Disposable Space destroyed."
+
+#: usr/bin/codebyr-space
+msgid "Application incompatible avec cet Espace"
+msgstr "Application incompatible with this Space"
+
+#: usr/bin/codebyr-space
+msgid "{application} ne s'ouvre pas dans {espace}"
+msgstr "{application} does not open in {espace}"
+
+#: usr/bin/codebyr-space
+msgid "Elle pourrait {risque}. Ouvrez-la hors des Espaces, ou activez « Compte séparé » pour {espace} dans Configuration Codebyr : elle y serait bornée au compte de l'Espace."
+msgstr "It could {risque}. Open it outside the Spaces, or turn on “Separate account” for {espace} in Codebyr Settings: it would then be confined to the Space's account."
+
+#: usr/bin/codebyr-space
+msgid "Application Flatpak dans l'Espace %s, sous son compte."
+msgstr "Flatpak application in the %s Space, under its account."
+
+#: usr/bin/codebyr-space
+msgid "Ses accès aux fichiers et au réseau dépendent des permissions de cette application, dans les limites du compte de l'Espace."
+msgstr "Its access to files and network depends on this application's permissions, within the limits of the Space's account."
+
+#: usr/bin/codebyr-space
+msgid "Permissions Flatpak"
+msgstr "Flatpak permissions"
+
+#: usr/bin/codebyr-space
+msgid "Application Flatpak dédiée à %s : permissions Flatpak applicables."
+msgstr "Flatpak application dedicated to %s: Flatpak permissions apply."
+
+#: usr/bin/codebyr-space
+msgid "Installation dédiée ; les accès aux fichiers et au réseau dépendent des permissions de cette application."
+msgstr "Dedicated installation; access to files and network depends on this application's permissions."
+
+#: usr/bin/codebyr-space
+msgid "Note : application Flatpak système — son propre bac à sable Flatpak ; le liseré de l'Espace reste indicatif."
+msgstr "Note: system-wide Flatpak application — its own Flatpak sandbox; the Space's border is only indicative."
+
+#: usr/bin/codebyr-space
+msgid "{application} n'est pas cloisonnée dans {espace}"
+msgstr "{application} is not compartmentalized in {espace}"
+
+#: usr/bin/codebyr-space
+msgid "Cette application est installée pour toute la machine : ses données sont les mêmes dans tous les Espaces. Pour l'isoler, installez-la DANS l'Espace depuis « Configuration Codebyr »."
+msgstr "This application is installed for the whole machine: its data is the same in every Space. To isolate it, install it IN the Space from “Codebyr Settings”."
+
+#: usr/bin/codebyr-space
+msgid "Blindage actif"
+msgstr "Hardening active"
+
+#: usr/bin/codebyr-space
+msgid " · hors-ligne (aucun réseau)"
+msgstr " · offline (no network)"
+
+#: usr/bin/codebyr-space
+msgid "🛡  {detail} dans l'Espace {espace}."
+msgstr "🛡  {detail} in the {espace} Space."
+
+#: usr/bin/codebyr-space
+msgid "🎤 Son et micro coupés dans l'Espace %s."
+msgstr "🎤 Sound and microphone off in the %s Space."
+
+#: usr/bin/codebyr-space
+msgid "Espace {espace} sauvegardé : {archive}"
+msgstr "{espace} Space saved: {archive}"
+
+#: usr/bin/codebyr-space
+msgid "Fermez cet Espace puis restaurez depuis le bureau.\n"
+msgstr "Close this Space, then restore from the desktop.\n"
+
+#: usr/bin/codebyr-space
+msgid "Restauration refusée, anciennes données conservées : %s\n"
+msgstr "Restore refused, previous data kept: %s\n"
+
+#: usr/bin/codebyr-space
+msgid "Espace %s restauré. L'état précédent est conservé dans l'Espace."
+msgstr "%s Space restored. The previous state is kept in the Space."
+
+#: usr/bin/codebyr-space
+msgid "Espace %s refermé, mais pas entièrement rangé (voir « journalctl -t codebyr-uid »).\n"
+msgstr "%s Space closed, but not fully cleaned up (see “journalctl -t codebyr-uid”).\n"
+
+#: usr/bin/codebyr-space
+msgid "Espace %s refermé."
+msgstr "%s Space closed."
+
+#: usr/bin/codebyr-space
+msgid "Espace {espace} : {n} fenêtre fermée."
+msgid_plural "Espace {espace} : {n} fenêtres fermées."
+msgstr[0] "{espace} Space: {n} window closed."
+msgstr[1] "{espace} Space: {n} windows closed."
+
+#: usr/bin/codebyr-space
+msgid "Données de l'Espace %s effacées."
+msgstr "Data of the %s Space erased."
+
+#: usr/bin/codebyr-space
+msgid "Rien à effacer pour %s."
+msgstr "Nothing to erase for %s."
+
+#: usr/bin/codebyr-space
+msgid "L'Espace %s est vide — rien à sauvegarder."
+msgstr "The %s Space is empty — nothing to save."
+
+#: usr/bin/codebyr-space
+msgid "Aucune sauvegarde trouvée pour %s."
+msgstr "No backup found for %s."
+
+#: usr/bin/codebyr-space
+msgid "Archive introuvable : %s\n"
+msgstr "Archive not found: %s\n"
+
+#: usr/bin/codebyr-space
+msgid "Fermez cet Espace puis restaurez depuis le bureau"
+msgstr "Close this Space, then restore from the desktop"
+
+#: usr/bin/codebyr-space
+#: usr/share/codebyr/ordres_espace.py
+msgid "Dossier personnel symbolique refusé"
+msgstr "Symbolic home folder refused"
+
+#: usr/bin/codebyr-space
+msgid "Espace %s restauré."
+msgstr "%s Space restored."
+
+#: usr/bin/codebyr-space
+msgid "Anciennes données conservées : %s"
+msgstr "Previous data kept: %s"
+
+#: usr/bin/codebyr-space
+msgid "Flatpak n'est pas installé.\n"
+msgstr "Flatpak is not installed.\n"
+
+#: usr/bin/codebyr-space
+msgid "Identifiant d'application invalide : %s\n"
+msgstr "Invalid application ID: %s\n"
+
+#: usr/bin/codebyr-space
+msgid "Installation de {application} dans l'Espace {espace}, sous son compte (le téléchargement peut être long)..."
+msgstr "Installing {application} in the {espace} Space, under its account (the download may take a while)..."
+
+#: usr/bin/codebyr-space
+msgid "« {application} » installée dans l'Espace {espace}."
+msgstr "“{application}” installed in the {espace} Space."
+
+#: usr/bin/codebyr-space
+msgid "Installation de « {application} » dans l'Espace {espace}…"
+msgstr "Installing “{application}” in the {espace} Space…"
+
+#: usr/bin/codebyr-space
+msgid "Échec de l'installation de %s.\n"
+msgstr "Installation of %s failed.\n"
+
+#: usr/bin/codebyr-space
+msgid "« {application} » ajoutée au menu de l'Espace {espace}."
+msgstr "“{application}” added to the {espace} Space menu."
+
+#: usr/bin/codebyr-space
+msgid "Applications de l'Espace %s :"
+msgstr "Applications of the %s Space:"
+
+#: usr/bin/codebyr-space
+msgid "« {application} » retirée de l'Espace {espace}."
+msgstr "“{application}” removed from the {espace} Space."
+
+#: usr/bin/codebyr-space
+msgid "Nom d'Espace vide.\n"
+msgstr "Empty Space name.\n"
+
+#: usr/bin/codebyr-space
+msgid "Couleur invalide : %r (attendu : #RRGGBB).\n"
+msgstr "Invalid color: %r (expected: #RRGGBB).\n"
+
+#: usr/bin/codebyr-space
+msgid "Espace « {espace} » créé ({couleur})."
+msgstr "“{espace}” Space created ({couleur})."
+
+#: usr/bin/codebyr-space
+msgid "L'Espace intégré « %s » ne peut pas être supprimé.\n"
+msgstr "The built-in “%s” Space cannot be deleted.\n"
+
+#: usr/bin/codebyr-space
+msgid "Compte de l'Espace %s pas entièrement retiré (voir « journalctl -t codebyr-uid »).\n"
+msgstr "Account of the %s Space not fully removed (see “journalctl -t codebyr-uid”).\n"
+
+#: usr/bin/codebyr-space
+msgid "Espace introuvable : %s"
+msgstr "Space not found: %s"
+
+#: usr/bin/codebyr-space
+msgid "Espace supprimé : %s"
+msgstr "Space deleted: %s"
+
+#: usr/bin/codebyr-space
+msgid "Vos réglages ne contiennent déjà que des différences. Rien à faire."
+msgstr "Your settings already contain only differences. Nothing to do."
+
+#: usr/bin/codebyr-space
+msgid "Réglages nettoyés : {n} valeur recopiée du système retirée."
+msgid_plural "Réglages nettoyés : {n} valeurs recopiées du système retirées."
+msgstr[0] "Settings cleaned up: {n} value copied from the system removed."
+msgstr[1] "Settings cleaned up: {n} values copied from the system removed."
+
+#: usr/bin/codebyr-space
+msgid "Vos choix personnels sont intacts ; les valeurs par défaut vous atteindront de nouveau."
+msgstr "Your personal choices are intact; default values will reach you again."
+
+#: usr/bin/codebyr-space
+msgid "Boîte d'envoi indisponible : cet Espace a été ouvert par une version antérieure\nde Codebyr. Fermez-le et rouvrez-le.\n"
+msgstr "Outbox unavailable: this Space was opened by an earlier version\nof Codebyr. Close it and open it again.\n"
+
+#: usr/bin/codebyr-space
+msgid "Copie impossible (%s)\n"
+msgstr "Could not copy (%s)\n"
+
+#: usr/bin/codebyr-space
+msgid "Envoi impossible"
+msgstr "Could not send"
+
+#: usr/bin/codebyr-space
+msgid "Le fichier n'a pas pu être remis à %s."
+msgstr "The file could not be delivered to %s."
+
+#: usr/bin/codebyr-space
+msgid "En route vers %s"
+msgstr "On its way to %s"
+
+#: usr/bin/codebyr-space
+msgid "Le fichier y sera déposé dans « %s » à la prochaine ouverture de cet Espace."
+msgstr "The file will be placed in “%s” the next time this Space opens."
+
+#: usr/bin/codebyr-space
+msgid "Déposé pour %s — remis à la prochaine ouverture de cet Espace."
+msgstr "Left for %s — delivered the next time this Space opens."
+
+#: usr/bin/codebyr-space
+msgid "L'Espace %s n'a pas encore été ouvert sous son propre compte : ouvrez-le une première fois.\n"
+msgstr "The %s Space has not been opened under its own account yet: open it once first.\n"
+
+#: usr/bin/codebyr-space
+msgid "Envoi impossible pour l'instant"
+msgstr "Cannot send yet"
+
+#: usr/bin/codebyr-space
+msgid "Ouvrez une première fois l'Espace %s, puis renvoyez le fichier."
+msgstr "Open the %s Space once, then send the file again."
+
+#: usr/bin/codebyr-space
+msgid "Le fichier n'a pas pu être déposé pour %s."
+msgstr "The file could not be left for %s."
+
+#: usr/bin/codebyr-space
+msgid "Le fichier sera dans le dossier « %s » à la prochaine ouverture de cet Espace."
+msgstr "The file will be in the “%s” folder the next time this Space opens."
+
+#: usr/bin/codebyr-space
+msgid "Déposé pour {espace} — dans « {dossier} » à sa prochaine ouverture."
+msgstr "Left for {espace} — in “{dossier}” the next time it opens."
+
+#: usr/bin/codebyr-space
+msgid "Un Espace jetable ne conserve rien : utilisez plutôt « codebyr-space launch %s --fichier … ».\n"
+msgstr "A Disposable Space keeps nothing: use “codebyr-space launch %s --fichier …” instead.\n"
+
+#: usr/bin/codebyr-space
+msgid "Fichier introuvable (ou ce n'est pas un fichier) : %s\n"
+msgstr "File not found (or not a file): %s\n"
+
+#: usr/bin/codebyr-space
+msgid "Le fichier n'a pas pu être copié dans %s."
+msgstr "The file could not be copied into %s."
+
+#: usr/bin/codebyr-space
+msgid "Envoyé dans %s"
+msgstr "Sent to %s"
+
+#: usr/bin/codebyr-space
+msgid "Le fichier vous attend dans le dossier « %s » de cet Espace."
+msgstr "The file is waiting for you in this Space's “%s” folder."
+
+#: usr/bin/codebyr-space
+msgid "Copié dans {espace} → {dossier}/{fichier}"
+msgstr "Copied into {espace} → {dossier}/{fichier}"
+
+#: usr/bin/codebyr-space
+msgid "Fichier introuvable : %s\n"
+msgstr "File not found: %s\n"
+
+#: usr/bin/codebyr-space
+msgid "Origine inconnue — ce fichier n'a jamais transité par un Espace,\nou il a perdu sa marque (clé USB, pièce jointe, partage réseau)."
+msgstr "Unknown origin — this file never went through a Space,\nor it lost its mark (USB stick, attachment, network share)."
+
+#: usr/bin/codebyr-space
+msgid "Vient de l'Espace : %s"
+msgstr "Comes from the Space: %s"
+
+#: usr/bin/codebyr-space
+msgid "Vous êtes dans %s : l'ouvrir ici ferait franchir une frontière."
+msgstr "You are in %s: opening it here would cross a boundary."
+
+#: usr/bin/codebyr-space
+msgid "Ouvert sous cloche"
+msgstr "Opened in quarantine"
+
+#: usr/bin/codebyr-space
+msgid "Ce fichier vient de l'Espace %s. Il s'ouvre isolé et sans réseau, et disparaîtra à la fermeture."
+msgstr "This file comes from the %s Space. It opens isolated and without network, and will disappear when closed."
+
+#: usr/bin/codebyr-space
+msgid "Ouverture refusée"
+msgstr "Opening refused"
+
+#: usr/bin/codebyr-space
+msgid "Le Jetable est indisponible. Le fichier reste fermé."
+msgstr "Disposable is unavailable. The file stays closed."
+
+#: usr/bin/codebyr-space
+msgid "Adopter n'a de sens que DANS un Espace : c'est là qu'un fichier peut appartenir\nà quelque part. Lancez cette commande depuis l'Espace où vous voulez le garder.\n"
+msgstr "Adopting only makes sense INSIDE a Space: that is where a file can belong\nsomewhere. Run this command from the Space where you want to keep it.\n"
+
+#: usr/bin/codebyr-space
+msgid "Ce fichier est déjà chez lui : rien à faire."
+msgstr "This file is already at home: nothing to do."
+
+#: usr/bin/codebyr-space
+msgid "Marque impossible à écrire (système de fichiers sans attributs étendus ?).\n"
+msgstr "Could not write the mark (file system without extended attributes?).\n"
+
+#: usr/bin/codebyr-space
+msgid "Adopté dans %s : ce fichier s'ouvrira désormais normalement ici."
+msgstr "Adopted in %s: this file will now open normally here."
+
+#: usr/bin/codebyr-space
+msgid "(Il redeviendra étranger si vous l'envoyez vers un autre Espace.)"
+msgstr "(It will become foreign again if you send it to another Space.)"
+
+#: usr/bin/codebyr-space
+msgid "Espace {espace} — {n} fichier au total."
+msgid_plural "Espace {espace} — {n} fichiers au total."
+msgstr[0] "{espace} Space — {n} file in total."
+msgstr[1] "{espace} Space — {n} files in total."
+
+#: usr/bin/codebyr-space
+msgid "Aucun fichier venu d'un autre Espace."
+msgstr "No file from another Space."
+
+#: usr/bin/codebyr-space
+msgid "\nCes fichiers ont franchi une frontière. Pour en examiner un sous cloche :\n  codebyr-space launch %s --fichier <chemin>"
+msgstr "\nThese files crossed a boundary. To examine one in quarantine:\n  codebyr-space launch %s --fichier <path>"
+
+#: usr/bin/codebyr-space
+msgid "Action inconnue : %s\n"
+msgstr "Unknown action: %s\n"
+
+#: usr/bin/codebyr-space
+msgid "Actions : %s\n"
+msgstr "Actions: %s\n"
+
+#: usr/bin/codebyr-space
+msgid "Usage : codebyr-space %s\n"
+msgstr "Usage: codebyr-space %s\n"
+
+#: usr/bin/codebyr-space
+msgid "Geste pas encore disponible"
+msgstr "Action not available yet"
+
+#: usr/bin/codebyr-space
+msgid "Opération interrompue"
+msgstr "Operation interrupted"
+
+#: usr/bin/codebyr-space
+msgid "Un accès sûr aux données n'a pas pu être établi. Consultez le terminal pour le détail."
+msgstr "Safe access to the data could not be established. See the terminal for details."
+
+#: usr/share/codebyr/archives.py
+msgid "Archive trop volumineuse (100 000 entrées / 20 Gio maximum)"
+msgstr "Archive too large (100,000 entries / 20 GiB maximum)"
+
+#: usr/share/codebyr/archives.py
+msgid "Archive contenant un fichier spécial"
+msgstr "Archive contains a special file"
+
+#: usr/share/codebyr/autotest.py
+msgid "l'extension n'est pas installée"
+msgstr "the extension is not installed"
+
+#: usr/share/codebyr/autotest.py
+msgid "python3-nautilus absent — l'extension n'est jamais chargée"
+msgstr "python3-nautilus missing — the extension is never loaded"
+
+#: usr/share/codebyr/autotest.py
+msgid "extension présente et greffon installé"
+msgstr "extension present and plugin installed"
+
+#: usr/share/codebyr/autotest.py
+msgid "pas de compte invité sur ce poste"
+msgstr "no guest account on this computer"
+
+#: usr/share/codebyr/autotest.py
+msgid "aucun mot de passe ne fonctionne (session locale seule)"
+msgstr "no password works (local session only)"
+
+#: usr/share/codebyr/autotest.py
+msgid "le compte invité a un mot de passe utilisable"
+msgstr "the guest account has a usable password"
+
+#: usr/share/codebyr/autotest.py
+msgid "lisible par d'autres comptes : {dossiers}"
+msgid_plural "lisibles par d'autres comptes : {dossiers}"
+msgstr[0] "readable by other accounts: {dossiers}"
+msgstr[1] "readable by other accounts: {dossiers}"
+
+#: usr/share/codebyr/autotest.py
+msgid "aucun dossier personnel à vérifier"
+msgstr "no home folder to check"
+
+#: usr/share/codebyr/autotest.py
+msgid "{n} dossier personnel, privé"
+msgid_plural "{n} dossiers personnels, tous privés"
+msgstr[0] "{n} home folder, private"
+msgstr[1] "{n} home folders, all private"
+
+#: usr/share/codebyr/autotest.py
+msgid "trousseau illisible ou vide"
+msgstr "keyring unreadable or empty"
+
+#: usr/share/codebyr/autotest.py
+msgid "connaît la sous-clé de signature en cours"
+msgstr "knows the current signing subkey"
+
+#: usr/share/codebyr/autotest.py
+msgid "ignore la sous-clé %s… — les mises à jour vont cesser"
+msgstr "does not know subkey %s… — updates will stop"
+
+#: usr/share/codebyr/autotest.py
+msgid "APT::Periodic::Unattended-Upgrade n'est pas à \"1\""
+msgstr "APT::Periodic::Unattended-Upgrade is not set to \"1\""
+
+#: usr/share/codebyr/autotest.py
+msgid "réglage présent mais la minuterie apt-daily est inactive"
+msgstr "setting present but the apt-daily timer is inactive"
+
+#: usr/share/codebyr/autotest.py
+msgid "réglage et minuterie en place"
+msgstr "setting and timer in place"
+
+#: usr/share/codebyr/autotest.py
+msgid "espaces de noms utilisateur"
+msgstr "user namespaces"
+
+#: usr/share/codebyr/autotest.py
+msgid "bubblewrap, espaces de noms et bus privé disponibles"
+msgstr "bubblewrap, namespaces and private bus available"
+
+#: usr/share/codebyr/autotest.py
+msgid "Clic droit « Ouvrir en Jetable »"
+msgstr "Right-click “Open in Disposable”"
+
+#: usr/share/codebyr/autotest.py
+msgid "Compte invité sans mot de passe"
+msgstr "Guest account without password"
+
+#: usr/share/codebyr/autotest.py
+msgid "Dossiers personnels privés"
+msgstr "Private home folders"
+
+#: usr/share/codebyr/autotest.py
+msgid "Trousseau à jour pour les mises à jour"
+msgstr "Up-to-date keyring for updates"
+
+#: usr/share/codebyr/autotest.py
+msgid "Mises à jour automatiques armées"
+msgstr "Automatic updates armed"
+
+#: usr/share/codebyr/autotest.py
+msgid "Bac à sable opérationnel"
+msgstr "Sandbox operational"
+
+#: usr/share/codebyr/autotest.py
+msgid "Cet autotest porte sur LE POSTE, et doit être lancé depuis le bureau."
+msgstr "This self-test is about THE COMPUTER, and must be run from the desktop."
+
+#: usr/share/codebyr/autotest.py
+msgid "Vous êtes dans l'Espace « %s » : les fichiers lus seraient ceux du bac à sable,"
+msgstr "You are in the “%s” Space: the files read would be those of the sandbox,"
+
+#: usr/share/codebyr/autotest.py
+msgid "et « sudo » y est volontairement impossible."
+msgstr "and “sudo” is deliberately impossible there."
+
+#: usr/share/codebyr/autotest.py
+#: usr/share/codebyr/bac_a_sable.py
+msgid "Ouvrez un terminal ordinaire du bureau et relancez."
+msgstr "Open an ordinary desktop terminal and run it again."
+
+#: usr/share/codebyr/autotest.py
+msgid "Autotest du poste — ce qui est mesuré sur cette machine, pas ce qui est promis.\n"
+msgstr "Computer self-test — what is measured on this machine, not what is promised.\n"
+
+#: usr/share/codebyr/autotest.py
+msgid "{n} contrôle en échec."
+msgid_plural "{n} contrôles en échec."
+msgstr[0] "{n} check failed."
+msgstr[1] "{n} checks failed."
+
+#: usr/share/codebyr/autotest.py
+msgid "Ce sont des défauts qui ne se voient pas\nà l'usage : un poste concerné se comporte exactement comme un poste sain."
+msgstr "These are defects you cannot see\nin use: an affected computer behaves exactly like a healthy one."
+
+#: usr/share/codebyr/autotest.py
+msgid "Tout ce qui a pu être mesuré est conforme."
+msgstr "Everything that could be measured is compliant."
+
+#: usr/share/codebyr/autotest.py
+msgid "Relancez avec sudo\npour les contrôles qui demandent les droits d'administration."
+msgstr "Run it again with sudo\nfor the checks that need administrator rights."
+
+#: usr/share/codebyr/autotest.py
+msgid "Tout est conforme."
+msgstr "Everything is compliant."
+
+#: usr/share/codebyr/bac_a_sable.py
+msgid "Codebyr : plafonds mémoire/processus indisponibles (session systemd utilisateur absente).\n"
+msgstr "Codebyr: memory/process limits unavailable (no systemd user session).\n"
+
+#: usr/share/codebyr/bac_a_sable.py
+msgid "Capacités d'isolation de cette machine :"
+msgstr "Isolation capabilities of this machine:"
+
+#: usr/share/codebyr/bac_a_sable.py
+msgid "Niveau : Blindage disponible (bac à sable + coupure réseau)."
+msgstr "Level: Hardening available (sandbox + network cut-off)."
+
+#: usr/share/codebyr/bac_a_sable.py
+msgid "Niveau : réduit (dossiers séparés seulement)."
+msgstr "Level: reduced (separate folders only)."
+
+#: usr/share/codebyr/bac_a_sable.py
+msgid "Bus de session de l'hôte joignable"
+msgstr "Host session bus reachable"
+
+#: usr/share/codebyr/bac_a_sable.py
+msgid "Bus système joignable"
+msgstr "System bus reachable"
+
+#: usr/share/codebyr/bac_a_sable.py
+msgid "Socket X11 de l'hôte visible"
+msgstr "Host X11 socket visible"
+
+#: usr/share/codebyr/bac_a_sable.py
+msgid "Son et micro (PipeWire)"
+msgstr "Sound and microphone (PipeWire)"
+
+#: usr/share/codebyr/bac_a_sable.py
+msgid "Carte graphique (accès direct)"
+msgstr "Graphics card (direct access)"
+
+#: usr/share/codebyr/bac_a_sable.py
+msgid "Accès au réseau"
+msgstr "Network access"
+
+#: usr/share/codebyr/bac_a_sable.py
+msgid "Dossier personnel bien isolé"
+msgstr "Home folder properly isolated"
+
+#: usr/share/codebyr/bac_a_sable.py
+msgid "Espace ordinaire"
+msgstr "Ordinary Space"
+
+#: usr/share/codebyr/bac_a_sable.py
+msgid "Espace blindé (Navigation)"
+msgstr "Hardened Space (Browsing)"
+
+#: usr/share/codebyr/bac_a_sable.py
+msgid "Espace blindé, sans micro ni carte graphique (Banque)"
+msgstr "Hardened Space, without microphone or graphics card (Bank)"
+
+#: usr/share/codebyr/bac_a_sable.py
+msgid "Lien en Jetable"
+msgstr "Link in Disposable"
+
+#: usr/share/codebyr/bac_a_sable.py
+msgid "Pièce jointe en Jetable"
+msgstr "Attachment in Disposable"
+
+#: usr/share/codebyr/bac_a_sable.py
+msgid "bubblewrap absent : aucun bac à sable à vérifier.\n"
+msgstr "bubblewrap missing: no sandbox to check.\n"
+
+#: usr/share/codebyr/bac_a_sable.py
+msgid "Cette vérification doit être lancée DEPUIS LE BUREAU, pas depuis un Espace."
+msgstr "This check must be run FROM THE DESKTOP, not from a Space."
+
+#: usr/share/codebyr/bac_a_sable.py
+msgid "Vous êtes dans « %s » : la sonde s'exécuterait dans un bac à sable imbriqué,"
+msgstr "You are in “%s”: the probe would run in a nested sandbox,"
+
+#: usr/share/codebyr/bac_a_sable.py
+msgid "et mesurerait les restrictions de cet Espace, pas celles qu'on veut vérifier."
+msgstr "and would measure this Space's restrictions, not the ones we want to check."
+
+#: usr/share/codebyr/bac_a_sable.py
+msgid "Vérification de l'isolation — une sonde est lancée dans un vrai bac à sable.\n"
+msgstr "Isolation check — a probe is launched in a real sandbox.\n"
+
+#: usr/share/codebyr/compte_dedie.py
+msgid "son identifiant « {identifiant} » ne peut pas nommer un compte : il doit commencer par une lettre et tenir en {n} caractères. Supprimez-le puis recréez-le, ou désactivez « Compte séparé » pour lui dans Configuration Codebyr"
+msgstr "its identifier “{identifiant}” cannot name an account: it must start with a letter and fit in {n} characters. Delete it and create it again, or turn off “Separate account” for it in Codebyr Settings"
+
+#: usr/share/codebyr/compte_dedie.py
+msgid "L'Espace {espace} tourne sous son propre compte : Codebyr ne sait pas encore {geste}. Retirez « \"compte\": \"dedie\" » de son réglage pour retrouver ce geste."
+msgstr "The {espace} Space runs under its own account: Codebyr cannot {geste} yet. Remove “\"compte\": \"dedie\"” from its setting to get this action back."
+
+#: usr/share/codebyr/compte_dedie.py
+msgid "le service des comptes d'Espaces n'est pas installé sur cette machine"
+msgstr "the Space accounts service is not installed on this machine"
+
+#: usr/share/codebyr/compte_dedie.py
+msgid "le service des comptes d'Espaces ne répond pas (%s)"
+msgstr "the Space accounts service is not responding (%s)"
+
+#: usr/share/codebyr/compte_dedie.py
+msgid "le service a refusé d'ouvrir cet Espace (%s)"
+msgstr "the service refused to open this Space (%s)"
+
+#: usr/share/codebyr/compte_dedie.py
+msgid "le service des comptes date d'avant la mise à jour ; déconnectez-vous et reconnectez-vous"
+msgstr "the accounts service predates the update; log out and log back in"
+
+#: usr/share/codebyr/compte_dedie.py
+msgid "le service des comptes d'Espaces n'est pas installé"
+msgstr "the Space accounts service is not installed"
+
+#: usr/share/codebyr/compte_dedie.py
+msgid "l'Espace ne répond pas (%s)"
+msgstr "the Space is not responding (%s)"
+
+#: usr/share/codebyr/compte_dedie.py
+msgid "l'Espace a refusé la commande (%s)"
+msgstr "the Space refused the command (%s)"
+
+#: usr/share/codebyr/fichiers_surs.py
+msgid "Accès sécurisé disponible uniquement sous Linux"
+msgstr "Secure access available on Linux only"
+
+#: usr/share/codebyr/fichiers_surs.py
+msgid "Fichier spécial ou lien dur refusé"
+msgstr "Special file or hard link refused"
+
+#: usr/share/codebyr/fichiers_surs.py
+msgid "Trop de fichiers du même nom"
+msgstr "Too many files with the same name"
+
+#: usr/share/codebyr/filtre_syscalls.py
+msgid "Blindage indisponible : %s"
+msgstr "Hardening unavailable: %s"
+
+#: usr/share/codebyr/navigateur.py
+msgid "Bouclier anti-hameçonnage : {n} domaine de banque protégé."
+msgid_plural "Bouclier anti-hameçonnage : {n} domaines de banque protégés."
+msgstr[0] "Anti-phishing shield: {n} bank domain protected."
+msgstr[1] "Anti-phishing shield: {n} bank domains protected."
+
+#: usr/share/codebyr/ordres_espace.py
+msgid "Espace %s : déménagement de ses données"
+msgstr "%s Space: moving its data"
+
+#: usr/share/codebyr/ordres_espace.py
+msgid "Première ouverture sous son propre compte : ses fichiers le suivent. Rien n'est effacé. Cela peut prendre un moment."
+msgstr "First opening under its own account: its files follow it. Nothing is erased. This may take a moment."
+
+#: usr/share/codebyr/ordres_espace.py
+msgid "Données de {espace} revenues de son compte dédié ; état précédent conservé : {sauvegarde}."
+msgstr "Data of {espace} back from its dedicated account; previous state kept: {sauvegarde}."
+
+#: usr/share/codebyr/ordres_espace.py
+msgid "Données de {espace} revenues de son compte dédié."
+msgstr "Data of {espace} back from its dedicated account."
+
+#: usr/share/codebyr/permissions_flatpak.py
+msgid "lancer des programmes sur le bureau, hors de tout bac à sable"
+msgstr "run programs on the desktop, outside any sandbox"
+
+#: usr/share/codebyr/permissions_flatpak.py
+msgid "modifier les réglages du bureau — dont la commande d'un raccourci clavier"
+msgstr "change the desktop settings — including the command of a keyboard shortcut"
+
+#: usr/share/codebyr/permissions_flatpak.py
+msgid "voir tous vos fichiers, ceux des autres Espaces compris"
+msgstr "see all your files, including those of the other Spaces"
+
+#: usr/share/codebyr/permissions_flatpak.py
+msgid "joindre le bus de session du bureau, donc y lancer des programmes"
+msgstr "reach the desktop session bus, and so run programs there"
+
+#: usr/share/codebyr/permissions_flatpak.py
+msgid "atteindre votre dossier personnel, où vivent les données de tous les Espaces et les programmes lancés à l'ouverture de session"
+msgstr "reach your home folder, where the data of every Space lives, along with the programs launched at login"
+
+#: usr/share/codebyr/permissions_flatpak.py
+msgid "Son réseau dépend de ses propres permissions : le réseau restreint de cet Espace ne serait pas tenu."
+msgstr "Its network depends on its own permissions: this Space's restricted network would not hold."
+
+#: usr/share/codebyr/permissions_flatpak.py
+msgid "Un Espace jetable ne garde rien : l'application n'y a pas sa place."
+msgstr "A Disposable Space keeps nothing: the application has no place there."
+
+#: usr/share/codebyr/permissions_flatpak.py
+msgid "Son bac à sable est celui de Flatpak, pas le Blindage de cet Espace. Activez « Compte séparé » pour cet Espace : son compte la bornera."
+msgstr "Its sandbox is Flatpak's, not this Space's Hardening. Turn on “Separate account” for this Space: its account will confine it."
+
+#: usr/share/codebyr/permissions_flatpak.py
+msgid "recevoir une permission ajoutée à sa ligne de commande (%s)"
+msgstr "receive a permission added to its command line (%s)"
+
 #: usr/share/gnome-shell/extensions/codebyr@codebyr.io/extension.js
 msgid "Navigateur"
 msgstr "Web browser"

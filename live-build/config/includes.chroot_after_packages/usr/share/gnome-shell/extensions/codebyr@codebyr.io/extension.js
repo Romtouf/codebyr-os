@@ -1083,15 +1083,19 @@ class Indicateur extends PanelMenu.Button {
         boite.add_child(recherche);
 
         // Le contenu d'un St.ScrollView est sa propriété « child » depuis GNOME
-        // 46 (c'est ainsi que GNOME 48 remplit les siens) ; add_child et
-        // add_actor n'y mènent plus. Cette fenêtre ne s'ouvrait donc plus sous
-        // Debian 13 — sans un mot. Constaté le 01/10/2026 sur la VM.
+        // 46 : c'est ainsi que GNOME 48 remplit les siens, et la bibliothèque
+        // n'offre plus que set_child (add_actor a disparu).
         const liste = new St.BoxLayout({vertical: true, style: 'spacing: 2px;'});
         const scroll = new St.ScrollView({style: 'max-height: 360px;', x_expand: true, child: liste});
         boite.add_child(scroll);
         dlg.contentLayout.add_child(boite);
 
-        const remplir = (filtre) => {
+        // « peupler », pas « remplir » : ce nom est celui de la fonction qui
+        // complète les textes traduits. Redéclaré ici, il la masquait dans
+        // toute la méthode, et le titre de la fenêtre échouait avant elle
+        // (ReferenceError) — « Autres applications… » ne s'ouvrait plus.
+        // Vu sur la VM le 01/10/2026 ; tests/test_traduction.py le refuse.
+        const peupler = (filtre) => {
             liste.destroy_all_children();
             const f = (filtre || '').trim().toLowerCase();
             let n = 0;
@@ -1118,8 +1122,8 @@ class Indicateur extends PanelMenu.Button {
                     style: 'color: #93A6B0; padding: 9px 12px;',
                 }));
         };
-        remplir('');
-        recherche.clutter_text.connect('text-changed', () => remplir(recherche.get_text()));
+        peupler('');
+        recherche.clutter_text.connect('text-changed', () => peupler(recherche.get_text()));
 
         dlg.setButtons([{label: _('Fermer'), action: () => dlg.close(),
             key: Clutter.KEY_Escape, default: true}]);

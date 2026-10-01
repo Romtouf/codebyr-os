@@ -168,9 +168,13 @@ class LOuvertureDeSession(unittest.TestCase):
 
 
 class LesFenetresDuMenu(unittest.TestCase):
-    """« Autres applications… » ne s'ouvrait plus sous GNOME 48 : son contenu
-    défilant était ajouté par add_child / add_actor, quand GNOME 46 et
-    suivants attendent la propriété « child ». Et l'échec ne se voyait pas."""
+    """Les fenêtres du menu du Sceau, sous GNOME 48.
+
+    « Autres applications… » ne s'ouvrait plus, sans un mot : le titre
+    traduit appelait remplir(), qu'une variable locale du même nom masquait
+    (voir tests/test_traduction.py). L'échec d'une fenêtre se voit désormais ;
+    et un contenu défilant est donné comme GNOME 46 et suivants l'attendent,
+    par la propriété « child »."""
 
     def setUp(self):
         self.texte = _lire(EXTENSION)

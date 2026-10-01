@@ -402,7 +402,45 @@ class LaLangueDeLExtension(unittest.TestCase):
         self.assertEqual(resultats[0][3], "$& et 2")
 
 
+NOMS_JS = ("_", "n_", "remplir")
+
+
+def masquages_js(code):
+    """Les redéclarations de _, n_ ou remplir dans l'extension.
+
+    En JavaScript comme en Python, un « const remplir » local masque la
+    fonction dans TOUT son bloc, y compris avant lui : « Autres
+    applications… » ne s'ouvrait plus (ReferenceError), vu sur la VM le
+    01/10/2026."""
+    code = traductions.sans_commentaires_js(code)
+    trouves = [nom for nom in re.findall(r"\b(?:const|let|var)\s+(\w+)", code) if nom in NOMS_JS]
+    parametres = (re.findall(r"\(([^()]*)\)\s*=>", code)
+                  + re.findall(r"\b(\w+)\s*=>", code)
+                  + re.findall(r"\bfunction\s*\w*\s*\(([^()]*)\)", code)
+                  + re.findall(r"\bcatch\s*\((\w+)\)", code)
+                  + re.findall(r"^\s+(?!if\b|for\b|while\b|switch\b)\w+\s*\(([^()]*)\)\s*\{",
+                               code, re.MULTILINE))
+    for liste in parametres:
+        trouves += [p for p in re.split(r"[\s,={}\[\]]+", liste) if p in NOMS_JS]
+    for nom in NOMS_JS:
+        if len(re.findall(r"\bfunction\s+%s\s*\(" % re.escape(nom), code)) != 1:
+            trouves.append("function " + nom)
+    return trouves
+
+
 class LesFichiersTraduits(unittest.TestCase):
+
+    def test_l_extension_ne_redeclare_pas_ses_fonctions_de_traduction(self):
+        self.assertEqual(masquages_js(_lire(EXTENSION_JS)), [])
+
+    def test_le_garde_fou_js_voit_le_piege(self):
+        base = ("function _(t) { return t; }\nfunction n_(a, b, n) { return a; }\n"
+                "function remplir(t, v) { return t; }\n")
+        self.assertEqual(masquages_js(base), [])
+        self.assertEqual(masquages_js(base + "class A {\n    f() {\n        const remplir = x => x;\n    }\n}\n"),
+                         ["remplir"])
+        self.assertEqual(masquages_js(base + "liste.forEach(_ => 1);\n"), ["_"])
+        self.assertEqual(masquages_js(base + "const f = (a, n_) => a;\n"), ["n_"])
 
     def test_l_extension_ne_garde_aucune_phrase_en_dur(self):
         self.assertEqual(phrases_en_dur_js(_lire(EXTENSION_JS)), [])

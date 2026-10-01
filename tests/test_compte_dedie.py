@@ -851,8 +851,30 @@ class LeDemenagement(unittest.TestCase):
         with tempfile.TemporaryDirectory() as t, \
                 mock.patch.object(chemins, "DONNEES", t), \
                 mock.patch.object(compte_dedie, "executer") as executer:
-            self.assertTrue(ordres_espace.demenager_vers_compte_dedie(DEDIE, mock.Mock(), mock.Mock()))
+            session = mock.Mock(compte="cbyr-1000-travail")
+            self.assertTrue(ordres_espace.demenager_vers_compte_dedie(DEDIE, session, mock.Mock()))
+            if POSIX:
+                # 1.17.1 : rien à emporter, mais le passage sous son compte est
+                # NOTÉ — sans quoi, le réglage retiré, ses données ne
+                # revenaient jamais et l'Espace s'ouvrait vide.
+                self.assertTrue(os.path.exists(ordres_espace.marqueur_demenagement("travail")))
         executer.assert_not_called()
+
+    @unittest.skipUnless(POSIX, "fichiers_surs est réservé à Linux")
+    def test_un_espace_ne_sous_son_compte_revient_si_l_on_retire_le_reglage(self):
+        # Depuis la 1.16.1, chaque Espace naît sous son compte : c'est le cas
+        # général. Le retour doit donc s'y déclencher, et demander à l'Espace
+        # ses données plutôt que d'ouvrir un dossier vide.
+        with tempfile.TemporaryDirectory() as t, \
+                mock.patch.object(chemins, "DONNEES", t), \
+                mock.patch.object(compte_dedie, "executer"):
+            ordres_espace.demenager_vers_compte_dedie(
+                DEDIE, mock.Mock(compte="cbyr-1000-travail"), mock.Mock())
+            with mock.patch.object(compte_dedie, "Session",
+                                   side_effect=compte_dedie.Indisponible("absent")) as session:
+                self.assertFalse(ordres_espace.rapatrier_depuis_compte_dedie(
+                    ORDINAIRE | {"id": "travail"}))
+            session.assert_called_once()
 
     def test_sans_service_le_retour_refuse_plutot_que_de_montrer_l_etat_fige(self):
         with tempfile.TemporaryDirectory() as t:

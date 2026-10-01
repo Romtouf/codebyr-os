@@ -12,7 +12,18 @@ GNOME (menu du Sceau, liserés colorés) ne se recharge pas à chaud.
 
 ## 1.17.1 — non publiée
 
-**Rien ne change à l'usage : le découpage de `codebyr-space` continue.**
+**Retirer « Compte séparé » à un Espace fait bien revenir ses fichiers.**
+« Configuration Codebyr » le promettait, mais ce n'était vrai que pour un
+Espace qui avait d'abord vécu sous votre compte. Depuis la 1.16.1, chaque
+Espace naît sous son propre compte : retirer le réglage l'ouvrait VIDE. Ses
+fichiers n'étaient pas perdus — ils réapparaissaient en remettant le réglage —
+mais rien ne le laissait voir. Désormais, ils reviennent. (Pour un Espace déjà
+utilisé, cela vaut à partir de sa prochaine ouverture sous son compte.)
+
+Le terminal annonce enfin l'application qu'il ouvre (« Ouverture de
+« gnome-text-editor » »), et non l'outil qui l'enveloppe.
+
+**Le découpage de `codebyr-space` se termine, sans rien changer à l'usage.**
 
 - Ce que le bureau demande à un Espace à compte séparé — déménager ses
   données, les rapatrier, préparer son dossier — : `ordres_espace.py`.

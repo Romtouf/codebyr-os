@@ -555,7 +555,9 @@ def _lancer(espaces, esp, extra, fichier, session):
         run = _envelopper_bac_a_sable(esp, session, cmd, env, home, renforce, hors_ligne,
                                       audio, envoi, filtre, gpu, notif)
 
-    print("Ouverture de « %s » dans l'Espace %s…" % (os.path.basename(cmd[0]), esp["nom"]))
+    # L'application, pas son enveloppe : « cmd » commence par dbus-run-session
+    # ou par le relais du filtre, et le message nommait l'un ou l'autre.
+    print("Ouverture de « %s » dans l'Espace %s…" % (os.path.basename(app_cmd[0]), esp["nom"]))
     journal("Espace %s : ouverture de %s%s%s"
             % (esp["id"], os.path.basename(app_cmd[0]),
                " [blindage]" if renforce else "",

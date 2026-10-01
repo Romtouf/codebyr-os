@@ -201,8 +201,23 @@ def demenager_vers_compte_dedie(esp, session, prevenir):
     try:
         noms = sorted(os.listdir(ancien))
     except FileNotFoundError:
-        return True                 # Espace jamais ouvert : rien à emporter
+        noms = []                   # jamais ouvert sous le compte du bureau
     if not noms:
+        # Rien à emporter. Mais c'est désormais sous son compte que vivent les
+        # données de cet Espace : on le note quand même. Sans cette marque, le
+        # retour (rapatrier_depuis_compte_dedie) ne se déclenchait jamais pour
+        # un Espace NÉ sous son compte — tous, depuis la 1.16.1. Retirer le
+        # réglage l'ouvrait alors VIDE, contrairement à ce que promet
+        # Configuration Codebyr (« elles reviennent — rien n'est effacé ») :
+        # ses fichiers n'étaient pas perdus, mais rien ne le laissait voir.
+        # Relevé le 01/10/2026 en relisant ce code. Une marque qui n'a pas pu
+        # s'écrire n'empêche pas l'ouverture : elle se retentera la prochaine.
+        try:
+            fichiers_surs.mkdir(chemins.dossier(esp["id"]))
+            _noter_le_compte(esp, session)
+        except OSError as exc:
+            journal.noter("Espace %s : passage sous compte dédié non noté (%s)"
+                          % (esp["id"], exc))
         return True
     taille = taille_sans_suivre(ancien)
     libre = shutil.disk_usage(os.path.dirname(os.path.dirname(session.home))).free
@@ -212,10 +227,10 @@ def demenager_vers_compte_dedie(esp, session, prevenir):
                          % (esp["nom"], taille // 2**20, libre // 2**20))
         return False
     prevenir("Espace %s : déménagement de ses données" % esp["nom"],
-              "Première ouverture sous son propre compte : ses fichiers le "
-              "suivent. Rien n'est effacé. Cela peut prendre un moment.")
+             "Première ouverture sous son propre compte : ses fichiers le "
+             "suivent. Rien n'est effacé. Cela peut prendre un moment.")
     code, erreurs = ordre_interne(session, INTERNE_IMPORTER,
-                                   produire=emballer(ancien, noms))
+                                  produire=emballer(ancien, noms))
     if code == MIGRATION_FAITE:
         erreurs = []                # l'Espace avait déjà reçu ses données
     elif code != 0 or erreurs:
@@ -224,10 +239,15 @@ def demenager_vers_compte_dedie(esp, session, prevenir):
                          % (esp["nom"], "; ".join(erreurs) or "code %s" % code))
         journal.noter("Espace %s : déménagement vers le compte dédié échoué" % esp["id"])
         return False
-    with fichiers_surs.ouvrir(marqueur_demenagement(esp["id"]), "w", encoding="utf-8") as f:
-        json.dump({"compte": session.compte, "date": time.strftime("%Y-%m-%d %H:%M:%S")}, f)
+    _noter_le_compte(esp, session)
     journal.noter("Espace %s : données déménagées vers son compte dédié" % esp["id"])
     return True
+
+
+def _noter_le_compte(esp, session):
+    """Côté bureau : « les données de cet Espace vivent sous son compte »."""
+    with fichiers_surs.ouvrir(marqueur_demenagement(esp["id"]), "w", encoding="utf-8") as f:
+        json.dump({"compte": session.compte, "date": time.strftime("%Y-%m-%d %H:%M:%S")}, f)
 
 
 def rapatrier_depuis_compte_dedie(esp):

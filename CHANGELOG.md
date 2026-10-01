@@ -10,7 +10,7 @@ GNOME (menu du Sceau, liserés colorés) ne se recharge pas à chaud.
 
 ---
 
-## 1.19.0 — non publiée
+## 1.19.0 — 1er octobre 2026
 
 **Un démarrage sans couture.** Du logo du fabricant à l'écran de connexion,
 plus de menu ni de texte technique :

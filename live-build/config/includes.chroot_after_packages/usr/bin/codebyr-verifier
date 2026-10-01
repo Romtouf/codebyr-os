@@ -13,17 +13,24 @@ set -e
 CLE=/usr/share/codebyr/codebyr-signing-key.asc
 EMPREINTE="E6FB6616EC58E15F40DA876CB1E8C803CE596E68"
 
+# Le texte dans la langue de la session (usr/share/codebyr/traduction.py) :
+#   traduire 'Fichier introuvable : {fichier}' fichier="$f"
+# Sans Python ou sans le module, le texte tel qu'il est écrit ici.
+traduire() {
+    python3 -B /usr/share/codebyr/traduction.py "$@" 2>/dev/null || printf '%s' "$1"
+}
+
 if [ $# -lt 1 ]; then
-    echo "Usage : codebyr-verifier <SHA256SUMS> [SHA256SUMS.asc]" >&2
+    printf '%s\n' "$(traduire 'Usage : codebyr-verifier <SHA256SUMS> [SHA256SUMS.asc]')" >&2
     exit 2
 fi
 SUMS="$1"
 ASC="${2:-$1.asc}"
 
 for f in "$CLE" "$SUMS" "$ASC"; do
-    [ -f "$f" ] || { echo "Fichier introuvable : $f" >&2; exit 2; }
+    [ -f "$f" ] || { printf '%s\n' "$(traduire 'Fichier introuvable : {fichier}' fichier="$f")" >&2; exit 2; }
 done
-command -v gpg >/dev/null 2>&1 || { echo "gpg absent." >&2; exit 2; }
+command -v gpg >/dev/null 2>&1 || { printf '%s\n' "$(traduire 'gpg absent.')" >&2; exit 2; }
 
 GNUPGHOME="$(mktemp -d)"
 export GNUPGHOME
@@ -32,20 +39,20 @@ chmod 700 "$GNUPGHOME"
 
 gpg --quiet --import "$CLE" 2>/dev/null
 
-printf '→ Clé de signature attendue : %s\n' "$EMPREINTE"
-printf '→ Vérification de la signature…\n'
+printf '→ %s\n' "$(traduire 'Clé de signature attendue : {empreinte}' empreinte="$EMPREINTE")"
+printf '→ %s\n' "$(traduire 'Vérification de la signature…')"
 if gpg --status-fd 1 --verify "$ASC" "$SUMS" 2>/dev/null | grep -q "VALIDSIG $EMPREINTE"; then
-    printf '  \033[32m✓ Signature authentique (Codebyr OS).\033[0m\n'
+    printf '  \033[32m✓ %s\033[0m\n' "$(traduire 'Signature authentique (Codebyr OS).')"
 else
-    printf '  \033[31m✗ SIGNATURE INVALIDE — n'\''utilisez PAS ce fichier.\033[0m\n' >&2
+    printf '  \033[31m✗ %s\033[0m\n' "$(traduire 'SIGNATURE INVALIDE — n'\''utilisez PAS ce fichier.')" >&2
     exit 1
 fi
 
-printf '→ Vérification de l'\''empreinte du fichier…\n'
+printf '→ %s\n' "$(traduire 'Vérification de l'\''empreinte du fichier…')"
 DIR="$(dirname "$SUMS")"
 if ( cd "$DIR" && sha256sum -c "$(basename "$SUMS")" ); then
-    printf '\033[32m✓ Tout est bon : le téléchargement est authentique et intact.\033[0m\n'
+    printf '\033[32m✓ %s\033[0m\n' "$(traduire 'Tout est bon : le téléchargement est authentique et intact.')"
 else
-    printf '\033[31m✗ Empreinte incorrecte — fichier corrompu ou altéré.\033[0m\n' >&2
+    printf '\033[31m✗ %s\033[0m\n' "$(traduire 'Empreinte incorrecte — fichier corrompu ou altéré.')" >&2
     exit 1
 fi

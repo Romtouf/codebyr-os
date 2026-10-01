@@ -7,6 +7,12 @@
 # de sudo sans mot de passe, d'où l'absence d'invite.
 set -e
 
+# Le texte dans la langue de la session (usr/share/codebyr/traduction.py).
+# Sans Python ou sans le module, le texte tel qu'il est écrit ici.
+traduire() {
+    python3 -B /usr/share/codebyr/traduction.py "$@" 2>/dev/null || printf '%s' "$1"
+}
+
 # ── Refus net hors du support live ──────────────────────────────────────────
 # Ce contrôle passe AVANT la redirection vers le journal : sinon le message
 # tomberait dans un fichier et l'utilisateur ne verrait, une fois de plus,
@@ -18,7 +24,7 @@ set -e
 # sur une machine déjà installée, où le lancer ne peut que faire des dégâts.
 if [ ! -d /run/live ] && [ ! -d /lib/live/mount/medium ] \
    && ! grep -qw "boot=live" /proc/cmdline 2>/dev/null; then
-    message="Codebyr OS est déjà installé sur cette machine : rien à installer."
+    message="$(traduire 'Codebyr OS est déjà installé sur cette machine : rien à installer.')"
     echo "$message" >&2
     notify-send --app-name=Codebyr --icon=dialog-information "Codebyr OS" "$message" 2>/dev/null \
         || zenity --info --text="$message" 2>/dev/null || true

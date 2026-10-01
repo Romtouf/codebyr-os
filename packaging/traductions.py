@@ -68,16 +68,23 @@ def sources(racine):
                 continue
             if motif and not nom.endswith(motif):
                 continue
-            if motif is None and not _est_python(complet):
+            if motif is None and _langage(complet) is None:
                 continue
             trouves.append(dossier + "/" + nom)
     return trouves
 
 
-def _est_python(chemin):
+def _langage(chemin):
+    """« python », « shell » ou None, d'après la première ligne d'un programme."""
     with open(chemin, "rb") as f:
         premiere = f.readline()
-    return premiere.startswith(b"#!") and b"python3" in premiere
+    if not premiere.startswith(b"#!"):
+        return None
+    if b"python3" in premiere:
+        return "python"
+    if premiere.strip() in (b"#!/bin/sh", b"#!/bin/bash", b"#!/usr/bin/env bash"):
+        return "shell"
+    return None
 
 
 class TexteNonTraduisible(ValueError):
@@ -169,13 +176,39 @@ def textes_js(code, nom):
     return trouves
 
 
+# Les scripts shell traduisent par leur fonction « traduire 'Texte {marque}' »
+# (voir usr/share/codebyr/traduction.py). Entre apostrophes, le shell écrit
+# une apostrophe « '\'' ».
+_APPEL_SHELL = re.compile(r"(?<![\w-])traduire\s+'((?:[^']|'\\'')*)'")
+_APPEL_SHELL_NU = re.compile(r"(?<![\w-])traduire\s+(?!')")
+
+
+def textes_shell(code, nom):
+    """Les textes des appels « traduire '…' » d'un script shell (hors commentaires)."""
+    trouves = []
+    for numero, ligne in enumerate(code.splitlines(), 1):
+        if ligne.lstrip().startswith("#"):
+            continue
+        if _APPEL_SHELL_NU.search(ligne):
+            raise TexteNonTraduisible(
+                "%s:%d : traduire doit recevoir un texte entre apostrophes, écrit tel "
+                "quel — compléter avec des marques {nom} et nom=valeur" % (nom, numero))
+        trouves += [(m.replace("'\\''", "'"), None) for m in _APPEL_SHELL.findall(ligne)]
+    return trouves
+
+
 def extraire_textes(racine):
     """{(msgid, pluriel): [fichiers]} dans l'ordre de première apparition."""
     textes = {}
     for relatif in sources(racine):
         with open(os.path.join(racine, INCLUDES, relatif), encoding="utf-8") as f:
             code = f.read()
-        trouves = textes_js(code, relatif) if relatif.endswith(".js") else textes_python(code, relatif)
+        if relatif.endswith(".js"):
+            trouves = textes_js(code, relatif)
+        elif not relatif.endswith(".py") and _langage(os.path.join(racine, INCLUDES, relatif)) == "shell":
+            trouves = textes_shell(code, relatif)
+        else:
+            trouves = textes_python(code, relatif)
         for cle in trouves:
             fichiers = textes.setdefault(cle, [])
             if relatif not in fichiers:

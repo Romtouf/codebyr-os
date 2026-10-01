@@ -14,10 +14,24 @@ Installé dans /usr/share/nautilus-python/extensions/ ; nécessite python3-nauti
 """
 import os
 import subprocess
+import sys
 
 import gi
 gi.require_version("Nautilus", "4.0")
 from gi.repository import GObject, Nautilus  # noqa: E402
+
+sys.path.insert(0, os.environ.get("CODEBYR_LIB", "/usr/share/codebyr"))
+# Les textes dans la langue de la session. Si le module manquait, le menu
+# resterait en français plutôt que de disparaître : Fichiers ne charge pas
+# une extension dont l'import échoue.
+try:
+    from traduction import _, n_  # noqa: E402
+except ImportError:
+    def _(texte):
+        return texte
+
+    def n_(singulier, pluriel, nombre):
+        return singulier if nombre <= 1 else pluriel
 
 JETABLE = "/usr/bin/codebyr-jetable"
 
@@ -48,13 +62,16 @@ class CodebyrJetable(GObject.GObject, Nautilus.MenuProvider):
         if not all(chemins):
             return []
 
-        libelle = ("Ouvrir en Jetable" if len(chemins) == 1
-                   else "Ouvrir %d fichiers en Jetable" % len(chemins))
+        # « Ouvrir en Jetable » est aussi un texte du menu du Sceau : un même
+        # texte ne peut pas être à la fois simple et singulier d'un pluriel.
+        libelle = (_("Ouvrir en Jetable") if len(chemins) == 1
+                   else n_("Ouvrir {n} fichier en Jetable", "Ouvrir {n} fichiers en Jetable",
+                           len(chemins)).format(n=len(chemins)))
         element = Nautilus.MenuItem(
             name="Codebyr::Jetable",
             label=libelle,
-            tip="S'ouvre dans un Espace éphémère, sans réseau, détruit à la "
-                "fermeture — un piège ne peut rien envoyer ni rien laisser.")
+            tip=_("S'ouvre dans un Espace éphémère, sans réseau, détruit à la "
+                  "fermeture — un piège ne peut rien envoyer ni rien laisser."))
         element.connect("activate", self._ouvrir, chemins)
         return [element]
 

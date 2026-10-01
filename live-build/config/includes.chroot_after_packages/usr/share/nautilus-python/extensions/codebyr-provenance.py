@@ -30,6 +30,18 @@ from gi.repository import GObject, Nautilus  # noqa: E402
 # ici : ce projet a déjà payé le prix de quatre lectures divergentes du
 # registre.
 sys.path.insert(0, os.environ.get("CODEBYR_LIB", "/usr/share/codebyr"))
+# Les textes dans la langue de la session. Si le module manquait, le menu
+# resterait en français plutôt que de disparaître : Fichiers ne charge pas
+# une extension dont l'import échoue.
+try:
+    from traduction import _, n_  # noqa: E402
+except ImportError:
+    def _(texte):
+        return texte
+
+    def n_(singulier, pluriel, nombre):
+        return singulier if nombre <= 1 else pluriel
+
 try:
     import chemins
     import provenance
@@ -99,10 +111,10 @@ class CodebyrAdopter(GObject.GObject, Nautilus.MenuProvider):
 
         element = Nautilus.MenuItem(
             name="Codebyr::Adopter",
-            label=("Ce fichier m'appartient" if len(chemins) == 1
-                   else "Ces %d fichiers m'appartiennent" % len(chemins)),
-            tip="Après l'avoir examiné : il s'ouvrira normalement dans cet "
-                "Espace, au lieu de partir sous cloche à chaque fois.")
+            label=n_("Ce fichier m'appartient", "Ces {n} fichiers m'appartiennent",
+                     len(chemins)).format(n=len(chemins)),
+            tip=_("Après l'avoir examiné : il s'ouvrira normalement dans cet "
+                  "Espace, au lieu de partir sous cloche à chaque fois."))
         element.connect("activate", self._adopter, chemins)
         return [element]
 
@@ -120,8 +132,8 @@ class CodebyrProvenance(GObject.GObject,
         return [Nautilus.Column(
             name="CodebyrProvenance::origine",
             attribute=ATTRIBUT,
-            label="Espace d'origine",
-            description="L'Espace Codebyr d'où provient ce fichier")]
+            label=_("Espace d'origine"),
+            description=_("L'Espace Codebyr d'où provient ce fichier"))]
 
     def update_file_info(self, fichier):
         # Ni les dossiers ni les emplacements distants : l'attribut se lit sur

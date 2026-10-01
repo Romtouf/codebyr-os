@@ -46,7 +46,11 @@ FICHIERS_TRADUITS = [
     "usr/share/codebyr/filtre_syscalls.py",
     "usr/share/codebyr/navigateur.py",
     "usr/share/codebyr/ordres_espace.py",
+    "usr/share/codebyr/page_blocage.py",
     "usr/share/codebyr/permissions_flatpak.py",
+    "usr/share/nautilus-python/extensions/codebyr-envoyer.py",
+    "usr/share/nautilus-python/extensions/codebyr-jetable.py",
+    "usr/share/nautilus-python/extensions/codebyr-provenance.py",
 ]
 
 # Ce qui reste en français DANS un fichier traduit, et pourquoi. Le journal
@@ -206,6 +210,12 @@ class LeFichierAnglais(unittest.TestCase):
                                  sorted(re.findall(r"\{\w*\}", traduit)), e.msgid)
                 self.assertEqual(re.findall(r"%[sd]", source), re.findall(r"%[sd]", traduit), e.msgid)
 
+    def test_un_texte_n_est_pas_a_la_fois_simple_et_pluriel(self):
+        # msgfmt et les plateformes de traduction refusent ce doublon.
+        simples = {e.msgid for e in self.entrees if e.pluriel is None}
+        doubles = [e.msgid for e in self.entrees if e.pluriel is not None and e.msgid in simples]
+        self.assertEqual(doubles, [])
+
     def test_plusieurs_valeurs_ont_des_marques_nommees(self):
         # « %s … %s » fige l'ordre des valeurs : une traduction ne pourrait pas
         # le changer. Une seule valeur peut garder « %s ».
@@ -250,6 +260,28 @@ class LExtraction(unittest.TestCase):
         for code in ("_(nom)", '_("guillemets doubles")', "_(`modèle ${x}`)"):
             with self.assertRaises(traductions.TexteNonTraduisible, msg=code):
                 traductions.textes_js(code, "essai.js")
+
+    def test_les_appels_shell_sont_lus(self):
+        code = ("#!/bin/sh\n"
+                "# traduire 'Un commentaire, pas un texte'\n"
+                "traduire() {\n"
+                "    python3 -B /usr/share/codebyr/traduction.py \"$@\" || printf '%s' \"$1\"\n"
+                "}\n"
+                "printf '%s\\n' \"$(traduire 'Fichier introuvable : {fichier}' fichier=\"$f\")\"\n"
+                "printf '%s\\n' \"$(traduire 'N'\\''utilisez PAS ce fichier.')\"\n")
+        self.assertEqual(traductions.textes_shell(code, "essai"),
+                         [("Fichier introuvable : {fichier}", None),
+                          ("N'utilisez PAS ce fichier.", None)])
+
+    def test_un_appel_shell_sans_texte_ecrit_est_refuse(self):
+        for code in ('x="$(traduire "$message")"\n', 'x="$(traduire "double")"\n'):
+            with self.assertRaises(traductions.TexteNonTraduisible, msg=code):
+                traductions.textes_shell(code, "essai")
+
+    def test_les_scripts_shell_sont_relus(self):
+        relus = traductions.sources(RACINE)
+        self.assertIn("usr/bin/codebyr-verifier", relus)
+        self.assertIn("usr/bin/codebyr-installer", relus)
 
     def test_un_fichier_po_relu_est_identique(self):
         with tempfile.TemporaryDirectory() as temporaire:
@@ -454,9 +486,10 @@ class AucuneVariableNeMasqueLaTraduction(unittest.TestCase):
 
     def test_dans_aucun_fichier(self):
         for relatif in traductions.sources(RACINE):
-            if relatif.endswith(".js"):
+            chemin = os.path.join(INCLUDES, relatif)
+            if not relatif.endswith(".py") and traductions._langage(chemin) != "python":
                 continue
-            code = _lire(os.path.join(INCLUDES, relatif))
+            code = _lire(chemin)
             self.assertEqual(fonctions_qui_masquent_la_traduction(code, relatif), [], relatif)
 
     def test_le_garde_fou_voit_le_piege(self):
@@ -464,6 +497,64 @@ class AucuneVariableNeMasqueLaTraduction(unittest.TestCase):
         self.assertEqual(fonctions_qui_masquent_la_traduction(code, "x"), [(1, "f")])
         self.assertEqual(fonctions_qui_masquent_la_traduction(
             "def f():\n    env, _x = g()\n    print(_('a'))\n", "x"), [])
+
+
+class LaPageDeBlocage(unittest.TestCase):
+    """Le filtre réseau ne lit pas les traductions (AppArmor) : codebyr-space
+    les lui donne. Son français et celui de page_blocage.py ne font qu'un."""
+
+    @classmethod
+    def setUpClass(cls):
+        from outils import charger
+        import page_blocage
+        cls.filtre = charger("codebyr-net-proxy")
+        cls.page_blocage = page_blocage
+
+    def test_le_francais_est_le_meme_des_deux_cotes(self):
+        self.assertEqual(self.page_blocage.textes(), self.filtre.TEXTES)
+
+    def test_des_textes_traduits_sont_acceptes(self):
+        anglais = {"langue": "en", "banque_titre": "This is not your bank's site",
+                   "banque_detail": "<code>%s</code> is not on your list."}
+        recus = self.filtre.textes_recus(
+            {self.page_blocage.VARIABLE: json.dumps(anglais)})
+        self.assertEqual(recus["langue"], "en")
+        self.assertEqual(recus["banque_titre"], anglais["banque_titre"])
+        self.assertEqual(recus["vide_titre"], self.filtre.TEXTES["vide_titre"])
+
+    def test_un_texte_douteux_garde_le_francais(self):
+        f = self.filtre
+        for recu in ("pas du json", "[1, 2]",
+                     json.dumps({"banque_detail": "sans marque"}),
+                     json.dumps({"banque_detail": "%s et %s"}),
+                     json.dumps({"banque_detail": "100 % %s"}),
+                     json.dumps({"banque_titre": 42}),
+                     json.dumps({"langue": "en\"><script>"})):
+            recus = f.textes_recus({self.page_blocage.VARIABLE: recu})
+            self.assertEqual(recus, f.TEXTES, recu)
+
+    def test_la_page_echappe_toujours_le_site(self):
+        f = self.filtre
+        envoye = []
+
+        class Client:
+            def sendall(self, donnees):
+                envoye.append(donnees)
+
+        ancien = f.TEXTES_PAGE
+        try:
+            f.TEXTES_PAGE = f.textes_recus({self.page_blocage.VARIABLE: json.dumps(
+                {"langue": "en", "banque_detail": "<code>%s</code> is not on your list."})})
+            f.bloque(Client(), "<img src=x>", patterns=["banque.fr"])
+        finally:
+            f.TEXTES_PAGE = ancien
+        page = envoye[0].decode("utf-8")
+        self.assertIn('<html lang="en">', page)
+        self.assertIn("<code>&lt;img src=x&gt;</code> is not on your list.", page)
+
+    def test_codebyr_space_les_donne_au_lancement(self):
+        code = _lire(os.path.join(INCLUDES, "usr", "bin", "codebyr-space"))
+        self.assertIn("env=page_blocage.environnement(os.environ))", code)
 
 
 class LesNomsDesApplications(unittest.TestCase):

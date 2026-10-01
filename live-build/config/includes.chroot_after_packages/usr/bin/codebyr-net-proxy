@@ -25,7 +25,9 @@ sa prise effective (un autre programme pouvait s'y glisser), et le cas où le
 navigateur démarrait plus vite que le filtre et tombait sur un port muet.
 """
 import ipaddress
+import json
 import os
+import re
 import select
 import socket
 import sys
@@ -166,8 +168,67 @@ def echapper(texte):
             .replace('"', "&quot;"))
 
 
-PAGE = u"""<!doctype html><html lang="fr"><meta charset="utf-8">
-<title>Site bloqué — Codebyr</title>
+# ── La page de blocage, dans la langue de l'utilisateur ────────────────────
+# Ce filtre ne lit aucun fichier hors de Python — son profil AppArmor
+# l'interdit, et c'est voulu : il est exposé à tout ce qu'un site lui envoie.
+# Il ne peut donc pas charger les traductions. codebyr-space les lui donne,
+# déjà traduites, au lancement (CODEBYR_PAGE_BLOCAGE, voir
+# usr/share/codebyr/page_blocage.py, qui reprend ces textes à l'identique —
+# un test le vérifie). Faute de quoi, la page reste en français.
+TEXTES = {
+    "langue": u"fr",
+    "titre_onglet": u"Site bloqué — Codebyr",
+    "bandeau": u"Espace à réseau restreint",
+    "interne_titre": u"Ce site mène à votre réseau local",
+    "interne_detail": (u"<code>%s</code> est autorisé, mais son adresse désigne cette "
+                       u"machine ou un appareil de votre réseau — box, imprimante, "
+                       u"NAS — et non un site Internet.<br><br>"
+                       u"Un Espace à réseau restreint n'y a jamais accès : c'est ce "
+                       u"qui empêche un nom de domaine détourné de servir de passage "
+                       u"vers vos autres appareils."),
+    "banque_titre": u"Ce site n'est pas celui de votre banque",
+    "banque_detail": (u"L'Espace Banque ne peut joindre que les adresses que vous "
+                      u"avez déclarées. <code>%s</code> n'en fait pas partie.<br><br>"
+                      u"Si votre banque a réellement besoin de ce site pour "
+                      u"fonctionner, ouvrez <b>Configuration Codebyr</b> : il vous "
+                      u"sera proposé dans la liste des sites bloqués."),
+    "vide_titre": u"Aucun site n'est encore autorisé ici",
+    "vide_detail": (u"Ouvrez <b>Configuration Codebyr</b> et ajoutez l'adresse de "
+                    u"votre banque. Elle sera alors la seule joignable dans cet "
+                    u"Espace — c'est ce qui rend un lien d'hameçonnage inoffensif "
+                    u"quand il s'ouvre ici par mégarde."),
+}
+
+
+def textes_recus(environ):
+    """Les textes de la page : ceux que codebyr-space a donnés, vérifiés un à
+    un. Une clé inconnue est ignorée ; une valeur qui n'est pas un texte, ou
+    qui n'a pas exactement les mêmes « %s » que le français, aussi — la page
+    reste alors en français plutôt que de casser. La langue n'est acceptée
+    que sous la forme d'un code (« en », « pt_BR »)."""
+    textes = dict(TEXTES)
+    try:
+        recus = json.loads(environ.get("CODEBYR_PAGE_BLOCAGE") or "{}")
+    except ValueError:
+        return textes
+    if not isinstance(recus, dict):
+        return textes
+    for cle, francais in TEXTES.items():
+        valeur = recus.get(cle)
+        if not isinstance(valeur, str) or not valeur:
+            continue
+        if cle == "langue":
+            if re.fullmatch(r"[a-z]{2,3}(_[A-Z]{2})?", valeur):
+                textes[cle] = valeur
+        elif re.findall(r"%.", valeur) == re.findall(r"%.", francais):
+            textes[cle] = valeur
+    return textes
+
+
+TEXTES_PAGE = dict(TEXTES)
+
+PAGE = u"""<!doctype html><html lang="%s"><meta charset="utf-8">
+<title>%s</title>
 <style>
  body{margin:0;min-height:100vh;display:flex;align-items:center;
       justify-content:center;background:#0A1318;color:#E7EEF1;
@@ -179,34 +240,19 @@ PAGE = u"""<!doctype html><html lang="fr"><meta charset="utf-8">
  .t{display:inline-block;margin-bottom:.4rem;padding:.2rem .7rem;border-radius:99px;
     background:#2FA36B22;color:#2FA36B;font-size:.8rem;font-weight:700}
 </style>
-<div class="c"><span class="t">Espace à réseau restreint</span>
+<div class="c"><span class="t">%s</span>
 <h1>%s</h1><p>%s</p></div>"""
 
 
 def bloque(client, host, patterns=(), interne=False):
+    t = TEXTES_PAGE
     if interne:
-        titre = u"Ce site mène à votre réseau local"
-        detail = (u"<code>%s</code> est autorisé, mais son adresse désigne cette "
-                  u"machine ou un appareil de votre réseau — box, imprimante, "
-                  u"NAS — et non un site Internet.<br><br>"
-                  u"Un Espace à réseau restreint n'y a jamais accès : c'est ce "
-                  u"qui empêche un nom de domaine détourné de servir de passage "
-                  u"vers vos autres appareils." % echapper(host))
+        titre, detail = t["interne_titre"], t["interne_detail"] % echapper(host)
     elif patterns:
-        titre = u"Ce site n'est pas celui de votre banque"
-        detail = (u"L'Espace Banque ne peut joindre que les adresses que vous "
-                  u"avez déclarées. <code>%s</code> n'en fait pas partie.<br><br>"
-                  u"Si votre banque a réellement besoin de ce site pour "
-                  u"fonctionner, ouvrez <b>Configuration Codebyr</b> : il vous "
-                  u"sera proposé dans la liste des sites bloqués."
-                  % echapper(host))
+        titre, detail = t["banque_titre"], t["banque_detail"] % echapper(host)
     else:
-        titre = u"Aucun site n'est encore autorisé ici"
-        detail = (u"Ouvrez <b>Configuration Codebyr</b> et ajoutez l'adresse de "
-                  u"votre banque. Elle sera alors la seule joignable dans cet "
-                  u"Espace — c'est ce qui rend un lien d'hameçonnage inoffensif "
-                  u"quand il s'ouvre ici par mégarde.")
-    corps = (PAGE % (titre, detail)).encode("utf-8")
+        titre, detail = t["vide_titre"], t["vide_detail"]
+    corps = (PAGE % (t["langue"], t["titre_onglet"], t["bandeau"], titre, detail)).encode("utf-8")
     entete = (b"HTTP/1.1 403 Forbidden\r\n"
               b"Content-Type: text/html; charset=utf-8\r\n"
               b"Content-Length: " + str(len(corps)).encode() + b"\r\n"
@@ -386,7 +432,8 @@ def gerer(client, patterns):
 
 
 def main(argv):
-    global JOURNAL, _VERROU
+    global JOURNAL, _VERROU, TEXTES_PAGE
+    TEXTES_PAGE = textes_recus(os.environ)
     args = argv[1:]
     if not args:
         sys.stderr.write(__doc__)

@@ -50,6 +50,7 @@ from traduction import _, n_  # noqa: E402
 import modeles  # noqa: E402
 import navigateur  # noqa: E402
 import ordres_espace  # noqa: E402
+import page_blocage  # noqa: E402
 import permissions_flatpak  # noqa: E402
 import programmes  # noqa: E402
 import provenance  # noqa: E402
@@ -268,9 +269,12 @@ def _demarrer_filtre_reseau(esp, home, app_cmd, chemin_socket=None, compte_dedie
         except OSError as exc:
             sys.stderr.write("codebyr-space : journal des refus indisponible (%s)\n" % exc)
 
+        # La page de blocage dans la langue de l'utilisateur : le filtre ne
+        # peut pas lire les traductions, on les lui donne (page_blocage.py).
         proc = subprocess.Popen(["codebyr-net-proxy", "--fd", str(srv.fileno()),
                                  "--journal", journal_refus(esp["id"])] + domaines,
-                                pass_fds=(srv.fileno(),))
+                                pass_fds=(srv.fileno(),),
+                                env=page_blocage.environnement(os.environ))
         if domaines:
             print(n_("Réseau restreint : seul {n} domaine autorisé dans {espace}.",
                      "Réseau restreint : seuls {n} domaines autorisés dans {espace}.",

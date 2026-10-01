@@ -95,6 +95,11 @@ def charger(dossier=DOSSIER, environ=None):
 _traduction = charger()
 
 
+def langue():
+    """Le code de la langue affichée (« fr » pour le texte du code)."""
+    return _traduction.info().get("language", "fr") or "fr"
+
+
 def _(texte):
     """Le texte dans la langue de la session."""
     return _traduction.gettext(texte)
@@ -109,3 +114,20 @@ def n_(singulier, pluriel, nombre):
     if isinstance(_traduction, gettext.GNUTranslations):
         return _traduction.ngettext(singulier, pluriel, nombre)
     return singulier if nombre <= 1 else pluriel
+
+
+if __name__ == "__main__":
+    # Pour les scripts shell (codebyr-verifier…) :
+    #   python3 -B traduction.py 'Fichier introuvable : {fichier}' fichier="$f"
+    # écrit le texte traduit, complété. Ils l'appellent par leur fonction
+    # « traduire », que packaging/traductions.py sait relever.
+    import sys
+    # Le catalogue directement : _() ne reçoit que des textes écrits dans le
+    # code, que l'extraction relève (ici, ils sont dans les scripts).
+    texte = _traduction.gettext(sys.argv[1]) if len(sys.argv) > 1 else ""
+    valeurs = dict(a.split("=", 1) for a in sys.argv[2:] if "=" in a)
+    try:
+        texte = texte.format(**valeurs)
+    except (KeyError, IndexError, ValueError):
+        pass
+    sys.stdout.write(texte)

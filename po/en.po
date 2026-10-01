@@ -574,6 +574,10 @@ msgstr "Could not add this program."
 msgid "« {adresse} » n'est pas une adresse de site valable."
 msgstr "“{adresse}” is not a valid site address."
 
+#: usr/bin/codebyr-installer
+msgid "Codebyr OS est déjà installé sur cette machine : rien à installer."
+msgstr "Codebyr OS is already installed on this machine: nothing to install."
+
 #: usr/bin/codebyr-space
 msgid "Il reste %d Mo de mémoire pour l'Espace jetable. Évitez d'y télécharger de gros fichiers."
 msgstr "Only %d MB of memory left for the Disposable Space. Avoid downloading large files there."
@@ -1035,6 +1039,46 @@ msgstr "Operation interrupted"
 msgid "Un accès sûr aux données n'a pas pu être établi. Consultez le terminal pour le détail."
 msgstr "Safe access to the data could not be established. See the terminal for details."
 
+#: usr/bin/codebyr-verifier
+msgid "Usage : codebyr-verifier <SHA256SUMS> [SHA256SUMS.asc]"
+msgstr "Usage: codebyr-verifier <SHA256SUMS> [SHA256SUMS.asc]"
+
+#: usr/bin/codebyr-verifier
+msgid "Fichier introuvable : {fichier}"
+msgstr "File not found: {fichier}"
+
+#: usr/bin/codebyr-verifier
+msgid "gpg absent."
+msgstr "gpg is missing."
+
+#: usr/bin/codebyr-verifier
+msgid "Clé de signature attendue : {empreinte}"
+msgstr "Expected signing key: {empreinte}"
+
+#: usr/bin/codebyr-verifier
+msgid "Vérification de la signature…"
+msgstr "Checking the signature…"
+
+#: usr/bin/codebyr-verifier
+msgid "Signature authentique (Codebyr OS)."
+msgstr "Authentic signature (Codebyr OS)."
+
+#: usr/bin/codebyr-verifier
+msgid "SIGNATURE INVALIDE — n'utilisez PAS ce fichier."
+msgstr "INVALID SIGNATURE — do NOT use this file."
+
+#: usr/bin/codebyr-verifier
+msgid "Vérification de l'empreinte du fichier…"
+msgstr "Checking the file's checksum…"
+
+#: usr/bin/codebyr-verifier
+msgid "Tout est bon : le téléchargement est authentique et intact."
+msgstr "All good: the download is authentic and intact."
+
+#: usr/bin/codebyr-verifier
+msgid "Empreinte incorrecte — fichier corrompu ou altéré."
+msgstr "Wrong checksum — file corrupted or tampered with."
+
 #: usr/share/codebyr/archives.py
 msgid "Archive trop volumineuse (100 000 entrées / 20 Gio maximum)"
 msgstr "Archive too large (100,000 entries / 20 GiB maximum)"
@@ -1340,6 +1384,38 @@ msgstr "Data of {espace} back from its dedicated account; previous state kept: {
 msgid "Données de {espace} revenues de son compte dédié."
 msgstr "Data of {espace} back from its dedicated account."
 
+#: usr/share/codebyr/page_blocage.py
+msgid "Site bloqué — Codebyr"
+msgstr "Site blocked — Codebyr"
+
+#: usr/share/codebyr/page_blocage.py
+msgid "Espace à réseau restreint"
+msgstr "Restricted-network Space"
+
+#: usr/share/codebyr/page_blocage.py
+msgid "Ce site mène à votre réseau local"
+msgstr "This site leads to your local network"
+
+#: usr/share/codebyr/page_blocage.py
+msgid "<code>%s</code> est autorisé, mais son adresse désigne cette machine ou un appareil de votre réseau — box, imprimante, NAS — et non un site Internet.<br><br>Un Espace à réseau restreint n'y a jamais accès : c'est ce qui empêche un nom de domaine détourné de servir de passage vers vos autres appareils."
+msgstr "<code>%s</code> is allowed, but its address points to this machine or to a device on your network — router, printer, NAS — not to an Internet site.<br><br>A restricted-network Space never has access to it: that is what stops a hijacked domain name from serving as a gateway to your other devices."
+
+#: usr/share/codebyr/page_blocage.py
+msgid "Ce site n'est pas celui de votre banque"
+msgstr "This is not your bank's site"
+
+#: usr/share/codebyr/page_blocage.py
+msgid "L'Espace Banque ne peut joindre que les adresses que vous avez déclarées. <code>%s</code> n'en fait pas partie.<br><br>Si votre banque a réellement besoin de ce site pour fonctionner, ouvrez <b>Configuration Codebyr</b> : il vous sera proposé dans la liste des sites bloqués."
+msgstr "The Bank Space can only reach the addresses you have declared. <code>%s</code> is not one of them.<br><br>If your bank really needs this site to work, open <b>Codebyr Settings</b>: it will be offered to you in the list of blocked sites."
+
+#: usr/share/codebyr/page_blocage.py
+msgid "Aucun site n'est encore autorisé ici"
+msgstr "No site is allowed here yet"
+
+#: usr/share/codebyr/page_blocage.py
+msgid "Ouvrez <b>Configuration Codebyr</b> et ajoutez l'adresse de votre banque. Elle sera alors la seule joignable dans cet Espace — c'est ce qui rend un lien d'hameçonnage inoffensif quand il s'ouvre ici par mégarde."
+msgstr "Open <b>Codebyr Settings</b> and add your bank's address. It will then be the only one reachable in this Space — that is what makes a phishing link harmless when it opens here by mistake."
+
 #: usr/share/codebyr/permissions_flatpak.py
 msgid "lancer des programmes sur le bureau, hors de tout bac à sable"
 msgstr "run programs on the desktop, outside any sandbox"
@@ -1375,6 +1451,49 @@ msgstr "Its sandbox is Flatpak's, not this Space's Hardening. Turn on “Separat
 #: usr/share/codebyr/permissions_flatpak.py
 msgid "recevoir une permission ajoutée à sa ligne de commande (%s)"
 msgstr "receive a permission added to its command line (%s)"
+
+#: usr/share/nautilus-python/extensions/codebyr-envoyer.py
+msgid "Envoyer vers l'Espace"
+msgid_plural "Envoyer {n} fichiers vers l'Espace"
+msgstr[0] "Send to Space"
+msgstr[1] "Send {n} files to Space"
+
+#: usr/share/nautilus-python/extensions/codebyr-envoyer.py
+msgid "Y dépose une copie, dans le dossier « Partagé » de l'Espace. L'original ne bouge pas."
+msgstr "Places a copy there, in the Space's “Partagé” (shared) folder. The original stays where it is."
+
+#: usr/share/nautilus-python/extensions/codebyr-jetable.py
+#: usr/share/gnome-shell/extensions/codebyr@codebyr.io/extension.js
+msgid "Ouvrir en Jetable"
+msgstr "Open in Disposable"
+
+#: usr/share/nautilus-python/extensions/codebyr-jetable.py
+msgid "Ouvrir {n} fichier en Jetable"
+msgid_plural "Ouvrir {n} fichiers en Jetable"
+msgstr[0] "Open {n} file in Disposable"
+msgstr[1] "Open {n} files in Disposable"
+
+#: usr/share/nautilus-python/extensions/codebyr-jetable.py
+msgid "S'ouvre dans un Espace éphémère, sans réseau, détruit à la fermeture — un piège ne peut rien envoyer ni rien laisser."
+msgstr "Opens in an ephemeral Space, without network, destroyed when closed — a trap can neither send nor leave anything."
+
+#: usr/share/nautilus-python/extensions/codebyr-provenance.py
+msgid "Ce fichier m'appartient"
+msgid_plural "Ces {n} fichiers m'appartiennent"
+msgstr[0] "This file is mine"
+msgstr[1] "These {n} files are mine"
+
+#: usr/share/nautilus-python/extensions/codebyr-provenance.py
+msgid "Après l'avoir examiné : il s'ouvrira normalement dans cet Espace, au lieu de partir sous cloche à chaque fois."
+msgstr "After examining it: it will open normally in this Space, instead of going into quarantine every time."
+
+#: usr/share/nautilus-python/extensions/codebyr-provenance.py
+msgid "Espace d'origine"
+msgstr "Origin Space"
+
+#: usr/share/nautilus-python/extensions/codebyr-provenance.py
+msgid "L'Espace Codebyr d'où provient ce fichier"
+msgstr "The Codebyr Space this file comes from"
 
 #: usr/share/gnome-shell/extensions/codebyr@codebyr.io/extension.js
 msgid "Navigateur"
@@ -1475,10 +1594,6 @@ msgstr "The link will open in an isolated bubble that self-destructs when closed
 #: usr/share/gnome-shell/extensions/codebyr@codebyr.io/extension.js
 msgid "Ouverture en Jetable impossible"
 msgstr "Could not open in Disposable"
-
-#: usr/share/gnome-shell/extensions/codebyr@codebyr.io/extension.js
-msgid "Ouvrir en Jetable"
-msgstr "Open in Disposable"
 
 #: usr/share/gnome-shell/extensions/codebyr@codebyr.io/extension.js
 msgid "Presse-papiers inter-Espaces indisponible."

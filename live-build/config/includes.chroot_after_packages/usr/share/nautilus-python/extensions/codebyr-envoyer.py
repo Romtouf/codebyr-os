@@ -32,6 +32,18 @@ SPACE = "/usr/bin/codebyr-space"
 # configurait son système, moins les durcissements livrés l'atteignaient.
 # Corrigé en 1.2.0 — on ne rouvre pas cette porte pour un menu contextuel.
 sys.path.insert(0, os.environ.get("CODEBYR_LIB", "/usr/share/codebyr"))
+# Les textes dans la langue de la session. Si le module manquait, le menu
+# resterait en français plutôt que de disparaître : Fichiers ne charge pas
+# une extension dont l'import échoue.
+try:
+    from traduction import _, n_  # noqa: E402
+except ImportError:
+    def _(texte):
+        return texte
+
+    def n_(singulier, pluriel, nombre):
+        return singulier if nombre <= 1 else pluriel
+
 try:
     import registre
 except ImportError:      # pragma: no cover — module partagé absent
@@ -85,12 +97,12 @@ class CodebyrEnvoyer(GObject.GObject, Nautilus.MenuProvider):
         if not espaces:
             return []
 
-        libelle = ("Envoyer vers l'Espace" if len(chemins) == 1
-                   else "Envoyer %d fichiers vers l'Espace" % len(chemins))
+        libelle = n_("Envoyer vers l'Espace", "Envoyer {n} fichiers vers l'Espace",
+                     len(chemins)).format(n=len(chemins))
         parent = Nautilus.MenuItem(
             name="Codebyr::Envoyer", label=libelle,
-            tip="Y dépose une copie, dans le dossier « Partagé » de l'Espace. "
-                "L'original ne bouge pas.")
+            tip=_("Y dépose une copie, dans le dossier « Partagé » de l'Espace. "
+                  "L'original ne bouge pas."))
         menu = Nautilus.Menu()
         parent.set_submenu(menu)
         for ident, nom in espaces:

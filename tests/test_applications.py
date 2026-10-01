@@ -9,6 +9,7 @@ charger dans un test. Elle est maintenant dans le module partagé.
 import os
 import tempfile
 import unittest
+from unittest import mock
 
 from outils import LIB  # noqa: F401 — place le module partagé sur sys.path
 import applications     # noqa: E402
@@ -36,11 +37,18 @@ class Detection(unittest.TestCase):
         self.assertEqual(applications.installees([self.dossier]),
                          [("Calculator", "gnome-calculator")])
 
-    def test_le_nom_francais_est_prefere(self):
+    def test_le_nom_suit_la_langue_de_la_session(self):
+        # Le français pour une session française (et sans préférence), le nom
+        # par défaut pour une session anglaise : la langue de la machine qui
+        # fait le test n'y est pour rien.
         ecrire(self.dossier, "a.desktop",
                "[Desktop Entry]\nType=Application\nName=Files\nName[fr]=Fichiers\n"
                "Exec=nautilus\n")
-        self.assertEqual(applications.installees([self.dossier])[0][0], "Fichiers")
+        for langue, attendu in (("fr_FR.UTF-8", "Fichiers"), ("C.UTF-8", "Fichiers"),
+                                ("en_US.UTF-8", "Files")):
+            environ = {"LANG": langue}
+            with mock.patch.dict(os.environ, environ, clear=True):
+                self.assertEqual(applications.installees([self.dossier])[0][0], attendu, langue)
 
     def test_les_codes_de_champ_sont_retires(self):
         ecrire(self.dossier, "a.desktop",

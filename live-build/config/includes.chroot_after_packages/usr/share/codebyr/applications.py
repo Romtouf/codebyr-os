@@ -14,6 +14,8 @@ import os
 import re
 import shlex
 
+import traduction
+
 DOSSIERS = (
     "/usr/share/applications",
     "/var/lib/flatpak/exports/share/applications",
@@ -60,6 +62,26 @@ def commande(entree, fichier, est_flatpak):
     return re.sub(r"\s+", " ", CODES_DE_CHAMP.sub("", exe)).strip() or None
 
 
+def nom_localise(entree, langues=None):
+    """Le nom de l'application dans la langue de la session, comme GNOME le
+    montre : « Name[de_DE] », puis « Name[de] »…, sinon « Name ».
+
+    On lisait toujours « Name[fr] » : une session anglaise aurait vu la liste
+    en français. Sans préférence (C, POSIX), c'est le français, comme pour les
+    textes de Codebyr (voir traduction.py).
+    """
+    if langues is None:
+        langues = traduction.langues_preferees()
+    if not langues or langues[0] in ("C", "POSIX"):
+        langues = ["fr"]
+    for code in langues:
+        for candidat in (code, code.split("_")[0]):
+            nom = entree.get("Name[%s]" % candidat)
+            if nom:
+                return nom
+    return entree.get("Name")
+
+
 def installees(dossiers=None):
     """(nom, commande) de chaque application installée, triés, sans doublon.
 
@@ -78,7 +100,7 @@ def installees(dossiers=None):
             entree = _entree(fichier)
             if entree is None or not _affichable(entree):
                 continue
-            nom = entree.get("Name[fr]") or entree.get("Name")
+            nom = nom_localise(entree)
             cmd = commande(entree, fichier, est_flatpak)
             if nom and cmd and nom not in vus:
                 vus[nom] = cmd

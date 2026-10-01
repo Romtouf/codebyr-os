@@ -7,6 +7,7 @@ le bouclier anti-hameçonnage) et de voir ses Espaces. 100% local.
 """
 import json
 import os
+import shlex
 import shutil
 import subprocess
 import sys
@@ -22,7 +23,6 @@ from gi.repository import Adw, Gtk, Gio, GLib  # noqa: E402
 # affichait l'icône générique — un losange gris — dans le dock, la vue
 # d'ensemble et Alt+Tab. Constaté le 13/09/2026 sur une installation réelle.
 GLib.set_prgname("io.codebyr.Config")
-GLib.set_application_name("Configuration Codebyr")
 
 # Registre partagé : la vue est la FUSION des défauts du système et des choix
 # de l'utilisateur ; on n'enregistre jamais que les différences (voir le module).
@@ -33,6 +33,9 @@ import chemins  # noqa: E402
 import compte_dedie  # noqa: E402
 import interface  # noqa: E402
 import registre  # noqa: E402
+from traduction import _, n_  # noqa: E402
+
+GLib.set_application_name(_("Configuration Codebyr"))
 
 
 def load_registry():
@@ -62,18 +65,18 @@ def capacites_machine():
         except OSError:
             return True
     return [
-        ("Bac à sable (bubblewrap)", bool(shutil.which("bwrap"))),
-        ("Isolation utilisateur", user_ns()),
-        ("Plafonds mémoire / processus", bac_a_sable.systemd_scope_dispo()),
+        (_("Bac à sable (bubblewrap)"), bool(shutil.which("bwrap"))),
+        (_("Isolation utilisateur"), user_ns()),
+        (_("Plafonds mémoire / processus"), bac_a_sable.systemd_scope_dispo()),
         # Sans lui, une application d'un Espace n'a aucun bus de session : le bus
         # de l'hôte n'est plus exposé au bac à sable (il permettait d'en sortir).
-        ("Bus de session privé par Espace", bool(shutil.which("dbus-run-session"))),
+        (_("Bus de session privé par Espace"), bool(shutil.which("dbus-run-session"))),
     ]
 
 
 class Fenetre(Adw.ApplicationWindow):
     def __init__(self, app):
-        super().__init__(application=app, title="Configuration Codebyr")
+        super().__init__(application=app, title=_("Configuration Codebyr"))
         self.set_default_size(720, 640)
         self._data = load_registry()
         self._scope_idx = 0  # 0 = liste commune ; 1..N = un Espace
@@ -83,7 +86,7 @@ class Fenetre(Adw.ApplicationWindow):
 
         tv = Adw.ToolbarView()
         header = Adw.HeaderBar()
-        header.set_title_widget(Adw.WindowTitle(title="Configuration Codebyr",
+        header.set_title_widget(Adw.WindowTitle(title=_("Configuration Codebyr"),
                                                 subtitle="Codebyr OS"))
         tv.add_top_bar(header)
         tv.set_content(self._page)
@@ -125,21 +128,21 @@ class Fenetre(Adw.ApplicationWindow):
         banque = espace_banque(self._data)
 
         intro = Adw.PreferencesGroup(
-            title="Le bouclier anti-hameçonnage",
-            description="Codebyr n'autorise QUE ces sites dans l'Espace Banque, et "
-                        "vous alerte si un autre site tente de les imiter. Ajoutez "
-                        "ici les adresses de VOTRE banque.")
+            title=_("Le bouclier anti-hameçonnage"),
+            description=_("Codebyr n'autorise QUE ces sites dans l'Espace Banque, et "
+                          "vous alerte si un autre site tente de les imiter. Ajoutez "
+                          "ici les adresses de VOTRE banque."))
         self._page.add(intro)
         self._groupes.append(intro)
 
-        grp = Adw.PreferencesGroup(title="Sites de votre banque")
+        grp = Adw.PreferencesGroup(title=_("Sites de votre banque"))
         self._page.add(grp)
         self._groupes.append(grp)
 
         domaines = (banque.get("reseau", {}).get("domaines", []) if banque else [])
         if not domaines:
-            vide = Adw.ActionRow(title="Aucun site pour l'instant",
-                                 subtitle="Ajoutez le site de votre banque ci-dessous.")
+            vide = Adw.ActionRow(title=_("Aucun site pour l'instant"),
+                                 subtitle=_("Ajoutez le site de votre banque ci-dessous."))
             grp.add(vide)
         for d in domaines:
             row = Adw.ActionRow(title=d)
@@ -149,7 +152,7 @@ class Fenetre(Adw.ApplicationWindow):
             row.add_suffix(btn)
             grp.add(row)
 
-        ajout = Adw.EntryRow(title="Ajouter un site (ex. mabanque.fr)")
+        ajout = Adw.EntryRow(title=_("Ajouter un site (ex. mabanque.fr)"))
         badd = Gtk.Button(icon_name="list-add-symbolic", valign=Gtk.Align.CENTER)
         badd.add_css_class("flat")
         badd.connect("clicked", lambda _b: self._ajouter_domaine(ajout.get_text()))
@@ -161,13 +164,13 @@ class Fenetre(Adw.ApplicationWindow):
 
         # Espaces + blindage
         gesp = Adw.PreferencesGroup(
-            title="Vos Espaces et leur blindage",
-            description="Le Blindage renforce l'isolation d'un Espace : bac à sable "
-                        "utilisateur, zéro privilège, session neuve. Idéal pour la Banque.")
+            title=_("Vos Espaces et leur blindage"),
+            description=_("Le Blindage renforce l'isolation d'un Espace : bac à sable "
+                          "utilisateur, zéro privilège, session neuve. Idéal pour la Banque."))
         self._page.add(gesp)
         self._groupes.append(gesp)
         for e in self._data.get("espaces", []):
-            tag = "  (éphémère)" if e.get("ephemere") else ""
+            tag = "  " + _("(éphémère)") if e.get("ephemere") else ""
             row = Adw.SwitchRow(title=e.get("nom", e.get("id")) + tag,
                                 subtitle=e.get("couleur", ""))
             row.set_active(e.get("blindage") == "renforce")
@@ -179,19 +182,19 @@ class Fenetre(Adw.ApplicationWindow):
         # c'est surtout lui retirer le microphone — d'où un réglage visible, et
         # pas seulement une clé dans un fichier.
         gson = Adw.PreferencesGroup(
-            title="Son et micro, par Espace",
-            description="Le serveur de son donne aussi accès au microphone. "
-                        "Coupez-le pour les Espaces qui n'en ont aucun besoin — "
-                        "Banque, par exemple : une page piégée ne pourra pas "
-                        "vous écouter.")
+            title=_("Son et micro, par Espace"),
+            description=_("Le serveur de son donne aussi accès au microphone. "
+                          "Coupez-le pour les Espaces qui n'en ont aucun besoin — "
+                          "Banque, par exemple : une page piégée ne pourra pas "
+                          "vous écouter."))
         self._page.add(gson)
         self._groupes.append(gson)
         for e in self._data.get("espaces", []):
             actif = e.get("audio", True) is not False
             row = Adw.SwitchRow(
                 title=e.get("nom", e.get("id")),
-                subtitle="Son et micro autorisés" if actif
-                         else "Aucun son, aucun micro")
+                subtitle=_("Son et micro autorisés") if actif
+                         else _("Aucun son, aucun micro"))
             row.set_active(actif)
             row.connect("notify::active", self._basculer_audio, e.get("id"))
             gson.add(row)
@@ -200,9 +203,9 @@ class Fenetre(Adw.ApplicationWindow):
 
         # Capacités réelles de la machine (transparence)
         gcap = Adw.PreferencesGroup(
-            title="Isolation disponible sur cette machine",
-            description="Codebyr s'adapte au matériel. Le Jetable d'une pièce jointe "
-                        "s'ouvre toujours blindé ET sans réseau.")
+            title=_("Isolation disponible sur cette machine"),
+            description=_("Codebyr s'adapte au matériel. Le Jetable d'une pièce jointe "
+                          "s'ouvre toujours blindé ET sans réseau."))
         self._page.add(gcap)
         self._groupes.append(gcap)
         for nom, dispo in capacites_machine():
@@ -226,11 +229,11 @@ class Fenetre(Adw.ApplicationWindow):
         """
         service = os.path.exists(compte_dedie.SOCKET_SERVICE)
         description = (
-            "Un Espace sous compte séparé possède ses fichiers sous une identité "
-            "à lui. Ce qui s'échapperait de son bac à sable ne pourrait plus lire "
-            "les autres Espaces, ni votre dossier personnel. Ses données le "
-            "suivent à sa prochaine ouverture, et reviennent si vous le "
-            "désactivez — rien n'est effacé.")
+            _("Un Espace sous compte séparé possède ses fichiers sous une identité "
+              "à lui. Ce qui s'échapperait de son bac à sable ne pourrait plus lire "
+              "les autres Espaces, ni votre dossier personnel. Ses données le "
+              "suivent à sa prochaine ouverture, et reviennent si vous le "
+              "désactivez — rien n'est effacé."))
         invite = compte_dedie.session_invitee()
         if invite:
             # Voir comptes.COMPTE_INVITE : ce réglage ne s'applique jamais ici,
@@ -241,7 +244,7 @@ class Fenetre(Adw.ApplicationWindow):
         elif not service:
             description += ("\n\nLe service des comptes d'Espaces n'est pas actif "
                             "sur cette machine : ce réglage reste sans effet.")
-        groupe = Adw.PreferencesGroup(title="Compte séparé, par Espace",
+        groupe = Adw.PreferencesGroup(title=_("Compte séparé, par Espace"),
                                       description=description)
         self._page.add(groupe)
         self._groupes.append(groupe)
@@ -253,12 +256,12 @@ class Fenetre(Adw.ApplicationWindow):
                 # compte séparé — mais celles déjà installées vivent dans un
                 # dossier du bureau, que l'Espace ne peut plus lire. Elles se
                 # réinstallent d'un geste, dans l'Espace cette fois.
-                sous_titre = ("Ses applications Flatpak seront à réinstaller "
-                              "dans l'Espace")
+                sous_titre = (_("Ses applications Flatpak seront à réinstaller "
+                                "dans l'Espace"))
             elif actif:
-                sous_titre = "Ses fichiers lui appartiennent"
+                sous_titre = _("Ses fichiers lui appartiennent")
             else:
-                sous_titre = "Ses fichiers appartiennent à votre compte"
+                sous_titre = _("Ses fichiers appartiennent à votre compte")
             row = Adw.SwitchRow(title=e.get("nom", e.get("id")), subtitle=sous_titre)
             row.set_active(actif and not invite)
             row.set_sensitive(service and not invite)
@@ -287,8 +290,8 @@ class Fenetre(Adw.ApplicationWindow):
                 e["compte"] = valeur
                 break
         registre.modifier_espace(esp_id, {"compte": valeur})
-        self._dire("Ses données déménageront à sa prochaine ouverture."
-                   if actif else "Ses données reviendront à sa prochaine ouverture.")
+        self._dire(_("Ses données déménageront à sa prochaine ouverture.")
+                   if actif else _("Ses données reviendront à sa prochaine ouverture."))
         self._construire()
 
     def _dire(self, message):
@@ -325,22 +328,22 @@ class Fenetre(Adw.ApplicationWindow):
         if not refuses:
             return
         grp = Adw.PreferencesGroup(
-            title="Sites bloqués dans « %s »" % banque.get("nom", "Banque"),
-            description="Codebyr a refusé ces adresses. Si votre banque ne "
-                        "s'affiche pas entièrement, l'une d'elles lui est "
-                        "peut-être nécessaire (paiement sécurisé, images…). "
-                        "N'autorisez que ce que vous reconnaissez.")
+            title=_("Sites bloqués dans « {nom} »").format(nom=banque.get("nom", _("Banque"))),
+            description=_("Codebyr a refusé ces adresses. Si votre banque ne "
+                          "s'affiche pas entièrement, l'une d'elles lui est "
+                          "peut-être nécessaire (paiement sécurisé, images…). "
+                          "N'autorisez que ce que vous reconnaissez."))
         self._page.add(grp)
         self._groupes.append(grp)
         for d in refuses[:20]:
             row = Adw.ActionRow(title=d)
-            btn = Gtk.Button(label="Autoriser", valign=Gtk.Align.CENTER)
+            btn = Gtk.Button(label=_("Autoriser"), valign=Gtk.Align.CENTER)
             btn.add_css_class("flat")
             btn.connect("clicked", lambda _b, dom=d: self._ajouter_domaine(dom))
             row.add_suffix(btn)
             grp.add(row)
-        oublier = Adw.ActionRow(title="Effacer cette liste",
-                                subtitle="Elle se remplira à nouveau au besoin.")
+        oublier = Adw.ActionRow(title=_("Effacer cette liste"),
+                                subtitle=_("Elle se remplira à nouveau au besoin."))
         boubli = Gtk.Button(icon_name="user-trash-symbolic", valign=Gtk.Align.CENTER)
         boubli.add_css_class("flat")
         boubli.connect("clicked", lambda _b: self._oublier_refus(banque.get("id", "")))
@@ -387,19 +390,19 @@ class Fenetre(Adw.ApplicationWindow):
 
     def _groupe_applications(self):
         esp = self._espace_scope()
-        titre_scope = "la liste commune" if esp is None else "« %s »" % esp.get("nom", "")
+        titre_scope = _("la liste commune") if esp is None else _("« {nom} »").format(nom=esp.get("nom", ""))
         grp = Adw.PreferencesGroup(
-            title="Applications du menu",
-            description="Ce qui apparaît dans le menu du Sceau. Choisissez la portée : "
-                        "la liste commune (tous les Espaces) ou un Espace précis.")
+            title=_("Applications du menu"),
+            description=_("Ce qui apparaît dans le menu du Sceau. Choisissez la portée : "
+                          "la liste commune (tous les Espaces) ou un Espace précis."))
         self._page.add(grp)
         self._groupes.append(grp)
 
         # Sélecteur de portée
-        noms = ["Tous les Espaces (liste commune)"] + \
+        noms = [_("Tous les Espaces (liste commune)")] + \
                [e.get("nom", e.get("id")) for e in self._espaces_registre()]
         modele = Gtk.StringList.new(noms)
-        combo = Adw.ComboRow(title="Configurer les applications de")
+        combo = Adw.ComboRow(title=_("Configurer les applications de"))
         combo.set_model(modele)
         combo.set_selected(min(self._scope_idx, len(noms) - 1))
         combo.connect("notify::selected", self._scope_change)
@@ -408,8 +411,8 @@ class Fenetre(Adw.ApplicationWindow):
         apps, perso = self._apps_effectives()
         if esp is not None and not perso:
             info = Adw.ActionRow(
-                title="Cet Espace utilise la liste commune",
-                subtitle="Ajoutez ou retirez une application pour la personnaliser.")
+                title=_("Cet Espace utilise la liste commune"),
+                subtitle=_("Ajoutez ou retirez une application pour la personnaliser."))
             info.add_css_class("dim-label")
             grp.add(info)
 
@@ -422,10 +425,10 @@ class Fenetre(Adw.ApplicationWindow):
             grp.add(row)
 
         ajout = Adw.ActionRow(
-            title="Ajouter une application déjà installée",
-            subtitle="Vers %s" % titre_scope)
+            title=_("Ajouter une application déjà installée"),
+            subtitle=_("Vers {portee}").format(portee=titre_scope))
         badd = Gtk.Button(icon_name="list-add-symbolic", valign=Gtk.Align.CENTER,
-                          label="Choisir…")
+                          label=_("Choisir…"))
         badd.add_css_class("suggested-action")
         badd.connect("clicked", lambda _b: self._ouvrir_selecteur_app())
         ajout.add_suffix(badd)
@@ -435,10 +438,11 @@ class Fenetre(Adw.ApplicationWindow):
         # (isolée dans cet Espace). Sans objet pour la liste commune.
         if esp is not None and shutil.which("flatpak"):
             inst = Adw.ActionRow(
-                title="Installer une nouvelle application dans « %s »" % esp.get("nom", ""),
-                subtitle="Depuis Flathub — installée et isolée dans cet Espace uniquement")
+                title=_("Installer une nouvelle application dans « {nom} »").format(
+                    nom=esp.get("nom", "")),
+                subtitle=_("Depuis Flathub — installée et isolée dans cet Espace uniquement"))
             binst = Gtk.Button(icon_name="folder-download-symbolic",
-                               valign=Gtk.Align.CENTER, label="Installer…")
+                               valign=Gtk.Align.CENTER, label=_("Installer…"))
             binst.connect("clicked", lambda _b, e=esp: self._ouvrir_installeur_flathub(e))
             inst.add_suffix(binst)
             grp.add(inst)
@@ -446,13 +450,13 @@ class Fenetre(Adw.ApplicationWindow):
         # Ajout d'un programme LOCAL téléchargé (binaire, AppImage…) au menu.
         if esp is not None:
             prog = Adw.ActionRow(
-                title="Ajouter un programme téléchargé",
-                subtitle=("Un programme téléchargé dans « %s », ou envoyé vers lui"
+                title=_("Ajouter un programme téléchargé"),
+                subtitle=(_("Un programme téléchargé dans « {nom} », ou envoyé vers lui")
                           if compte_dedie.demande(esp) else
-                          "Un fichier exécutable présent sur le disque, vers « %s »")
-                         % esp.get("nom", ""))
+                          _("Un fichier exécutable présent sur le disque, vers « {nom} »"))
+                         .format(nom=esp.get("nom", "")))
             bprog = Gtk.Button(icon_name="document-open-symbolic",
-                               valign=Gtk.Align.CENTER, label="Parcourir…")
+                               valign=Gtk.Align.CENTER, label=_("Parcourir…"))
             bprog.connect("clicked", lambda _b, e=esp: self._ouvrir_ajout_programme(e))
             prog.add_suffix(bprog)
             grp.add(prog)
@@ -472,9 +476,8 @@ class Fenetre(Adw.ApplicationWindow):
             # n'existe pas, et le bureau n'a pas le droit d'aller voir. C'est
             # « codebyr-space » qui demandera la désinstallation à l'Espace.
             if os.path.isdir(d) or compte_dedie.demande(esp):
-                term_cmd = ("codebyr-space remove-app %s %s; echo; "
-                            "echo '— Terminé. Fermez cette fenêtre. —'; read _"
-                            % (esp.get("id"), appid))
+                term_cmd = ("codebyr-space remove-app %s %s; echo; echo %s; read _"
+                            % (esp.get("id"), appid, shlex.quote(_("— Terminé. Fermez cette fenêtre. —"))))
                 for term in ("kgx", "gnome-terminal", "xterm"):
                     if shutil.which(term):
                         try:
@@ -505,13 +508,13 @@ class Fenetre(Adw.ApplicationWindow):
 
     def _ouvrir_selecteur_app(self):
         dlg = Adw.Window(transient_for=self, modal=True,
-                         default_width=460, default_height=560, title="Ajouter une application")
+                         default_width=460, default_height=560, title=_("Ajouter une application"))
         tv = Adw.ToolbarView()
         tv.add_top_bar(Adw.HeaderBar())
         boite = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
         boite.set_margin_top(6); boite.set_margin_bottom(6)
         boite.set_margin_start(6); boite.set_margin_end(6)
-        recherche = Gtk.SearchEntry(placeholder_text="Rechercher une application…")
+        recherche = Gtk.SearchEntry(placeholder_text=_("Rechercher une application…"))
         boite.append(recherche)
         defilement = Gtk.ScrolledWindow(vexpand=True)
         liste = Gtk.ListBox()
@@ -550,16 +553,16 @@ class Fenetre(Adw.ApplicationWindow):
     def _ouvrir_installeur_flathub(self, esp):
         dlg = Adw.Window(transient_for=self, modal=True, default_width=500,
                          default_height=600,
-                         title="Installer dans « %s »" % esp.get("nom", ""))
+                         title=_("Installer dans « {nom} »").format(nom=esp.get("nom", "")))
         tv = Adw.ToolbarView()
         tv.add_top_bar(Adw.HeaderBar())
         boite = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
         for m in ("top", "bottom", "start", "end"):
             getattr(boite, "set_margin_" + m)(8)
         recherche = Gtk.SearchEntry(
-            placeholder_text="Rechercher sur Flathub (ex. brave, gimp, vlc)…")
+            placeholder_text=_("Rechercher sur Flathub (ex. brave, gimp, vlc)…"))
         boite.append(recherche)
-        etat = Gtk.Label(label="Tapez le nom d'une application, puis Entrée.",
+        etat = Gtk.Label(label=_("Tapez le nom d'une application, puis Entrée."),
                          wrap=True, xalign=0)
         etat.add_css_class("dim-label")
         boite.append(etat)
@@ -584,12 +587,14 @@ class Fenetre(Adw.ApplicationWindow):
             vider()
             if len(terme) < 2:
                 return
-            etat.set_text("Recherche…")
+            etat.set_text(_("Recherche…"))
             resultats = self._flathub_search(terme)
             if not resultats:
-                etat.set_text("Aucun résultat (ou catalogue pas encore chargé).")
+                etat.set_text(_("Aucun résultat (ou catalogue pas encore chargé)."))
                 return
-            etat.set_text("%d résultat(s) — cliquez pour installer :" % len(resultats))
+            etat.set_text(n_("{n} résultat — cliquez pour installer :",
+                             "{n} résultats — cliquez pour installer :",
+                             len(resultats)).format(n=len(resultats)))
             for appid, nom, desc in resultats:
                 row = Adw.ActionRow(title=nom, subtitle=desc or appid, activatable=True)
                 row.connect("activated", self._installer_flathub, esp, appid, nom, dlg)
@@ -621,9 +626,8 @@ class Fenetre(Adw.ApplicationWindow):
     def _installer_flathub(self, _row, esp, appid, nom, dlg):
         """Lance l'installation dans un terminal (progression visible)."""
         dlg.close()
-        cmd = ("codebyr-space install %s %s; echo; "
-               "echo '— Terminé. Fermez cette fenêtre. —'; "
-               "read _" % (esp.get("id"), appid))
+        cmd = ("codebyr-space install %s %s; echo; echo %s; read _"
+               % (esp.get("id"), appid, shlex.quote(_("— Terminé. Fermez cette fenêtre. —"))))
         lance = False
         for term in ("kgx", "gnome-terminal", "xterm"):
             if shutil.which(term):
@@ -633,9 +637,9 @@ class Fenetre(Adw.ApplicationWindow):
                     break
                 except OSError:
                     continue
-        toast = Adw.Toast(title=("Installation de « %s » lancée dans l'Espace %s…"
-                                 % (nom, esp.get("nom", "")))
-                          if lance else "Impossible d'ouvrir un terminal.")
+        toast = Adw.Toast(title=(_("Installation de « {application} » lancée dans l'Espace {espace}…")
+                                 .format(application=nom, espace=esp.get("nom", "")))
+                          if lance else _("Impossible d'ouvrir un terminal."))
         if hasattr(self, "_toaster"):
             self._toaster.add_toast(toast)
 
@@ -647,13 +651,13 @@ class Fenetre(Adw.ApplicationWindow):
             # de ses programmes ; on n'y choisit que parmi eux.
             self._chercher_programmes_de_l_espace(esp)
             return
-        dialog = Gtk.FileDialog(title="Choisir un programme")
+        dialog = Gtk.FileDialog(title=_("Choisir un programme"))
         dl = os.path.join(chemins.home(esp.get("id")), "Téléchargements")
         if os.path.isdir(dl):
             dialog.set_initial_folder(Gio.File.new_for_path(dl))
         dialog.open(self, None, self._programme_choisi, esp)
 
-    NATURES = {"appimage": "AppImage", "elf": "Programme", "script": "Script"}
+    NATURES = {"appimage": "AppImage", "elf": _("Programme"), "script": _("Script")}
 
     def _annoncer(self, texte):
         if hasattr(self, "_toaster"):
@@ -661,13 +665,13 @@ class Fenetre(Adw.ApplicationWindow):
 
     def _chercher_programmes_de_l_espace(self, esp):
         """Demande à l'Espace sa liste de programmes, sans figer la fenêtre."""
-        self._annoncer("Recherche des programmes de « %s »…" % esp.get("nom", ""))
+        self._annoncer(_("Recherche des programmes de « {nom} »…").format(nom=esp.get("nom", "")))
         try:
             proc = Gio.Subprocess.new(
                 ["codebyr-space", "programmes", esp.get("id", "")],
                 Gio.SubprocessFlags.STDOUT_PIPE | Gio.SubprocessFlags.STDERR_SILENCE)
         except GLib.Error:
-            self._annoncer("Impossible d'interroger l'Espace « %s »." % esp.get("nom", ""))
+            self._annoncer(_("Impossible d'interroger l'Espace « {nom} ».").format(nom=esp.get("nom", "")))
             return
         proc.communicate_utf8_async(None, None, self._programmes_recus, esp)
 
@@ -678,8 +682,8 @@ class Fenetre(Adw.ApplicationWindow):
         except (GLib.Error, ValueError, IndexError):
             liste = None
         if not isinstance(liste, list):
-            self._annoncer("L'Espace « %s » n'a pas pu dresser la liste de ses "
-                           "programmes." % esp.get("nom", ""))
+            self._annoncer(_("L'Espace « {nom} » n'a pas pu dresser la liste de ses "
+                             "programmes.").format(nom=esp.get("nom", "")))
             return
         self._choisir_programme(esp, liste)
 
@@ -687,19 +691,19 @@ class Fenetre(Adw.ApplicationWindow):
         """La liste que l'Espace a dressée. Les noms viennent de lui : sans balisage."""
         dlg = Adw.Window(transient_for=self, modal=True, default_width=500,
                          default_height=520,
-                         title="Programmes de « %s »" % esp.get("nom", ""))
+                         title=_("Programmes de « {nom} »").format(nom=esp.get("nom", "")))
         tv = Adw.ToolbarView()
         tv.add_top_bar(Adw.HeaderBar())
         boite = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
         for m in ("top", "bottom", "start", "end"):
             getattr(boite, "set_margin_" + m)(10)
-        aide = ("Pour en ajouter un autre, téléchargez-le avec le navigateur de "
-                "l'Espace, ou envoyez-le-lui (clic droit sur le fichier → « Envoyer "
-                "vers l'Espace »), puis revenez ici.")
+        aide = (_("Pour en ajouter un autre, téléchargez-le avec le navigateur de "
+                  "l'Espace, ou envoyez-le-lui (clic droit sur le fichier → « Envoyer "
+                  "vers l'Espace »), puis revenez ici."))
         entete = Gtk.Label(wrap=True, xalign=0, label=(
-            ("Programmes trouvés dans les Téléchargements et le dossier Partagé de "
-             "l'Espace. " if liste else
-             "Aucun programme trouvé dans l'Espace « %s ». " % esp.get("nom", "")) + aide))
+            (_("Programmes trouvés dans les Téléchargements et le dossier Partagé de "
+               "l'Espace. ") if liste else
+             _("Aucun programme trouvé dans l'Espace « {nom} ». ").format(nom=esp.get("nom", ""))) + aide))
         entete.add_css_class("dim-label")
         boite.append(entete)
         if liste:
@@ -711,9 +715,9 @@ class Fenetre(Adw.ApplicationWindow):
                 chemin = entree.get("chemin", "")
                 rang = Adw.ActionRow(
                     title=os.path.basename(chemin),
-                    subtitle="%s — dans « %s »" % (
-                        self.NATURES.get(entree.get("nature"), "Programme"),
-                        os.path.basename(os.path.dirname(chemin))),
+                    subtitle=_("{nature} — dans « {dossier} »").format(
+                        nature=self.NATURES.get(entree.get("nature"), _("Programme")),
+                        dossier=os.path.basename(os.path.dirname(chemin))),
                     activatable=True)
                 rang.set_use_markup(False)
                 rang.connect("activated", self._programme_de_l_espace_choisi,
@@ -740,30 +744,30 @@ class Fenetre(Adw.ApplicationWindow):
 
     def _dialogue_nom_programme(self, esp, chemin):
         dlg = Adw.Window(transient_for=self, modal=True, default_width=440,
-                         title="Ajouter au menu")
+                         title=_("Ajouter au menu"))
         tv = Adw.ToolbarView()
         tv.add_top_bar(Adw.HeaderBar())
         page = Adw.PreferencesPage()
         grp = Adw.PreferencesGroup(
-            title="Ajouter « %s »" % os.path.basename(chemin),
-            description="Ce programme apparaîtra dans le menu du Sceau de l'Espace "
-                        "« %s »." % esp.get("nom", ""))
-        nom_row = Adw.EntryRow(title="Nom affiché")
+            title=_("Ajouter « {nom} »").format(nom=os.path.basename(chemin)),
+            description=_("Ce programme apparaîtra dans le menu du Sceau de l'Espace "
+                          "« {nom} ».").format(nom=esp.get("nom", "")))
+        nom_row = Adw.EntryRow(title=_("Nom affiché"))
         nom_row.set_text(applications.nom_propose(chemin))
         grp.add(nom_row)
         sw = Adw.SwitchRow(
-            title="Application Electron / Chromium",
-            subtitle="Ajoute les options Wayland + « --no-sandbox » "
-                     "(VS Code, Antigravity, navigateurs…)")
+            title=_("Application Electron / Chromium"),
+            subtitle=_("Ajoute les options Wayland + « --no-sandbox » "
+                       "(VS Code, Antigravity, navigateurs…)"))
         grp.add(sw)
         page.add(grp)
 
         bar = Gtk.Box(halign=Gtk.Align.END, spacing=8)
         for m in ("top", "bottom", "start", "end"):
             getattr(bar, "set_margin_" + m)(12)
-        annuler = Gtk.Button(label="Annuler")
+        annuler = Gtk.Button(label=_("Annuler"))
         annuler.connect("clicked", lambda _b: dlg.close())
-        ajouter = Gtk.Button(label="Ajouter au menu")
+        ajouter = Gtk.Button(label=_("Ajouter au menu"))
         ajouter.add_css_class("suggested-action")
         ajouter.connect("clicked", lambda _b: self._ajouter_programme(
             esp, chemin, nom_row.get_text(), sw.get_active(), dlg))
@@ -796,8 +800,9 @@ class Fenetre(Adw.ApplicationWindow):
         self._construire()
         if hasattr(self, "_toaster"):
             self._toaster.add_toast(Adw.Toast(
-                title=("« %s » ajouté au menu de %s" % (nom, esp.get("nom", "")))
-                if ok else "Impossible d'ajouter ce programme."))
+                title=(_("« {application} » ajouté au menu de {espace}").format(
+                    application=nom, espace=esp.get("nom", "")))
+                if ok else _("Impossible d'ajouter ce programme.")))
 
     def _ajouter_domaine(self, texte):
         # L'analyse vit dans le module partagé : c'est la seule porte d'entrée
@@ -805,8 +810,8 @@ class Fenetre(Adw.ApplicationWindow):
         d = registre.normaliser_domaine(texte)
         if d is None:
             self._toaster.add_toast(Adw.Toast(
-                title="« %s » n'est pas une adresse de site valable."
-                      % (texte or "").strip()[:40]))
+                title=_("« {adresse} » n'est pas une adresse de site valable.").format(
+                    adresse=(texte or "").strip()[:40])))
             return
         banque = espace_banque(self._data)
         if banque is None:

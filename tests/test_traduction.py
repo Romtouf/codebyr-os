@@ -34,7 +34,9 @@ PO_EN = os.path.join(RACINE, "po", "en.po")
 # Les fichiers passés à _(), étape par étape. Un fichier entre ici quand plus
 # aucune de ses phrases affichées n'est écrite en dur.
 FICHIERS_TRADUITS = [
+    "usr/bin/codebyr-assistant",
     "usr/bin/codebyr-bienvenue",
+    "usr/bin/codebyr-config",
 ]
 
 
@@ -373,6 +375,22 @@ class LesLanceurs(unittest.TestCase):
                 self.assertNotEqual(champs[cle], champs[cle + "[fr]"], "%s : %s non traduit" % (nom, cle))
                 self.assertNotIn(cle + "[en]", champs, "%s : l'anglais est la valeur par défaut" % nom)
             self.assertIn("Name", champs, nom)
+
+
+class LesNomsDesApplications(unittest.TestCase):
+    """La liste des applications installées (Configuration Codebyr) suit la
+    langue de la session ; elle lisait toujours « Name[fr] »."""
+
+    def test_le_nom_suit_la_langue_de_la_session(self):
+        import applications
+        entree = {"Name": "Files", "Name[fr]": "Fichiers", "Name[de]": "Dateien",
+                  "Name[pt_BR]": "Arquivos"}
+        for langues, attendu in ((["de_DE"], "Dateien"), (["pt_BR"], "Arquivos"),
+                                 (["en_US"], "Files"), (["ja_JP"], "Files"),
+                                 (["fr_FR"], "Fichiers"), (["C"], "Fichiers"), ([], "Fichiers"),
+                                 (["ja_JP", "de_DE"], "Dateien")):
+            self.assertEqual(applications.nom_localise(entree, langues), attendu, langues)
+        self.assertEqual(applications.nom_localise({"Name": "Kalk"}, ["fr_FR"]), "Kalk")
 
 
 class LaConstruction(unittest.TestCase):

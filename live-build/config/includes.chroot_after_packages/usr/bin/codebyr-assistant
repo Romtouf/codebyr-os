@@ -19,62 +19,64 @@ from gi.repository import Adw, GLib, Gio, Gtk  # noqa: E402
 # affichait l'icône générique — un losange gris — dans le dock, la vue
 # d'ensemble et Alt+Tab. Constaté le 13/09/2026 sur une installation réelle.
 GLib.set_prgname("io.codebyr.Assistant")
-GLib.set_application_name("Assistant de sécurité")
 
 # Registre partagé : vue fusionnée (défauts du système + choix de l'utilisateur).
 sys.path.insert(0, os.environ.get("CODEBYR_LIB", "/usr/share/codebyr"))
 import registre  # noqa: E402
+from traduction import _, n_  # noqa: E402
+
+GLib.set_application_name(_("Assistant de sécurité"))
 
 CONNAITRE = [
-    ("Qu'est-ce qu'un Espace ?",
-     "Un Espace est un compartiment séparé. Les applications de « Banque » et celles "
-     "de « Navigation » ne partagent ni dossier personnel, ni fichiers temporaires, "
-     "ni bus de communication : ce que vous téléchargez dans l'un n'existe pas dans "
-     "l'autre. Chaque Espace a sa couleur : le liseré autour d'une fenêtre vous dit "
-     "d'un coup d'œil à quel compartiment elle appartient. Si un Espace attrape "
-     "quelque chose, le dégât reste confiné à ce compartiment."),
-    ("Pourquoi certains sites sont bloqués dans Banque ?",
-     "Le navigateur de l'Espace Banque ne peut ouvrir QUE les sites que vous avez "
-     "déclarés comme étant ceux de votre banque. Tout le reste est refusé — y compris "
-     "un lien d'hameçonnage reçu par courriel et ouvert par mégarde dans cet Espace. "
-     "Un site bloqué dans Banque, c'est la protection qui marche, pas une panne."),
-    ("À quoi sert l'Espace Jetable ?",
-     "Il s'autodétruit dès que vous le fermez. Idéal pour ouvrir un lien ou un "
-     "fichier douteux : s'il est piégé, le piège disparaît avec l'Espace. Une pièce "
-     "jointe y est même ouverte SANS réseau : elle ne peut rien envoyer dehors."),
-    ("Est-ce que Codebyr OS me rend invulnérable ?",
-     "Non, et personne ne devrait vous le promettre. Codebyr réduit fortement les "
-     "dégâts d'un piège en l'enfermant dans un compartiment. Mais les Espaces "
-     "reposent sur les protections du noyau Linux, pas sur des machines virtuelles "
-     "séparées : une faille grave du noyau permettrait d'en sortir. Continuez donc à "
-     "vous méfier des pièces jointes et à vérifier l'adresse des sites — Codebyr est "
-     "un filet de sécurité, pas une raison de sauter sans regarder."),
+    (_("Qu'est-ce qu'un Espace ?"),
+     _("Un Espace est un compartiment séparé. Les applications de « Banque » et celles "
+       "de « Navigation » ne partagent ni dossier personnel, ni fichiers temporaires, "
+       "ni bus de communication : ce que vous téléchargez dans l'un n'existe pas dans "
+       "l'autre. Chaque Espace a sa couleur : le liseré autour d'une fenêtre vous dit "
+       "d'un coup d'œil à quel compartiment elle appartient. Si un Espace attrape "
+       "quelque chose, le dégât reste confiné à ce compartiment.")),
+    (_("Pourquoi certains sites sont bloqués dans Banque ?"),
+     _("Le navigateur de l'Espace Banque ne peut ouvrir QUE les sites que vous avez "
+       "déclarés comme étant ceux de votre banque. Tout le reste est refusé — y compris "
+       "un lien d'hameçonnage reçu par courriel et ouvert par mégarde dans cet Espace. "
+       "Un site bloqué dans Banque, c'est la protection qui marche, pas une panne.")),
+    (_("À quoi sert l'Espace Jetable ?"),
+     _("Il s'autodétruit dès que vous le fermez. Idéal pour ouvrir un lien ou un "
+       "fichier douteux : s'il est piégé, le piège disparaît avec l'Espace. Une pièce "
+       "jointe y est même ouverte SANS réseau : elle ne peut rien envoyer dehors.")),
+    (_("Est-ce que Codebyr OS me rend invulnérable ?"),
+     _("Non, et personne ne devrait vous le promettre. Codebyr réduit fortement les "
+       "dégâts d'un piège en l'enfermant dans un compartiment. Mais les Espaces "
+       "reposent sur les protections du noyau Linux, pas sur des machines virtuelles "
+       "séparées : une faille grave du noyau permettrait d'en sortir. Continuez donc à "
+       "vous méfier des pièces jointes et à vérifier l'adresse des sites — Codebyr est "
+       "un filet de sécurité, pas une raison de sauter sans regarder.")),
 ]
 
 REAGIR = [
-    ("Un écran rouge dit « site suspect » — que faire ?",
-     "C'est le bouclier anti-hameçonnage de Codebyr OS. Ce site imite votre banque "
-     "sans en être le vrai site. NE SAISISSEZ JAMAIS vos identifiants ici. Fermez "
-     "l'onglet. Pour votre vraie banque, utilisez toujours l'Espace Banque."),
-    ("Une application demande ma caméra ou mon micro — est-ce normal ?",
-     "Posez-vous une question simple : est-ce cohérent avec ce que fait l'appli ? "
-     "Un logiciel d'appel vidéo qui demande la caméra : normal. Un site d'actualité "
-     "ou un jeu qui la réclame : méfiance, refusez. Dans le doute, refusez — vous "
-     "pourrez toujours autoriser plus tard si besoin."),
-    ("Comment ouvrir un lien douteux sans risque ?",
-     "Menu du Sceau (en haut à droite) → « Ouvrir un lien en Jetable ». Le lien "
-     "s'ouvre dans une bulle éphémère : même piégé, il ne touche pas à vos données, "
-     "et tout disparaît à la fermeture."),
-    ("Je pense avoir été infecté — que faire ?",
-     "Pas de panique : le problème est confiné à un seul Espace. 1) Fermez l'Espace "
-     "concerné (menu Sceau → l'Espace → « Fermer cet Espace »). 2) Videz ses données, "
-     "ou mieux : « Revenir à un instantané… » d'avant le problème. Les autres Espaces "
-     "ne sont pas touchés."),
-    ("Je prête mon ordinateur — comment protéger mes données ?",
-     "Menu du Sceau → « Mode invité (prêter le PC) ». La personne arrive dans une "
-     "session séparée, sous un autre compte : votre dossier personnel lui est fermé "
-     "(droits 0700), et sa session est effacée dès qu'elle se déconnecte. Elle n'a "
-     "pas besoin de mot de passe, et ne peut pas devenir administrateur."),
+    (_("Un écran rouge dit « site suspect » — que faire ?"),
+     _("C'est le bouclier anti-hameçonnage de Codebyr OS. Ce site imite votre banque "
+       "sans en être le vrai site. NE SAISISSEZ JAMAIS vos identifiants ici. Fermez "
+       "l'onglet. Pour votre vraie banque, utilisez toujours l'Espace Banque.")),
+    (_("Une application demande ma caméra ou mon micro — est-ce normal ?"),
+     _("Posez-vous une question simple : est-ce cohérent avec ce que fait l'appli ? "
+       "Un logiciel d'appel vidéo qui demande la caméra : normal. Un site d'actualité "
+       "ou un jeu qui la réclame : méfiance, refusez. Dans le doute, refusez — vous "
+       "pourrez toujours autoriser plus tard si besoin.")),
+    (_("Comment ouvrir un lien douteux sans risque ?"),
+     _("Menu du Sceau (en haut à droite) → « Ouvrir un lien en Jetable ». Le lien "
+       "s'ouvre dans une bulle éphémère : même piégé, il ne touche pas à vos données, "
+       "et tout disparaît à la fermeture.")),
+    (_("Je pense avoir été infecté — que faire ?"),
+     _("Pas de panique : le problème est confiné à un seul Espace. 1) Fermez l'Espace "
+       "concerné (menu Sceau → l'Espace → « Fermer cet Espace »). 2) Videz ses données, "
+       "ou mieux : « Revenir à un instantané… » d'avant le problème. Les autres Espaces "
+       "ne sont pas touchés.")),
+    (_("Je prête mon ordinateur — comment protéger mes données ?"),
+     _("Menu du Sceau → « Mode invité (prêter le PC) ». La personne arrive dans une "
+       "session séparée, sous un autre compte : votre dossier personnel lui est fermé "
+       "(droits 0700), et sa session est effacée dès qu'elle se déconnecte. Elle n'a "
+       "pas besoin de mot de passe, et ne peut pas devenir administrateur.")),
 ]
 
 
@@ -105,62 +107,65 @@ def _espaces_ouverts():
 
 class Fenetre(Adw.ApplicationWindow):
     def __init__(self, app):
-        super().__init__(application=app, title="Assistant de sécurité")
+        super().__init__(application=app, title=_("Assistant de sécurité"))
         self.set_default_size(720, 620)
 
         page = Adw.PreferencesPage()
 
         intro = Adw.PreferencesGroup(
-            title="Bonjour 👋",
-            description="Je suis l'assistant de Codebyr OS. Je réponds en clair aux "
-                        "questions de sécurité du quotidien. Tout reste sur votre "
-                        "ordinateur : je ne consulte aucun serveur.")
+            title=_("Bonjour 👋"),
+            description=_("Je suis l'assistant de Codebyr OS. Je réponds en clair aux "
+                          "questions de sécurité du quotidien. Tout reste sur votre "
+                          "ordinateur : je ne consulte aucun serveur."))
         page.add(intro)
 
-        etat = Adw.PreferencesGroup(title="En ce moment")
+        etat = Adw.PreferencesGroup(title=_("En ce moment"))
         # État RÉEL, jamais rassurant par défaut : le bouclier ne surveille que les
         # domaines déclarés. Sans banque enregistrée, il n'a rien à comparer — le
         # dire est plus utile qu'un « Actif » de façade.
         doms = _domaines_banque()
         if doms:
             etat.add(self._info(
-                "Bouclier anti-hameçonnage",
-                "Actif : il vous alerte si un site imite l'un de vos %d site(s) "
-                "protégé(s), dans vos Espaces de navigation." % len(doms),
+                _("Bouclier anti-hameçonnage"),
+                n_("Actif : il vous alerte si un site imite votre site protégé, "
+                   "dans vos Espaces de navigation.",
+                   "Actif : il vous alerte si un site imite l'un de vos {n} sites "
+                   "protégés, dans vos Espaces de navigation.", len(doms)).format(n=len(doms)),
                 "security-high-symbolic"))
             etat.add(self._info(
-                "Espace Banque", "Navigateur restreint à : %s. Tout autre site y est "
-                "refusé." % ", ".join(doms), "network-wireless-symbolic"))
+                _("Espace Banque"), _("Navigateur restreint à : {sites}. Tout autre site y "
+                                      "est refusé.").format(sites=", ".join(doms)),
+                "network-wireless-symbolic"))
         else:
             etat.add(self._info(
-                "Bouclier anti-hameçonnage",
-                "En attente : aucun site de banque n'est encore enregistré. Ouvrez "
-                "« Configuration Codebyr » pour ajouter le vôtre — sans lui, le "
-                "bouclier n'a rien à surveiller.", "dialog-warning-symbolic"))
+                _("Bouclier anti-hameçonnage"),
+                _("En attente : aucun site de banque n'est encore enregistré. Ouvrez "
+                  "« Configuration Codebyr » pour ajouter le vôtre — sans lui, le "
+                  "bouclier n'a rien à surveiller."), "dialog-warning-symbolic"))
             etat.add(self._info(
-                "Espace Banque", "Aucun site autorisé pour l'instant : le navigateur "
-                "de cet Espace n'ouvrira rien tant que vous n'aurez pas déclaré votre "
-                "banque.", "dialog-warning-symbolic"))
+                _("Espace Banque"), _("Aucun site autorisé pour l'instant : le navigateur "
+                  "de cet Espace n'ouvrira rien tant que vous n'aurez pas déclaré votre "
+                  "banque."), "dialog-warning-symbolic"))
         ouverts = _espaces_ouverts()
         etat.add(self._info(
-            "Espaces ouverts",
-            (", ".join(ouverts) if ouverts else "Aucun Espace ouvert pour l'instant."),
+            _("Espaces ouverts"),
+            (", ".join(ouverts) if ouverts else _("Aucun Espace ouvert pour l'instant.")),
             "view-grid-symbolic"))
         page.add(etat)
 
-        g1 = Adw.PreferencesGroup(title="Comprendre Codebyr OS")
+        g1 = Adw.PreferencesGroup(title=_("Comprendre Codebyr OS"))
         for q, a in CONNAITRE:
             g1.add(self._qa(q, a))
         page.add(g1)
 
-        g2 = Adw.PreferencesGroup(title="Réagir à une alerte")
+        g2 = Adw.PreferencesGroup(title=_("Réagir à une alerte"))
         for q, a in REAGIR:
             g2.add(self._qa(q, a))
         page.add(g2)
 
         tv = Adw.ToolbarView()
         header = Adw.HeaderBar()
-        header.set_title_widget(Adw.WindowTitle(title="Assistant de sécurité",
+        header.set_title_widget(Adw.WindowTitle(title=_("Assistant de sécurité"),
                                                 subtitle="Codebyr OS"))
         tv.add_top_bar(header)
         tv.set_content(page)

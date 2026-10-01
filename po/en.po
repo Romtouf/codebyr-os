@@ -13,6 +13,137 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
 
+#: usr/bin/codebyr-assistant
+#: usr/share/gnome-shell/extensions/codebyr@codebyr.io/extension.js
+msgid "Assistant de sécurité"
+msgstr "Security Assistant"
+
+#: usr/bin/codebyr-assistant
+msgid "Qu'est-ce qu'un Espace ?"
+msgstr "What is a Space?"
+
+#: usr/bin/codebyr-assistant
+msgid "Un Espace est un compartiment séparé. Les applications de « Banque » et celles de « Navigation » ne partagent ni dossier personnel, ni fichiers temporaires, ni bus de communication : ce que vous téléchargez dans l'un n'existe pas dans l'autre. Chaque Espace a sa couleur : le liseré autour d'une fenêtre vous dit d'un coup d'œil à quel compartiment elle appartient. Si un Espace attrape quelque chose, le dégât reste confiné à ce compartiment."
+msgstr "A Space is a separate compartment. Apps in “Bank” and apps in “Browsing” share no home folder, no temporary files and no communication bus: what you download in one does not exist in the other. Each Space has its own color: the border around a window tells you at a glance which compartment it belongs to. If a Space catches something, the damage stays inside that compartment."
+
+#: usr/bin/codebyr-assistant
+msgid "Pourquoi certains sites sont bloqués dans Banque ?"
+msgstr "Why are some sites blocked in Bank?"
+
+#: usr/bin/codebyr-assistant
+msgid "Le navigateur de l'Espace Banque ne peut ouvrir QUE les sites que vous avez déclarés comme étant ceux de votre banque. Tout le reste est refusé — y compris un lien d'hameçonnage reçu par courriel et ouvert par mégarde dans cet Espace. Un site bloqué dans Banque, c'est la protection qui marche, pas une panne."
+msgstr "The Bank Space's browser can open ONLY the sites you declared as your bank's. Everything else is refused — including a phishing link received by email and opened in that Space by mistake. A site blocked in Bank is the protection working, not a fault."
+
+#: usr/bin/codebyr-assistant
+msgid "À quoi sert l'Espace Jetable ?"
+msgstr "What is the Disposable Space for?"
+
+#: usr/bin/codebyr-assistant
+msgid "Il s'autodétruit dès que vous le fermez. Idéal pour ouvrir un lien ou un fichier douteux : s'il est piégé, le piège disparaît avec l'Espace. Une pièce jointe y est même ouverte SANS réseau : elle ne peut rien envoyer dehors."
+msgstr "It self-destructs as soon as you close it. Ideal for opening a suspicious link or file: if it is booby-trapped, the trap disappears with the Space. An attachment is even opened there WITHOUT network: it cannot send anything out."
+
+#: usr/bin/codebyr-assistant
+msgid "Est-ce que Codebyr OS me rend invulnérable ?"
+msgstr "Does Codebyr OS make me invulnerable?"
+
+#: usr/bin/codebyr-assistant
+msgid "Non, et personne ne devrait vous le promettre. Codebyr réduit fortement les dégâts d'un piège en l'enfermant dans un compartiment. Mais les Espaces reposent sur les protections du noyau Linux, pas sur des machines virtuelles séparées : une faille grave du noyau permettrait d'en sortir. Continuez donc à vous méfier des pièces jointes et à vérifier l'adresse des sites — Codebyr est un filet de sécurité, pas une raison de sauter sans regarder."
+msgstr "No, and nobody should promise you that. Codebyr greatly reduces the damage of a trap by locking it in a compartment. But Spaces rely on the protections of the Linux kernel, not on separate virtual machines: a serious kernel flaw would make it possible to escape. So keep being wary of attachments and keep checking site addresses — Codebyr is a safety net, not a reason to jump without looking."
+
+#: usr/bin/codebyr-assistant
+msgid "Un écran rouge dit « site suspect » — que faire ?"
+msgstr "A red screen says “suspicious site” — what should I do?"
+
+#: usr/bin/codebyr-assistant
+msgid "C'est le bouclier anti-hameçonnage de Codebyr OS. Ce site imite votre banque sans en être le vrai site. NE SAISISSEZ JAMAIS vos identifiants ici. Fermez l'onglet. Pour votre vraie banque, utilisez toujours l'Espace Banque."
+msgstr "That is the Codebyr OS anti-phishing shield. This site imitates your bank without being the real one. NEVER enter your credentials here. Close the tab. For your real bank, always use the Bank Space."
+
+#: usr/bin/codebyr-assistant
+msgid "Une application demande ma caméra ou mon micro — est-ce normal ?"
+msgstr "An app is asking for my camera or microphone — is that normal?"
+
+#: usr/bin/codebyr-assistant
+msgid "Posez-vous une question simple : est-ce cohérent avec ce que fait l'appli ? Un logiciel d'appel vidéo qui demande la caméra : normal. Un site d'actualité ou un jeu qui la réclame : méfiance, refusez. Dans le doute, refusez — vous pourrez toujours autoriser plus tard si besoin."
+msgstr "Ask yourself a simple question: does it fit what the app does? A video-call app asking for the camera: normal. A news site or a game asking for it: be wary, refuse. When in doubt, refuse — you can always allow it later if needed."
+
+#: usr/bin/codebyr-assistant
+msgid "Comment ouvrir un lien douteux sans risque ?"
+msgstr "How can I open a suspicious link safely?"
+
+#: usr/bin/codebyr-assistant
+msgid "Menu du Sceau (en haut à droite) → « Ouvrir un lien en Jetable ». Le lien s'ouvre dans une bulle éphémère : même piégé, il ne touche pas à vos données, et tout disparaît à la fermeture."
+msgstr "Seal menu (top right) → “Open a link in Disposable”. The link opens in an ephemeral bubble: even if it is booby-trapped, it does not touch your data, and everything disappears when you close it."
+
+#: usr/bin/codebyr-assistant
+msgid "Je pense avoir été infecté — que faire ?"
+msgstr "I think I've been infected — what should I do?"
+
+#: usr/bin/codebyr-assistant
+msgid "Pas de panique : le problème est confiné à un seul Espace. 1) Fermez l'Espace concerné (menu Sceau → l'Espace → « Fermer cet Espace »). 2) Videz ses données, ou mieux : « Revenir à un instantané… » d'avant le problème. Les autres Espaces ne sont pas touchés."
+msgstr "Don't panic: the problem is confined to a single Space. 1) Close the affected Space (Seal menu → the Space → “Close this Space”). 2) Erase its data, or better: “Restore a snapshot…” from before the problem. The other Spaces are not affected."
+
+#: usr/bin/codebyr-assistant
+msgid "Je prête mon ordinateur — comment protéger mes données ?"
+msgstr "I'm lending my computer — how do I protect my data?"
+
+#: usr/bin/codebyr-assistant
+msgid "Menu du Sceau → « Mode invité (prêter le PC) ». La personne arrive dans une session séparée, sous un autre compte : votre dossier personnel lui est fermé (droits 0700), et sa session est effacée dès qu'elle se déconnecte. Elle n'a pas besoin de mot de passe, et ne peut pas devenir administrateur."
+msgstr "Seal menu → “Guest mode (lend the PC)”. The person gets a separate session under another account: your home folder is closed to them (0700 permissions), and their session is erased as soon as they log out. They need no password and cannot become administrator."
+
+#: usr/bin/codebyr-assistant
+msgid "Bonjour 👋"
+msgstr "Hello 👋"
+
+#: usr/bin/codebyr-assistant
+msgid "Je suis l'assistant de Codebyr OS. Je réponds en clair aux questions de sécurité du quotidien. Tout reste sur votre ordinateur : je ne consulte aucun serveur."
+msgstr "I'm the Codebyr OS assistant. I answer everyday security questions in plain language. Everything stays on your computer: I don't contact any server."
+
+#: usr/bin/codebyr-assistant
+msgid "En ce moment"
+msgstr "Right now"
+
+#: usr/bin/codebyr-assistant
+msgid "Bouclier anti-hameçonnage"
+msgstr "Anti-phishing shield"
+
+#: usr/bin/codebyr-assistant
+msgid "Actif : il vous alerte si un site imite votre site protégé, dans vos Espaces de navigation."
+msgid_plural "Actif : il vous alerte si un site imite l'un de vos {n} sites protégés, dans vos Espaces de navigation."
+msgstr[0] "Active: it warns you if a site imitates your protected site, in your browsing Spaces."
+msgstr[1] "Active: it warns you if a site imitates one of your {n} protected sites, in your browsing Spaces."
+
+#: usr/bin/codebyr-assistant
+msgid "Espace Banque"
+msgstr "Bank Space"
+
+#: usr/bin/codebyr-assistant
+msgid "Navigateur restreint à : {sites}. Tout autre site y est refusé."
+msgstr "Browser restricted to: {sites}. Any other site is refused there."
+
+#: usr/bin/codebyr-assistant
+msgid "En attente : aucun site de banque n'est encore enregistré. Ouvrez « Configuration Codebyr » pour ajouter le vôtre — sans lui, le bouclier n'a rien à surveiller."
+msgstr "Waiting: no bank site is registered yet. Open “Codebyr Settings” to add yours — without it, the shield has nothing to watch."
+
+#: usr/bin/codebyr-assistant
+msgid "Aucun site autorisé pour l'instant : le navigateur de cet Espace n'ouvrira rien tant que vous n'aurez pas déclaré votre banque."
+msgstr "No site allowed yet: this Space's browser will open nothing until you have declared your bank."
+
+#: usr/bin/codebyr-assistant
+msgid "Espaces ouverts"
+msgstr "Open Spaces"
+
+#: usr/bin/codebyr-assistant
+msgid "Aucun Espace ouvert pour l'instant."
+msgstr "No Space open right now."
+
+#: usr/bin/codebyr-assistant
+msgid "Comprendre Codebyr OS"
+msgstr "Understanding Codebyr OS"
+
+#: usr/bin/codebyr-assistant
+msgid "Réagir à une alerte"
+msgstr "Responding to an alert"
+
 #: usr/bin/codebyr-bienvenue
 msgid "Bienvenue dans Codebyr OS"
 msgstr "Welcome to Codebyr OS"
@@ -26,6 +157,7 @@ msgid "Travail"
 msgstr "Work"
 
 #: usr/bin/codebyr-bienvenue
+#: usr/bin/codebyr-config
 msgid "Banque"
 msgstr "Bank"
 
@@ -109,6 +241,339 @@ msgstr "Next"
 msgid "Commencer"
 msgstr "Get started"
 
+#: usr/bin/codebyr-config
+#: usr/share/gnome-shell/extensions/codebyr@codebyr.io/extension.js
+msgid "Configuration Codebyr"
+msgstr "Codebyr Settings"
+
+#: usr/bin/codebyr-config
+msgid "Bac à sable (bubblewrap)"
+msgstr "Sandbox (bubblewrap)"
+
+#: usr/bin/codebyr-config
+msgid "Isolation utilisateur"
+msgstr "User isolation"
+
+#: usr/bin/codebyr-config
+msgid "Plafonds mémoire / processus"
+msgstr "Memory / process limits"
+
+#: usr/bin/codebyr-config
+msgid "Bus de session privé par Espace"
+msgstr "Private session bus per Space"
+
+#: usr/bin/codebyr-config
+msgid "Le bouclier anti-hameçonnage"
+msgstr "The anti-phishing shield"
+
+#: usr/bin/codebyr-config
+msgid "Codebyr n'autorise QUE ces sites dans l'Espace Banque, et vous alerte si un autre site tente de les imiter. Ajoutez ici les adresses de VOTRE banque."
+msgstr "Codebyr allows ONLY these sites in the Bank Space, and warns you if another site tries to imitate them. Add YOUR bank's addresses here."
+
+#: usr/bin/codebyr-config
+msgid "Sites de votre banque"
+msgstr "Your bank's sites"
+
+#: usr/bin/codebyr-config
+msgid "Aucun site pour l'instant"
+msgstr "No site yet"
+
+#: usr/bin/codebyr-config
+msgid "Ajoutez le site de votre banque ci-dessous."
+msgstr "Add your bank's site below."
+
+#: usr/bin/codebyr-config
+msgid "Ajouter un site (ex. mabanque.fr)"
+msgstr "Add a site (e.g. mybank.com)"
+
+#: usr/bin/codebyr-config
+msgid "Vos Espaces et leur blindage"
+msgstr "Your Spaces and their hardening"
+
+#: usr/bin/codebyr-config
+msgid "Le Blindage renforce l'isolation d'un Espace : bac à sable utilisateur, zéro privilège, session neuve. Idéal pour la Banque."
+msgstr "Hardening strengthens a Space's isolation: user sandbox, zero privileges, fresh session. Ideal for Bank."
+
+#: usr/bin/codebyr-config
+msgid "(éphémère)"
+msgstr "(ephemeral)"
+
+#: usr/bin/codebyr-config
+msgid "Son et micro, par Espace"
+msgstr "Sound and microphone, per Space"
+
+#: usr/bin/codebyr-config
+msgid "Le serveur de son donne aussi accès au microphone. Coupez-le pour les Espaces qui n'en ont aucun besoin — Banque, par exemple : une page piégée ne pourra pas vous écouter."
+msgstr "The sound server also gives access to the microphone. Turn it off for Spaces that have no need for it — Bank, for example: a booby-trapped page will not be able to listen to you."
+
+#: usr/bin/codebyr-config
+msgid "Son et micro autorisés"
+msgstr "Sound and microphone allowed"
+
+#: usr/bin/codebyr-config
+msgid "Aucun son, aucun micro"
+msgstr "No sound, no microphone"
+
+#: usr/bin/codebyr-config
+msgid "Isolation disponible sur cette machine"
+msgstr "Isolation available on this machine"
+
+#: usr/bin/codebyr-config
+msgid "Codebyr s'adapte au matériel. Le Jetable d'une pièce jointe s'ouvre toujours blindé ET sans réseau."
+msgstr "Codebyr adapts to the hardware. A Disposable for an attachment always opens hardened AND without network."
+
+#: usr/bin/codebyr-config
+msgid "Un Espace sous compte séparé possède ses fichiers sous une identité à lui. Ce qui s'échapperait de son bac à sable ne pourrait plus lire les autres Espaces, ni votre dossier personnel. Ses données le suivent à sa prochaine ouverture, et reviennent si vous le désactivez — rien n'est effacé."
+msgstr "A Space with a separate account owns its files under an identity of its own. Whatever escaped its sandbox could no longer read the other Spaces, nor your home folder. Its data follows it the next time it opens, and comes back if you turn it off — nothing is erased."
+
+#: usr/bin/codebyr-config
+msgid "Compte séparé, par Espace"
+msgstr "Separate account, per Space"
+
+#: usr/bin/codebyr-config
+msgid "Ses applications Flatpak seront à réinstaller dans l'Espace"
+msgstr "Its Flatpak apps will need to be reinstalled in the Space"
+
+#: usr/bin/codebyr-config
+msgid "Ses fichiers lui appartiennent"
+msgstr "Its files belong to it"
+
+#: usr/bin/codebyr-config
+msgid "Ses fichiers appartiennent à votre compte"
+msgstr "Its files belong to your account"
+
+#: usr/bin/codebyr-config
+msgid "Ses données déménageront à sa prochaine ouverture."
+msgstr "Its data will move the next time it opens."
+
+#: usr/bin/codebyr-config
+msgid "Ses données reviendront à sa prochaine ouverture."
+msgstr "Its data will come back the next time it opens."
+
+#: usr/bin/codebyr-config
+msgid "Sites bloqués dans « {nom} »"
+msgstr "Sites blocked in “{nom}”"
+
+#: usr/bin/codebyr-config
+msgid "Codebyr a refusé ces adresses. Si votre banque ne s'affiche pas entièrement, l'une d'elles lui est peut-être nécessaire (paiement sécurisé, images…). N'autorisez que ce que vous reconnaissez."
+msgstr "Codebyr refused these addresses. If your bank does not display fully, one of them may be needed (secure payment, images…). Only allow what you recognize."
+
+#: usr/bin/codebyr-config
+msgid "Autoriser"
+msgstr "Allow"
+
+#: usr/bin/codebyr-config
+msgid "Effacer cette liste"
+msgstr "Clear this list"
+
+#: usr/bin/codebyr-config
+msgid "Elle se remplira à nouveau au besoin."
+msgstr "It will fill up again when needed."
+
+#: usr/bin/codebyr-config
+msgid "la liste commune"
+msgstr "the shared list"
+
+#: usr/bin/codebyr-config
+msgid "« {nom} »"
+msgstr "“{nom}”"
+
+#: usr/bin/codebyr-config
+msgid "Applications du menu"
+msgstr "Menu applications"
+
+#: usr/bin/codebyr-config
+msgid "Ce qui apparaît dans le menu du Sceau. Choisissez la portée : la liste commune (tous les Espaces) ou un Espace précis."
+msgstr "What appears in the Seal menu. Choose the scope: the shared list (all Spaces) or a specific Space."
+
+#: usr/bin/codebyr-config
+msgid "Tous les Espaces (liste commune)"
+msgstr "All Spaces (shared list)"
+
+#: usr/bin/codebyr-config
+msgid "Configurer les applications de"
+msgstr "Configure the applications of"
+
+#: usr/bin/codebyr-config
+msgid "Cet Espace utilise la liste commune"
+msgstr "This Space uses the shared list"
+
+#: usr/bin/codebyr-config
+msgid "Ajoutez ou retirez une application pour la personnaliser."
+msgstr "Add or remove an application to customize it."
+
+#: usr/bin/codebyr-config
+msgid "Ajouter une application déjà installée"
+msgstr "Add an application that is already installed"
+
+#: usr/bin/codebyr-config
+msgid "Vers {portee}"
+msgstr "To {portee}"
+
+#: usr/bin/codebyr-config
+msgid "Choisir…"
+msgstr "Choose…"
+
+#: usr/bin/codebyr-config
+msgid "Installer une nouvelle application dans « {nom} »"
+msgstr "Install a new application in “{nom}”"
+
+#: usr/bin/codebyr-config
+msgid "Depuis Flathub — installée et isolée dans cet Espace uniquement"
+msgstr "From Flathub — installed and isolated in this Space only"
+
+#: usr/bin/codebyr-config
+msgid "Installer…"
+msgstr "Install…"
+
+#: usr/bin/codebyr-config
+msgid "Ajouter un programme téléchargé"
+msgstr "Add a downloaded program"
+
+#: usr/bin/codebyr-config
+msgid "Un programme téléchargé dans « {nom} », ou envoyé vers lui"
+msgstr "A program downloaded in “{nom}”, or sent to it"
+
+#: usr/bin/codebyr-config
+msgid "Un fichier exécutable présent sur le disque, vers « {nom} »"
+msgstr "An executable file on the disk, to “{nom}”"
+
+#: usr/bin/codebyr-config
+msgid "Parcourir…"
+msgstr "Browse…"
+
+#: usr/bin/codebyr-config
+msgid "— Terminé. Fermez cette fenêtre. —"
+msgstr "— Done. Close this window. —"
+
+#: usr/bin/codebyr-config
+msgid "Ajouter une application"
+msgstr "Add an application"
+
+#: usr/bin/codebyr-config
+#: usr/share/gnome-shell/extensions/codebyr@codebyr.io/extension.js
+msgid "Rechercher une application…"
+msgstr "Search for an application…"
+
+#: usr/bin/codebyr-config
+msgid "Installer dans « {nom} »"
+msgstr "Install in “{nom}”"
+
+#: usr/bin/codebyr-config
+msgid "Rechercher sur Flathub (ex. brave, gimp, vlc)…"
+msgstr "Search Flathub (e.g. brave, gimp, vlc)…"
+
+#: usr/bin/codebyr-config
+msgid "Tapez le nom d'une application, puis Entrée."
+msgstr "Type the name of an application, then Enter."
+
+#: usr/bin/codebyr-config
+msgid "Recherche…"
+msgstr "Searching…"
+
+#: usr/bin/codebyr-config
+msgid "Aucun résultat (ou catalogue pas encore chargé)."
+msgstr "No results (or catalog not loaded yet)."
+
+#: usr/bin/codebyr-config
+msgid "{n} résultat — cliquez pour installer :"
+msgid_plural "{n} résultats — cliquez pour installer :"
+msgstr[0] "{n} result — click to install:"
+msgstr[1] "{n} results — click to install:"
+
+#: usr/bin/codebyr-config
+msgid "Installation de « {application} » lancée dans l'Espace {espace}…"
+msgstr "Installing “{application}” in the {espace} Space…"
+
+#: usr/bin/codebyr-config
+msgid "Impossible d'ouvrir un terminal."
+msgstr "Could not open a terminal."
+
+#: usr/bin/codebyr-config
+msgid "Choisir un programme"
+msgstr "Choose a program"
+
+#: usr/bin/codebyr-config
+msgid "Programme"
+msgstr "Program"
+
+#: usr/bin/codebyr-config
+msgid "Script"
+msgstr "Script"
+
+#: usr/bin/codebyr-config
+msgid "Recherche des programmes de « {nom} »…"
+msgstr "Looking for programs in “{nom}”…"
+
+#: usr/bin/codebyr-config
+msgid "Impossible d'interroger l'Espace « {nom} »."
+msgstr "Could not query the “{nom}” Space."
+
+#: usr/bin/codebyr-config
+msgid "L'Espace « {nom} » n'a pas pu dresser la liste de ses programmes."
+msgstr "The “{nom}” Space could not list its programs."
+
+#: usr/bin/codebyr-config
+msgid "Programmes de « {nom} »"
+msgstr "Programs in “{nom}”"
+
+#: usr/bin/codebyr-config
+msgid "Pour en ajouter un autre, téléchargez-le avec le navigateur de l'Espace, ou envoyez-le-lui (clic droit sur le fichier → « Envoyer vers l'Espace »), puis revenez ici."
+msgstr "To add another one, download it with the Space's browser, or send it there (right-click the file → “Send to Space”), then come back here."
+
+#: usr/bin/codebyr-config
+msgid "Programmes trouvés dans les Téléchargements et le dossier Partagé de l'Espace. "
+msgstr "Programs found in the Space's Downloads and Shared folders."
+
+#: usr/bin/codebyr-config
+msgid "Aucun programme trouvé dans l'Espace « {nom} ». "
+msgstr "No program found in the “{nom}” Space."
+
+#: usr/bin/codebyr-config
+msgid "{nature} — dans « {dossier} »"
+msgstr "{nature} — in “{dossier}”"
+
+#: usr/bin/codebyr-config
+msgid "Ajouter au menu"
+msgstr "Add to menu"
+
+#: usr/bin/codebyr-config
+msgid "Ajouter « {nom} »"
+msgstr "Add “{nom}”"
+
+#: usr/bin/codebyr-config
+msgid "Ce programme apparaîtra dans le menu du Sceau de l'Espace « {nom} »."
+msgstr "This program will appear in the Seal menu of the “{nom}” Space."
+
+#: usr/bin/codebyr-config
+msgid "Nom affiché"
+msgstr "Displayed name"
+
+#: usr/bin/codebyr-config
+msgid "Application Electron / Chromium"
+msgstr "Electron / Chromium application"
+
+#: usr/bin/codebyr-config
+msgid "Ajoute les options Wayland + « --no-sandbox » (VS Code, Antigravity, navigateurs…)"
+msgstr "Adds the Wayland options + “--no-sandbox” (VS Code, Antigravity, browsers…)"
+
+#: usr/bin/codebyr-config
+#: usr/share/gnome-shell/extensions/codebyr@codebyr.io/extension.js
+msgid "Annuler"
+msgstr "Cancel"
+
+#: usr/bin/codebyr-config
+msgid "« {application} » ajouté au menu de {espace}"
+msgstr "“{application}” added to the {espace} menu"
+
+#: usr/bin/codebyr-config
+msgid "Impossible d'ajouter ce programme."
+msgstr "Could not add this program."
+
+#: usr/bin/codebyr-config
+msgid "« {adresse} » n'est pas une adresse de site valable."
+msgstr "“{adresse}” is not a valid site address."
+
 #: usr/share/gnome-shell/extensions/codebyr@codebyr.io/extension.js
 msgid "Navigateur"
 msgstr "Web browser"
@@ -154,16 +619,8 @@ msgid "Transférer le presse-papiers vers…"
 msgstr "Send the clipboard to…"
 
 #: usr/share/gnome-shell/extensions/codebyr@codebyr.io/extension.js
-msgid "Assistant de sécurité"
-msgstr "Security Assistant"
-
-#: usr/share/gnome-shell/extensions/codebyr@codebyr.io/extension.js
 msgid "Assistant de sécurité indisponible"
 msgstr "Security Assistant unavailable"
-
-#: usr/share/gnome-shell/extensions/codebyr@codebyr.io/extension.js
-msgid "Configuration Codebyr"
-msgstr "Codebyr Settings"
 
 #: usr/share/gnome-shell/extensions/codebyr@codebyr.io/extension.js
 msgid "Configuration Codebyr indisponible"
@@ -192,10 +649,6 @@ msgstr "Could not create the “{nom}” Space"
 #: usr/share/gnome-shell/extensions/codebyr@codebyr.io/extension.js
 msgid "Espace créé : {nom}"
 msgstr "Space created: {nom}"
-
-#: usr/share/gnome-shell/extensions/codebyr@codebyr.io/extension.js
-msgid "Annuler"
-msgstr "Cancel"
 
 #: usr/share/gnome-shell/extensions/codebyr@codebyr.io/extension.js
 msgid "Créer"
@@ -292,10 +745,6 @@ msgstr "Delete this Space"
 #: usr/share/gnome-shell/extensions/codebyr@codebyr.io/extension.js
 msgid "Ouvrir une application dans « {nom} »"
 msgstr "Open an application in “{nom}”"
-
-#: usr/share/gnome-shell/extensions/codebyr@codebyr.io/extension.js
-msgid "Rechercher une application…"
-msgstr "Search for an application…"
 
 #: usr/share/gnome-shell/extensions/codebyr@codebyr.io/extension.js
 msgid "Aucune application trouvée."

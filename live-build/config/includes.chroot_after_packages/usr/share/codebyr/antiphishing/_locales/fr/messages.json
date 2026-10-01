@@ -1,0 +1,37 @@
+{
+  "nom_extension": {
+    "message": "Codebyr — Bouclier anti-hameçonnage",
+    "description": "Nom de l'extension, dans le gestionnaire de Firefox."
+  },
+  "description_extension": {
+    "message": "Avertit quand un site imite une banque protégée par Codebyr OS."
+  },
+  "titre": {
+    "message": "Attention — site suspect"
+  },
+  "ressemble": {
+    "message": "Ce site ($HOTE$) ressemble au site de votre banque ($BANQUE$) mais ce n'en est pas le site officiel.",
+    "placeholders": {
+      "hote": { "content": "$1", "example": "mabanque-securite.com" },
+      "banque": { "content": "$2", "example": "mabanque.fr" }
+    }
+  },
+  "deguise": {
+    "message": "Son adresse imite des lettres ordinaires avec des caractères d'un autre alphabet, ou accentués : sous son apparence, elle s'écrit « $HOTE$ ».",
+    "placeholders": {
+      "hote": { "content": "$1", "example": "xn--mbanque-2fg.fr" }
+    }
+  },
+  "jamais": {
+    "message": "N'entrez jamais vos identifiants ici. Pour votre banque, utilisez l'Espace Banque de Codebyr OS."
+  },
+  "quitter": {
+    "message": "Quitter ce site"
+  },
+  "legitime": {
+    "message": "Ce site est légitime, ne plus me prévenir"
+  },
+  "protection": {
+    "message": "Protection Codebyr OS"
+  }
+}

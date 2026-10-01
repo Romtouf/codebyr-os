@@ -78,6 +78,87 @@ def _node(demande):
     return json.loads(r.stdout)
 
 
+LOCALES = os.path.join(SRC, "_locales")
+
+
+def _messages(langue):
+    with open(os.path.join(LOCALES, langue, "messages.json"), encoding="utf-8") as f:
+        return json.load(f)
+
+
+class Langues(unittest.TestCase):
+    """L'alerte parle la langue de Firefox (1.4). Le français est la source ;
+    l'anglais, produit depuis po/en.po, sert aussi à toute langue sans
+    traduction (default_locale), comme le reste de Codebyr."""
+
+    def setUp(self):
+        with open(os.path.join(SRC, "manifest.json"), encoding="utf-8") as f:
+            self.manifeste = json.load(f)
+        with open(os.path.join(SRC, "content.js"), encoding="utf-8") as f:
+            self.code = f.read()
+
+    def test_l_anglais_est_la_langue_par_defaut(self):
+        self.assertEqual(self.manifeste["default_locale"], "en")
+        self.assertEqual(self.manifeste["name"], "__MSG_nom_extension__")
+        self.assertEqual(self.manifeste["description"], "__MSG_description_extension__")
+
+    def test_chaque_cle_existe_dans_chaque_langue(self):
+        cles = set(re.findall(r'texte\("(\w+)"', self.code))
+        cles |= {"nom_extension", "description_extension"}
+        self.assertGreaterEqual(len(cles), 9)
+        for langue in sorted(os.listdir(LOCALES)):
+            messages = _messages(langue)
+            self.assertEqual(sorted(cles - set(messages)), [], langue)
+            # Les marques ($HOTE$…) existent et désignent les mêmes valeurs.
+            for cle, entree in messages.items():
+                for marque in re.findall(r"\$(\w+)\$", entree["message"]):
+                    self.assertIn(marque.lower(), entree.get("placeholders", {}), (langue, cle))
+
+    def test_le_code_n_ecrit_plus_de_phrase(self):
+        for phrase in ("Attention — site suspect", "Quitter ce site", "Protection Codebyr OS"):
+            self.assertNotIn(phrase, self.code)
+
+    def test_l_anglais_suit_les_traductions_de_codebyr(self):
+        import sys
+        sys.path.insert(0, os.path.join(RACINE, "packaging"))
+        try:
+            import traductions
+        finally:
+            sys.path.pop(0)
+        attendu = traductions.messages_traduits(
+            RACINE, traductions.lire_po(os.path.join(RACINE, "po", "en.po"))[2])
+        with open(os.path.join(LOCALES, "en", "messages.json"), encoding="utf-8") as f:
+            self.assertEqual(f.read(), attendu,
+                             "lancez « python3 packaging/traductions.py extraire »")
+
+
+@unittest.skipUnless(shutil.which("node"), "node absent : le bouclier ne peut pas être exécuté")
+class AlerteTraduite(unittest.TestCase):
+    """Le VRAI content.js, avec la langue de Firefox."""
+
+    def _alerte(self, langue):
+        r = _node({"mode": "adresses", "proteges": ["mabanque.fr"], "langue": langue,
+                   "adresses": ["https://mabanque.com/", "https://mаbanque.fr/"]})
+        return r[0]["textes"], r[1]["textes"]
+
+    def test_en_anglais(self):
+        simple, deguise = self._alerte("en")
+        self.assertIn("Warning — suspicious site", simple)
+        self.assertIn("This site (mabanque.com) looks like your bank's site (mabanque.fr) "
+                      "but it is not the official one.", simple)
+        self.assertTrue(any("it is spelled “xn--" in t for t in deguise), deguise)
+
+    def test_en_francais(self):
+        simple, _deguise = self._alerte("fr")
+        self.assertIn("Attention — site suspect", simple)
+        self.assertIn("Ce site (mabanque.com) ressemble au site de votre banque (mabanque.fr) "
+                      "mais ce n'en est pas le site officiel.", simple)
+
+    def test_une_langue_sans_traduction_recoit_l_anglais(self):
+        simple, _deguise = self._alerte("de")
+        self.assertIn("Warning — suspicious site", simple)
+
+
 @unittest.skipUnless(shutil.which("node"), "node absent : le bouclier ne peut pas être exécuté")
 class Detection(unittest.TestCase):
     """Le VRAI content.js, exécuté comme Firefox l'exécute, face à des adresses.
@@ -365,6 +446,18 @@ class XpiSigne(unittest.TestCase):
                          "version du manifeste ≠ version signée." + self.RAPPEL)
         self.assertEqual(embarque.get("permissions"), source.get("permissions"),
                          "permissions ≠ celles du .xpi signé." + self.RAPPEL)
+        self.assertEqual(embarque.get("default_locale"), source.get("default_locale"),
+                         "langue par défaut ≠ celle du .xpi signé." + self.RAPPEL)
+
+    def test_les_langues_du_xpi_signe_correspondent_aux_sources(self):
+        # Le sens, pas les octets : AMO peut ré-encoder le JSON.
+        with zipfile.ZipFile(self._xpi()) as z:
+            embarquees = {n.split("/")[1]: json.loads(z.read(n).decode("utf-8"))
+                          for n in z.namelist()
+                          if n.startswith("_locales/") and n.endswith("/messages.json")}
+        sources = {langue: _messages(langue) for langue in os.listdir(LOCALES)}
+        self.assertEqual(embarquees, sources,
+                         "les textes de l'alerte diffèrent du .xpi signé." + self.RAPPEL)
 
 
 if __name__ == "__main__":

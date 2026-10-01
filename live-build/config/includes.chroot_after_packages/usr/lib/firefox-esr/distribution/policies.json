@@ -3,7 +3,7 @@
     "ExtensionSettings": {
       "antiphishing@codebyr.io": {
         "installation_mode": "normal_installed",
-        "install_url": "file:///usr/share/codebyr/antiphishing/signed/711a18eca1064bc08760-1.3.xpi"
+        "install_url": "file:///usr/share/codebyr/antiphishing/signed/711a18eca1064bc08760-1.4.xpi"
       }
     }
   }

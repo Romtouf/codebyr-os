@@ -220,10 +220,57 @@ def extraire_textes(racine):
         fichiers = textes.setdefault((nom, None), [])
         if REGISTRE not in fichiers:
             fichiers.append(REGISTRE)
+    source_bouclier = BOUCLIER + "/fr/messages.json"
+    for entree in messages_bouclier(racine).values():
+        fichiers = textes.setdefault((_vers_marques(entree["message"]), None), [])
+        if source_bouclier not in fichiers:
+            fichiers.append(source_bouclier)
     return textes
 
 
 REGISTRE = "etc/codebyr/espaces.json"
+
+# ── Le bouclier anti-hameçonnage (extension Firefox) ─────────────────────────
+# Ses textes suivent le format des extensions : _locales/<langue>/messages.json,
+# lus par Firefox lui-même. Le français (_locales/fr) est la source, écrite à la
+# main ; les autres langues en sont produites depuis po/<langue>.po par
+# « extraire », pour qu'un traducteur n'ait qu'un seul fichier à tenir. Ils
+# entrent dans le .xpi SIGNÉ : une langue ajoutée demande une nouvelle
+# signature (live-build/scripts/sign-extension.sh).
+BOUCLIER = "usr/share/codebyr/antiphishing/_locales"
+
+
+def _vers_marques(message):
+    """« $HOTE$ » (Firefox) → « {hote} » (les traductions de Codebyr)."""
+    return re.sub(r"\$([A-Za-z0-9_@]+)\$", lambda m: "{" + m.group(1).lower() + "}", message)
+
+
+def _vers_firefox(texte):
+    return re.sub(r"\{(\w+)\}", lambda m: "$" + m.group(1).upper() + "$", texte)
+
+
+def messages_bouclier(racine):
+    """{clé: entrée} du fichier de langue français du bouclier, la source."""
+    chemin = os.path.join(racine, INCLUDES, BOUCLIER, "fr", "messages.json")
+    if not os.path.isfile(chemin):
+        return {}
+    with open(chemin, encoding="utf-8") as f:
+        return json.load(f)
+
+
+def messages_traduits(racine, entrees):
+    """Le messages.json d'une langue, depuis ses entrées .po (traduites seulement :
+    Firefox prend l'anglais, la langue par défaut, pour ce qui manque)."""
+    traduits = {e.msgid: e.msgstr[0] for e in entrees if e.traduite and e.pluriel is None}
+    sortie = {}
+    for cle, entree in messages_bouclier(racine).items():
+        msgid = _vers_marques(entree["message"])
+        if msgid not in traduits:
+            continue
+        sortie[cle] = {"message": _vers_firefox(traduits[msgid])}
+        if "placeholders" in entree:
+            sortie[cle]["placeholders"] = entree["placeholders"]
+    return json.dumps(sortie, ensure_ascii=False, indent=2) + "\n"
 
 
 def noms_du_registre(racine):
@@ -452,6 +499,18 @@ def main(argv):
             ecrire_po(os.path.join(racine, "po", langue + ".po"), langue, entrees)
             manquantes = sum(1 for e in entrees if not e.traduite)
             print("po/%s.po : %d textes, %d à traduire" % (langue, len(entrees), manquantes))
+            if messages_bouclier(racine):
+                dossier = os.path.join(racine, INCLUDES, BOUCLIER, langue)
+                os.makedirs(dossier, exist_ok=True)
+                chemin = os.path.join(dossier, "messages.json")
+                ancien = open(chemin, encoding="utf-8").read() if os.path.exists(chemin) else None
+                nouveau = messages_traduits(racine, entrees)
+                if nouveau != ancien:
+                    with open(chemin, "w", encoding="utf-8", newline="\n") as f:
+                        f.write(nouveau)
+                    print("%s/%s/messages.json mis à jour : le bouclier est à "
+                          "refaire signer (live-build/scripts/sign-extension.sh)"
+                          % (BOUCLIER, langue))
         return 0
     if argv[:1] == ["compiler"] and len(argv) == 3:
         compiler(argv[1], argv[2])

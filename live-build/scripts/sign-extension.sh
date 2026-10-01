@@ -94,8 +94,11 @@ done
 STAGE="$(mktemp -d)"
 trap 'rm -rf "$STAGE"' EXIT
 cp "$SRC/manifest.json" "$SRC/content.js" "$STAGE/"
+# Les textes de l'alerte, par langue (depuis la 1.4) : le manifeste les
+# désigne (« __MSG_… », default_locale), Firefox refuserait l'extension sans.
+cp -r "$SRC/_locales" "$STAGE/"
 [ -f "$SRC/.amo-upload-uuid" ] && cp "$SRC/.amo-upload-uuid" "$STAGE/"
-echo "    Contenu envoyé : manifest.json, content.js"
+echo "    Contenu envoyé : manifest.json, content.js, _locales ($(ls "$SRC/_locales" | tr '\n' ' '))"
 
 # ── 5) Signature (canal « unlisted » : distribution privée, pas de revue) ───
 mkdir -p "$OUT"
@@ -144,9 +147,9 @@ if [ -z "$PY" ]; then
 	echo "    (Python introuvable : vérification automatique du .xpi ignorée.)"
 fi
 if [ -n "$PY" ]; then
-	"$PY" - "$SIGNES/$(basename "$nouveau")" "$SRC/content.js" "$SRC/manifest.json" <<'VERIF'
-import json, sys, zipfile
-xpi, source, manifeste = sys.argv[1], sys.argv[2], sys.argv[3]
+	"$PY" - "$SIGNES/$(basename "$nouveau")" "$SRC/content.js" "$SRC/manifest.json" "$SRC/_locales" <<'VERIF'
+import json, os, sys, zipfile
+xpi, source, manifeste, locales = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4]
 with zipfile.ZipFile(xpi) as z:
     embarque = z.read("content.js").replace(b"\r\n", b"\n")
     scelle = json.loads(z.read("manifest.json").decode("utf-8"))
@@ -163,12 +166,25 @@ print("    content.js du .xpi = content.js du depot : OK")
 with open(manifeste, "rb") as f:
     voulu = json.loads(f.read().decode("utf-8"))
 ecarts = [c for c in ("manifest_version", "version", "permissions",
-                      "host_permissions", "content_scripts")
+                      "host_permissions", "content_scripts", "default_locale")
           if scelle.get(c) != voulu.get(c)]
 if ecarts:
     sys.exit("ECHEC : le manifeste du .xpi differe du depot sur : "
              + ", ".join(ecarts))
 print("    manifest.json du .xpi = manifest.json du depot : OK")
+
+# Les textes de l'alerte, langue par langue (le sens : AMO peut re-encoder).
+with zipfile.ZipFile(xpi) as z:
+    embarquees = {n.split("/")[1]: json.loads(z.read(n).decode("utf-8"))
+                  for n in z.namelist()
+                  if n.startswith("_locales/") and n.endswith("/messages.json")}
+attendues = {}
+for langue in sorted(os.listdir(locales)):
+    with open(os.path.join(locales, langue, "messages.json"), encoding="utf-8") as f:
+        attendues[langue] = json.load(f)
+if embarquees != attendues:
+    sys.exit("ECHEC : les textes de l'alerte du .xpi different du depot.")
+print("    _locales du .xpi = _locales du depot (%s) : OK" % ", ".join(sorted(attendues)))
 VERIF
 	echo
 	echo "Vérification complète :  $PY -m unittest discover -s tests"

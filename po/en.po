@@ -1747,3 +1747,39 @@ msgstr "{nom} restored to the snapshot of {date}"
 #: etc/codebyr/espaces.json
 msgid "Calculatrice"
 msgstr "Calculator"
+
+#: usr/share/codebyr/antiphishing/_locales/fr/messages.json
+msgid "Codebyr — Bouclier anti-hameçonnage"
+msgstr "Codebyr — Anti-phishing shield"
+
+#: usr/share/codebyr/antiphishing/_locales/fr/messages.json
+msgid "Avertit quand un site imite une banque protégée par Codebyr OS."
+msgstr "Warns you when a site imitates a bank protected by Codebyr OS."
+
+#: usr/share/codebyr/antiphishing/_locales/fr/messages.json
+msgid "Attention — site suspect"
+msgstr "Warning — suspicious site"
+
+#: usr/share/codebyr/antiphishing/_locales/fr/messages.json
+msgid "Ce site ({hote}) ressemble au site de votre banque ({banque}) mais ce n'en est pas le site officiel."
+msgstr "This site ({hote}) looks like your bank's site ({banque}) but it is not the official one."
+
+#: usr/share/codebyr/antiphishing/_locales/fr/messages.json
+msgid "Son adresse imite des lettres ordinaires avec des caractères d'un autre alphabet, ou accentués : sous son apparence, elle s'écrit « {hote} »."
+msgstr "Its address imitates ordinary letters with characters from another alphabet, or accented ones: behind its appearance, it is spelled “{hote}”."
+
+#: usr/share/codebyr/antiphishing/_locales/fr/messages.json
+msgid "N'entrez jamais vos identifiants ici. Pour votre banque, utilisez l'Espace Banque de Codebyr OS."
+msgstr "Never enter your credentials here. For your bank, use the Codebyr OS Bank Space."
+
+#: usr/share/codebyr/antiphishing/_locales/fr/messages.json
+msgid "Quitter ce site"
+msgstr "Leave this site"
+
+#: usr/share/codebyr/antiphishing/_locales/fr/messages.json
+msgid "Ce site est légitime, ne plus me prévenir"
+msgstr "This site is legitimate, don't warn me again"
+
+#: usr/share/codebyr/antiphishing/_locales/fr/messages.json
+msgid "Protection Codebyr OS"
+msgstr "Codebyr OS protection"

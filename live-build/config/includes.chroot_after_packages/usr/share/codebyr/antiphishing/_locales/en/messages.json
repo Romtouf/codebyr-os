@@ -1,0 +1,45 @@
+{
+  "nom_extension": {
+    "message": "Codebyr — Anti-phishing shield"
+  },
+  "description_extension": {
+    "message": "Warns you when a site imitates a bank protected by Codebyr OS."
+  },
+  "titre": {
+    "message": "Warning — suspicious site"
+  },
+  "ressemble": {
+    "message": "This site ($HOTE$) looks like your bank's site ($BANQUE$) but it is not the official one.",
+    "placeholders": {
+      "hote": {
+        "content": "$1",
+        "example": "mabanque-securite.com"
+      },
+      "banque": {
+        "content": "$2",
+        "example": "mabanque.fr"
+      }
+    }
+  },
+  "deguise": {
+    "message": "Its address imitates ordinary letters with characters from another alphabet, or accented ones: behind its appearance, it is spelled “$HOTE$”.",
+    "placeholders": {
+      "hote": {
+        "content": "$1",
+        "example": "xn--mbanque-2fg.fr"
+      }
+    }
+  },
+  "jamais": {
+    "message": "Never enter your credentials here. For your bank, use the Codebyr OS Bank Space."
+  },
+  "quitter": {
+    "message": "Leave this site"
+  },
+  "legitime": {
+    "message": "This site is legitimate, don't warn me again"
+  },
+  "protection": {
+    "message": "Codebyr OS protection"
+  }
+}

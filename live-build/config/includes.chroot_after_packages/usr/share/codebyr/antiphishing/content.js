@@ -222,10 +222,19 @@
         } catch (e) { /* rien à faire : au pire l'alerte reviendra */ }
     }
 
-    function bloc(texte, style) {
+    // Les textes de l'alerte dans la langue de Firefox (_locales/<langue>/
+    // messages.json, produits depuis les traductions de Codebyr). Une langue
+    // sans traduction reçoit l'anglais (default_locale), comme le reste de
+    // Codebyr. Les valeurs (le site, la banque) sont des « substitutions » :
+    // Firefox les insère telles quelles, et bloc() n'emploie que textContent.
+    function texte(cle, valeurs) {
+        return (api.i18n && api.i18n.getMessage(cle, valeurs || [])) || cle;
+    }
+
+    function bloc(contenu, style) {
         const el = document.createElement("div");
         el.setAttribute("style", style);
-        el.textContent = texte;      // jamais innerHTML avec une donnée du site
+        el.textContent = contenu;    // jamais innerHTML avec une donnée du site
         return el;
     }
 
@@ -242,23 +251,16 @@
         const carte = document.createElement("div");
         carte.setAttribute("style", "max-width:560px;text-align:center;");
         carte.appendChild(bloc("⚠️", "font-size:60px;line-height:1;"));
-        carte.appendChild(bloc("Attention — site suspect",
+        carte.appendChild(bloc(texte("titre"),
             "font-size:26px;font-weight:700;margin:14px 0 8px;"));
-        carte.appendChild(bloc(
-            "Ce site (" + host + ") ressemble au site de votre banque (" + banque +
-            ") mais ce n'en est pas le site officiel.",
+        carte.appendChild(bloc(texte("ressemble", [host, banque]),
             "font-size:17px;line-height:1.6;"));
         // L'adresse affichée par le navigateur peut être identique à l'œil
         // à celle de la banque : on dit pourquoi elle ne l'est pas.
         if (hoteLu !== host)
-            carte.appendChild(bloc(
-                "Son adresse imite des lettres ordinaires avec des caractères " +
-                "d'un autre alphabet, ou accentués : sous son apparence, elle " +
-                "s'écrit « " + host + " ».",
+            carte.appendChild(bloc(texte("deguise", [host]),
                 "font-size:17px;line-height:1.6;margin-top:12px;"));
-        carte.appendChild(bloc(
-            "N'entrez jamais vos identifiants ici. Pour votre banque, utilisez " +
-            "l'Espace Banque de Codebyr OS.",
+        carte.appendChild(bloc(texte("jamais"),
             "font-size:17px;line-height:1.6;margin-top:12px;font-weight:700;"));
 
         const boutons = document.createElement("div");
@@ -266,7 +268,7 @@
             "margin-top:18px;display:flex;gap:10px;justify-content:center;flex-wrap:wrap;");
 
         const quitter = document.createElement("button");
-        quitter.textContent = "Quitter ce site";
+        quitter.textContent = texte("quitter");
         quitter.setAttribute("style",
             "padding:11px 22px;font-size:15px;border:0;border-radius:10px;" +
             "background:#fff;color:#7f1d1d;font-weight:700;cursor:pointer;");
@@ -276,7 +278,7 @@
         // Soupape indispensable : sans elle, un seul faux positif transforme le
         // bouclier en gêne qu'on apprend à ignorer.
         const continuer = document.createElement("button");
-        continuer.textContent = "Ce site est légitime, ne plus me prévenir";
+        continuer.textContent = texte("legitime");
         continuer.setAttribute("style",
             "padding:11px 22px;font-size:15px;border:1px solid rgba(255,255,255,.5);" +
             "border-radius:10px;background:transparent;color:#fff;cursor:pointer;");
@@ -287,7 +289,7 @@
         boutons.appendChild(continuer);
 
         carte.appendChild(boutons);
-        carte.appendChild(bloc("Protection Codebyr OS",
+        carte.appendChild(bloc(texte("protection"),
             "margin-top:18px;opacity:.75;font-size:13px;"));
         o.appendChild(carte);
         (document.body || document.documentElement).appendChild(o);

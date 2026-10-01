@@ -15,7 +15,19 @@ n'a pas été re-signée. C'est contre-intuitif, et c'est la raison d'être du t
 `tests/test_bouclier.py::XpiSigne` : il compare le code du dépôt à celui du
 `.xpi` livré et passe au rouge dès qu'ils divergent.
 
-**À faire donc à chaque modification de `content.js` ou de `manifest.json`.**
+**À faire donc à chaque modification de `content.js`, de `manifest.json` ou
+des textes de l'alerte (`_locales/`).**
+
+## Les langues de l'alerte (depuis la 1.4)
+
+Les textes de l'alerte sont dans `_locales/<langue>/messages.json`, le format
+des extensions : Firefox prend la langue de son interface, sinon l'anglais
+(`default_locale`), comme le reste de Codebyr. **Le français
+(`_locales/fr`) est la source**, écrite à la main ; les autres langues sont
+produites depuis `po/<langue>.po` par `python3 packaging/traductions.py
+extraire`. Un traducteur n'a donc qu'un fichier à tenir — mais une langue
+ajoutée ou corrigée ne part qu'avec une nouvelle signature : la commande le
+rappelle quand elle réécrit un `messages.json`.
 
 ## Une seule fois : les identifiants
 
@@ -46,11 +58,16 @@ sh live-build/scripts/sign-extension.sh
 ```
 
 Le script fait tout : il vérifie que le numéro de version n'a pas déjà été
-signé (Mozilla refuse un doublon), n'envoie que `manifest.json` et `content.js`
-— surtout pas le sous-dossier `signed/`, qui embarquerait l'ancien `.xpi` dans
-le nouveau —, récupère le paquet signé, l'installe dans
-`…/antiphishing/signed/` en remplaçant le précédent, puis vérifie que le code
-du `.xpi` est bien celui du dépôt.
+signé (Mozilla refuse un doublon), n'envoie que `manifest.json`, `content.js`
+et `_locales/` — surtout pas le sous-dossier `signed/`, qui embarquerait
+l'ancien `.xpi` dans le nouveau —, récupère le paquet signé, l'installe dans
+`…/antiphishing/signed/` en remplaçant le précédent, puis vérifie que le code,
+le manifeste et les textes du `.xpi` sont bien ceux du dépôt.
+
+Avant de signer, un contrôle sans compte ni envoi :
+`web-ext lint --source-dir <copie de manifest.json, content.js et _locales>`.
+Une version signée ne se resoumet pas : mieux vaut qu'elle soit juste du
+premier coup.
 
 Puis, pour confirmer :
 

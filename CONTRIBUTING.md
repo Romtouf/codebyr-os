@@ -127,6 +127,9 @@ de référence pour qui ne lit pas le français).
   montre `Name=` aux langues sans traduction.
 - Ajouter une langue : copier `po/en.po` en `po/<langue>.po`, y changer
   `Language:` et traduire. La construction du paquet la compile seule.
+  L'alerte du bouclier anti-hameçonnage en reçoit sa version
+  (`_locales/<langue>/messages.json`, par `extraire`), mais elle ne part
+  qu'avec une nouvelle signature Mozilla (docs/signer-le-bouclier.md).
 
 ## Proposer un changement
 

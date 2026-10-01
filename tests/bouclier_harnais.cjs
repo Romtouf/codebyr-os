@@ -6,7 +6,7 @@
 // et c'est précisément celle qui trompait le bouclier.
 //
 // Deux modes, sur l'entrée standard (JSON) :
-//   {"mode": "adresses", "proteges": [...], "adresses": [...]}
+//   {"mode": "adresses", "proteges": [...], "adresses": [...], "langue": "fr"}
 //       → pour chaque adresse : {adresse, hote, alerte, textes}
 //   {"mode": "punycode", "etiquettes": [...]}
 //       → le décodeur du bouclier comparé à celui de node, étiquette par étiquette
@@ -34,7 +34,36 @@ function textes(e) {
     return [e.textContent].concat(...e.enfants.map(textes)).filter(Boolean);
 }
 
-async function une_adresse(proteges, adresse) {
+// browser.i18n.getMessage, comme Firefox : le message dans la langue du
+// navigateur, sinon dans la langue par défaut du manifeste ; « $HOTE$ » est
+// remplacé par sa marque (« $1 »), elle-même par la valeur donnée.
+const LOCALES = path.join(path.dirname(SOURCE), "_locales");
+const MANIFESTE = JSON.parse(fs.readFileSync(path.join(path.dirname(SOURCE), "manifest.json"), "utf8"));
+
+function messages(langue) {
+    const chemin = path.join(LOCALES, langue, "messages.json");
+    return fs.existsSync(chemin) ? JSON.parse(fs.readFileSync(chemin, "utf8")) : {};
+}
+
+function faux_i18n(langue) {
+    const propres = messages(langue), defaut = messages(MANIFESTE.default_locale);
+    return {
+        getMessage(cle, valeurs) {
+            const entree = propres[cle] || defaut[cle];
+            if (!entree)
+                return "";
+            const marques = entree.placeholders || {};
+            return entree.message.replace(/\$([A-Za-z0-9_@]+)\$/g, (tout, nom) => {
+                const marque = marques[nom.toLowerCase()];
+                if (!marque)
+                    return tout;
+                return marque.content.replace(/\$(\d)/g, (_t, n) => String((valeurs || [])[n - 1] ?? ""));
+            });
+        },
+    };
+}
+
+async function une_adresse(proteges, adresse, langue) {
     const hote = new URL(adresse).hostname;
     const corps = faux_element("body");
     const document = {
@@ -46,7 +75,7 @@ async function une_adresse(proteges, adresse) {
     const browser = {storage: {
         managed: {get: async () => ({domaines: proteges})},
         local: {get: async () => ({}), set: async () => {}},
-    }};
+    }, i18n: faux_i18n(langue || "fr")};
     const contexte = vm.createContext({
         browser, document, location: {hostname: hote},
         setInterval: () => 0, clearInterval() {}, setTimeout: () => 0,
@@ -70,7 +99,7 @@ async function principal() {
     if (demande.mode === "adresses") {
         const resultats = [];
         for (const adresse of demande.adresses)
-            resultats.push(await une_adresse(demande.proteges, adresse));
+            resultats.push(await une_adresse(demande.proteges, adresse, demande.langue));
         process.stdout.write(JSON.stringify(resultats));
     } else if (demande.mode === "punycode") {
         const depunycode = decodeur_du_bouclier();

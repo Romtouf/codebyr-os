@@ -10,6 +10,14 @@ GNOME (menu du Sceau, liserés colorés) ne se recharge pas à chaud.
 
 ---
 
+## 1.18.1 — non publiée
+
+**Le bouclier anti-hameçonnage parle anglais.** Son alerte rouge (« site
+suspect ») suit la langue de Firefox : en anglais pour toute langue autre que
+le français, comme le reste de Codebyr. Bouclier 1.4, signé par Mozilla.
+
+---
+
 ## 1.18.0 — 1er octobre 2026
 
 **Codebyr parle anglais.** Tout ce que Codebyr affiche sur une machine

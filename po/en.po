@@ -1548,6 +1548,10 @@ msgid "Configuration Codebyr indisponible"
 msgstr "Codebyr Settings unavailable"
 
 #: usr/share/gnome-shell/extensions/codebyr@codebyr.io/extension.js
+msgid "Cette fenêtre ne s'ouvre pas. Détail : journalctl -b _COMM=gnome-shell"
+msgstr "This window does not open. Details: journalctl -b _COMM=gnome-shell"
+
+#: usr/share/gnome-shell/extensions/codebyr@codebyr.io/extension.js
 msgid "Créer un Espace"
 msgstr "Create a Space"
 

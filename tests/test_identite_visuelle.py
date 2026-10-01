@@ -167,6 +167,26 @@ class LOuvertureDeSession(unittest.TestCase):
         self.assertIn("this._rendreVueEnsemble();", self.disable)
 
 
+class LesFenetresDuMenu(unittest.TestCase):
+    """« Autres applications… » ne s'ouvrait plus sous GNOME 48 : son contenu
+    défilant était ajouté par add_child / add_actor, quand GNOME 46 et
+    suivants attendent la propriété « child ». Et l'échec ne se voyait pas."""
+
+    def setUp(self):
+        self.texte = _lire(EXTENSION)
+
+    def test_un_contenu_defilant_est_donne_par_child(self):
+        self.assertNotIn(".add_actor(", self.texte)
+        for appel in re.findall(r"new St\.ScrollView\(\{[^}]*\}\)", self.texte):
+            self.assertIn("child:", appel)
+
+    def test_chaque_fenetre_du_menu_dit_son_echec(self):
+        appels = re.findall(r"\(\) => this\._(?:ouvrirFenetre\(\(\) => this\._)?dialogue\w+\(", self.texte)
+        self.assertEqual(len(appels), 5)
+        for appel in appels:
+            self.assertIn("_ouvrirFenetre", appel)
+
+
 class LaVueDEnsemble(unittest.TestCase):
     """Plus d'icône d'application sous chaque fenêtre de la vue d'ensemble :
     elle recouvrait le contenu (le bouton « Suivant » de « Bienvenue »)."""

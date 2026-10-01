@@ -828,16 +828,16 @@ class Indicateur extends PanelMenu.Button {
                 continue;
             this._ajouterEspace(e, false);
         }
-        this.menu.addAction('＋  ' + _('Créer un Espace…'), () => this._dialogueCreer());
+        this.menu.addAction('＋  ' + _('Créer un Espace…'), () => this._ouvrirFenetre(() => this._dialogueCreer()));
         this.menu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
         const jetable = espaces.find(e => e.ephemere);
         if (jetable)
             this._ajouterEspace(jetable, true);
-        this.menu.addAction(_('Ouvrir un lien en Jetable…'), () => this._dialogueLienJetable());
+        this.menu.addAction(_('Ouvrir un lien en Jetable…'), () => this._ouvrirFenetre(() => this._dialogueLienJetable()));
         this.menu.addAction(_('Mode invité (prêter le PC)'), () => this._modeInvite());
         this.menu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
         this.menu.addAction('📋  ' + _('Transférer le presse-papiers vers…'),
-            () => this._dialogueTransfert(espaces));
+            () => this._ouvrirFenetre(() => this._dialogueTransfert(espaces)));
         this.menu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
         this.menu.addAction('🛡  ' + _('Assistant de sécurité'),
             () => this._executer('/usr/bin/codebyr-assistant',
@@ -845,6 +845,18 @@ class Indicateur extends PanelMenu.Button {
         this.menu.addAction('⚙  ' + _('Configuration Codebyr'),
             () => this._executer('/usr/bin/codebyr-config',
                 _('Configuration Codebyr indisponible')));
+    }
+
+    // Une fenêtre du menu qui ne peut pas se construire le DIT, au lieu de ne
+    // rien faire : c'est ainsi qu'« Autres applications… » s'était tue sous
+    // GNOME 48. Le détail part au journal.
+    _ouvrirFenetre(construire) {
+        try {
+            construire();
+        } catch (e) {
+            logError(e, 'Codebyr: fenêtre du menu');
+            Main.notify('Codebyr', _('Cette fenêtre ne s\'ouvre pas. Détail : journalctl -b _COMM=gnome-shell'));
+        }
     }
 
     _styleSwatch(couleur, choisie) {
@@ -1023,13 +1035,13 @@ class Indicateur extends PanelMenu.Button {
             sub.menu.addAction(app.nom, () => this._lancer(e.id, app.cmd));
         // Toute application installée (par n'importe quel moyen : magasin, apt,
         // Flatpak…) est lançable ici, sans passer par un enregistrement manuel.
-        sub.menu.addAction('➕  ' + _('Autres applications…'), () => this._dialogueApps(e));
+        sub.menu.addAction('➕  ' + _('Autres applications…'), () => this._ouvrirFenetre(() => this._dialogueApps(e)));
         sub.menu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
         sub.menu.addAction(_('Fermer cet Espace'), () => this._gerer('close', e.id, e.nom));
         if (!jetable) {
             sub.menu.addAction(_('Vider ses données'), () => this._gerer('purge', e.id, e.nom));
             sub.menu.addAction(_('Créer un instantané (sauvegarde)'), () => this._gerer('export', e.id, e.nom));
-            sub.menu.addAction(_('Revenir à un instantané…'), () => this._dialogueInstantanes(e.id, e.nom));
+            sub.menu.addAction(_('Revenir à un instantané…'), () => this._ouvrirFenetre(() => this._dialogueInstantanes(e.id, e.nom)));
             if (!e._systeme)
                 sub.menu.addAction(_('Supprimer cet Espace'), () => this._gerer('delete', e.id, e.nom));
         }
@@ -1070,9 +1082,12 @@ class Indicateur extends PanelMenu.Button {
         });
         boite.add_child(recherche);
 
-        const scroll = new St.ScrollView({style: 'max-height: 360px;', x_expand: true});
+        // Le contenu d'un St.ScrollView est sa propriété « child » depuis GNOME
+        // 46 (c'est ainsi que GNOME 48 remplit les siens) ; add_child et
+        // add_actor n'y mènent plus. Cette fenêtre ne s'ouvrait donc plus sous
+        // Debian 13 — sans un mot. Constaté le 01/10/2026 sur la VM.
         const liste = new St.BoxLayout({vertical: true, style: 'spacing: 2px;'});
-        try { scroll.add_child(liste); } catch (e) { scroll.add_actor(liste); }
+        const scroll = new St.ScrollView({style: 'max-height: 360px;', x_expand: true, child: liste});
         boite.add_child(scroll);
         dlg.contentLayout.add_child(boite);
 

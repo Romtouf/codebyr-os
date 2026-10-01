@@ -50,8 +50,10 @@ jobs:
       - name: Installer live-build
         run: |
           sudo apt-get update -qq
+          # python3 : la construction du paquet compile les traductions
+          # (packaging/traductions.py) depuis la 1.18.0.
           sudo apt-get install -y --no-install-recommends \
-            live-build rsync librsvg2-bin dpkg-dev xorriso squashfs-tools
+            live-build rsync librsvg2-bin dpkg-dev xorriso squashfs-tools python3
 
       - name: Construire
         run: |

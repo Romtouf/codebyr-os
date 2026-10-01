@@ -37,6 +37,7 @@ apt-get install -y --no-install-recommends \
 	ca-certificates \
 	rsync \
 	git \
+	python3 \
 	debian-archive-keyring \
 	librsvg2-bin \
 	imagemagick \

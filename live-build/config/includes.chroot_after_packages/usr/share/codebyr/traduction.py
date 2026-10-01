@@ -1,0 +1,103 @@
+# -*- coding: utf-8 -*-
+"""La langue dans laquelle Codebyr parle à l'utilisateur.
+
+Codebyr est écrit en français : le texte écrit dans le code EST la version
+française. Les autres langues sont des traductions — po/<langue>.po dans le
+dépôt, compilées à la construction du paquet en
+/usr/share/locale/<langue>/LC_MESSAGES/codebyr.mo.
+
+Dans le code, tout texte destiné à l'écran passe par _() :
+
+    _("Ouvrir dans l'Espace « {nom} »").format(nom=espace["nom"])
+
+Le texte est traduit AVANT d'être complété : une traduction déplace les mots
+autour de « {nom} », que les chaînes f"…" figeraient. Un test refuse tout
+texte affiché qui n'a pas sa traduction anglaise (tests/test_traduction.py).
+
+── QUELLE LANGUE ───────────────────────────────────────────────────────────
+Les langues préférées de la session sont lues comme gettext les lit (LANGUAGE,
+puis LC_ALL, LC_MESSAGES, LANG), et parcourues dans l'ordre :
+  · le français, ou aucune préférence (C, POSIX) → le texte du code ;
+  · une langue traduite → sa traduction ;
+  · une langue qui ne l'est pas → la suivante.
+Si aucune ne convient : l'anglais, la langue de référence. Qui ne lit pas le
+français lit plus souvent l'anglais ; gettext seul lui aurait montré le
+texte du code, en français.
+"""
+import gettext
+import os
+import struct
+
+DOMAINE = "codebyr"
+DOSSIER = "/usr/share/locale"
+REFERENCE = "en"
+
+
+def langues_preferees(environ=None):
+    """Les langues de la session, dans l'ordre (« fr_FR.UTF-8 » → « fr_FR »)."""
+    environ = os.environ if environ is None else environ
+    for variable in ("LANGUAGE", "LC_ALL", "LC_MESSAGES", "LANG"):
+        valeur = environ.get(variable, "")
+        if valeur:
+            break
+    else:
+        return []
+    langues = []
+    for morceau in valeur.split(":"):
+        code = morceau.split(".")[0].split("@")[0]
+        if code:
+            langues.append(code)
+    return langues
+
+
+def choisir(langues, disponibles):
+    """La langue de traduction à charger, ou None pour le texte du code."""
+    for code in langues:
+        if code in ("C", "POSIX"):
+            return None
+        base = code.split("_")[0]
+        if base == "fr":
+            return None
+        for candidat in (code, base):
+            if candidat in disponibles:
+                return candidat
+    return REFERENCE if langues else None
+
+
+def _disponible(dossier, langue):
+    return os.path.isfile(os.path.join(dossier, langue, "LC_MESSAGES", DOMAINE + ".mo"))
+
+
+def charger(dossier=DOSSIER, environ=None):
+    """La traduction de la session ; le texte du code si elle manque."""
+    langues = langues_preferees(environ)
+    candidats = {c for code in langues for c in (code, code.split("_")[0])}
+    candidats.add(REFERENCE)
+    langue = choisir(langues, {c for c in candidats if _disponible(dossier, c)})
+    if langue is None:
+        return gettext.NullTranslations()
+    try:
+        with open(os.path.join(dossier, langue, "LC_MESSAGES", DOMAINE + ".mo"), "rb") as f:
+            return gettext.GNUTranslations(f)
+    except (OSError, ValueError, struct.error):
+        # Absent ou abîmé : le texte du code, jamais un programme qui ne s'ouvre pas.
+        return gettext.NullTranslations()
+
+
+_traduction = charger()
+
+
+def _(texte):
+    """Le texte dans la langue de la session."""
+    return _traduction.gettext(texte)
+
+
+def n_(singulier, pluriel, nombre):
+    """Le texte au singulier ou au pluriel, selon la langue de la session.
+
+    Sans traduction, c'est la règle du français : « 0 fichier », « 1 fichier »,
+    « 2 fichiers » — gettext seul aurait écrit « 0 fichiers ».
+    """
+    if isinstance(_traduction, gettext.GNUTranslations):
+        return _traduction.ngettext(singulier, pluriel, nombre)
+    return singulier if nombre <= 1 else pluriel

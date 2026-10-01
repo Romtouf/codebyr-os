@@ -18,11 +18,13 @@ from gi.repository import Adw, Gtk, Gio, GLib  # noqa: E402
 # affichait l'icône générique — un losange gris — dans le dock, la vue
 # d'ensemble et Alt+Tab. Constaté le 13/09/2026 sur une installation réelle.
 GLib.set_prgname("io.codebyr.Bienvenue")
-GLib.set_application_name("Bienvenue dans Codebyr OS")
 
 sys.path.insert(0, os.environ.get("CODEBYR_LIB", "/usr/share/codebyr"))
 import interface  # noqa: E402
 import systeme  # noqa: E402
+from traduction import _  # noqa: E402
+
+GLib.set_application_name(_("Bienvenue dans Codebyr OS"))
 
 MARQUEUR = os.path.expanduser("~/.config/codebyr/bienvenue-vu")
 
@@ -37,9 +39,11 @@ def marquer_vu():
     except OSError:
         pass
 
+# Les couleurs de la charte (branding/couleurs.md). Navigation valait encore
+# #E09A32, l'ambre abandonné en 1.12.2 faute de contraste.
 ESPACES = [
-    ("Personnel", "#4E8FEF"), ("Travail", "#8F6CF0"), ("Banque", "#2FA36B"),
-    ("Navigation", "#E09A32"), ("Jetable", "#E25551"),
+    (_("Personnel"), "#4E8FEF"), (_("Travail"), "#8F6CF0"), (_("Banque"), "#2FA36B"),
+    (_("Navigation"), "#BF7600"), (_("Jetable"), "#E25551"),
 ]
 
 
@@ -92,27 +96,27 @@ def legende_espaces():
 
 class Fenetre(Adw.ApplicationWindow):
     def __init__(self, app):
-        super().__init__(application=app, title="Bienvenue")
+        super().__init__(application=app, title=_("Bienvenue"))
         self.set_default_size(560, 620)
 
         self._carousel = Adw.Carousel()
         self._carousel.set_vexpand(True)
 
         self._carousel.append(page(
-            "Bienvenue dans Codebyr OS",
-            ["Sécurisé par conception. Simple par conviction.",
-             "Un ordinateur qui protège vos données sans vous compliquer la vie."],
+            _("Bienvenue dans Codebyr OS"),
+            [_("Sécurisé par conception. Simple par conviction."),
+             _("Un ordinateur qui protège vos données sans vous compliquer la vie.")],
             sceau(96)))
         self._carousel.append(page(
-            "Vos Espaces",
-            ["Votre vie numérique, rangée en compartiments colorés.",
-             "Si l'un est un jour piégé, le dégât reste confiné à celui-là."],
+            _("Vos Espaces"),
+            [_("Votre vie numérique, rangée en compartiments colorés."),
+             _("Si l'un est un jour piégé, le dégât reste confiné à celui-là.")],
             legende_espaces()))
         self._carousel.append(page(
-            "Comment ça marche",
-            ["L'icône du Sceau, en haut à droite, ouvre vos Espaces.",
-             "Le liseré coloré autour d'une fenêtre dit à quel Espace elle appartient.",
-             "L'Assistant de sécurité répond à toutes vos questions, en clair."]))
+            _("Comment ça marche"),
+            [_("L'icône du Sceau, en haut à droite, ouvre vos Espaces."),
+             _("Le liseré coloré autour d'une fenêtre dit à quel Espace elle appartient."),
+             _("L'Assistant de sécurité répond à toutes vos questions, en clair.")]))
         # Bouton d'installation : SEULEMENT depuis le support live.
         # On ne se fie plus à la présence de Calamares — son retrait à la fin
         # de l'installation passe par apt, hors ligne, et peut échouer en
@@ -120,24 +124,24 @@ class Fenetre(Adw.ApplicationWindow):
         # à chaque session sur une machine déjà installée.
         bouton_install = None
         if systeme.session_live() and shutil.which("codebyr-installer"):
-            bouton_install = Gtk.Button(label="Installer Codebyr OS sur ce disque")
+            bouton_install = Gtk.Button(label=_("Installer Codebyr OS sur ce disque"))
             bouton_install.add_css_class("suggested-action")
             bouton_install.add_css_class("pill")
             bouton_install.set_halign(Gtk.Align.CENTER)
             bouton_install.set_margin_top(10)
             bouton_install.connect("clicked", self._installer)
-        derniere = ["Un lien ou un fichier douteux ? Ouvrez-le « en Jetable ».",
-                    "Votre banque ? Déclarez-la d'abord dans « Configuration "
-                    "Codebyr » : l'Espace Banque n'ouvrira qu'elle.",
-                    "Cliquez sur le Sceau pour commencer votre exploration."]
+        derniere = [_("Un lien ou un fichier douteux ? Ouvrez-le « en Jetable »."),
+                    _("Votre banque ? Déclarez-la d'abord dans « Configuration "
+                      "Codebyr » : l'Espace Banque n'ouvrira qu'elle."),
+                    _("Cliquez sur le Sceau pour commencer votre exploration.")]
         if bouton_install is not None:
-            derniere.append("Vous utilisez la version d'essai : rien n'est "
-                            "écrit sur votre disque tant que vous n'installez pas.")
-        self._carousel.append(page("Vous êtes prêt !", derniere, bouton_install))
+            derniere.append(_("Vous utilisez la version d'essai : rien n'est "
+                              "écrit sur votre disque tant que vous n'installez pas."))
+        self._carousel.append(page(_("Vous êtes prêt !"), derniere, bouton_install))
 
         dots = Adw.CarouselIndicatorDots(carousel=self._carousel)
 
-        self._btn = Gtk.Button(label="Suivant")
+        self._btn = Gtk.Button(label=_("Suivant"))
         self._btn.add_css_class("suggested-action")
         self._btn.add_css_class("pill")
         self._btn.set_halign(Gtk.Align.CENTER)
@@ -160,7 +164,7 @@ class Fenetre(Adw.ApplicationWindow):
 
     def _maj_bouton(self, _c, index):
         dernier = self._carousel.get_n_pages() - 1
-        self._btn.set_label("Commencer" if index >= dernier else "Suivant")
+        self._btn.set_label(_("Commencer") if index >= dernier else _("Suivant"))
 
     def _installer(self, _b):
         import subprocess

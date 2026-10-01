@@ -1,15 +1,16 @@
 [Desktop Entry]
 Type=Application
-Name=Installer Codebyr OS
+Name=Install Codebyr OS
 Name[fr]=Installer Codebyr OS
-Comment=Installer Codebyr OS sur ce disque
+Comment=Install Codebyr OS on this disk
 Comment[fr]=Installer Codebyr OS sur ce disque
 Exec=codebyr-installer
 TryExec=calamares
 Icon=io.codebyr.Installer
 Terminal=false
 Categories=System;
-Keywords=install;installer;calamares;disque;
+Keywords=install;installer;calamares;disk;
+Keywords[fr]=install;installer;calamares;disque;
 StartupNotify=true
 # La fenêtre de Calamares porte la classe « calamares ». Sans cette ligne,
 # GNOME la rattachait au lanceur caché de Debian (« Install Debian »), et

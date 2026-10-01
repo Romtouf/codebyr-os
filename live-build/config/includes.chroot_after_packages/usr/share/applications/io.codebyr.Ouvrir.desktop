@@ -1,9 +1,9 @@
 [Desktop Entry]
 Type=Application
-Name=Ouvrir avec Codebyr
-Name[en]=Open with Codebyr
-Comment=Ouvre le fichier sous cloche s'il vient d'un autre Espace
-Comment[en]=Opens the file in a disposable Space if it came from another Space
+Name=Open with Codebyr
+Name[fr]=Ouvrir avec Codebyr
+Comment=Opens the file in a disposable Space if it came from another Space
+Comment[fr]=Ouvre le fichier sous cloche s'il vient d'un autre Espace
 Exec=/usr/bin/codebyr-space ouvrir %f
 Icon=io.codebyr.Jetable
 Terminal=false

@@ -518,7 +518,7 @@ class AucunFichierDuPaquetModifiableParTous(unittest.TestCase):
         finally:
             sys.path.pop(0)
         with tempfile.TemporaryDirectory() as tmp:
-            for chemin in ("VERSION", "packaging",
+            for chemin in ("VERSION", "packaging", "po",
                            os.path.join("live-build", "config", "includes.chroot_after_packages")):
                 source, copie = os.path.join(RACINE, chemin), os.path.join(tmp, chemin)
                 if os.path.isdir(source):

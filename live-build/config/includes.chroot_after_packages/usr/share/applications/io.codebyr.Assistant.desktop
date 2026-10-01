@@ -1,11 +1,13 @@
 [Desktop Entry]
 Type=Application
-Name=Assistant de sécurité
+Name=Security Assistant
 Name[fr]=Assistant de sécurité
-Comment=L'assistant de sécurité de Codebyr OS — explications en clair
+Comment=The Codebyr OS security assistant — plain-language explanations
+Comment[fr]=L'assistant de sécurité de Codebyr OS — explications en clair
 Exec=codebyr-assistant
 Icon=io.codebyr.Assistant
 Terminal=false
 Categories=System;Security;Utility;
 StartupWMClass=io.codebyr.Assistant
-Keywords=sécurité;aide;assistant;codebyr;
+Keywords=security;help;assistant;codebyr;
+Keywords[fr]=sécurité;aide;assistant;codebyr;

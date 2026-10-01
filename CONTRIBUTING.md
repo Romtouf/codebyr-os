@@ -102,6 +102,25 @@ faille qui revient. Ne les neutralisez jamais pour faire passer la CI.
    > `systemctl --user` (la porte de sortie historique) et l'absence de
    > `org.gnome.Shell`.
 
+## Textes affichés et traductions
+
+Le texte écrit dans le code est la version **française** ; les autres langues
+sont des traductions, dans `po/<langue>.po` (anglais : `po/en.po`, la langue
+de référence pour qui ne lit pas le français).
+
+- Tout texte destiné à l'écran passe par `_()` (Python :
+  `from traduction import _`), écrit tel quel. On le complète **après** :
+  `_("Ouvrir « {nom} »").format(nom=nom)` — jamais `_(f"…")`, que l'outil
+  refuse : une traduction a besoin de déplacer les mots autour de `{nom}`.
+- Les pluriels : `n_("{n} fichier", "{n} fichiers", n)`.
+- Après avoir écrit ou modifié un texte :
+  `python3 packaging/traductions.py extraire`, puis traduire les `msgstr`
+  vides de `po/en.po`. `tests/test_traduction.py` échoue tant qu'il en reste.
+- Lanceurs (`.desktop`) : `Name=` en anglais, `Name[fr]=` en français — GNOME
+  montre `Name=` aux langues sans traduction.
+- Ajouter une langue : copier `po/en.po` en `po/<langue>.po`, y changer
+  `Language:` et traduire. La construction du paquet la compile seule.
+
 ## Proposer un changement
 
 1. Issue d'abord pour les changements de fond (nouvelle fonctionnalité,

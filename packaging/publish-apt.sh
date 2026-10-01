@@ -246,7 +246,7 @@ verifier_la_ci() {
 	local sha modifies reponse verdict
 	sha="$("${git[@]}" rev-parse HEAD 2>/dev/null)" || {
 		echo "ERREUR : $REPO n'est pas un dépôt git lisible." >&2; return 1; }
-	modifies="$("${git[@]}" status --porcelain -- VERSION packaging live-build 2>/dev/null)"
+	modifies="$("${git[@]}" status --porcelain -- VERSION packaging live-build po 2>/dev/null)"
 	if [ -n "$modifies" ]; then
 		echo "ERREUR : du code du paquet n'est pas commité — la CI ne l'a jamais vu :" >&2
 		echo "$modifies" | sed 's/^/         /' >&2

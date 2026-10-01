@@ -1,8 +1,9 @@
 [Desktop Entry]
 Type=Application
-Name=Ouvrir en Jetable
+Name=Open in Disposable
 Name[fr]=Ouvrir en Jetable
-Comment=Ouvrir ce fichier dans un Espace jetable isolé qui s'autodétruit
+Comment=Open this file in an isolated disposable Space that self-destructs
+Comment[fr]=Ouvrir ce fichier dans un Espace jetable isolé qui s'autodétruit
 Exec=codebyr-jetable %f
 Icon=io.codebyr.Jetable
 Terminal=false

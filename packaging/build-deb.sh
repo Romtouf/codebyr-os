@@ -114,6 +114,14 @@ EOF
 mkdir -p "$STAGE/etc/skel"
 cp "$SRC/usr/share/codebyr/avatar.svg" "$STAGE/etc/skel/.face"
 
+# 1 quinquies) Les langues autres que le français (po/<langue>.po), compilées
+#    pour les programmes (.mo, gettext) et pour l'extension GNOME (.json). Voir
+#    packaging/traductions.py. Obligatoires : sans elles, un testeur qui ne
+#    lit pas le français recevrait un système entièrement en français, sans
+#    que rien ne le signale à la construction.
+[ -d "$REPO/po" ] || { echo "ERREUR : traductions introuvables ($REPO/po)." >&2; exit 1; }
+python3 -B "$REPO/packaging/traductions.py" compiler "$REPO/po" "$STAGE"
+
 # 2) Droits corrects. IMPORTANT : « cp -a » depuis un checkout Windows (9p)
 #    hérite de fichiers et de dossiers en 777 → inscriptibles par tous = faille.
 #

@@ -58,7 +58,7 @@ if [ "${CODEBYR_NON_COMMITE:-0}" = "1" ]; then
 	echo "==> Dossier de travail, commité ou non : image NON reproductible (essai seulement)." >&2
 else
 	COMMIT="$($GIT rev-parse HEAD)"
-	if [ -n "$($GIT status --porcelain -- VERSION live-build branding packaging)" ]; then
+	if [ -n "$($GIT status --porcelain -- VERSION live-build branding packaging po)" ]; then
 		echo "==> ATTENTION : des modifications non commitées ne seront PAS dans l'image" >&2
 		echo "    (CODEBYR_NON_COMMITE=1 pour les essayer)." >&2
 	fi
@@ -67,7 +67,7 @@ else
 	# tar.umask : les droits de l'archive sont ceux de git (644, ou 755 pour un
 	# programme), pas ceux que le masque du poste ferait sortir.
 	$GIT -c tar.umask=0022 archive --format=tar "$COMMIT" \
-		VERSION live-build branding packaging | tar -x -C "$SOURCE"
+		VERSION live-build branding packaging po | tar -x -C "$SOURCE"
 	SOURCE_DATE_EPOCH="$($GIT log -1 --format=%ct "$COMMIT")"
 	export SOURCE_DATE_EPOCH
 	# Debian tel qu'il était 24 heures AVANT le commit. snapshot.debian.org

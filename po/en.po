@@ -1,0 +1,110 @@
+# Codebyr OS — traduction : en.
+#
+# Le texte source est le français écrit dans le code. Ce fichier est mis à
+# jour par « python3 packaging/traductions.py extraire » : n'y ajoutez ni n'y
+# retirez d'entrée à la main, traduisez seulement les « msgstr ».
+
+msgid ""
+msgstr ""
+"Project-Id-Version: Codebyr OS\n"
+"Language: en\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+
+#: usr/bin/codebyr-bienvenue
+msgid "Bienvenue dans Codebyr OS"
+msgstr "Welcome to Codebyr OS"
+
+#: usr/bin/codebyr-bienvenue
+msgid "Personnel"
+msgstr "Personal"
+
+#: usr/bin/codebyr-bienvenue
+msgid "Travail"
+msgstr "Work"
+
+#: usr/bin/codebyr-bienvenue
+msgid "Banque"
+msgstr "Bank"
+
+#: usr/bin/codebyr-bienvenue
+msgid "Navigation"
+msgstr "Browsing"
+
+#: usr/bin/codebyr-bienvenue
+msgid "Jetable"
+msgstr "Disposable"
+
+#: usr/bin/codebyr-bienvenue
+msgid "Bienvenue"
+msgstr "Welcome"
+
+#: usr/bin/codebyr-bienvenue
+msgid "Sécurisé par conception. Simple par conviction."
+msgstr "Secure by design. Simple by conviction."
+
+#: usr/bin/codebyr-bienvenue
+msgid "Un ordinateur qui protège vos données sans vous compliquer la vie."
+msgstr "A computer that protects your data without making your life harder."
+
+#: usr/bin/codebyr-bienvenue
+msgid "Vos Espaces"
+msgstr "Your Spaces"
+
+#: usr/bin/codebyr-bienvenue
+msgid "Votre vie numérique, rangée en compartiments colorés."
+msgstr "Your digital life, sorted into color-coded compartments."
+
+#: usr/bin/codebyr-bienvenue
+msgid "Si l'un est un jour piégé, le dégât reste confiné à celui-là."
+msgstr "If one of them is ever compromised, the damage stays inside it."
+
+#: usr/bin/codebyr-bienvenue
+msgid "Comment ça marche"
+msgstr "How it works"
+
+#: usr/bin/codebyr-bienvenue
+msgid "L'icône du Sceau, en haut à droite, ouvre vos Espaces."
+msgstr "The Seal icon, at the top right, opens your Spaces."
+
+#: usr/bin/codebyr-bienvenue
+msgid "Le liseré coloré autour d'une fenêtre dit à quel Espace elle appartient."
+msgstr "The colored border around a window tells you which Space it belongs to."
+
+#: usr/bin/codebyr-bienvenue
+msgid "L'Assistant de sécurité répond à toutes vos questions, en clair."
+msgstr "The Security Assistant answers all your questions, in plain language."
+
+#: usr/bin/codebyr-bienvenue
+msgid "Installer Codebyr OS sur ce disque"
+msgstr "Install Codebyr OS on this disk"
+
+#: usr/bin/codebyr-bienvenue
+msgid "Un lien ou un fichier douteux ? Ouvrez-le « en Jetable »."
+msgstr "A suspicious link or file? Open it “in Disposable”."
+
+#: usr/bin/codebyr-bienvenue
+msgid "Votre banque ? Déclarez-la d'abord dans « Configuration Codebyr » : l'Espace Banque n'ouvrira qu'elle."
+msgstr "Your bank? Add it first in “Codebyr Settings”: the Bank Space will open nothing else."
+
+#: usr/bin/codebyr-bienvenue
+msgid "Cliquez sur le Sceau pour commencer votre exploration."
+msgstr "Click the Seal to start exploring."
+
+#: usr/bin/codebyr-bienvenue
+msgid "Vous utilisez la version d'essai : rien n'est écrit sur votre disque tant que vous n'installez pas."
+msgstr "You are using the trial version: nothing is written to your disk until you install."
+
+#: usr/bin/codebyr-bienvenue
+msgid "Vous êtes prêt !"
+msgstr "You're all set!"
+
+#: usr/bin/codebyr-bienvenue
+msgid "Suivant"
+msgstr "Next"
+
+#: usr/bin/codebyr-bienvenue
+msgid "Commencer"
+msgstr "Get started"

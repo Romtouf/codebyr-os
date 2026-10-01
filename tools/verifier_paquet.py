@@ -1,9 +1,12 @@
 #!/usr/bin/env python3
 """Compare un .deb aux sources locales sans l'installer (Debian/WSL)."""
 import argparse
+import gettext
 import hashlib
 import io
+import json
 from pathlib import Path
+import struct
 import subprocess
 import tarfile
 import tempfile
@@ -75,6 +78,19 @@ def verifier_arbre(stage, racine):
     face = stage / "etc/skel/.face"
     if not face.is_file() or face.read_bytes() != (source / "usr/share/codebyr/avatar.svg").read_bytes():
         raise ValueError("Avatar absent ou différent des sources : etc/skel/.face")
+    # Une langue par fichier po/<langue>.po, compilée pour les programmes et
+    # pour l'extension GNOME (packaging/traductions.py).
+    for po in sorted((racine / "po").glob("*.po")):
+        langue = po.stem
+        catalogue = stage / "usr/share/locale" / langue / "LC_MESSAGES/codebyr.mo"
+        extension = (stage / "usr/share/gnome-shell/extensions/codebyr@codebyr.io/traductions"
+                     / (langue + ".json"))
+        try:
+            with catalogue.open("rb") as f:
+                gettext.GNUTranslations(f)
+            json.loads(extension.read_text(encoding="utf-8"))
+        except (OSError, ValueError, struct.error) as e:
+            raise ValueError("Traduction « %s » absente ou illisible : %s" % (langue, e))
     for nom in ("fichiers_surs.py", "filtre_syscalls.py", "relais_reseau.py",
                 "permissions_flatpak.py", "navigateur.py"):
         if not (stage / "usr/share/codebyr" / nom).is_file():

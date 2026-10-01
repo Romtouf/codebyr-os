@@ -1,8 +1,9 @@
 [Desktop Entry]
 Type=Application
-Name=Bienvenue dans Codebyr OS
+Name=Welcome to Codebyr OS
 Name[fr]=Bienvenue dans Codebyr OS
-Comment=Tour de bienvenue au premier démarrage
+Comment=Welcome tour at first startup
+Comment[fr]=Tour de bienvenue au premier démarrage
 Exec=codebyr-bienvenue
 Icon=io.codebyr.Bienvenue
 Terminal=false

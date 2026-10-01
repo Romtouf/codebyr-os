@@ -167,5 +167,32 @@ class LOuvertureDeSession(unittest.TestCase):
         self.assertIn("this._rendreVueEnsemble();", self.disable)
 
 
+class LaVueDEnsemble(unittest.TestCase):
+    """Plus d'icône d'application sous chaque fenêtre de la vue d'ensemble :
+    elle recouvrait le contenu (le bouton « Suivant » de « Bienvenue »)."""
+
+    def setUp(self):
+        self.texte = _lire(EXTENSION)
+        self.masquer = self.texte[self.texte.index("    _masquerIconesDesApercus() {"):
+                                  self.texte.index("    _rendreIconesDesApercus() {")]
+
+    def test_l_icone_est_masquee_a_chaque_mise_a_l_echelle(self):
+        # GNOME 48 (windowPreview.js) : _updateIconScale est appelée à la
+        # création de l'aperçu et à chaque ouverture de la vue d'ensemble.
+        self.assertIn("overrideMethod(WindowPreview.WindowPreview.prototype, '_updateIconScale',",
+                      self.masquer)
+        self.assertIn("original.call(this);", self.masquer)
+        self.assertIn("this._icon.hide();", self.masquer)
+        self.assertIn("this._masquerIconesDesApercus();",
+                      self.texte[self.texte.index("    enable() {"):self.texte.index("    _rendreVueEnsemble() {")])
+
+    def test_tout_est_rendu_a_la_desactivation(self):
+        disable = self.texte[self.texte.index("    disable() {"):]
+        self.assertIn("this._rendreIconesDesApercus();", disable)
+        rendre = self.texte[self.texte.index("    _rendreIconesDesApercus() {"):self.texte.index("    disable() {")]
+        self.assertIn("this._injections?.clear();", rendre)
+        self.assertIn("apercu._icon?.show();", rendre)
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -17,8 +17,9 @@ import Clutter from 'gi://Clutter';
 // dessin, dont on n'a besoin que pour nommer les extrémités arrondies.
 import Cairo from 'cairo';
 
-import {Extension} from 'resource:///org/gnome/shell/extensions/extension.js';
+import {Extension, InjectionManager} from 'resource:///org/gnome/shell/extensions/extension.js';
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
+import * as WindowPreview from 'resource:///org/gnome/shell/ui/windowPreview.js';
 import * as PanelMenu from 'resource:///org/gnome/shell/ui/panelMenu.js';
 import * as PopupMenu from 'resource:///org/gnome/shell/ui/popupMenu.js';
 import * as ModalDialog from 'resource:///org/gnome/shell/ui/modalDialog.js';
@@ -1258,6 +1259,7 @@ export default class CodebyrExtension extends Extension {
             this._finDemarrage = Main.layoutManager.connect('startup-complete',
                 () => this._rendreVueEnsemble());
         }
+        this._masquerIconesDesApercus();
         this._espaces = chargerEspaces();
         this._apps = chargerApps();
         this._indicateur = new Indicateur(this);
@@ -1286,8 +1288,40 @@ export default class CodebyrExtension extends Extension {
         }
     }
 
+    // Vue d'ensemble : plus d'icône d'application à cheval sur le bas de
+    // chaque fenêtre. Elle recouvrait son contenu — le bouton « Suivant » de
+    // « Bienvenue » le 01/10/2026 — et répétait ce que dit déjà le titre,
+    // affiché au survol. GNOME prévoit qu'elle soit masquée : son propre code
+    // teste sa visibilité (WindowPreview.vfunc_has_overlaps).
+    //
+    // Masquée chaque fois que GNOME la met à l'échelle : dès la création de
+    // l'aperçu, puis à chaque ouverture de la vue d'ensemble — ce qui couvre
+    // les aperçus déjà créés quand l'extension s'active.
+    _masquerIconesDesApercus() {
+        const masquees = this._iconesMasquees = new Set();
+        this._injections = new InjectionManager();
+        this._injections.overrideMethod(WindowPreview.WindowPreview.prototype, '_updateIconScale',
+            original => function () {
+                original.call(this);
+                if (this._icon?.visible) {
+                    this._icon.hide();
+                    masquees.add(this);
+                    this.connect('destroy', () => masquees.delete(this));
+                }
+            });
+    }
+
+    _rendreIconesDesApercus() {
+        this._injections?.clear();
+        this._injections = null;
+        for (const apercu of this._iconesMasquees ?? [])
+            apercu._icon?.show();
+        this._iconesMasquees = null;
+    }
+
     disable() {
         this._rendreVueEnsemble();
+        this._rendreIconesDesApercus();
         this._coloriage?.detruire();
         this._coloriage = null;
         this.pressePapiers?.detruire();

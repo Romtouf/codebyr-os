@@ -105,7 +105,8 @@ def textes_python(code, nom):
 
 _CHAINE_JS = r"""'((?:[^'\\\n]|\\.)*)'"""
 _APPEL_JS = re.compile(r"(?<![\w.$])(_|n_)\(\s*(?:" + _CHAINE_JS + r")(?:\s*,\s*" + _CHAINE_JS + r")?")
-_APPEL_JS_NU = re.compile(r"(?<![\w.$])(?:_|n_)\(\s*(?!')")
+# Sauf leur propre définition (« function _(texte) »).
+_APPEL_JS_NU = re.compile(r"(?<![\w.$])(?<!function )(?:_|n_)\(\s*(?!')")
 _ECHAPPEMENTS_JS = {"n": "\n", "t": "\t", "'": "'", '"': '"', "\\": "\\"}
 
 
@@ -113,13 +114,50 @@ def _js_vers_texte(brut):
     return re.sub(r"\\(.)", lambda m: _ECHAPPEMENTS_JS.get(m.group(1), m.group(1)), brut)
 
 
+def sans_commentaires_js(code):
+    """Le code sans ses commentaires, remplacés par des espaces (les numéros de
+    ligne restent justes). Les chaînes sont respectées : dans « 'https://…' »,
+    « // » n'ouvre pas un commentaire."""
+    sortie, i, n, guillemet = [], 0, len(code), None
+    while i < n:
+        c = code[i]
+        if guillemet:
+            if c == "\\":
+                sortie.append(code[i:i + 2])
+                i += 2
+                continue
+            if c == guillemet:
+                guillemet = None
+            sortie.append(c)
+            i += 1
+        elif c in "'\"`":
+            guillemet = c
+            sortie.append(c)
+            i += 1
+        elif code.startswith("//", i):
+            fin = code.find("\n", i)
+            fin = n if fin < 0 else fin
+            sortie.append(" " * (fin - i))
+            i = fin
+        elif code.startswith("/*", i):
+            fin = code.find("*/", i + 2)
+            fin = n if fin < 0 else fin + 2
+            sortie.append(re.sub(r"[^\n]", " ", code[i:fin]))
+            i = fin
+        else:
+            sortie.append(c)
+            i += 1
+    return "".join(sortie)
+
+
 def textes_js(code, nom):
     """Les _('…') et n_('…', '…') de l'extension : guillemets simples seulement."""
+    code = sans_commentaires_js(code)
     for appel in _APPEL_JS_NU.finditer(code):
         ligne = code.count("\n", 0, appel.start()) + 1
         raise TexteNonTraduisible(
             "%s:%d : _() doit recevoir un texte entre guillemets simples, écrit "
-            "tel quel — compléter APRÈS avec .replace()" % (nom, ligne))
+            "tel quel — compléter APRÈS avec remplir()" % (nom, ligne))
     trouves = []
     for appel in _APPEL_JS.finditer(code):
         msgid = _js_vers_texte(appel.group(2))

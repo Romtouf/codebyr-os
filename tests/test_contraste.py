@@ -294,7 +294,7 @@ class EtiquetteDuNom(unittest.TestCase):
         self.assertIn("'notify::focus-window'", self.code)
         self.assertIn("esp => this._indicateur?.afficherEspace(esp)", self.code)
         # Lecteurs d'écran : le nom est aussi annoncé, pas seulement affiché.
-        self.assertIn("'Codebyr — Espace actif : ' + esp.nom", self.code)
+        self.assertIn("remplir(_('Codebyr — Espace actif : {nom}'), {nom: esp.nom})", self.code)
 
 
 class SceauDuPanneau(unittest.TestCase):

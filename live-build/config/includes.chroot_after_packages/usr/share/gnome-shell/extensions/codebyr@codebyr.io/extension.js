@@ -28,6 +28,66 @@ const REGISTRE_SYSTEME = '/etc/codebyr/espaces.json';
 const DIAG = false;  // notifications de diagnostic
 const EP = 3;        // épaisseur du liseré
 
+// ── Langue ──────────────────────────────────────────────────────────────────
+// Même règle que les programmes (usr/share/codebyr/traduction.py) : le texte
+// écrit ici est la version française ; une langue traduite reçoit sa
+// traduction ; toute autre, l'anglais. gettext ne sait pas faire ce dernier
+// choix : les traductions sont donc compilées à côté de ce fichier
+// (traductions/<langue>.json, voir packaging/traductions.py).
+const DOSSIER_EXTENSION = GLib.path_get_dirname(GLib.filename_from_uri(import.meta.url)[0]);
+
+function lireTraduction(langue) {
+    try {
+        const [ok, octets] = GLib.file_get_contents(
+            DOSSIER_EXTENSION + '/traductions/' + langue + '.json');
+        return ok ? JSON.parse(new TextDecoder().decode(octets)) : null;
+    } catch (e) {
+        return null;
+    }
+}
+
+function choisirTraduction() {
+    // Les langues de la session, dans l'ordre, sans leur codage (« de_DE »,
+    // « de »…). GLib termine toujours la liste par « C » : seule une session
+    // SANS préférence commence par lui.
+    const noms = GLib.get_language_names().filter(n => !n.includes('.') && !n.includes('@'));
+    for (const [rang, code] of noms.entries()) {
+        if (code === 'C' || code === 'POSIX') {
+            if (rang === 0)
+                return null;
+            break;  // la fin de liste, pas un choix : on passe à l'anglais
+        }
+        if (code.split('_')[0] === 'fr')
+            return null;
+        const traduction = lireTraduction(code);
+        if (traduction)
+            return traduction;
+    }
+    return lireTraduction('en');
+}
+
+const TRADUCTION = choisirTraduction();
+
+// Tout texte affiché passe par _(), écrit tel quel entre guillemets simples
+// (packaging/traductions.py le relève dans ce fichier), et n'est complété
+// qu'APRÈS, par remplir().
+function _(texte) {
+    return TRADUCTION?.textes?.[texte] ?? texte;
+}
+
+function n_(singulier, pluriel, nombre) {
+    const formes = TRADUCTION?.pluriels?.[singulier];
+    if (formes)
+        return nombre === 1 ? formes[0] : formes[1];
+    return nombre <= 1 ? singulier : pluriel;
+}
+
+// « {nom} » → la valeur, insérée telle quelle : String.replace interpréterait
+// un « $ » dans le nom d'un Espace.
+function remplir(texte, valeurs) {
+    return texte.replace(/\{(\w+)\}/g, (marque, cle) => (cle in valeurs ? String(valeurs[cle]) : marque));
+}
+
 function registreUtilisateur() {
     return GLib.get_home_dir() + '/.config/codebyr/espaces.json';
 }
@@ -137,10 +197,10 @@ function chargerEspaces() {
 }
 
 const APPS_DEFAUT = [
-    {nom: 'Navigateur', cmd: 'firefox-esr'},
-    {nom: 'Fichiers', cmd: 'nautilus'},
-    {nom: 'Terminal', cmd: 'kgx'},
-    {nom: 'Éditeur de texte', cmd: 'gnome-text-editor'},
+    {nom: _('Navigateur'), cmd: 'firefox-esr'},
+    {nom: _('Fichiers'), cmd: 'nautilus'},
+    {nom: _('Terminal'), cmd: 'kgx'},
+    {nom: _('Éditeur de texte'), cmd: 'gnome-text-editor'},
 ];
 
 function chargerApps() {
@@ -710,7 +770,7 @@ class PressePapiers {
 const Indicateur = GObject.registerClass(
 class Indicateur extends PanelMenu.Button {
     _init(extension) {
-        super._init(0.0, 'Codebyr Espaces');
+        super._init(0.0, _('Codebyr Espaces'));
         this._extension = extension;
 
         const boite = new St.BoxLayout({style_class: 'panel-status-menu-box'});
@@ -750,7 +810,7 @@ class Indicateur extends PanelMenu.Button {
             `border-radius: 5px; margin-right: 6px; background-color: ${esp.couleur};`);
         this._repereNom.text = esp.nom;
         this._repere.show();
-        this.accessible_name = 'Codebyr — Espace actif : ' + esp.nom;
+        this.accessible_name = remplir(_('Codebyr — Espace actif : {nom}'), {nom: esp.nom});
     }
 
     _rebuild() {
@@ -758,7 +818,7 @@ class Indicateur extends PanelMenu.Button {
         this._apps = chargerApps();
         const espaces = chargerEspaces();
 
-        const entete = new PopupMenu.PopupMenuItem('Ouvrir une app dans un Espace', {reactive: false});
+        const entete = new PopupMenu.PopupMenuItem(_('Ouvrir une app dans un Espace'), {reactive: false});
         entete.label.add_style_class_name('codebyr-entete');
         this.menu.addMenuItem(entete);
 
@@ -767,23 +827,23 @@ class Indicateur extends PanelMenu.Button {
                 continue;
             this._ajouterEspace(e, false);
         }
-        this.menu.addAction('＋  Créer un Espace…', () => this._dialogueCreer());
+        this.menu.addAction('＋  ' + _('Créer un Espace…'), () => this._dialogueCreer());
         this.menu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
         const jetable = espaces.find(e => e.ephemere);
         if (jetable)
             this._ajouterEspace(jetable, true);
-        this.menu.addAction('Ouvrir un lien en Jetable…', () => this._dialogueLienJetable());
-        this.menu.addAction('Mode invité (prêter le PC)', () => this._modeInvite());
+        this.menu.addAction(_('Ouvrir un lien en Jetable…'), () => this._dialogueLienJetable());
+        this.menu.addAction(_('Mode invité (prêter le PC)'), () => this._modeInvite());
         this.menu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
-        this.menu.addAction('📋  Transférer le presse-papiers vers…',
+        this.menu.addAction('📋  ' + _('Transférer le presse-papiers vers…'),
             () => this._dialogueTransfert(espaces));
         this.menu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
-        this.menu.addAction('🛡  Assistant de sécurité',
+        this.menu.addAction('🛡  ' + _('Assistant de sécurité'),
             () => this._executer('/usr/bin/codebyr-assistant',
-                'Assistant de sécurité indisponible'));
-        this.menu.addAction('⚙  Configuration Codebyr',
+                _('Assistant de sécurité indisponible')));
+        this.menu.addAction('⚙  ' + _('Configuration Codebyr'),
             () => this._executer('/usr/bin/codebyr-config',
-                'Configuration Codebyr indisponible'));
+                _('Configuration Codebyr indisponible')));
     }
 
     _styleSwatch(couleur, choisie) {
@@ -794,16 +854,16 @@ class Indicateur extends PanelMenu.Button {
     _dialogueCreer() {
         const dlg = new ModalDialog.ModalDialog({destroyOnClose: true});
         const boite = new St.BoxLayout({vertical: true, style: 'spacing: 12px; min-width: 470px;'});
-        boite.add_child(new St.Label({text: 'Créer un Espace',
+        boite.add_child(new St.Label({text: _('Créer un Espace'),
             style: 'font-weight: 700; font-size: 15px;'}));
         boite.add_child(new St.Label({
-            text: 'Un compartiment isolé et persistant, avec sa couleur.',
+            text: _('Un compartiment isolé et persistant, avec sa couleur.'),
             style: 'color: #93A6B0;'}));
         const entry = new St.Entry({
-            hint_text: 'Nom (ex. Achats, Études, Association…)',
+            hint_text: _('Nom (ex. Achats, Études, Association…)'),
             can_focus: true, x_expand: true, style: 'margin-top: 4px;'});
         boite.add_child(entry);
-        boite.add_child(new St.Label({text: 'Couleur :', style: 'margin-top: 4px;'}));
+        boite.add_child(new St.Label({text: _('Couleur :'), style: 'margin-top: 4px;'}));
 
         const palette = ['#4E8FEF', '#8F6CF0', '#2FA36B', '#BF7600',
             '#E25551', '#43C7DF', '#E5679B', '#6E7E89'];
@@ -829,13 +889,13 @@ class Indicateur extends PanelMenu.Button {
             if (nom) {
                 this._executer('/usr/bin/codebyr-space create '
                     + GLib.shell_quote(nom) + ' ' + GLib.shell_quote(etat.couleur),
-                    'Création de l\'Espace « ' + nom + ' » impossible');
-                Main.notify('Codebyr', 'Espace créé : ' + nom);
+                    remplir(_('Création de l\'Espace « {nom} » impossible'), {nom}));
+                Main.notify('Codebyr', remplir(_('Espace créé : {nom}'), {nom}));
             }
         };
         dlg.setButtons([
-            {label: 'Annuler', action: () => dlg.close(), key: Clutter.KEY_Escape},
-            {label: 'Créer', action: creer, default: true},
+            {label: _('Annuler'), action: () => dlg.close(), key: Clutter.KEY_Escape},
+            {label: _('Créer'), action: creer, default: true},
         ]);
         entry.clutter_text.connect('activate', creer);
         dlg.open();
@@ -846,9 +906,8 @@ class Indicateur extends PanelMenu.Button {
         try {
             SystemActions.getDefault().activateSwitchUser();
         } catch (e) {
-            Main.notify('Codebyr — Mode invité',
-                'Ouvre le menu en haut à droite → Changer d\'utilisateur → Invité '
-                + '(aucun mot de passe demandé).');
+            Main.notify(_('Codebyr — Mode invité'),
+                _('Ouvrez le menu en haut à droite → Changer d\'utilisateur → Invité (aucun mot de passe demandé).'));
         }
     }
 
@@ -856,11 +915,11 @@ class Indicateur extends PanelMenu.Button {
         const dlg = new ModalDialog.ModalDialog({destroyOnClose: true});
         const boite = new St.BoxLayout({vertical: true, style: 'spacing: 10px; min-width: 440px;'});
         boite.add_child(new St.Label({
-            text: 'Ouvrir un lien en Jetable',
+            text: _('Ouvrir un lien en Jetable'),
             style: 'font-weight: 700; font-size: 15px;',
         }));
         boite.add_child(new St.Label({
-            text: "Le lien s'ouvrira dans une bulle isolée qui s'autodétruit à la fermeture.",
+            text: _('Le lien s\'ouvrira dans une bulle isolée qui s\'autodétruit à la fermeture.'),
             style: 'color: #93A6B0;',
         }));
         const entry = new St.Entry({
@@ -875,11 +934,11 @@ class Indicateur extends PanelMenu.Button {
             dlg.close();
             if (u)
                 this._executer('/usr/bin/codebyr-jetable ' + GLib.shell_quote(u),
-                    'Ouverture en Jetable impossible');
+                    _('Ouverture en Jetable impossible'));
         };
         dlg.setButtons([
-            {label: 'Annuler', action: () => dlg.close(), key: Clutter.KEY_Escape},
-            {label: 'Ouvrir en Jetable', action: ouvrir, default: true},
+            {label: _('Annuler'), action: () => dlg.close(), key: Clutter.KEY_Escape},
+            {label: _('Ouvrir en Jetable'), action: ouvrir, default: true},
         ]);
         entry.clutter_text.connect('activate', ouvrir);
         dlg.open();
@@ -889,14 +948,13 @@ class Indicateur extends PanelMenu.Button {
     _dialogueTransfert(espaces) {
         const pp = this._extension.pressePapiers;
         if (!pp) {
-            Main.notify('Codebyr', 'Presse-papiers inter-Espaces indisponible.');
+            Main.notify('Codebyr', _('Presse-papiers inter-Espaces indisponible.'));
             return;
         }
         pp.lireContenu((texte) => {
             if (!texte || !texte.trim()) {
-                Main.notify('Codebyr — Presse-papiers',
-                    'Rien à transférer. Copiez d\'abord un texte (Ctrl+C) dans un Espace, '
-                    + 'puis rouvrez ce menu.');
+                Main.notify(_('Codebyr — Presse-papiers'),
+                    _('Rien à transférer. Copiez d\'abord un texte (Ctrl+C) dans un Espace, puis rouvrez ce menu.'));
                 return;
             }
             this._ouvrirTransfert(espaces, texte, pp);
@@ -909,16 +967,19 @@ class Indicateur extends PanelMenu.Button {
         const dlg = new ModalDialog.ModalDialog({destroyOnClose: true});
         const boite = new St.BoxLayout({vertical: true, style: 'spacing: 10px; min-width: 460px;'});
         boite.add_child(new St.Label({
-            text: 'Transférer le presse-papiers',
+            text: _('Transférer le presse-papiers'),
             style: 'font-weight: 700; font-size: 15px;',
         }));
         // On n'affiche JAMAIS le contenu (ce peut être un mot de passe) : seulement
         // sa taille et l'Espace d'origine. Le transfert entre Espaces est une
         // action délibérée, pas une fuite silencieuse.
         boite.add_child(new St.Label({
-            text: (source ? 'Contenu copié depuis « ' + source.nom + ' »' : 'Contenu copié')
-                + ' (' + texte.length + ' caractère' + (texte.length > 1 ? 's' : '') + ').'
-                + '\nVers quel Espace l\'autoriser ?',
+            text: remplir(source
+                ? n_('Contenu copié depuis « {source} » ({n} caractère).',
+                    'Contenu copié depuis « {source} » ({n} caractères).', texte.length)
+                : n_('Contenu copié ({n} caractère).', 'Contenu copié ({n} caractères).', texte.length),
+                {source: source?.nom, n: texte.length})
+                + '\n' + _('Vers quel Espace l\'autoriser ?'),
             style: 'color: #93A6B0;',
         }));
         for (const e of espaces) {
@@ -933,21 +994,20 @@ class Indicateur extends PanelMenu.Button {
             b.connect('clicked', () => {
                 dlg.close();
                 pp.autoriserTransfert(e.id);
-                Main.notify('Codebyr — Presse-papiers',
-                    'Autorisé vers « ' + e.nom + ' ». Basculez sur cet Espace et collez '
-                    + '(Ctrl+V). Le presse-papiers sera ensuite effacé.');
+                Main.notify(_('Codebyr — Presse-papiers'),
+                    remplir(_('Autorisé vers « {nom} ». Basculez sur cet Espace et collez (Ctrl+V). Le presse-papiers sera ensuite effacé.'), {nom: e.nom}));
             });
             boite.add_child(b);
         }
         dlg.contentLayout.add_child(boite);
-        dlg.setButtons([{label: 'Annuler', action: () => dlg.close(),
+        dlg.setButtons([{label: _('Annuler'), action: () => dlg.close(),
             key: Clutter.KEY_Escape, default: true}]);
         dlg.open();
     }
 
     _ajouterEspace(e, jetable) {
         const blinde = e.blindage === 'renforce';
-        const titre = (jetable ? 'Jetable (éphémère)' : e.nom) + (blinde ? '  🛡' : '');
+        const titre = (jetable ? _('Jetable (éphémère)') : e.nom) + (blinde ? '  🛡' : '');
         const sub = new PopupMenu.PopupSubMenuMenuItem(titre);
         const pastille = new St.Widget({
             style: `background-color: ${e.couleur}; border-radius: 6px;` +
@@ -962,15 +1022,15 @@ class Indicateur extends PanelMenu.Button {
             sub.menu.addAction(app.nom, () => this._lancer(e.id, app.cmd));
         // Toute application installée (par n'importe quel moyen : magasin, apt,
         // Flatpak…) est lançable ici, sans passer par un enregistrement manuel.
-        sub.menu.addAction('➕  Autres applications…', () => this._dialogueApps(e));
+        sub.menu.addAction('➕  ' + _('Autres applications…'), () => this._dialogueApps(e));
         sub.menu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
-        sub.menu.addAction('Fermer cet Espace', () => this._gerer('close', e.id, e.nom));
+        sub.menu.addAction(_('Fermer cet Espace'), () => this._gerer('close', e.id, e.nom));
         if (!jetable) {
-            sub.menu.addAction('Vider ses données', () => this._gerer('purge', e.id, e.nom));
-            sub.menu.addAction('Créer un instantané (sauvegarde)', () => this._gerer('export', e.id, e.nom));
-            sub.menu.addAction('Revenir à un instantané…', () => this._dialogueInstantanes(e.id, e.nom));
+            sub.menu.addAction(_('Vider ses données'), () => this._gerer('purge', e.id, e.nom));
+            sub.menu.addAction(_('Créer un instantané (sauvegarde)'), () => this._gerer('export', e.id, e.nom));
+            sub.menu.addAction(_('Revenir à un instantané…'), () => this._dialogueInstantanes(e.id, e.nom));
             if (!e._systeme)
-                sub.menu.addAction('Supprimer cet Espace', () => this._gerer('delete', e.id, e.nom));
+                sub.menu.addAction(_('Supprimer cet Espace'), () => this._gerer('delete', e.id, e.nom));
         }
         this.menu.addMenuItem(sub);
     }
@@ -992,7 +1052,7 @@ class Indicateur extends PanelMenu.Button {
         } catch (e) {
             logError(e, 'Codebyr: liste des applications');
         }
-        out.sort((a, b) => a.nom.localeCompare(b.nom, 'fr'));
+        out.sort((a, b) => a.nom.localeCompare(b.nom));
         return out;
     }
 
@@ -1001,11 +1061,11 @@ class Indicateur extends PanelMenu.Button {
         const dlg = new ModalDialog.ModalDialog({destroyOnClose: true});
         const boite = new St.BoxLayout({vertical: true, style: 'spacing: 10px; min-width: 480px;'});
         boite.add_child(new St.Label({
-            text: 'Ouvrir une application dans « ' + esp.nom + ' »',
+            text: remplir(_('Ouvrir une application dans « {nom} »'), {nom: esp.nom}),
             style: 'font-weight: 700; font-size: 15px;',
         }));
         const recherche = new St.Entry({
-            hint_text: 'Rechercher une application…', can_focus: true, x_expand: true,
+            hint_text: _('Rechercher une application…'), can_focus: true, x_expand: true,
         });
         boite.add_child(recherche);
 
@@ -1038,14 +1098,14 @@ class Indicateur extends PanelMenu.Button {
             }
             if (n === 0)
                 liste.add_child(new St.Label({
-                    text: 'Aucune application trouvée.',
+                    text: _('Aucune application trouvée.'),
                     style: 'color: #93A6B0; padding: 9px 12px;',
                 }));
         };
         remplir('');
         recherche.clutter_text.connect('text-changed', () => remplir(recherche.get_text()));
 
-        dlg.setButtons([{label: 'Fermer', action: () => dlg.close(),
+        dlg.setButtons([{label: _('Fermer'), action: () => dlg.close(),
             key: Clutter.KEY_Escape, default: true}]);
         dlg.open();
         global.stage.set_key_focus(recherche.clutter_text);
@@ -1087,7 +1147,7 @@ class Indicateur extends PanelMenu.Button {
                 const secondes = (GLib.get_monotonic_time() - debut) / 1000000;
                 if (secondes < 3) {
                     Main.notify('Codebyr — ' + echec,
-                        'Détail : ouvrez un terminal et tapez  journalctl -t codebyr -n 20');
+                        _('Détail : ouvrez un terminal et tapez  journalctl -t codebyr -n 20'));
                 }
             }
         });
@@ -1100,23 +1160,23 @@ class Indicateur extends PanelMenu.Button {
         let commande = '/usr/bin/codebyr-space launch ' + GLib.shell_quote(id);
         if (cmd)
             commande += ' -- ' + cmd;
-        this._executer(commande, 'Impossible d\'ouvrir l\'Espace ' + id);
+        this._executer(commande, remplir(_('Impossible d\'ouvrir l\'Espace {nom}'), {nom: id}));
     }
 
     _gerer(action, id, nom) {
         try {
             this._executer('/usr/bin/codebyr-space ' + action + ' ' + GLib.shell_quote(id),
-                'Action « ' + action + ' » impossible sur ' + nom);
+                remplir(_('Action « {action} » impossible sur {nom}'), {action, nom}));
             const msgs = {
-                close: 'Espace fermé : ',
-                purge: 'Données effacées : ',
-                export: 'Sauvegardé (dossier « Espaces-Codebyr ») : ',
-                import: 'Restauré depuis la dernière sauvegarde : ',
-                delete: 'Espace supprimé : ',
+                close: _('Espace fermé : {nom}'),
+                purge: _('Données effacées : {nom}'),
+                export: _('Sauvegardé (dossier « Espaces-Codebyr ») : {nom}'),
+                import: _('Restauré depuis la dernière sauvegarde : {nom}'),
+                delete: _('Espace supprimé : {nom}'),
             };
-            Main.notify('Codebyr', (msgs[action] || '') + nom);
+            Main.notify('Codebyr', remplir(msgs[action] || '{nom}', {nom}));
         } catch (e) {
-            Main.notify('Codebyr', 'Action impossible sur ' + nom);
+            Main.notify('Codebyr', remplir(_('Action impossible sur {nom}'), {nom}));
         }
     }
 
@@ -1124,7 +1184,8 @@ class Indicateur extends PanelMenu.Button {
         const m = fichier.match(/-(\d{4})(\d{2})(\d{2})-(\d{2})(\d{2})\.tar\.gz$/);
         if (!m)
             return fichier;
-        return m[3] + '/' + m[2] + '/' + m[1] + ' à ' + m[4] + 'h' + m[5];
+        return remplir(_('{jour}/{mois}/{annee} à {heure}h{minute}'),
+            {jour: m[3], mois: m[2], annee: m[1], heure: m[4], minute: m[5]});
     }
 
     _dialogueInstantanes(id, nom) {
@@ -1144,17 +1205,17 @@ class Indicateur extends PanelMenu.Button {
         fichiers.sort().reverse();
         if (!fichiers.length) {
             Main.notify('Codebyr',
-                'Aucun instantané pour ' + nom + '. Faites d\'abord « Créer un instantané ».');
+                remplir(_('Aucun instantané pour {nom}. Faites d\'abord « Créer un instantané ».'), {nom}));
             return;
         }
         const dlg = new ModalDialog.ModalDialog({destroyOnClose: true});
         const boite = new St.BoxLayout({vertical: true, style: 'spacing: 8px; min-width: 470px;'});
         boite.add_child(new St.Label({
-            text: 'Revenir à un instantané de « ' + nom + ' »',
+            text: remplir(_('Revenir à un instantané de « {nom} »'), {nom}),
             style: 'font-weight: 700; font-size: 15px;',
         }));
         boite.add_child(new St.Label({
-            text: "Choisissez la date à laquelle restaurer cet Espace :",
+            text: _('Choisissez la date à laquelle restaurer cet Espace :'),
             style: 'color: #93A6B0; margin-bottom: 4px;',
         }));
         for (const f of fichiers) {
@@ -1167,13 +1228,13 @@ class Indicateur extends PanelMenu.Button {
                 dlg.close();
                 this._executer(
                     '/usr/bin/codebyr-space import ' + GLib.shell_quote(id) + ' ' + GLib.shell_quote(dir + '/' + f),
-                    'Restauration de ' + nom + ' impossible');
-                Main.notify('Codebyr', nom + ' restauré à l\'instantané du ' + label);
+                    remplir(_('Restauration de {nom} impossible'), {nom}));
+                Main.notify('Codebyr', remplir(_('{nom} restauré à l\'instantané du {date}'), {nom, date: label}));
             });
             boite.add_child(b);
         }
         dlg.contentLayout.add_child(boite);
-        dlg.setButtons([{label: 'Annuler', action: () => dlg.close(),
+        dlg.setButtons([{label: _('Annuler'), action: () => dlg.close(),
             key: Clutter.KEY_Escape, default: true}]);
         dlg.open();
     }

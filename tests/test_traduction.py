@@ -13,8 +13,11 @@ Ce que ces tests gardent :
 """
 import ast
 import gettext
+import json
 import os
 import re
+import shutil
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -190,6 +193,15 @@ class LExtraction(unittest.TestCase):
         self.assertEqual(traductions.textes_js(code, "essai.js"),
                          [("L'Espace « {nom} »", None), ("{n} fenêtre", "{n} fenêtres")])
 
+    def test_les_definitions_et_les_commentaires_js_sont_ignores(self):
+        code = ("// Tout passe par _(), puis remplir().\n"
+                "/* n_() aussi */\n"
+                "function _(texte) { return texte; }\n"
+                "function n_(a, b, n) { return a; }\n"
+                "const u = 'https://exemple.org'; // _(x)\n"
+                "const t = _('Fermer');\n")
+        self.assertEqual(traductions.textes_js(code, "essai.js"), [("Fermer", None)])
+
     def test_un_appel_js_sans_texte_ecrit_est_refuse(self):
         for code in ("_(nom)", '_("guillemets doubles")', "_(`modèle ${x}`)"):
             with self.assertRaises(traductions.TexteNonTraduisible, msg=code):
@@ -224,7 +236,101 @@ def phrases_en_dur(code, nom):
             and id(n) not in exclus and PHRASE.match(n.value)]
 
 
+EXTENSION_JS = os.path.join(INCLUDES, traductions.EXTENSION, "extension.js")
+# Pour le développeur, pas pour l'utilisateur : les notifications de
+# diagnostic (DIAG = false) et le journal (« Codebyr: … », par logError).
+DIAGNOSTIC_JS = {"Codebyr — fenêtre détectée", "Codebyr — classe mise à jour",
+                 "Codebyr — liseré posé"}
+
+
+def phrases_en_dur_js(code):
+    """Les phrases de l'extension écrites hors de _() et n_()."""
+    code = traductions.sans_commentaires_js(code)
+    code = traductions._APPEL_JS.sub(lambda m: " " * len(m.group(0)), code)
+    trouvees = []
+    for m in re.finditer(r"'((?:[^'\\\n]|\\.)*)'|\"((?:[^\"\\\n]|\\.)*)\"|`((?:[^`\\]|\\.)*)`", code):
+        texte = next(g for g in m.groups() if g is not None)
+        if (PHRASE.match(texte) and texte not in DIAGNOSTIC_JS
+                and not texte.startswith("Codebyr: ")):
+            trouvees.append(texte)
+    return trouvees
+
+
+BANC_LANGUE_JS = r"""
+// Les deux derniers arguments : « node -e » ne compte pas le script lui-même.
+const [casJson, bloc] = process.argv.slice(-2);
+const cas = JSON.parse(casJson);
+const resultats = [];
+for (const [langues, fichiers] of cas) {
+    const GLib = {
+        path_get_dirname: p => p.replace(/\/[^/]*$/, ''),
+        filename_from_uri: u => [u.replace('file://', ''), null],
+        get_language_names: () => langues,
+        file_get_contents: chemin => {
+            if (!(chemin in fichiers))
+                throw new Error('absent : ' + chemin);
+            return [true, new TextEncoder().encode(fichiers[chemin])];
+        },
+    };
+    const fabrique = new Function('GLib', bloc +
+        '\nreturn [_("Suivant"), n_("{n} pomme", "{n} pommes", 0), n_("{n} pomme", "{n} pommes", 2),' +
+        ' remplir("{a} et {b}", {a: "$&", b: 2})];');
+    resultats.push(fabrique(GLib));
+}
+console.log(JSON.stringify(resultats));
+"""
+
+
+@unittest.skipUnless(shutil.which("node"), "Node.js requis")
+class LaLangueDeLExtension(unittest.TestCase):
+    """Le choix de langue de l'extension, exécuté hors de GNOME (faux GLib)."""
+
+    def _resultats(self, cas):
+        code = _lire(EXTENSION_JS)
+        debut = code.index("// ── Langue")
+        fin = code.index("\n}\n", code.index("function remplir(")) + 3
+        bloc = code[debut:fin].replace(
+            "import.meta.url", "'file:///usr/share/gnome-shell/extensions/codebyr@codebyr.io/extension.js'")
+        sortie = subprocess.run(["node", "-e", BANC_LANGUE_JS, "--", json.dumps(cas), bloc],
+                                capture_output=True, text=True, encoding="utf-8", timeout=30)
+        self.assertEqual(sortie.returncode, 0, sortie.stderr)
+        return json.loads(sortie.stdout)
+
+    def test_la_meme_regle_que_les_programmes(self):
+        dossier = "/usr/share/gnome-shell/extensions/codebyr@codebyr.io/traductions/"
+        anglais = json.dumps({"textes": {"Suivant": "Next"},
+                              "pluriels": {"{n} pomme": ["{n} apple", "{n} apples"]}})
+        allemand = json.dumps({"textes": {"Suivant": "Weiter"}, "pluriels": {}})
+        en = {dossier + "en.json": anglais}
+        de_en = {dossier + "en.json": anglais, dossier + "de.json": allemand}
+        resultats = self._resultats([
+            [["fr_FR", "fr", "C"], en],                 # français
+            [["C"], en],                                # sans préférence
+            [["en_US", "en", "C"], en],                 # anglais
+            [["de_DE", "de", "C"], en],                 # non traduit → anglais
+            [["de_DE", "de", "C"], de_en],              # traduit → sa traduction
+            [["de", "fr", "C"], en],                    # préférence suivante : français
+            [["en_US", "en", "C"], {}],                 # aucun fichier → texte du code
+        ])
+        self.assertEqual([r[0] for r in resultats],
+                         ["Suivant", "Suivant", "Next", "Next", "Weiter", "Suivant", "Suivant"])
+        # Pluriels : règle du français sans traduction (« 0 pomme »), de
+        # l'anglais avec (« 0 apples »).
+        self.assertEqual(resultats[0][1:3], ["{n} pomme", "{n} pommes"])
+        self.assertEqual(resultats[2][1:3], ["{n} apples", "{n} apples"])
+        # remplir() insère tel quel : « $& » n'est pas interprété.
+        self.assertEqual(resultats[0][3], "$& et 2")
+
+
 class LesFichiersTraduits(unittest.TestCase):
+
+    def test_l_extension_ne_garde_aucune_phrase_en_dur(self):
+        self.assertEqual(phrases_en_dur_js(_lire(EXTENSION_JS)), [])
+
+    def test_le_garde_fou_js_voit_une_phrase_oubliee(self):
+        self.assertEqual(phrases_en_dur_js("x = {label: 'Fermer la fenêtre'};"), ["Fermer la fenêtre"])
+        self.assertEqual(phrases_en_dur_js("x = {label: _('Fermer la fenêtre')};"), [])
+        self.assertEqual(phrases_en_dur_js("// 'Une phrase en commentaire'\nx = 1;"), [])
 
     def test_aucune_phrase_affichee_n_echappe_a_la_traduction(self):
         for relatif in FICHIERS_TRADUITS:

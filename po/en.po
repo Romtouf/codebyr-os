@@ -108,3 +108,259 @@ msgstr "Next"
 #: usr/bin/codebyr-bienvenue
 msgid "Commencer"
 msgstr "Get started"
+
+#: usr/share/gnome-shell/extensions/codebyr@codebyr.io/extension.js
+msgid "Navigateur"
+msgstr "Web browser"
+
+#: usr/share/gnome-shell/extensions/codebyr@codebyr.io/extension.js
+msgid "Fichiers"
+msgstr "Files"
+
+#: usr/share/gnome-shell/extensions/codebyr@codebyr.io/extension.js
+msgid "Terminal"
+msgstr "Terminal"
+
+#: usr/share/gnome-shell/extensions/codebyr@codebyr.io/extension.js
+msgid "Éditeur de texte"
+msgstr "Text editor"
+
+#: usr/share/gnome-shell/extensions/codebyr@codebyr.io/extension.js
+msgid "Codebyr Espaces"
+msgstr "Codebyr Spaces"
+
+#: usr/share/gnome-shell/extensions/codebyr@codebyr.io/extension.js
+msgid "Codebyr — Espace actif : {nom}"
+msgstr "Codebyr — active Space: {nom}"
+
+#: usr/share/gnome-shell/extensions/codebyr@codebyr.io/extension.js
+msgid "Ouvrir une app dans un Espace"
+msgstr "Open an app in a Space"
+
+#: usr/share/gnome-shell/extensions/codebyr@codebyr.io/extension.js
+msgid "Créer un Espace…"
+msgstr "Create a Space…"
+
+#: usr/share/gnome-shell/extensions/codebyr@codebyr.io/extension.js
+msgid "Ouvrir un lien en Jetable…"
+msgstr "Open a link in Disposable…"
+
+#: usr/share/gnome-shell/extensions/codebyr@codebyr.io/extension.js
+msgid "Mode invité (prêter le PC)"
+msgstr "Guest mode (lend the PC)"
+
+#: usr/share/gnome-shell/extensions/codebyr@codebyr.io/extension.js
+msgid "Transférer le presse-papiers vers…"
+msgstr "Send the clipboard to…"
+
+#: usr/share/gnome-shell/extensions/codebyr@codebyr.io/extension.js
+msgid "Assistant de sécurité"
+msgstr "Security Assistant"
+
+#: usr/share/gnome-shell/extensions/codebyr@codebyr.io/extension.js
+msgid "Assistant de sécurité indisponible"
+msgstr "Security Assistant unavailable"
+
+#: usr/share/gnome-shell/extensions/codebyr@codebyr.io/extension.js
+msgid "Configuration Codebyr"
+msgstr "Codebyr Settings"
+
+#: usr/share/gnome-shell/extensions/codebyr@codebyr.io/extension.js
+msgid "Configuration Codebyr indisponible"
+msgstr "Codebyr Settings unavailable"
+
+#: usr/share/gnome-shell/extensions/codebyr@codebyr.io/extension.js
+msgid "Créer un Espace"
+msgstr "Create a Space"
+
+#: usr/share/gnome-shell/extensions/codebyr@codebyr.io/extension.js
+msgid "Un compartiment isolé et persistant, avec sa couleur."
+msgstr "An isolated, persistent compartment with its own color."
+
+#: usr/share/gnome-shell/extensions/codebyr@codebyr.io/extension.js
+msgid "Nom (ex. Achats, Études, Association…)"
+msgstr "Name (e.g. Shopping, School, Club…)"
+
+#: usr/share/gnome-shell/extensions/codebyr@codebyr.io/extension.js
+msgid "Couleur :"
+msgstr "Color:"
+
+#: usr/share/gnome-shell/extensions/codebyr@codebyr.io/extension.js
+msgid "Création de l'Espace « {nom} » impossible"
+msgstr "Could not create the “{nom}” Space"
+
+#: usr/share/gnome-shell/extensions/codebyr@codebyr.io/extension.js
+msgid "Espace créé : {nom}"
+msgstr "Space created: {nom}"
+
+#: usr/share/gnome-shell/extensions/codebyr@codebyr.io/extension.js
+msgid "Annuler"
+msgstr "Cancel"
+
+#: usr/share/gnome-shell/extensions/codebyr@codebyr.io/extension.js
+msgid "Créer"
+msgstr "Create"
+
+#: usr/share/gnome-shell/extensions/codebyr@codebyr.io/extension.js
+msgid "Codebyr — Mode invité"
+msgstr "Codebyr — Guest mode"
+
+#: usr/share/gnome-shell/extensions/codebyr@codebyr.io/extension.js
+msgid "Ouvrez le menu en haut à droite → Changer d'utilisateur → Invité (aucun mot de passe demandé)."
+msgstr "Open the menu at the top right → Switch User → Guest (no password needed)."
+
+#: usr/share/gnome-shell/extensions/codebyr@codebyr.io/extension.js
+msgid "Ouvrir un lien en Jetable"
+msgstr "Open a link in Disposable"
+
+#: usr/share/gnome-shell/extensions/codebyr@codebyr.io/extension.js
+msgid "Le lien s'ouvrira dans une bulle isolée qui s'autodétruit à la fermeture."
+msgstr "The link will open in an isolated bubble that self-destructs when closed."
+
+#: usr/share/gnome-shell/extensions/codebyr@codebyr.io/extension.js
+msgid "Ouverture en Jetable impossible"
+msgstr "Could not open in Disposable"
+
+#: usr/share/gnome-shell/extensions/codebyr@codebyr.io/extension.js
+msgid "Ouvrir en Jetable"
+msgstr "Open in Disposable"
+
+#: usr/share/gnome-shell/extensions/codebyr@codebyr.io/extension.js
+msgid "Presse-papiers inter-Espaces indisponible."
+msgstr "Cross-Space clipboard unavailable."
+
+#: usr/share/gnome-shell/extensions/codebyr@codebyr.io/extension.js
+msgid "Codebyr — Presse-papiers"
+msgstr "Codebyr — Clipboard"
+
+#: usr/share/gnome-shell/extensions/codebyr@codebyr.io/extension.js
+msgid "Rien à transférer. Copiez d'abord un texte (Ctrl+C) dans un Espace, puis rouvrez ce menu."
+msgstr "Nothing to send. First copy some text (Ctrl+C) in a Space, then reopen this menu."
+
+#: usr/share/gnome-shell/extensions/codebyr@codebyr.io/extension.js
+msgid "Transférer le presse-papiers"
+msgstr "Send the clipboard"
+
+#: usr/share/gnome-shell/extensions/codebyr@codebyr.io/extension.js
+msgid "Contenu copié depuis « {source} » ({n} caractère)."
+msgid_plural "Contenu copié depuis « {source} » ({n} caractères)."
+msgstr[0] "Copied from “{source}” ({n} character)."
+msgstr[1] "Copied from “{source}” ({n} characters)."
+
+#: usr/share/gnome-shell/extensions/codebyr@codebyr.io/extension.js
+msgid "Contenu copié ({n} caractère)."
+msgid_plural "Contenu copié ({n} caractères)."
+msgstr[0] "Copied content ({n} character)."
+msgstr[1] "Copied content ({n} characters)."
+
+#: usr/share/gnome-shell/extensions/codebyr@codebyr.io/extension.js
+msgid "Vers quel Espace l'autoriser ?"
+msgstr "Which Space should receive it?"
+
+#: usr/share/gnome-shell/extensions/codebyr@codebyr.io/extension.js
+msgid "Autorisé vers « {nom} ». Basculez sur cet Espace et collez (Ctrl+V). Le presse-papiers sera ensuite effacé."
+msgstr "Allowed for “{nom}”. Switch to that Space and paste (Ctrl+V). The clipboard will then be cleared."
+
+#: usr/share/gnome-shell/extensions/codebyr@codebyr.io/extension.js
+msgid "Jetable (éphémère)"
+msgstr "Disposable (ephemeral)"
+
+#: usr/share/gnome-shell/extensions/codebyr@codebyr.io/extension.js
+msgid "Autres applications…"
+msgstr "Other applications…"
+
+#: usr/share/gnome-shell/extensions/codebyr@codebyr.io/extension.js
+msgid "Fermer cet Espace"
+msgstr "Close this Space"
+
+#: usr/share/gnome-shell/extensions/codebyr@codebyr.io/extension.js
+msgid "Vider ses données"
+msgstr "Erase its data"
+
+#: usr/share/gnome-shell/extensions/codebyr@codebyr.io/extension.js
+msgid "Créer un instantané (sauvegarde)"
+msgstr "Take a snapshot (backup)"
+
+#: usr/share/gnome-shell/extensions/codebyr@codebyr.io/extension.js
+msgid "Revenir à un instantané…"
+msgstr "Restore a snapshot…"
+
+#: usr/share/gnome-shell/extensions/codebyr@codebyr.io/extension.js
+msgid "Supprimer cet Espace"
+msgstr "Delete this Space"
+
+#: usr/share/gnome-shell/extensions/codebyr@codebyr.io/extension.js
+msgid "Ouvrir une application dans « {nom} »"
+msgstr "Open an application in “{nom}”"
+
+#: usr/share/gnome-shell/extensions/codebyr@codebyr.io/extension.js
+msgid "Rechercher une application…"
+msgstr "Search for an application…"
+
+#: usr/share/gnome-shell/extensions/codebyr@codebyr.io/extension.js
+msgid "Aucune application trouvée."
+msgstr "No application found."
+
+#: usr/share/gnome-shell/extensions/codebyr@codebyr.io/extension.js
+msgid "Fermer"
+msgstr "Close"
+
+#: usr/share/gnome-shell/extensions/codebyr@codebyr.io/extension.js
+msgid "Détail : ouvrez un terminal et tapez  journalctl -t codebyr -n 20"
+msgstr "Details: open a terminal and type  journalctl -t codebyr -n 20"
+
+#: usr/share/gnome-shell/extensions/codebyr@codebyr.io/extension.js
+msgid "Impossible d'ouvrir l'Espace {nom}"
+msgstr "Could not open the {nom} Space"
+
+#: usr/share/gnome-shell/extensions/codebyr@codebyr.io/extension.js
+msgid "Action « {action} » impossible sur {nom}"
+msgstr "Action “{action}” failed on {nom}"
+
+#: usr/share/gnome-shell/extensions/codebyr@codebyr.io/extension.js
+msgid "Espace fermé : {nom}"
+msgstr "Space closed: {nom}"
+
+#: usr/share/gnome-shell/extensions/codebyr@codebyr.io/extension.js
+msgid "Données effacées : {nom}"
+msgstr "Data erased: {nom}"
+
+#: usr/share/gnome-shell/extensions/codebyr@codebyr.io/extension.js
+msgid "Sauvegardé (dossier « Espaces-Codebyr ») : {nom}"
+msgstr "Saved (“Espaces-Codebyr” folder): {nom}"
+
+#: usr/share/gnome-shell/extensions/codebyr@codebyr.io/extension.js
+msgid "Restauré depuis la dernière sauvegarde : {nom}"
+msgstr "Restored from the latest backup: {nom}"
+
+#: usr/share/gnome-shell/extensions/codebyr@codebyr.io/extension.js
+msgid "Espace supprimé : {nom}"
+msgstr "Space deleted: {nom}"
+
+#: usr/share/gnome-shell/extensions/codebyr@codebyr.io/extension.js
+msgid "Action impossible sur {nom}"
+msgstr "Action failed on {nom}"
+
+#: usr/share/gnome-shell/extensions/codebyr@codebyr.io/extension.js
+msgid "{jour}/{mois}/{annee} à {heure}h{minute}"
+msgstr "{annee}-{mois}-{jour} at {heure}:{minute}"
+
+#: usr/share/gnome-shell/extensions/codebyr@codebyr.io/extension.js
+msgid "Aucun instantané pour {nom}. Faites d'abord « Créer un instantané »."
+msgstr "No snapshot for {nom}. Use “Take a snapshot” first."
+
+#: usr/share/gnome-shell/extensions/codebyr@codebyr.io/extension.js
+msgid "Revenir à un instantané de « {nom} »"
+msgstr "Restore a snapshot of “{nom}”"
+
+#: usr/share/gnome-shell/extensions/codebyr@codebyr.io/extension.js
+msgid "Choisissez la date à laquelle restaurer cet Espace :"
+msgstr "Choose the date to restore this Space to:"
+
+#: usr/share/gnome-shell/extensions/codebyr@codebyr.io/extension.js
+msgid "Restauration de {nom} impossible"
+msgstr "Could not restore {nom}"
+
+#: usr/share/gnome-shell/extensions/codebyr@codebyr.io/extension.js
+msgid "{nom} restauré à l'instantané du {date}"
+msgstr "{nom} restored to the snapshot of {date}"

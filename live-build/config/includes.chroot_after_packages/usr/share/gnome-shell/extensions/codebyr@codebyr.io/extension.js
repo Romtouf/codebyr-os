@@ -239,15 +239,6 @@ function classeDe(win) {
     return {wm, app, combo: (wm + ' ' + app).toLowerCase()};
 }
 
-function espacePourFenetre(win, espaces) {
-    const c = classeDe(win).combo;
-    for (const e of espaces) {
-        if (c.includes('codebyr-' + e.id))
-            return e;
-    }
-    return null;
-}
-
 // PPid d'un processus, lu dans /proc
 function ppid(pid) {
     try {
@@ -641,7 +632,8 @@ class Coloriage {
     }
 }
 
-// Espace de la fenêtre actuellement focalisée (par classe, sinon filiation).
+// Espace de la fenêtre actuellement focalisée, par filiation des processus —
+// jamais par la classe de fenêtre, qu'une application choisit elle-même.
 function espaceFocalise(espaces, rundir) {
     let win = null;
     try { win = global.display.focus_window; } catch (e) {}

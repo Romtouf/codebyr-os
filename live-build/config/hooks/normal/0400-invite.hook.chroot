@@ -7,10 +7,16 @@ set -e
 
 echo "P: Codebyr — mode invité"
 
-# — Compte invité (PAS sudo, groupes minimaux) —
+# — Compte invité (PAS sudo, AUCUN groupe supplémentaire) —
+# Il était dans audio, video, plugdev et netdev jusqu'à la 1.19.0. Ce que ces
+# groupes donnent, logind le donne déjà à la session ACTIVE ; au-delà, netdev
+# permettait à l'invité de modifier les connexions réseau de la machine sans
+# mot de passe (le DNS du Wi-Fi du propriétaire), et audio/video d'ouvrir le
+# micro et la caméra depuis une session laissée en arrière-plan. Les machines
+# installées sont rattrapées par codebyr-durcir-poste.
 if ! id invite >/dev/null 2>&1; then
 	useradd --create-home --shell /bin/bash --uid 1001 --user-group \
-		--groups audio,video,plugdev,netdev --comment "Invité" invite
+		--comment "Invité" invite
 fi
 # — Isole le dossier de l'utilisateur principal : l'invité ne peut pas le lire —
 chmod 700 /home/user 2>/dev/null || true

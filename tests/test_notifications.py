@@ -11,11 +11,16 @@ deux moitiés : que le texte passe, et que rien d'autre ne passe.
 """
 import json
 import os
+import re
+import shutil
 import socket
+import subprocess
+import sys
 import tempfile
 import threading
 import time
 import unittest
+from unittest import mock
 
 from outils import BIN, LIB, RACINE  # noqa: F401 — place les modules partagés
 import relais_notifications as relais  # noqa: E402
@@ -185,6 +190,81 @@ class LeBusPriveResteIntact(unittest.TestCase):
         # transmis. Une action rouvrirait un canal de retour vers l'Espace.
         self.assertIn("_, _, _, resume, corps, _, _, _ = params.unpack()", source)
         self.assertIn("--icon=dialog-information", source)
+
+
+class LesTextesNeSontJamaisDesOptions(unittest.TestCase):
+    """1.19.1 : notify-send lit ses options PARTOUT sur la ligne de commande,
+    et la dernière l'emporte. Un titre « --app-name=Espace Banque » venu de
+    Jetable remplaçait l'en-tête imposé (analyse externe du 01/10/2026)."""
+
+    def test_le_relais_place_les_textes_apres_le_separateur(self):
+        vus = []
+        with mock.patch.object(relais.subprocess, "Popen", lambda argv, **kw: vus.append(argv)):
+            relais.traiter(json.dumps({"resume": "--app-name=Espace Banque",
+                                       "corps": "--urgency=critical"}).encode("utf-8"),
+                           "Jetable", montrer=relais.afficher)
+        argv = vus[0]
+        separateur = argv.index("--")
+        self.assertEqual(argv[separateur + 1:], ["--app-name=Espace Banque", "--urgency=critical"])
+        self.assertEqual([a for a in argv[:separateur] if a.startswith("--app-name")],
+                         ["--app-name=Espace Jetable"])
+
+    def test_chaque_appel_a_notify_send_a_son_separateur(self):
+        appels = 0
+        for dossier, _d, fichiers in os.walk(os.path.join(RACINE, "live-build")):
+            for nom in fichiers:
+                chemin = os.path.join(dossier, nom)
+                try:
+                    texte = _lire(chemin)
+                except (UnicodeDecodeError, OSError):
+                    continue
+                code = "\n".join(l for l in texte.splitlines() if not l.lstrip().startswith("#"))
+                for liste in re.findall(r'\["notify-send",[^\]]*\]', code):
+                    appels += 1
+                    self.assertIn('"--"', liste, chemin)
+                for ligne in re.findall(r"^\s*notify-send\s.*$", code, re.M):
+                    appels += 1
+                    self.assertRegex(ligne, r"\s--\s", chemin)
+        self.assertGreaterEqual(appels, 3)
+
+
+def _gi_disponible():
+    try:
+        import gi.repository.Gio  # noqa: F401
+        return True
+    except ImportError:
+        return False
+
+
+@unittest.skipUnless(shutil.which("notify-send") and shutil.which("dbus-run-session")
+                     and _gi_disponible(), "notify-send, dbus-run-session et python3-gi")
+class AvecLeVraiNotifySend(unittest.TestCase):
+    """Le vrai notify-send, face à un faux serveur de notifications sur un bus
+    jetable (tests/notifications_harnais.py) : ce que le bureau reçoit."""
+
+    HARNAIS = os.path.join(RACINE, "tests", "notifications_harnais.py")
+
+    def _recu(self, mode, resume, corps):
+        env = dict(os.environ)
+        env["PYTHONPATH"] = LIB + os.pathsep + env.get("PYTHONPATH", "")
+        resultat = subprocess.run(["dbus-run-session", "--", sys.executable, "-B",
+                                   self.HARNAIS, mode, resume, corps],
+                                  capture_output=True, text=True, timeout=60, env=env)
+        self.assertEqual(resultat.returncode, 0, resultat.stderr)
+        return json.loads(resultat.stdout.strip().splitlines()[-1])
+
+    def test_l_attaque_etait_reelle(self):
+        # Sans ce témoin, un test qui passe ne prouverait rien.
+        recu = self._recu("sans-tirets", "--app-name=Espace Banque", "Session expirée")
+        self.assertEqual(recu["app"], "Espace Banque")
+
+    def test_l_en_tete_de_l_espace_tient(self):
+        recu = self._recu("relais", "--app-name=Espace Banque", "--urgency=critical")
+        self.assertEqual(recu["app"], "Espace Jetable")
+        self.assertEqual(recu["resume"], "--app-name=Espace Banque")
+        self.assertEqual(recu["corps"], "--urgency=critical")
+        self.assertNotEqual(recu["urgence"], 2)
+        self.assertEqual(recu["actions"], [])
 
 
 if __name__ == "__main__":

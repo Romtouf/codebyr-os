@@ -87,6 +87,30 @@ def analyser_invite(champ_shadow):
     return False, _("le compte invité a un mot de passe utilisable")
 
 
+# Ce que ces groupes donnent à l'invité, logind ne le donne qu'à la session
+# ACTIVE, ou pas du tout : « netdev » modifie les connexions réseau de la
+# machine sans mot de passe (règle polkit de Debian) — le DNS du Wi-Fi du
+# propriétaire, durablement ; « audio » et « video » ouvrent micro, caméra et
+# carte graphique même quand sa session tourne en arrière-plan ; « plugdev »,
+# des périphériques USB. L'invité en faisait partie jusqu'à la 1.19.0
+# (analyse externe du 01/10/2026).
+GROUPES_INTERDITS_INVITE = ("netdev", "audio", "video", "plugdev")
+
+
+def analyser_groupes_invite(groupes):
+    """Le compte invité ne doit appartenir à aucun groupe qui donne du matériel.
+
+    groupes : noms de ses groupes supplémentaires, ou None si le compte
+              n'existe pas (ce qui n'est pas une anomalie).
+    """
+    if groupes is None:
+        return True, _("pas de compte invité sur ce poste")
+    en_trop = sorted(set(groupes) & set(GROUPES_INTERDITS_INVITE))
+    if en_trop:
+        return False, _("l'invité est encore dans : {groupes}").format(groupes=", ".join(en_trop))
+    return True, _("ni réseau de la machine, ni micro, ni caméra hors de sa session")
+
+
 def analyser_homes(dossiers):
     """Les dossiers personnels doivent être privés (0700).
 
@@ -242,14 +266,32 @@ def _userns_dispo():
         return contenu != "0"
 
 
+def _groupes_invite():
+    """Les groupes supplémentaires de l'invité ; None s'il n'existe pas, « ? »
+    là où les comptes ne se lisent pas (hors Linux : les tests sous Windows)."""
+    try:
+        import grp
+        import pwd
+    except ImportError:
+        return "?"
+    try:
+        pwd.getpwnam(INVITE)
+    except KeyError:
+        return None
+    return [g.gr_name for g in grp.getgrall() if INVITE in g.gr_mem]
+
+
 def relever():
     """Toutes les mesures de la machine, en une passe."""
     champ = _champ_shadow(INVITE)
+    groupes = _groupes_invite()
     return {
         "extension_jetable": analyser_extension_jetable(
             os.path.exists(EXTENSION_JETABLE), _paquet_installe("python3-nautilus")),
         "invite": (analyser_invite(champ) if champ != "?illisible"
                    else (None, "/etc/shadow illisible — relancez avec sudo")),
+        "groupes_invite": (analyser_groupes_invite(groupes) if groupes != "?"
+                           else (None, "—")),
         "homes": analyser_homes(_dossiers_personnels()),
         "trousseau": analyser_trousseau(_empreintes_trousseau()),
         "maj": analyser_maj_automatiques(_lire(PERIODIQUE), _minuterie_active()),
@@ -262,6 +304,7 @@ def relever():
 LIBELLES = (
     ("extension_jetable", _("Clic droit « Ouvrir en Jetable »")),
     ("invite", _("Compte invité sans mot de passe")),
+    ("groupes_invite", _("Invité sans accès au matériel")),
     ("homes", _("Dossiers personnels privés")),
     ("trousseau", _("Trousseau à jour pour les mises à jour")),
     ("maj", _("Mises à jour automatiques armées")),

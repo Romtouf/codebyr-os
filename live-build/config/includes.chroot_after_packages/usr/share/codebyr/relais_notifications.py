@@ -93,10 +93,18 @@ class Limiteur:
 
 
 def afficher(nom_espace, resume, corps):
-    """Affiche sur le bureau de l'hôte, sous l'identité de l'ESPACE."""
+    """Affiche sur le bureau de l'hôte, sous l'identité de l'ESPACE.
+
+    « -- » avant les textes, toujours : notify-send lit ses options PARTOUT
+    sur la ligne de commande, et la dernière l'emporte. Un titre
+    « --app-name=Espace Banque », venu de Jetable, remplaçait l'en-tête
+    imposé ici ; « --urgency=critical » ou « --action » passaient de même.
+    Après « -- », ce n'est plus que du texte. Constaté par une analyse
+    externe du 01/10/2026.
+    """
     subprocess.Popen(
         ["notify-send", "--app-name=Espace %s" % nom_espace,
-         "--icon=dialog-information", resume, corps],
+         "--icon=dialog-information", "--", resume, corps],
         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
 

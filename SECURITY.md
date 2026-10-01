@@ -1,5 +1,31 @@
 # Politique de sécurité
 
+## Analyse externe du 1er octobre 2026
+
+Une relecture extérieure du code (commit `d386f94`) a relevé quatre défauts de
+sécurité et plusieurs faiblesses. Chaque point a été vérifié sur le code et sur
+le système de l'ISO avant d'être corrigé. Où en est chacun :
+
+- **Corrigé en 1.19.1** — une notification venue d'un Espace pouvait se
+  signer « Espace Banque » (voir l'historique) ;
+- **Corrigé en 1.19.1** — le compte invité pouvait modifier les connexions
+  réseau de la machine, et ouvrir micro et caméra depuis une session en
+  arrière-plan (voir l'historique) ;
+- **En cours** — l'alerte du bouclier anti-hameçonnage vit dans la page
+  qu'elle dénonce : un script de cette page peut la retirer, ou cliquer
+  « Ce site est légitime » à la place de l'utilisateur ;
+- **En cours** — un Espace qui tourne sous le compte du bureau (ceux de
+  l'invité, ou un Espace sans « Compte séparé ») partage son espace de noms
+  réseau, donc pourrait joindre le serveur X11 du bureau par sa socket
+  abstraite : presse-papiers et frappes. Les Espaces à compte séparé, le
+  défaut, n'y sont pas exposés ;
+- **En cours** — le filtre d'appels système du Blindage laisse passer 316
+  appels sur 379, dont la création d'espaces de noms (`unshare`, `clone3`) et
+  les montages. Il ferme les appels les plus dangereux (`ptrace`, `bpf`,
+  `keyctl`, `setns`…), mais un processus compromis peut encore créer ses
+  propres espaces de noms et atteindre ainsi une large surface du noyau
+  (nf_tables). Ne le considérez pas, à ce jour, comme une barrière forte.
+
 ## Lot de sécurité de septembre 2026
 
 **Publié en 1.11.0** : défauts de liens dans les échanges et la préparation des
@@ -133,7 +159,8 @@ utilisateur non technique.
   caractères de contrôle) et borné, leur débit limité, et les boutons d'action
   refusés — ils rouvriraient un canal vers l'Espace. Le bus de session de
   l'hôte, lui, n'entre toujours pas : seule une socket transportant deux
-  chaînes de texte relie l'Espace au bureau (1.14.0).
+  chaînes de texte relie l'Espace au bureau (1.14.0). Jusqu'en 1.19.0, un
+  titre déguisé en option de `notify-send` remplaçait cet en-tête (1.19.1).
 - Le presse-papiers ne « suit » pas passivement d'un Espace à l'autre : il est
   vidé dès que le focus passe à un Espace différent de celui qui l'a rempli —
   **et aussi dès qu'on quitte un Espace sensible** (Blindage ou réseau
@@ -317,6 +344,8 @@ surface applicative minimale (`--apt-recommends false`).
 
 | Version | Correctif |
 |---|---|
+| 1.19.1 | **Une notification d'Espace pouvait usurper l'en-tête d'un autre** (présent depuis 1.14.0). L'hôte affiche les notifications d'un Espace par `notify-send`, en imposant l'en-tête « Espace Jetable », « Espace Banque »… Mais `notify-send` lit ses options partout sur sa ligne de commande, et la dernière l'emporte : un titre `--app-name=Espace Banque`, envoyé par une application de Jetable — ou par une page web à qui l'on a permis les notifications —, remplaçait l'en-tête, et `--urgency=critical` ou `--action` passaient de même. Le nettoyage du texte retirait balises et caractères de contrôle, pas un tiret. Les textes sont désormais placés après `--`. Relevé par une analyse externe le 01/10/2026 ; attaque reproduite avec le vrai `notify-send` de Debian 13 face à un faux serveur de notifications, puis vérifiée fermée — un test rejoue les deux. Aucune exploitation connue. |
+| 1.19.1 | **Le compte invité modifiait les connexions réseau de la machine** (présent depuis 1.0). L'image le plaçait dans les groupes `netdev`, `audio`, `video` et `plugdev`. Sous Debian, une règle polkit de NetworkManager donne à `netdev` le droit de modifier sans mot de passe les connexions de toute la machine : l'invité pouvait changer le DNS ou le proxy du Wi-Fi du propriétaire, durablement. `audio` et `video` ouvraient micro et caméra même depuis une session invité laissée en arrière-plan. Ce que ces groupes donnent, logind l'accorde déjà à la session active : l'invité n'en a plus aucun, les machines installées sont rattrapées à la mise à jour, et le vérificateur du poste le contrôle. Relevé par une analyse externe le 01/10/2026 ; règle polkit lue sur le système de l'ISO 1.18.2. Aucune exploitation connue. |
 | 1.17.2 | **Élévation au rang de root par le remplissage du dossier « Modèles »** (présent depuis 1.10.0). `codebyr-durcir-poste` tourne en root à chaque mise à jour de `codebyr-tools`, donc sans personne devant l'écran (`unattended-upgrades`). Pour chaque compte de `/home`, il lisait `XDG_TEMPLATES_DIR` dans `~/.config/user-dirs.dirs`, créait ce dossier, y copiait les modèles, puis remettait le dossier au compte par `chown`. Ce fichier appartient au compte : y écrire `"$HOME/../../etc"` faisait remettre `/etc` au compte à la mise à jour suivante — donc tout le système. Un lien `~/Modèles` → `/etc` produisait le même effet (`chown` suit les liens). Atteignable depuis tout compte non administrateur, l'invité compris si une mise à jour tombait pendant sa session. Tout ce qui écrit dans un dossier personnel est désormais exécuté sous l'identité de son propriétaire (`setpriv`, les trois identifiants changés, `--no-new-privs`, environnement remis à zéro), et seulement si le dossier lui appartient : un chemin détourné ne mène plus qu'où le compte pouvait déjà écrire. Relevé le 01/10/2026 en relisant le script pour y ajouter l'avatar ; attaque reproduite (le dossier victime passait au compte attaquant), puis vérifiée fermée. Un test la rejoue, chemin détourné et lien, dans un espace de montage privé. Aucune exploitation connue. |
 | 1.16.7 | **Lanceur de session modifiable par tous (depuis 1.13.0).** Le paquet `codebyr-tools` installait `/etc/xdg/autostart/codebyr-bienvenue.desktop` et `/usr/share/icons/hicolor/scalable/apps/io.codebyr.Bienvenue.svg` en `0777`. Le premier est lu à l'ouverture de CHAQUE session : n'importe quel compte de la machine — l'invité, sans mot de passe, ou le compte d'un Espace sorti de son bac à sable — pouvait y inscrire une commande exécutée ensuite sous le compte de chaque utilisateur qui se connecte. Cause : le paquet publié se construit depuis un disque Windows, où tout apparaît en `0777`, et `build-deb.sh` ne normalisait que des dossiers choisis ; `verifier_paquet.py` ne contrôlait les droits que sur sa propre liste de fichiers ; la CI, qui construit depuis un checkout git aux droits justes, ne pouvait pas le voir. Désormais tout le paquet part de `0644`/`0755` et seuls les programmes reçoivent le bit d'exécution ; le vérificateur lit les droits de TOUTES les entrées dans l'archive ; un test construit le paquet depuis une copie des sources toute en `0777`. La mise à jour réécrit les deux fichiers (ce ne sont pas des fichiers de configuration) : un contenu altéré est remplacé. Relevé le 30/09/2026 en préparant l'ISO reproductible ; aucune exploitation connue. |
 | 1.16.6 | **« Ajouter une application » rendait exécutable en suivant les liens.** Pour un Espace ordinaire, le programme choisi dans le dossier de l'Espace était rendu exécutable (`chmod 0755`) par son nom, depuis le compte du bureau. Un Espace compromis pouvait y placer un lien vers `~/.ssh/id_rsa` : le choisir rendait la clé privée lisible par tous les comptes de la machine. Le fichier est désormais ouvert sans suivre de lien et modifié par son descripteur, et seulement s'il est un fichier ordinaire. Sous compte séparé, le geste — nouveau en 1.16.6 — est fait par l'Espace lui-même, sur ses propres fichiers. |

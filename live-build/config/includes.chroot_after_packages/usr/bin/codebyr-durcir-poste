@@ -178,6 +178,19 @@ if id invite >/dev/null 2>&1; then
 		echo "codebyr : règle PAM invité non posée — mot de passe laissé tel quel" >&2
 		echo "          (mieux vaut un invité accessible qu'un invité inutilisable)." >&2
 	fi
+
+	# c) Aucun groupe qui donne du matériel ou le réseau de la machine. Ce
+	#    qu'ils donnent, logind l'accorde déjà à la session ACTIVE ; au-delà,
+	#    « netdev » modifiait les connexions réseau de la machine sans mot de
+	#    passe (règle polkit de Debian), « audio » et « video » ouvraient micro
+	#    et caméra depuis une session en arrière-plan. L'image l'y mettait
+	#    jusqu'à la 1.19.0 (analyse externe du 01/10/2026).
+	for groupe in netdev audio video plugdev; do
+		if id -nG invite 2>/dev/null | tr ' ' '\n' | grep -qx "$groupe"; then
+			gpasswd -d invite "$groupe" >/dev/null 2>&1 \
+				&& echo "codebyr : le compte invité quitte le groupe « $groupe »."
+		fi
+	done
 fi
 
 # ── 3) Espace d'échange chiffré : la ligne que l'installeur laisse à moitié ──

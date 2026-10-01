@@ -31,7 +31,7 @@ Points importants :
 |---|---|
 | `usr/bin/codebyr-space` | Cœur : cycle de vie des Espaces, bwrap, réseau, blindage |
 | `usr/bin/codebyr-jetable` | Ouverture jetable de liens et fichiers |
-| `usr/bin/codebyr-net-proxy` | Filtre réseau à liste blanche (HTTP/CONNECT) |
+| `usr/bin/codebyr-net-proxy` | Filtre réseau à liste blanche (HTTP/CONNECT et SOCKS5) |
 | `usr/bin/codebyr-config` | Réglages (GTK4/Adwaita) : domaines bancaires, blindage |
 | `usr/bin/codebyr-assistant` | Assistant de sécurité (GTK4, 100 % local) |
 | `usr/bin/codebyr-bienvenue` | Tour de bienvenue + lancement de l'installation |
@@ -61,8 +61,13 @@ python -m unittest discover -s tests -v
 
 Sans dépendance : bibliothèque standard uniquement, comme le reste du projet.
 La même suite tourne en CI (`.github/workflows/ci.yml`) sur chaque push et
-chaque pull request, avec en plus `py_compile`, `ruff` (erreurs réelles
-seulement), `bash -n`, `shellcheck` et la construction du `.deb`.
+chaque pull request, avec en plus une compilation de chaque programme Python
+(par `compile()`, pas `py_compile`, qui déposerait des `__pycache__` dans
+l'arborescence copiée dans l'ISO), `ruff` (erreurs réelles seulement),
+`bash -n`, `shellcheck` et la construction du `.deb`. Un programme est
+reconnu à sa première ligne (`#!…python3`, `#!/bin/sh`…), où qu'il soit dans
+l'image : le service root `codebyr-uid` compris. Un nouveau dossier de
+programmes s'ajoute à la liste de `ci.yml`.
 
 Les tests de `tests/test_bac_a_sable.py` sont des **gardes de non-régression de
 sécurité** : chacun correspond à une ligne de l'historique des correctifs de

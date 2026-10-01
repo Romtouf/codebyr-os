@@ -10,6 +10,30 @@ GNOME (menu du Sceau, liserés colorés) ne se recharge pas à chaud.
 
 ---
 
+## 1.19.1 — non publiée
+
+**Deux failles fermées, relevées par une analyse externe du code** (détail
+dans [SECURITY.md](SECURITY.md)) :
+
+- **Une notification ne peut plus se faire passer pour un autre Espace.** Un
+  titre déguisé en option (`--app-name=Espace Banque`) remplaçait l'en-tête
+  imposé par Codebyr : une page web ouverte en Jetable, à qui l'on avait
+  permis les notifications, pouvait signer une fausse alerte de la Banque ;
+- **le compte invité ne touche plus au réseau de la machine**, ni au micro ou
+  à la caméra hors de sa session. Il était membre de groupes qui lui
+  permettaient, par exemple, de changer le DNS du Wi-Fi du propriétaire. Les
+  machines installées sont corrigées à la mise à jour, et
+  `sudo codebyr-space verifier-poste` le contrôle.
+
+Et, sans effet visible : la vérification automatique du code couvre désormais
+aussi les programmes qui tournent en administrateur (le service des comptes
+d'Espaces, le premier processus d'un Espace, le filtre réseau, la
+configuration du démarrage par l'installeur), et une fonction morte de
+l'extension GNOME, qui identifiait un Espace d'une façon falsifiable, est
+retirée.
+
+---
+
 ## 1.19.0 — 1er octobre 2026
 
 **Un démarrage sans couture.** Du logo du fabricant à l'écran de connexion,

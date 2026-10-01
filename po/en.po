@@ -1117,6 +1117,14 @@ msgid "le compte invité a un mot de passe utilisable"
 msgstr "the guest account has a usable password"
 
 #: usr/share/codebyr/autotest.py
+msgid "l'invité est encore dans : {groupes}"
+msgstr "the guest is still in: {groupes}"
+
+#: usr/share/codebyr/autotest.py
+msgid "ni réseau de la machine, ni micro, ni caméra hors de sa session"
+msgstr "no machine network, microphone or camera outside its session"
+
+#: usr/share/codebyr/autotest.py
 msgid "lisible par d'autres comptes : {dossiers}"
 msgid_plural "lisibles par d'autres comptes : {dossiers}"
 msgstr[0] "readable by other accounts: {dossiers}"
@@ -1171,6 +1179,10 @@ msgstr "Right-click “Open in Disposable”"
 #: usr/share/codebyr/autotest.py
 msgid "Compte invité sans mot de passe"
 msgstr "Guest account without password"
+
+#: usr/share/codebyr/autotest.py
+msgid "Invité sans accès au matériel"
+msgstr "Guest without hardware access"
 
 #: usr/share/codebyr/autotest.py
 msgid "Dossiers personnels privés"

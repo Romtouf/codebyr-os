@@ -65,9 +65,10 @@ assert.equal(espaceParProcessus(win, espaces, '/run/codebyr'), null);
 '''
         resultat = subprocess.run(["node", "-e", programme], capture_output=True, text=True, timeout=10)
         self.assertEqual(resultat.returncode, 0, resultat.stderr)
-        # Aucune décision effective ne doit réintroduire la classe auto-déclarée.
+        # La décision par classe auto-déclarée n'existe plus, même inutilisée :
+        # une fonction morte se réutilise par mégarde (retirée en 1.19.1).
         usages = re.findall(r"espacePourFenetre\(", source)
-        self.assertEqual(len(usages), 1, json.dumps(usages))  # définition historique seule
+        self.assertEqual(usages, [], json.dumps(usages))
 
 class NomDeLEspaceActif(unittest.TestCase):
     """Le nom affiché à côté du Sceau ne doit pas pouvoir être usurpé.

@@ -34,19 +34,29 @@ jobs:
         id: sources
         run: |
           set -e
-          py=$(grep -rl '^#!/usr/bin/env python3' \
-                live-build/config/includes.chroot_after_packages/usr/bin/ | tr '\n' ' ')
+          I=live-build/config/includes.chroot_after_packages
+          # Un programme se reconnaît à sa PREMIÈRE ligne, quelle qu'elle
+          # soit. La recherche de « #!/usr/bin/env python3 » laissait de côté
+          # « #!/usr/bin/python3 -IS » : le service root codebyr-uid,
+          # codebyr-espace-init et le filtre réseau — les programmes les plus
+          # sensibles (analyse externe du 01/10/2026).
+          premiere() {
+            motif=$1; shift
+            find "$@" -type f -exec awk -v motif="$motif" \
+              'FNR == 1 { if ($0 ~ motif) print FILENAME; nextfile }' {} + | tr '\n' ' '
+          }
+          py="$(premiere '^#!.*python3' $I/usr/bin $I/usr/lib/codebyr)"
+          py="$py $(ls $I/usr/share/nautilus-python/extensions/*.py \
+                tools/*.py packaging/*.py | tr '\n' ' ')"
           sh=$(find live-build packaging -type f \
                 \( -name '*.sh' -o -name '*.hook.chroot' -o -name '*.postinst' \
                    -o -name '*.preinst' -o -name '*.postrm' \) \
                 | tr '\n' ' ')
-          sh="$sh $(grep -rl '^#!/bin/sh' \
-                live-build/config/includes.chroot_after_packages/usr/bin/ \
-                | tr '\n' ' ')"
-          # Les scripts de GRUB (menu, entrées Linux) tournent à chaque
-          # update-grub : une faute, et plus aucun noyau ne s'installe.
-          sh="$sh $(ls live-build/config/includes.chroot_after_packages/etc/grub.d/* \
-                packaging/grub/* | tr '\n' ' ')"
+          # Tout script shell de l'image, où qu'il soit : les commandes, la
+          # configuration du chargeur par l'installeur (exécutée en root), les
+          # scripts de GRUB, qui tournent à chaque update-grub.
+          sh="$sh $(premiere '^#!.*(/sh|bash)' $I) $(ls packaging/grub/* | tr '\n' ' ')"
+          sh="$(echo $sh | tr ' ' '\n' | sort -u | tr '\n' ' ')"
           echo "python=$py" >> "$GITHUB_OUTPUT"
           echo "shell=$sh"  >> "$GITHUB_OUTPUT"
           echo "Python : $py"
@@ -183,7 +193,7 @@ jobs:
       - name: Installer les outils de test
         run: |
           apt-get update -qq
-          apt-get install -y --no-install-recommends git ca-certificates python3 bubblewrap dbus-daemon libseccomp2 firefox-esr nodejs
+          apt-get install -y --no-install-recommends git ca-certificates python3 bubblewrap dbus-daemon libseccomp2 firefox-esr nodejs libnotify-bin python3-gi
       - uses: actions/checkout@v7
       - name: Autoriser les espaces de noms utilisateur si possible
         # Ubuntu 24.04 les restreint par AppArmor et le conteneur en hérite :

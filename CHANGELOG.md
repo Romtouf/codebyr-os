@@ -10,6 +10,41 @@ GNOME (menu du Sceau, liserés colorés) ne se recharge pas à chaud.
 
 ---
 
+## 1.18.0 — non publiée
+
+**Codebyr parle anglais.** Tout ce que Codebyr affiche sur une machine
+installée existe désormais aussi en anglais : la fenêtre « Bienvenue », le
+menu du Sceau et ses fenêtres, Configuration Codebyr, l'Assistant de sécurité,
+les notifications et messages des Espaces, la page de l'Espace Banque qui
+refuse un site, les menus du clic droit dans Fichiers, le vérificateur
+d'ISO. Pour l'essayer : Paramètres → Système → Région et langue → English,
+puis se reconnecter.
+
+- Le français reste la langue de Codebyr. Une session dans une autre langue
+  que le français ou l'anglais reçoit l'anglais, plutôt que le français.
+- Les noms des Espaces livrés suivent la langue (Personal, Work, Bank…) ;
+  ceux que vous avez donnés restent tels quels.
+- Restent en français pour l'instant : la page d'alerte du bouclier
+  anti-hameçonnage, l'écran de démarrage et l'installeur. Ils viendront avec
+  la prochaine ISO.
+- Pour contribuer une langue : `po/en.po` sert de modèle (voir
+  CONTRIBUTING.md).
+
+**Aussi :**
+
+- La vue d'ensemble (touche Super) ne pose plus l'icône d'une application à
+  cheval sur le bas de chaque fenêtre : elle en recouvrait le contenu.
+- « Autres applications… » ne propose plus les outils de Codebyr eux-mêmes
+  (Assistant, Bienvenue) : les ouvrir dans un Espace n'a pas de sens.
+- Une fenêtre du menu du Sceau qui ne peut pas s'ouvrir le dit, au lieu de
+  ne rien faire.
+- Configuration Codebyr : la liste des applications installées suit la
+  langue de la session ; elle était toujours en français.
+- La fenêtre « Bienvenue » montre l'Espace Navigation de sa vraie couleur
+  (l'ambre de la charte depuis la 1.12.2).
+
+---
+
 ## 1.17.2 — 1er octobre 2026
 
 **Correctif de sécurité : un compte de la machine pouvait devenir

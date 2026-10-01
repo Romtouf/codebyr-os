@@ -697,6 +697,67 @@ class LesNomsLivres(unittest.TestCase):
         self.assertEqual([n for n in noms if n not in msgids], [])
 
 
+DIAPORAMA = os.path.join(INCLUDES, traductions.DIAPORAMA)
+
+
+class LeDiaporamaDeLInstalleur(unittest.TestCase):
+    """Calamares ne lit pas nos catalogues : le diaporama porte ses traductions
+    en lui-même, écrites par « extraire »."""
+
+    def test_ses_traductions_sont_a_jour(self):
+        self.assertEqual(_lire(DIAPORAMA), traductions.diaporama_a_jour(RACINE),
+                         "lancez « python3 packaging/traductions.py extraire »")
+
+    def test_plus_de_bac_a_sable_materiel(self):
+        # Les Espaces reposent sur le noyau, pas sur du matériel : le
+        # diaporama ne le prétend plus.
+        self.assertNotIn("Bac à sable matériel", _lire(DIAPORAMA))
+
+    @unittest.skipUnless(shutil.which("node"), "Node.js requis")
+    def test_la_langue_de_la_session(self):
+        code = _lire(DIAPORAMA)
+        table = re.search(r"readonly property var traductions: (\(.*\))\n", code).group(1)
+        debut = code.index("    function traduire(texte) {")
+        fin = code.index("\n    }\n", debut) + 6
+        banc = ("const resultats = [];\n"
+                "for (const nom of ['fr_FR', 'en_US', 'de_DE', 'C']) {\n"
+                "  const Qt = {locale: () => ({name: nom})};\n"
+                "  const traductions = " + table + ";\n"
+                "  " + code[debut:fin] + "\n"
+                "  resultats.push(traduire('Bienvenue dans Codebyr OS\\n\\nLa sécurité par "
+                "compartimentation, simple pour tout le monde.').split('\\n')[0]);\n"
+                "}\nconsole.log(JSON.stringify(resultats));\n")
+        sortie = subprocess.run(["node", "-e", banc], capture_output=True, text=True,
+                                encoding="utf-8", timeout=30)
+        self.assertEqual(sortie.returncode, 0, sortie.stderr)
+        self.assertEqual(json.loads(sortie.stdout),
+                         ["Bienvenue dans Codebyr OS", "Welcome to Codebyr OS",
+                          "Welcome to Codebyr OS", "Bienvenue dans Codebyr OS"])
+
+
+class LeMenuDeDemarrageDuLive(unittest.TestCase):
+    """Une session live en anglais, au menu de démarrage de l'ISO : le premier
+    écran qu'un testeur étranger voit."""
+
+    OPTIONS = "@APPEND_LIVE@ locales=en_US.UTF-8 keyboard-layouts=us"
+
+    def test_grub_uefi(self):
+        grub = _lire(os.path.join(RACINE, "live-build", "config", "bootloaders", "grub-pc", "grub.cfg"))
+        self.assertIn("linux\t@KERNEL_LIVE@ " + self.OPTIONS, grub)
+
+    def test_syslinux_bios(self):
+        live = _lire(os.path.join(RACINE, "live-build", "config", "bootloaders",
+                                  "syslinux_common", "live.cfg.in"))
+        self.assertIn("append " + self.OPTIONS, live)
+
+    def test_les_options_suivent_celles_de_l_image(self):
+        # Ajoutées APRÈS @APPEND_LIVE@ : live-config garde la dernière valeur,
+        # et les protections du noyau restent celles de auto/config, jamais
+        # recopiées à la main.
+        config = _lire(os.path.join(RACINE, "live-build", "auto", "config"))
+        self.assertIn("locales=fr_FR.UTF-8 keyboard-layouts=fr", config)
+
+
 class LesNomsDesApplications(unittest.TestCase):
     """La liste des applications installées (Configuration Codebyr) suit la
     langue de la session ; elle lisait toujours « Name[fr] »."""

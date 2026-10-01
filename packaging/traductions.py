@@ -220,6 +220,20 @@ def extraire_textes(racine):
         fichiers = textes.setdefault((nom, None), [])
         if REGISTRE not in fichiers:
             fichiers.append(REGISTRE)
+    diaporama = os.path.join(racine, INCLUDES, DIAPORAMA)
+    if os.path.isfile(diaporama):
+        with open(diaporama, encoding="utf-8") as f:
+            for cle in textes_qml(f.read(), DIAPORAMA):
+                fichiers = textes.setdefault(cle, [])
+                if DIAPORAMA not in fichiers:
+                    fichiers.append(DIAPORAMA)
+    plymouth = os.path.join(racine, INCLUDES, PLYMOUTH)
+    if os.path.isfile(plymouth):
+        with open(plymouth, encoding="utf-8") as f:
+            for cle in textes_plymouth(f.read(), PLYMOUTH):
+                fichiers = textes.setdefault(cle, [])
+                if PLYMOUTH not in fichiers:
+                    fichiers.append(PLYMOUTH)
     source_bouclier = BOUCLIER + "/fr/messages.json"
     for entree in messages_bouclier(racine).values():
         fichiers = textes.setdefault((_vers_marques(entree["message"]), None), [])
@@ -247,6 +261,104 @@ def _vers_marques(message):
 
 def _vers_firefox(texte):
     return re.sub(r"\{(\w+)\}", lambda m: "$" + m.group(1).upper() + "$", texte)
+
+
+# ── L'écran de démarrage (thème Plymouth) ────────────────────────────────────
+# Le langage de Plymouth ne connaît pas la langue du système. Le thème
+# « codebyr » est le français ; la construction du paquet en produit un par
+# langue traduite (« codebyr-en »…), où chaque traduire("…") reçoit sa
+# traduction. codebyr-durcir-poste choisit le thème selon la langue du système.
+PLYMOUTH = "usr/share/plymouth/themes/codebyr/codebyr.script"
+_APPEL_PLYMOUTH = re.compile(r'(?<![\w.])traduire\("((?:[^"\\\n]|\\.)*)"\)')
+_APPEL_PLYMOUTH_NU = re.compile(r'(?<![\w.])(?<!fun )traduire\(\s*(?!")')
+
+
+def textes_plymouth(code, nom):
+    code = sans_commentaires_js(code)
+    for appel in _APPEL_PLYMOUTH_NU.finditer(code):
+        ligne = code.count("\n", 0, appel.start()) + 1
+        raise TexteNonTraduisible("%s:%d : traduire() doit recevoir un texte entre "
+                                  "guillemets, écrit tel quel" % (nom, ligne))
+    return [(m, None) for m in _APPEL_PLYMOUTH.findall(code)]
+
+
+def theme_traduit(script, entrees):
+    """Le script du thème, chaque traduire("…") remplacé par sa traduction."""
+    traduits = {e.msgid: e.msgstr[0] for e in entrees if e.traduite and e.pluriel is None}
+
+    def remplacer(appel):
+        texte = traduits.get(appel.group(1))
+        if texte is None:
+            return appel.group(0)
+        if '"' in texte or "\\" in texte or "\n" in texte:
+            raise ValueError("Traduction impropre à Plymouth (guillemet, barre ou "
+                             "retour à la ligne) : %r" % texte)
+        return 'traduire("%s")' % texte
+    return _APPEL_PLYMOUTH.sub(remplacer, script)
+
+
+def themes_traduits(racine, dossier_po, racine_paquet):
+    """Écrit usr/share/plymouth/themes/codebyr-<langue>/ pour chaque langue."""
+    source = os.path.join(racine, INCLUDES, PLYMOUTH)
+    if not os.path.isfile(source):
+        return
+    with open(source, encoding="utf-8") as f:
+        script = f.read().replace("\r\n", "\n")
+    for nom in sorted(os.listdir(dossier_po)):
+        if not nom.endswith(".po"):
+            continue
+        langue = nom[:-3]
+        theme = "codebyr-" + langue
+        cible = os.path.join(racine_paquet, "usr/share/plymouth/themes", theme)
+        os.makedirs(cible, exist_ok=True)
+        entrees = lire_po(os.path.join(dossier_po, nom))[2]
+        with open(os.path.join(cible, theme + ".script"), "w", encoding="utf-8", newline="\n") as f:
+            f.write(theme_traduit(script, entrees))
+        # Le logo est celui du thème français (ImageDir) : le hook initramfs de
+        # Debian copie aussi ce dossier, il n'est donc pas dupliqué.
+        with open(os.path.join(cible, theme + ".plymouth"), "w", encoding="utf-8", newline="\n") as f:
+            f.write("[Plymouth Theme]\nName=Codebyr OS (%s)\nDescription=Codebyr OS — %s\n"
+                    "ModuleName=script\n\n[script]\n"
+                    "ImageDir=/usr/share/plymouth/themes/codebyr\n"
+                    "ScriptFile=/usr/share/plymouth/themes/%s/%s.script\n"
+                    % (langue, langue, theme, theme))
+
+
+# ── Le diaporama de l'installeur (Calamares, QML) ────────────────────────────
+# Ses textes sont des traduire("…") ; les traductions sont écrites DANS le
+# fichier, entre deux balises, par « extraire » : Calamares ne lit pas nos
+# catalogues, et le fichier est livré par l'image telle quelle.
+DIAPORAMA = "etc/calamares/branding/debian/show.qml"
+_APPEL_QML = re.compile(r'(?<![\w.])traduire\("((?:[^"\\\n]|\\.)*)"\)')
+_APPEL_QML_NU = re.compile(r'(?<![\w.])(?<!function )traduire\(\s*(?!")')
+_BLOC_QML = re.compile(r"(    // traductions:début\n).*?(\n    // traductions:fin)", re.S)
+
+
+def textes_qml(code, nom):
+    code = sans_commentaires_js(code)
+    for appel in _APPEL_QML_NU.finditer(code):
+        ligne = code.count("\n", 0, appel.start()) + 1
+        raise TexteNonTraduisible("%s:%d : traduire() doit recevoir un texte entre "
+                                  "guillemets, écrit tel quel" % (nom, ligne))
+    return [(_js_vers_texte(m), None) for m in _APPEL_QML.findall(code)]
+
+
+def diaporama_a_jour(racine):
+    """Le diaporama, son bloc de traductions réécrit depuis po/*.po."""
+    chemin = os.path.join(racine, INCLUDES, DIAPORAMA)
+    with open(chemin, encoding="utf-8") as f:
+        code = f.read()
+    msgids = {m for m, _p in textes_qml(code, DIAPORAMA)}
+    table = {}
+    for langue in langues(racine):
+        entrees = lire_po(os.path.join(racine, "po", langue + ".po"))[2]
+        traduits = {e.msgid: e.msgstr[0] for e in entrees
+                    if e.traduite and e.pluriel is None and e.msgid in msgids}
+        if traduits:
+            table[langue] = traduits
+    bloc = "    readonly property var traductions: (%s)" % json.dumps(
+        table, ensure_ascii=False, sort_keys=True)
+    return _BLOC_QML.sub(lambda m: m.group(1) + bloc + m.group(2), code)
 
 
 def messages_bouclier(racine):
@@ -489,6 +601,9 @@ def compiler(dossier_po, racine_paquet):
             f.write(json_extension(entete, entrees))
         traduites = sum(1 for e in entrees if e.traduite)
         print("   %s : %d textes sur %d traduits" % (langue, traduites, len(entrees)))
+    # Les thèmes de démarrage traduits, depuis le thème français du dépôt.
+    themes_traduits(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                    dossier_po, racine_paquet)
 
 
 def main(argv):
@@ -511,6 +626,16 @@ def main(argv):
                     print("%s/%s/messages.json mis à jour : le bouclier est à "
                           "refaire signer (live-build/scripts/sign-extension.sh)"
                           % (BOUCLIER, langue))
+        # Le diaporama de l'installeur porte ses traductions en lui-même.
+        chemin = os.path.join(racine, INCLUDES, DIAPORAMA)
+        if os.path.isfile(chemin):
+            nouveau = diaporama_a_jour(racine)
+            with open(chemin, encoding="utf-8") as f:
+                ancien = f.read()
+            if nouveau != ancien:
+                with open(chemin, "w", encoding="utf-8", newline="\n") as f:
+                    f.write(nouveau)
+                print("%s : traductions mises à jour" % DIAPORAMA)
         return 0
     if argv[:1] == ["compiler"] and len(argv) == 3:
         compiler(argv[1], argv[2])

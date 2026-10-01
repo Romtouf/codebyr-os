@@ -10,6 +10,25 @@ GNOME (menu du Sceau, liserés colorés) ne se recharge pas à chaud.
 
 ---
 
+## 1.18.2 — non publiée
+
+**L'écran de démarrage parle la langue du système.** Sur un disque chiffré,
+« Phrase de passe du disque » devient « Disk passphrase » quand Codebyr est
+installé en anglais (ou dans une autre langue que le français). C'est la
+langue du système qui compte, celle choisie à l'installation, et non celle
+d'un compte : la question vient avant toute session. Un écran de démarrage
+choisi par vous n'est jamais remplacé.
+
+**Pour la prochaine ISO** (déjà prêts, ils n'arrivent que par elle) :
+
+- une entrée « Live session (English) » au menu de démarrage : la session
+  d'essai s'ouvre en anglais, clavier américain par défaut ;
+- le diaporama de l'installeur suit la langue de la session ; il ne dit plus
+  « bac à sable matériel », ce qui était inexact : les Espaces reposent sur le
+  noyau Linux, pas sur du matériel ni des machines virtuelles.
+
+---
+
 ## 1.18.1 — 1er octobre 2026
 
 **Le bouclier anti-hameçonnage parle anglais.** Son alerte rouge (« site

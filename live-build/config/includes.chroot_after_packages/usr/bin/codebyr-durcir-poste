@@ -281,6 +281,41 @@ if [ -n "$a_reparer" ]; then
 	fi
 fi
 
+# ── 3 bis) L'écran de démarrage dans la langue du système ──────────────────
+# La phrase de passe du disque se demande avant toute session : c'est la
+# langue du SYSTÈME qui compte (/etc/default/locale, écrite par l'installeur),
+# pas celle d'un compte. Le paquet livre « codebyr » (français) et un thème par
+# langue traduite (« codebyr-en »…, voir packaging/traductions.py) ; une
+# langue sans thème reçoit l'anglais, comme le reste de Codebyr.
+#
+# Seulement si le thème actif est déjà l'un de ceux de Codebyr : un thème
+# choisi par l'administrateur n'est jamais remplacé. Rien n'est régénéré ici :
+# le postinst le fait si le thème actif a changé, l'installeur juste après.
+THEMES=/usr/share/plymouth/themes
+if [ -x /usr/sbin/plymouth-set-default-theme ]; then
+	actif="$(/usr/sbin/plymouth-set-default-theme 2>/dev/null || true)"
+	case "$actif" in
+		codebyr|codebyr-*)
+			langue="$(sed -n 's/^LANG="\{0,1\}\([^".]*\).*/\1/p' /etc/default/locale 2>/dev/null | head -n1)"
+			langue="${langue%%_*}"
+			case "$langue" in
+				fr|C|POSIX|"") voulu=codebyr ;;
+				*)
+					if [ -f "$THEMES/codebyr-$langue/codebyr-$langue.plymouth" ]; then
+						voulu="codebyr-$langue"
+					else
+						voulu=codebyr-en
+					fi
+					;;
+			esac
+			if [ "$voulu" != "$actif" ] && [ -f "$THEMES/$voulu/$voulu.plymouth" ]; then
+				/usr/sbin/plymouth-set-default-theme "$voulu" 2>/dev/null \
+					&& echo "codebyr : écran de démarrage « $voulu » (langue du système)."
+			fi
+			;;
+	esac
+fi
+
 # ── 4) Le réglage APT de la construction, resté sur les machines ────────────
 # Voir le hook 1000 : ce fichier servait à construire l'image, et s'y trouvait
 # encore. Un dépôt injoignable bloquait alors apt jusqu'à 40 minutes. On ne le

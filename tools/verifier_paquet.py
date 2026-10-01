@@ -91,6 +91,11 @@ def verifier_arbre(stage, racine):
             json.loads(extension.read_text(encoding="utf-8"))
         except (OSError, ValueError, struct.error) as e:
             raise ValueError("Traduction « %s » absente ou illisible : %s" % (langue, e))
+        # L'écran de démarrage traduit (« Phrase de passe du disque »).
+        theme = stage / "usr/share/plymouth/themes" / ("codebyr-" + langue)
+        for nom in ("codebyr-%s.plymouth" % langue, "codebyr-%s.script" % langue):
+            if not (theme / nom).is_file():
+                raise ValueError("Écran de démarrage « %s » absent : %s" % (langue, nom))
     for nom in ("fichiers_surs.py", "filtre_syscalls.py", "relais_reseau.py",
                 "permissions_flatpak.py", "navigateur.py"):
         if not (stage / "usr/share/codebyr" / nom).is_file():

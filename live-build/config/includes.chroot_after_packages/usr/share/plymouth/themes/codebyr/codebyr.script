@@ -27,6 +27,16 @@
 // du bas et l'invite. Le message « cryptsetup: … set up successfully » arrive
 // juste avant le changement de définition, et glissait encore (même jour).
 
+// ── LANGUE ──────────────────────────────────────────────────────────────────
+// Ce script est le thème français. Le langage de Plymouth ne sait rien de la
+// langue du système : la construction du paquet en produit donc un thème par
+// langue traduite (codebyr-en…), où chaque traduire("…") reçoit sa traduction
+// (packaging/traductions.py), et codebyr-durcir-poste choisit le thème selon
+// la langue du système.
+fun traduire(texte) {
+	return texte;
+}
+
 Window.SetBackgroundTopColor(0.031, 0.059, 0.078);
 Window.SetBackgroundBottomColor(0.031, 0.059, 0.078);
 
@@ -103,7 +113,7 @@ fun display_password_callback(prompt, puces) {
 	global.invite_nb_puces = puces;
 	label.sprite.SetOpacity(0);       // le libellé cède la place
 
-	global.invite_titre = ligne("Phrase de passe du disque",
+	global.invite_titre = ligne(traduire("Phrase de passe du disque"),
 	                            0.90, 0.93, 0.96, ligne_1);
 
 	chaine = "";
@@ -117,7 +127,7 @@ fun display_password_callback(prompt, puces) {
 		                            ligne_1 + interligne);
 	}
 
-	global.invite_aide = ligne("Tapez-la, puis appuyez sur Entrée",
+	global.invite_aide = ligne(traduire("Tapez-la, puis appuyez sur Entrée"),
 	                           0.55, 0.62, 0.68, ligne_1 + 2 * interligne);
 }
 Plymouth.SetDisplayPasswordFunction(display_password_callback);

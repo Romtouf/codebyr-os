@@ -98,38 +98,6 @@ case "$1" in
 				|| echo "codebyr : update-grub a échoué — relancez-le à la main." >&2
 		fi
 
-		# Écran de démarrage (thème Plymouth « codebyr »). Il n'agit pas depuis
-		# /usr/share : il est COPIÉ dans l'image de démarrage (initramfs), qui
-		# ne voit que ce qu'elle contenait à sa dernière génération. Un thème
-		# corrigé n'arriverait donc jamais à l'écran.
-		#
-		# On ne la régénère que si le thème a changé depuis la dernière fois
-		# (empreinte gardée dans /var/lib/codebyr) : pas à chaque mise à jour,
-		# l'opération prend de longues secondes. Et seulement là où elle sert :
-		# un système démarré (pas un chroot de construction, où l'image se
-		# génère seule), qui n'est pas une session live, et dont le thème est
-		# bien celui de Codebyr.
-		#
-		# « update-initramfs -u », exactement : dans un script de paquet, il ne
-		# s'exécute pas aussitôt, il se donne rendez-vous à la fin d'apt — une
-		# seule génération, même si un nouveau noyau arrive en même temps.
-		THEME=/usr/share/plymouth/themes/codebyr
-		TEMOIN=/var/lib/codebyr/plymouth-theme.sha256
-		if [ -f "$THEME/codebyr.script" ] && [ -d /run/systemd/system ] && [ ! -d /run/live ] \
-				&& [ -x /usr/sbin/update-initramfs ] && [ -x /usr/sbin/plymouth-set-default-theme ] \
-				&& [ "$(/usr/sbin/plymouth-set-default-theme 2>/dev/null)" = "codebyr" ]; then
-			EMPREINTE="$(cat "$THEME/codebyr.plymouth" "$THEME/codebyr.script" "$THEME/logo.png" 2>/dev/null \
-				| sha256sum | cut -d' ' -f1)"
-			if [ "$(cat "$TEMOIN" 2>/dev/null)" != "$EMPREINTE" ]; then
-				if /usr/sbin/update-initramfs -u; then
-					mkdir -p /var/lib/codebyr
-					echo "$EMPREINTE" > "$TEMOIN"
-				else
-					echo "codebyr : update-initramfs a échoué — relancez-le à la main." >&2
-				fi
-			fi
-		fi
-
 		# Profil AppArmor du filtre réseau. Au démarrage, apparmor.service
 		# charge tout /etc/apparmor.d ; sur une machine déjà en marche, un
 		# nouveau profil n'agit qu'une fois chargé — d'où cette ligne.
@@ -165,6 +133,50 @@ case "$1" in
 		# jour de sécurité du reste du parc.
 		if [ -f /usr/bin/codebyr-durcir-poste ]; then
 			sh /usr/bin/codebyr-durcir-poste || true
+		fi
+
+		# Écran de démarrage (thème Plymouth « codebyr », ou sa version
+		# traduite « codebyr-en »… que codebyr-durcir-poste vient de choisir
+		# selon la langue du système). Il n'agit pas depuis /usr/share : il
+		# est COPIÉ dans l'image de démarrage (initramfs), qui ne voit que ce
+		# qu'elle contenait à sa dernière génération. Un thème corrigé, ou qui
+		# change de langue, n'arriverait donc jamais à l'écran.
+		#
+		# APRÈS codebyr-durcir-poste, et pas avant : c'est lui qui choisit le
+		# thème. On ne régénère que si le thème actif, ou son contenu, a changé
+		# depuis la dernière fois (empreinte gardée dans /var/lib/codebyr) : pas
+		# à chaque mise à jour, l'opération prend de longues secondes. Et
+		# seulement là où elle sert : un système démarré (pas un chroot de
+		# construction, où l'image se génère seule), qui n'est pas une session
+		# live, et dont le thème est l'un de ceux de Codebyr.
+		#
+		# « update-initramfs -u », exactement : dans un script de paquet, il ne
+		# s'exécute pas aussitôt, il se donne rendez-vous à la fin d'apt — une
+		# seule génération, même si un nouveau noyau arrive en même temps.
+		THEMES=/usr/share/plymouth/themes
+		TEMOIN=/var/lib/codebyr/plymouth-theme.sha256
+		ACTIF=""
+		if [ -x /usr/sbin/plymouth-set-default-theme ]; then
+			ACTIF="$(/usr/sbin/plymouth-set-default-theme 2>/dev/null || true)"
+		fi
+		case "$ACTIF" in
+			codebyr|codebyr-*) ;;
+			*) ACTIF="" ;;
+		esac
+		if [ -n "$ACTIF" ] && [ -f "$THEMES/$ACTIF/$ACTIF.script" ] \
+				&& [ -d /run/systemd/system ] && [ ! -d /run/live ] \
+				&& [ -x /usr/sbin/update-initramfs ]; then
+			EMPREINTE="$( { echo "$ACTIF"; cat "$THEMES/$ACTIF/$ACTIF.plymouth" \
+				"$THEMES/$ACTIF/$ACTIF.script" "$THEMES/codebyr/logo.png"; } 2>/dev/null \
+				| sha256sum | cut -d' ' -f1)"
+			if [ "$(cat "$TEMOIN" 2>/dev/null)" != "$EMPREINTE" ]; then
+				if /usr/sbin/update-initramfs -u; then
+					mkdir -p /var/lib/codebyr
+					echo "$EMPREINTE" > "$TEMOIN"
+				else
+					echo "codebyr : update-initramfs a échoué — relancez-le à la main." >&2
+				fi
+			fi
 		fi
 		;;
 esac

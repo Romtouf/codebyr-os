@@ -1748,6 +1748,30 @@ msgstr "{nom} restored to the snapshot of {date}"
 msgid "Calculatrice"
 msgstr "Calculator"
 
+#: etc/calamares/branding/debian/show.qml
+msgid "Bienvenue dans Codebyr OS\n\nLa sécurité par compartimentation, simple pour tout le monde."
+msgstr "Welcome to Codebyr OS\n\nSecurity through compartmentalization, simple for everyone."
+
+#: etc/calamares/branding/debian/show.qml
+msgid "Vos Espaces isolés et colorés\n\nPersonnel, Travail, Banque, Navigation, Jetable. Si l'un est piégé, les autres restent intacts."
+msgstr "Your isolated, color-coded Spaces\n\nPersonal, Work, Bank, Browsing, Disposable. If one is compromised, the others stay intact."
+
+#: etc/calamares/branding/debian/show.qml
+msgid "Le Blindage\n\nBac à sable renforcé, coupure réseau et zéro privilège pour les tâches sensibles."
+msgstr "Hardening\n\nReinforced sandbox, network cut-off and zero privileges for sensitive tasks."
+
+#: etc/calamares/branding/debian/show.qml
+msgid "Installation en cours…\n\nDans quelques minutes, votre ordinateur sera à la fois sûr et simple."
+msgstr "Installing…\n\nIn a few minutes, your computer will be both secure and simple."
+
+#: usr/share/plymouth/themes/codebyr/codebyr.script
+msgid "Phrase de passe du disque"
+msgstr "Disk passphrase"
+
+#: usr/share/plymouth/themes/codebyr/codebyr.script
+msgid "Tapez-la, puis appuyez sur Entrée"
+msgstr "Type it, then press Enter"
+
 #: usr/share/codebyr/antiphishing/_locales/fr/messages.json
 msgid "Codebyr — Bouclier anti-hameçonnage"
 msgstr "Codebyr — Anti-phishing shield"

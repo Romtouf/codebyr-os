@@ -5,6 +5,14 @@ label live-@FLAVOUR@
 	initrd @INITRD@
 	append @APPEND_LIVE@
 
+# La même, en anglais : la langue et le clavier APRÈS les options de l'image
+# (live-config garde la dernière valeur), qui ne sont donc pas recopiées.
+label live-@FLAVOUR@-english
+	menu label Codebyr OS  (live session, ^English)
+	linux @LINUX@
+	initrd @INITRD@
+	append @APPEND_LIVE@ locales=en_US.UTF-8 keyboard-layouts=us
+
 label live-@FLAVOUR@-failsafe
 	menu label Codebyr OS  (mode sans échec)
 	linux @LINUX@

@@ -110,18 +110,77 @@ class LEcranDeDemarrage(unittest.TestCase):
 
     def test_l_image_de_demarrage_n_est_regeneree_que_si_le_theme_change(self):
         postinst = _lire(RACINE, "packaging", "codebyr-tools.postinst")
-        bloc = postinst[postinst.index("THEME=/usr/share/plymouth/themes/codebyr"):]
-        bloc = bloc[:bloc.index("\n\t\tfi\n\n")]
+        bloc = postinst[postinst.index("THEMES=/usr/share/plymouth/themes"):]
+        bloc = bloc[:bloc.index("\n\t\t;;\n")]
         self.assertIn('[ "$(cat "$TEMOIN" 2>/dev/null)" != "$EMPREINTE" ]', bloc)
-        # Ni dans un chroot, ni sur le live, ni avec un autre thème.
+        # Le thème actif fait partie de l'empreinte : changer de langue
+        # régénère l'image.
+        self.assertIn('echo "$ACTIF"; cat "$THEMES/$ACTIF/$ACTIF.plymouth"', bloc)
+        # Ni dans un chroot, ni sur le live, ni avec un thème qui n'est pas
+        # l'un de ceux de Codebyr.
         for garde in ("[ -d /run/systemd/system ]", "[ ! -d /run/live ]",
-                      '= "codebyr" ]'):
+                      "codebyr|codebyr-*) ;;", '*) ACTIF="" ;;'):
             self.assertIn(garde, bloc)
+        # APRÈS codebyr-durcir-poste, qui choisit le thème.
+        self.assertLess(postinst.index("sh /usr/bin/codebyr-durcir-poste"),
+                        postinst.index("THEMES=/usr/share/plymouth/themes"))
         # Exactement « -u » : dans un script de paquet, la génération est
         # alors reportée à la fin d'apt (une seule, même avec un noyau neuf).
         self.assertIn("if /usr/sbin/update-initramfs -u; then", bloc)
         # Le témoin n'est écrit qu'après une génération réussie.
         self.assertLess(bloc.index("update-initramfs -u"), bloc.index('> "$TEMOIN"'))
+
+
+class LEcranDeDemarrageTraduit(unittest.TestCase):
+    """« Phrase de passe du disque » dans la langue du système (1.18.2)."""
+
+    @classmethod
+    def setUpClass(cls):
+        import sys
+        import tempfile
+        sys.path.insert(0, os.path.join(RACINE, "packaging"))
+        try:
+            import traductions
+        finally:
+            sys.path.pop(0)
+        cls.traductions = traductions
+        cls.temporaire = tempfile.TemporaryDirectory()
+        traductions.compiler(os.path.join(RACINE, "po"), cls.temporaire.name)
+        cls.theme = os.path.join(cls.temporaire.name, "usr", "share", "plymouth", "themes", "codebyr-en")
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.temporaire.cleanup()
+
+    def test_le_paquet_produit_le_theme_anglais(self):
+        script = _lire(self.theme, "codebyr-en.script")
+        self.assertIn('ligne(traduire("Disk passphrase"),', script)
+        self.assertIn('ligne(traduire("Type it, then press Enter"),', script)
+        self.assertNotIn('traduire("Phrase de passe du disque")', script)
+        # Le reste du script est le même : seules les phrases changent.
+        source = _lire(PLYMOUTH, "codebyr.script")
+        self.assertEqual(len(script.splitlines()), len(source.splitlines()))
+        plymouth = _lire(self.theme, "codebyr-en.plymouth")
+        # Le logo est celui du thème français : le hook initramfs copie ImageDir.
+        self.assertIn("ImageDir=/usr/share/plymouth/themes/codebyr\n", plymouth)
+        self.assertIn("ScriptFile=/usr/share/plymouth/themes/codebyr-en/codebyr-en.script\n", plymouth)
+
+    def test_une_traduction_impropre_a_plymouth_est_refusee(self):
+        e = self.traductions.Entree("Phrase de passe du disque")
+        e.msgstr = ['Disk "passphrase"']
+        with self.assertRaises(ValueError):
+            self.traductions.theme_traduit('x = traduire("Phrase de passe du disque");', [e])
+
+    def test_le_theme_suit_la_langue_du_systeme(self):
+        durcir = _lire(INCLUDES, "usr", "bin", "codebyr-durcir-poste")
+        bloc = durcir[durcir.index("# ── 3 bis) L'écran de démarrage"):durcir.index("# ── 4)")]
+        self.assertIn("/etc/default/locale", bloc)
+        # Jamais un thème que l'administrateur aurait choisi.
+        self.assertIn("codebyr|codebyr-*)", bloc)
+        self.assertIn("fr|C|POSIX|\"\") voulu=codebyr ;;", bloc)
+        self.assertIn("voulu=codebyr-en", bloc)
+        # Pas de régénération ici : le postinst ou l'installeur s'en charge.
+        self.assertNotIn("update-initramfs", bloc.split("# le postinst le fait")[1])
 
 
 class LInstalleur(unittest.TestCase):

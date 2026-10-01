@@ -184,6 +184,13 @@ class LesFenetresDuMenu(unittest.TestCase):
         for appel in re.findall(r"new St\.ScrollView\(\{[^}]*\}\)", self.texte):
             self.assertIn("child:", appel)
 
+    def test_les_outils_de_codebyr_ne_s_ouvrent_pas_dans_un_espace(self):
+        # Assistant, Configuration, Bienvenue : des outils du bureau. La liste
+        # « Autres applications… » les écarte, comme Configuration Codebyr.
+        apps = self.texte[self.texte.index("    _appsInstallees() {"):
+                          self.texte.index("    _dialogueApps(esp) {")]
+        self.assertIn(".startsWith('io.codebyr.')", apps)
+
     def test_chaque_fenetre_du_menu_dit_son_echec(self):
         appels = re.findall(r"\(\) => this\._(?:ouvrirFenetre\(\(\) => this\._)?dialogue\w+\(", self.texte)
         self.assertEqual(len(appels), 5)

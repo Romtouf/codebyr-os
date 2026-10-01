@@ -156,6 +156,19 @@ function couleurSure(couleur) {
         ? couleur : COULEUR_DEFAUT;
 }
 
+// Les noms que le paquet livre (« Banque », « Calculatrice »…) sont traduits ;
+// ceux que l'utilisateur a donnés, jamais. Même règle que registre.py. Ces
+// noms ne sont pas écrits ici : l'extraction les relève dans le registre livré.
+// (L'extension n'écrit jamais le registre : rien à rendre à l'écriture.)
+function nomLivre(texte) {
+    return TRADUCTION?.textes?.[texte] ?? texte;
+}
+
+function avecNomsTraduits(apps, livrees) {
+    return apps.map(a => (a && livrees.has(a.nom + '\u0000' + a.cmd)
+        ? Object.assign({}, a, {nom: nomLivre(a.nom)}) : a));
+}
+
 function fusionner() {
     const signature = signatureRegistres();
     if (_fusionCache && signature === _fusionSignature)
@@ -163,6 +176,11 @@ function fusionner() {
 
     const sys = lireRegistre(REGISTRE_SYSTEME);
     const usr = lireRegistre(registreUtilisateur());
+    const livrees = new Set();
+    for (const a of [...sys.apps, ...sys.espaces.flatMap(e => (e && Array.isArray(e.apps)) ? e.apps : [])]) {
+        if (a)
+            livrees.add(a.nom + '\u0000' + a.cmd);
+    }
     const perso = new Map();
     for (const e of usr.espaces) {
         if (e && e.id)
@@ -176,6 +194,10 @@ function fusionner() {
         const espace = Object.assign({}, base, perso.get(base.id) || {});
         espace.couleur = couleurSure(espace.couleur);
         espace._systeme = true;
+        if (espace.nom === base.nom)
+            espace.nom = nomLivre(base.nom);
+        if (Array.isArray(espace.apps))
+            espace.apps = avecNomsTraduits(espace.apps, livrees);
         espaces.push(espace);
         vus.add(base.id);
     }
@@ -188,7 +210,7 @@ function fusionner() {
         espaces.push(espace);
         vus.add(e.id);
     }
-    _fusionCache = {espaces, apps: (usr.apps.length ? usr.apps : sys.apps)};
+    _fusionCache = {espaces, apps: avecNomsTraduits(usr.apps.length ? usr.apps : sys.apps, livrees)};
     _fusionSignature = signature;
     return _fusionCache;
 }
@@ -1055,6 +1077,11 @@ class Indicateur extends PanelMenu.Button {
         try {
             for (const info of Gio.AppInfo.get_all()) {
                 if (!info.should_show())
+                    continue;
+                // Les outils de Codebyr (Assistant, Configuration, Bienvenue…)
+                // appartiennent au bureau : les ouvrir DANS un Espace n'a pas de
+                // sens. Configuration Codebyr les écarte déjà (applications.py).
+                if ((info.get_id() || '').toLowerCase().startsWith('io.codebyr.'))
                     continue;
                 const nom = info.get_name();
                 let cmd = info.get_commandline() || '';

@@ -213,7 +213,32 @@ def extraire_textes(racine):
             fichiers = textes.setdefault(cle, [])
             if relatif not in fichiers:
                 fichiers.append(relatif)
+    # Les noms livrés par le registre (« Banque », « Calculatrice »…) : ils ne
+    # sont pas dans le code, mais traduits à la lecture (traduction.nom_livre,
+    # et la fonction nomLivre de l'extension).
+    for nom in noms_du_registre(racine):
+        fichiers = textes.setdefault((nom, None), [])
+        if REGISTRE not in fichiers:
+            fichiers.append(REGISTRE)
     return textes
+
+
+REGISTRE = "etc/codebyr/espaces.json"
+
+
+def noms_du_registre(racine):
+    """Les noms d'Espaces et d'applications que le registre livré contient."""
+    chemin = os.path.join(racine, INCLUDES, REGISTRE)
+    if not os.path.isfile(chemin):
+        return []
+    with open(chemin, encoding="utf-8") as f:
+        data = json.load(f)
+    noms = []
+    for e in data.get("espaces", []):
+        noms.append(e.get("nom"))
+        noms += [a.get("nom") for a in e.get("apps") or []]
+    noms += [a.get("nom") for a in data.get("apps", [])]
+    return [n for n in noms if isinstance(n, str) and n]
 
 
 # ── Le format .po ──────────────────────────────────────────────────────────

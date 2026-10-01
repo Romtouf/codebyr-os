@@ -595,6 +595,106 @@ class LaPageDeBlocage(unittest.TestCase):
         self.assertIn("env=page_blocage.environnement(os.environ))", code)
 
 
+class _CatalogueAnglais(gettext.NullTranslations):
+    TEXTES = {"Banque": "Bank", "Calculatrice": "Calculator", "Fichiers": "Files"}
+
+    def gettext(self, message):
+        return self.TEXTES.get(message, message)
+
+
+class LesNomsLivres(unittest.TestCase):
+    """Les noms du registre livré (« Banque », « Calculatrice ») suivent la
+    langue ; ceux de l'utilisateur, jamais. Et une liste lue traduite puis
+    réécrite garde ses noms d'origine dans le fichier de l'utilisateur."""
+
+    SYSTEME = {
+        "espaces": [{"id": "banque", "nom": "Banque", "couleur": "#2FA36B"},
+                    {"id": "travail", "nom": "Travail", "couleur": "#8F6CF0"}],
+        "apps": [{"nom": "Calculatrice", "cmd": "gnome-calculator"},
+                 {"nom": "Fichiers", "cmd": "nautilus"}],
+    }
+
+    def setUp(self):
+        from unittest import mock
+        import registre
+        self.registre = registre
+        self.dossier = tempfile.TemporaryDirectory()
+        self.systeme = os.path.join(self.dossier.name, "systeme.json")
+        self.utilisateur = os.path.join(self.dossier.name, "utilisateur.json")
+        with open(self.systeme, "w", encoding="utf-8") as f:
+            json.dump(self.SYSTEME, f, ensure_ascii=False)
+        for cible, valeur in ((registre, ("SYSTEME", self.systeme)),
+                              (registre, ("UTILISATEUR", self.utilisateur)),
+                              (traduction, ("_traduction", _CatalogueAnglais()))):
+            correctif = mock.patch.object(cible, valeur[0], valeur[1])
+            correctif.start()
+            self.addCleanup(correctif.stop)
+        self.addCleanup(self.dossier.cleanup)
+
+    def _ecrire_utilisateur(self, data):
+        with open(self.utilisateur, "w", encoding="utf-8") as f:
+            json.dump(data, f, ensure_ascii=False)
+
+    def test_les_noms_livres_sont_traduits(self):
+        vue = self.registre.charger()
+        self.assertEqual([e["nom"] for e in vue["espaces"]], ["Bank", "Travail"])
+        self.assertEqual([a["nom"] for a in vue["apps"]], ["Calculator", "Files"])
+
+    def test_les_noms_de_l_utilisateur_ne_le_sont_jamais(self):
+        self._ecrire_utilisateur({"espaces": [
+            {"id": "travail", "nom": "Banque"},                       # renommé par lui
+            {"id": "perso2", "nom": "Banque", "couleur": "#4E8FEF"},  # créé par lui
+        ], "apps": [{"nom": "Calculatrice", "cmd": "mon-script"}]})
+        vue = self.registre.charger()
+        noms = {e["id"]: e["nom"] for e in vue["espaces"]}
+        self.assertEqual(noms, {"banque": "Bank", "travail": "Banque", "perso2": "Banque"})
+        # Même nom qu'une application livrée, mais pas la même commande.
+        self.assertEqual(vue["apps"][0]["nom"], "Calculatrice")
+
+    def test_une_liste_relue_et_reecrite_garde_ses_noms_d_origine(self):
+        # Configuration Codebyr : la liste commune lue (traduite), un ajout,
+        # puis réécrite.
+        apps = self.registre.charger()["apps"]
+        apps.append({"nom": "Kalk", "cmd": "kalk"})
+        self.registre.ecrire_apps_communes(apps)
+        with open(self.utilisateur, encoding="utf-8") as f:
+            ecrit = json.load(f)
+        self.assertEqual([a["nom"] for a in ecrit["apps"]], ["Calculatrice", "Fichiers", "Kalk"])
+        self.assertNotIn("_nom_source", json.dumps(ecrit))
+        # Et relue : traduite de nouveau.
+        self.assertEqual([a["nom"] for a in self.registre.charger()["apps"]],
+                         ["Calculator", "Files", "Kalk"])
+
+    def test_un_reglage_ne_fige_pas_le_nom_traduit(self):
+        banque = self.registre.espaces()["banque"]
+        self.registre.modifier_espace("banque", {"audio": False, "apps": [
+            dict(a) for a in self.registre.charger()["apps"]]})
+        with open(self.utilisateur, encoding="utf-8") as f:
+            ecrit = json.load(f)
+        entree = ecrit["espaces"][0]
+        self.assertNotIn("nom", entree)
+        self.assertEqual([a["nom"] for a in entree["apps"]], ["Calculatrice", "Fichiers"])
+        self.assertEqual(banque["nom"], "Bank")
+
+    def test_en_francais_rien_ne_change(self):
+        from unittest import mock
+        with mock.patch.object(traduction, "_traduction", gettext.NullTranslations()):
+            vue = self.registre.charger()
+        self.assertEqual([e["nom"] for e in vue["espaces"]], ["Banque", "Travail"])
+        self.assertNotIn("_nom_source", json.dumps(vue))
+
+    def test_l_extension_suit_la_meme_regle(self):
+        code = _lire(EXTENSION_JS)
+        self.assertIn("if (espace.nom === base.nom)\n            espace.nom = nomLivre(base.nom);", code)
+        self.assertIn("apps: avecNomsTraduits(usr.apps.length ? usr.apps : sys.apps, livrees)", code)
+
+    def test_les_noms_du_registre_livre_sont_au_catalogue(self):
+        msgids = {e.msgid for e in traductions.lire_po(PO_EN)[2]}
+        noms = traductions.noms_du_registre(RACINE)
+        self.assertIn("Calculatrice", noms)
+        self.assertEqual([n for n in noms if n not in msgids], [])
+
+
 class LesNomsDesApplications(unittest.TestCase):
     """La liste des applications installées (Configuration Codebyr) suit la
     langue de la session ; elle lisait toujours « Name[fr] »."""

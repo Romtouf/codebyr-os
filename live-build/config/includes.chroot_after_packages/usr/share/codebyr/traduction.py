@@ -105,6 +105,14 @@ def _(texte):
     return _traduction.gettext(texte)
 
 
+def nom_livre(texte):
+    """Un nom livré par /etc/codebyr/espaces.json (« Banque », « Calculatrice »),
+    dans la langue de la session. Ces noms ne sont pas écrits dans le code :
+    l'extraction les relève dans le registre (packaging/traductions.py). Les
+    noms donnés par l'utilisateur n'arrivent jamais ici (voir registre.py)."""
+    return _traduction.gettext(texte)
+
+
 def n_(singulier, pluriel, nombre):
     """Le texte au singulier ou au pluriel, selon la langue de la session.
 

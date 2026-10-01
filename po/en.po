@@ -149,23 +149,28 @@ msgid "Bienvenue dans Codebyr OS"
 msgstr "Welcome to Codebyr OS"
 
 #: usr/bin/codebyr-bienvenue
+#: etc/codebyr/espaces.json
 msgid "Personnel"
 msgstr "Personal"
 
 #: usr/bin/codebyr-bienvenue
+#: etc/codebyr/espaces.json
 msgid "Travail"
 msgstr "Work"
 
 #: usr/bin/codebyr-bienvenue
 #: usr/bin/codebyr-config
+#: etc/codebyr/espaces.json
 msgid "Banque"
 msgstr "Bank"
 
 #: usr/bin/codebyr-bienvenue
+#: etc/codebyr/espaces.json
 msgid "Navigation"
 msgstr "Browsing"
 
 #: usr/bin/codebyr-bienvenue
+#: etc/codebyr/espaces.json
 msgid "Jetable"
 msgstr "Disposable"
 
@@ -1496,18 +1501,22 @@ msgid "L'Espace Codebyr d'où provient ce fichier"
 msgstr "The Codebyr Space this file comes from"
 
 #: usr/share/gnome-shell/extensions/codebyr@codebyr.io/extension.js
+#: etc/codebyr/espaces.json
 msgid "Navigateur"
 msgstr "Web browser"
 
 #: usr/share/gnome-shell/extensions/codebyr@codebyr.io/extension.js
+#: etc/codebyr/espaces.json
 msgid "Fichiers"
 msgstr "Files"
 
 #: usr/share/gnome-shell/extensions/codebyr@codebyr.io/extension.js
+#: etc/codebyr/espaces.json
 msgid "Terminal"
 msgstr "Terminal"
 
 #: usr/share/gnome-shell/extensions/codebyr@codebyr.io/extension.js
+#: etc/codebyr/espaces.json
 msgid "Éditeur de texte"
 msgstr "Text editor"
 
@@ -1734,3 +1743,7 @@ msgstr "Could not restore {nom}"
 #: usr/share/gnome-shell/extensions/codebyr@codebyr.io/extension.js
 msgid "{nom} restauré à l'instantané du {date}"
 msgstr "{nom} restored to the snapshot of {date}"
+
+#: etc/codebyr/espaces.json
+msgid "Calculatrice"
+msgstr "Calculator"

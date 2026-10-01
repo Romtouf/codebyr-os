@@ -40,8 +40,9 @@ import re
 import unicodedata
 
 import comptes
+import traduction
 
-SYSTEME = "/etc/codebyr/espaces.json"
+SYSTEME ="/etc/codebyr/espaces.json"
 UTILISATEUR = os.path.expanduser("~/.config/codebyr/espaces.json")
 
 def _vide():
@@ -111,7 +112,64 @@ def charger():
 
     # Liste d'applications commune : celle de l'utilisateur si elle existe.
     apps = usr.get("apps") or sys_.get("apps") or []
-    return {"espaces": fusion, "apps": apps}
+    return _noms_traduits({"espaces": fusion, "apps": apps}, sys_)
+
+
+# ── Les noms livrés, dans la langue de l'utilisateur ────────────────────────
+# Les noms que le paquet livre (« Banque », « Calculatrice »…) sont traduits à
+# la lecture ; ceux que l'utilisateur a donnés, jamais. L'original reste à
+# côté, sous « _nom_source » : une liste lue puis réécrite (Configuration
+# Codebyr le fait) doit garder le nom livré, sans quoi « Calculator » serait
+# figé dans le fichier de l'utilisateur, en anglais même revenu au français.
+# ecrire_couche() le remet donc toujours avant d'écrire.
+
+def _cle_app(app):
+    return (app.get("nom"), app.get("cmd")) if isinstance(app, dict) else None
+
+
+def _noms_traduits(vue, sys_):
+    livrees = {_cle_app(a) for a in sys_.get("apps", [])}
+    noms_livres = {}
+    for base in sys_.get("espaces", []):
+        if isinstance(base, dict) and base.get("id"):
+            noms_livres[base["id"]] = base.get("nom")
+            livrees |= {_cle_app(a) for a in base.get("apps") or []}
+    livrees.discard(None)
+
+    # En français, rien ne change : pas de clé ajoutée quand le nom est le même.
+    def traduire_apps(apps):
+        sortie = []
+        for app in apps:
+            if _cle_app(app) in livrees and app.get("nom"):
+                traduit = traduction.nom_livre(app["nom"])
+                if traduit != app["nom"]:
+                    app = dict(app, nom=traduit, _nom_source=app["nom"])
+            sortie.append(app)
+        return sortie
+
+    for espace in vue["espaces"]:
+        nom = espace.get("nom")
+        if espace.get("_systeme") and nom and nom == noms_livres.get(espace.get("id")):
+            traduit = traduction.nom_livre(nom)
+            if traduit != nom:
+                espace["_nom_source"] = nom
+                espace["nom"] = traduit
+        if isinstance(espace.get("apps"), list):
+            espace["apps"] = traduire_apps(espace["apps"])
+    vue["apps"] = traduire_apps(vue["apps"])
+    return vue
+
+
+def _noms_d_origine(entree):
+    """L'entrée telle qu'on l'écrit : nom livré rendu, clés calculées retirées."""
+    if not isinstance(entree, dict):
+        return entree
+    propre = {k: v for k, v in entree.items() if not k.startswith("_")}
+    if "_nom_source" in entree:
+        propre["nom"] = entree["_nom_source"]
+    if isinstance(propre.get("apps"), list):
+        propre["apps"] = [_noms_d_origine(a) for a in propre["apps"]]
+    return propre
 
 
 def espaces():
@@ -160,7 +218,15 @@ def reduire_couche(data=None):
 
 
 def ecrire_couche(data):
-    """Écrit la couche utilisateur, réduite aux différences et sans clés calculées."""
+    """Écrit la couche utilisateur, réduite aux différences et sans clés calculées.
+
+    Les noms livrés reprennent leur forme d'origine AVANT la réduction : un nom
+    traduit n'est pas une différence avec le système, c'est le même nom.
+    """
+    data = dict(data)
+    data["espaces"] = [_noms_d_origine(e) for e in data.get("espaces", [])]
+    if isinstance(data.get("apps"), list):
+        data["apps"] = [_noms_d_origine(a) for a in data["apps"]]
     data = reduire_couche(data)
     propre = {
         "_commentaire": "Personnalisations Codebyr. Les valeurs absentes d'ici "

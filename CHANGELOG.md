@@ -10,7 +10,7 @@ GNOME (menu du Sceau, liserés colorés) ne se recharge pas à chaud.
 
 ---
 
-## 1.18.1 — non publiée
+## 1.18.1 — 1er octobre 2026
 
 **Le bouclier anti-hameçonnage parle anglais.** Son alerte rouge (« site
 suspect ») suit la langue de Firefox : en anglais pour toute langue autre que

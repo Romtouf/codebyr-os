@@ -10,7 +10,7 @@ GNOME (menu du Sceau, liserés colorés) ne se recharge pas à chaud.
 
 ---
 
-## 1.17.1 — non publiée
+## 1.17.1 — 1er octobre 2026
 
 **Retirer « Compte séparé » à un Espace fait bien revenir ses fichiers.**
 « Configuration Codebyr » le promettait, mais ce n'était vrai que pour un

@@ -1,6 +1,6 @@
 # Chantiers — Codebyr OS
 
-Mise à jour de lecture : **30 septembre 2026**, version publiée **1.17.0**.
+Mise à jour de lecture : **1er octobre 2026**, version publiée **1.17.1**.
 
 Ce document est la carte du projet : ce qui est fait, ce qui reste, et pourquoi.
 Les estimations d'effort des lignes anciennes n'ont pas été refaites.
@@ -183,7 +183,7 @@ Voir `usr/share/codebyr/relais_notifications.py`.
 
 | | Point | Détail | Effort |
 |---|---|---|---|
-| 🟡 | **`codebyr-space` : 3 168 → 2 550 lignes en 1.17.0 (audit, point 8) — 6 étapes sur 8** | Publié le 30/09/2026, validé sur une VM neuve (Firefox et bouclier, ajout de programme, envoi entre Espaces, sauvegarde et restauration, application Flatpak sous compte séparé). Sortis en modules partagés, à l'identique : `navigateur.py` (profil Firefox, filtre, bouclier), `programmes.py`, `chemins.py` (la racine des données, écrite six fois dans trois programmes, ne l'est plus qu'une), `flatpak_espace.py`, `archives.py`, `envois.py`, `journal.py`. **Restent** : les ordres donnés aux Espaces à compte séparé (~600 lignes très imbriquées) et `_lancer` (~400 lignes), à redécouper en étapes nommées ; et `nom_libre`, code mort (fichiers_surs.copier_unique fait la même chose, sans course) | M |
+| ✅ | **`codebyr-space` découpé — 3 168 → 2 076 lignes, 8 étapes, publié en 1.17.0 et 1.17.1 (30/09 et 01/10/2026), validé sur une VM neuve** | Neuf modules partagés, extraits à l'identique (par script pour les plus gros) : `navigateur.py`, `programmes.py`, `chemins.py` (la racine des données, écrite six fois dans trois programmes, ne l'est plus qu'une), `flatpak_espace.py`, `archives.py`, `envois.py`, `journal.py`, `ordres_espace.py` (ce que le bureau demande à un Espace à compte dédié) et `cote_espace.py` (ce que l'Espace fait chez lui). `_lancer` : 400 → 218 lignes, enchaînant des étapes nommées dont un test garde l'ordre. Code mort retiré (`nom_libre`). **Piège évité** : les ordres faisaient exécuter `os.path.realpath(__file__)` — recopié dans un module, ce nom aurait désigné le module, et plus aucun ordre ne serait passé ; codebyr-space s'inscrit désormais dans `ordres_espace.PROGRAMME`, gardé par un test. **Défaut trouvé en relisant** : retirer « Compte séparé » ouvrait VIDE un Espace né sous son compte (tous, depuis 1.16.1) — corrigé en 1.17.1, cycle complet validé sur la VM | M |
 | ⚪ | **Commentaires-journaux** | Beaucoup de commentaires racontent la découverte d'un défaut (« Constaté le … »). Précieux pour le pourquoi, mais ils alourdissent le code et vieilliront mal : leur place serait le CHANGELOG ou une fiche de décision, le code n'en gardant que la règle | S |
 
 ---
@@ -259,12 +259,13 @@ tests. Détail dans [SECURITY.md](../SECURITY.md).
    anti-hameçonnage est resté muet de la 1.6.0 à la 1.16.2 : chargé, signé,
    actif — et jamais vérifié en train d'alerter. Chaque protection mérite un
    essai qui la montre à l'œuvre, sur la VM ou dans un vrai programme.
-3. **Un code qu'un second mainteneur peut reprendre.** `codebyr-space` fait
-   plus de 3 000 lignes : c'est le cœur du système et son point de fragilité.
-   Le découper en modules testables est la condition pour que quelqu'un
-   d'autre puisse le relire, le corriger, le maintenir. (L'ISO à jour, qui
-   était ici, est publiée : la 1.16.8, reproductible, le 30/09/2026 ;
-   « Ajouter une application » sous compte séparé est fait en 1.16.6.)
+3. **Parler une autre langue que le français.** Tout ce que Codebyr dit à
+   l'utilisateur est écrit en dur, en français : un testeur qui ne le lit
+   pas ne peut rien essayer, et un contributeur étranger rien relire. Poser
+   gettext et une première traduction anglaise ouvre le projet au-delà de la
+   francophonie — condition des testeurs du point 1. (Le découpage de
+   `codebyr-space`, qui était ici, est fait en 1.17.0 et 1.17.1 ; l'ISO à
+   jour et reproductible est publiée, la 1.16.8, le 30/09/2026.)
 
    *(`xdg-dbus-proxy`, ancien numéro deux, a été tranché le 13/09/2026 : les
    notifications passent par un relais, voir plus haut.)*

@@ -14,9 +14,9 @@ installée sur machine réelle. Voir la [feuille de route](#feuille-de-route).
 
 ![Bureau Codebyr OS — vue d'ensemble GNOME, fond d'écran au Sceau, dock des applications](site/captures/01-bureau.png)
 
-## Où en est le projet — 30 septembre 2026
+## Où en est le projet — 1er octobre 2026
 
-Version publiée : **1.17.0** (voir le [CHANGELOG](CHANGELOG.md)). La 1.16.2 a
+Version publiée : **1.17.1** (voir le [CHANGELOG](CHANGELOG.md)). La 1.16.2 a
 fermé une élévation de privilèges du service des comptes d'Espaces, présente
 depuis la 1.15.0 ; la 1.16.3 remet en marche le bouclier anti-hameçonnage, muet
 depuis la 1.6.0, et lui fait reconnaître les adresses déguisées par d'autres
@@ -28,8 +28,9 @@ bienvenue, modifiable par tous les comptes depuis la 1.13.0, et la 1.16.8
 ajoute deux protections du noyau au démarrage (détail dans
 [SECURITY.md](SECURITY.md)). **L'ISO 1.16.8 est reproductible** : chacun peut
 la reconstruire depuis le code publié et retrouver la même empreinte (voir
-« Reconstruire l'ISO vous-même » plus bas). La 1.17.0 range le cœur du
-système en modules, sans rien changer à l'usage. Le lot de
+« Reconstruire l'ISO vous-même » plus bas). Les 1.17.0 et 1.17.1 rangent le
+cœur du système en modules ; la 1.17.1 fait aussi revenir les fichiers d'un
+Espace quand on lui retire « Compte séparé », comme promis. Le lot de
 sécurité de septembre est publié (frontières des fichiers, restauration non
 destructive, aucun repli sans isolation, réseau restreint par namespace, filtre
 d'appels système).

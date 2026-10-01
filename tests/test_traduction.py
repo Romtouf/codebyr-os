@@ -456,8 +456,10 @@ class LesFichiersTraduits(unittest.TestCase):
             self.assertEqual(phrases_en_dur(code, relatif, LAISSES), [], relatif)
 
     def test_ils_chargent_la_traduction(self):
+        # _ ou n_ selon ce que le fichier emploie : ruff refuse un import inutile.
         for relatif in FICHIERS_TRADUITS:
-            self.assertIn("from traduction import _", _lire(os.path.join(INCLUDES, relatif)), relatif)
+            self.assertRegex(_lire(os.path.join(INCLUDES, relatif)),
+                             r"(?m)^\s*from traduction import (_|n_)\b", relatif)
 
     def test_le_garde_fou_voit_une_phrase_oubliee(self):
         self.assertEqual(phrases_en_dur('b = Gtk.Button(label="Ouvrir le dossier")', "x"),

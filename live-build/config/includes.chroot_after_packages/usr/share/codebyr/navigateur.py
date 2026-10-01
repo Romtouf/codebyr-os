@@ -14,7 +14,7 @@ import os
 import re
 
 import fichiers_surs
-from traduction import _, n_
+from traduction import n_
 
 PROFIL_CODEBYR = "codebyr.default"
 FORME_PROFIL = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]{0,63}")

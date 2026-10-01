@@ -16,7 +16,7 @@ installée sur machine réelle. Voir la [feuille de route](#feuille-de-route).
 
 ## Où en est le projet — 1er octobre 2026
 
-Version publiée : **1.19.0** (voir le [CHANGELOG](CHANGELOG.md)). La 1.16.2 a
+Version publiée : **1.19.1** (voir le [CHANGELOG](CHANGELOG.md)). La 1.16.2 a
 fermé une élévation de privilèges du service des comptes d'Espaces, présente
 depuis la 1.15.0 ; la 1.16.3 remet en marche le bouclier anti-hameçonnage, muet
 depuis la 1.6.0, et lui fait reconnaître les adresses déguisées par d'autres
@@ -41,7 +41,11 @@ Region & Language*) ; la 1.18.1 y ajoute l'alerte du bouclier
 anti-hameçonnage, la 1.18.2 l'écran de démarrage. **La 1.19.0 démarre sans
 couture** : du logo du fabricant à l'écran de connexion, plus de menu ni de
 texte technique — le menu de GRUB s'ouvre en tapotant F4 (Fn + F4 sur la
-plupart des portables) dès le logo du fabricant. Le lot de
+plupart des portables) dès le logo du fabricant. La 1.19.1 ferme deux
+failles relevées par une analyse externe du code : une notification
+pouvait se signer d'un autre Espace, et le compte invité modifier le réseau
+de la machine (l'état de chaque point est tenu dans
+[SECURITY.md](SECURITY.md)). Le lot de
 sécurité de septembre est publié (frontières des fichiers, restauration non
 destructive, aucun repli sans isolation, réseau restreint par namespace, filtre
 d'appels système).

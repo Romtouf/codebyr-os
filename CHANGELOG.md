@@ -10,7 +10,7 @@ GNOME (menu du Sceau, liserés colorés) ne se recharge pas à chaud.
 
 ---
 
-## 1.19.1 — non publiée
+## 1.19.1 — 1er octobre 2026
 
 **Deux failles fermées, relevées par une analyse externe du code** (détail
 dans [SECURITY.md](SECURITY.md)) :

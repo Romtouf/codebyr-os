@@ -10,7 +10,7 @@ GNOME (menu du Sceau, liserés colorés) ne se recharge pas à chaud.
 
 ---
 
-## 1.17.2 — non publiée
+## 1.17.2 — 1er octobre 2026
 
 **Correctif de sécurité : un compte de la machine pouvait devenir
 administrateur à la mise à jour suivante** (depuis la 1.10.0). Pour remplir le

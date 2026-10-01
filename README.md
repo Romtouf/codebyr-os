@@ -16,7 +16,7 @@ installée sur machine réelle. Voir la [feuille de route](#feuille-de-route).
 
 ## Où en est le projet — 1er octobre 2026
 
-Version publiée : **1.17.1** (voir le [CHANGELOG](CHANGELOG.md)). La 1.16.2 a
+Version publiée : **1.17.2** (voir le [CHANGELOG](CHANGELOG.md)). La 1.16.2 a
 fermé une élévation de privilèges du service des comptes d'Espaces, présente
 depuis la 1.15.0 ; la 1.16.3 remet en marche le bouclier anti-hameçonnage, muet
 depuis la 1.6.0, et lui fait reconnaître les adresses déguisées par d'autres
@@ -30,7 +30,10 @@ ajoute deux protections du noyau au démarrage (détail dans
 la reconstruire depuis le code publié et retrouver la même empreinte (voir
 « Reconstruire l'ISO vous-même » plus bas). Les 1.17.0 et 1.17.1 rangent le
 cœur du système en modules ; la 1.17.1 fait aussi revenir les fichiers d'un
-Espace quand on lui retire « Compte séparé », comme promis. Le lot de
+Espace quand on lui retire « Compte séparé », comme promis. La 1.17.2
+ferme une élévation de privilèges par le remplissage du dossier « Modèles »,
+présente depuis la 1.10.0, et donne à Codebyr son visage dès l'allumage :
+avatar des comptes, écran de démarrage, ouverture de session. Le lot de
 sécurité de septembre est publié (frontières des fichiers, restauration non
 destructive, aucun repli sans isolation, réseau restreint par namespace, filtre
 d'appels système).

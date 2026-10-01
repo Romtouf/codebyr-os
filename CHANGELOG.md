@@ -10,7 +10,7 @@ GNOME (menu du Sceau, liserés colorés) ne se recharge pas à chaud.
 
 ---
 
-## 1.18.0 — non publiée
+## 1.18.0 — 1er octobre 2026
 
 **Codebyr parle anglais.** Tout ce que Codebyr affiche sur une machine
 installée existe désormais aussi en anglais : la fenêtre « Bienvenue », le

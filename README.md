@@ -16,7 +16,7 @@ installée sur machine réelle. Voir la [feuille de route](#feuille-de-route).
 
 ## Où en est le projet — 1er octobre 2026
 
-Version publiée : **1.17.2** (voir le [CHANGELOG](CHANGELOG.md)). La 1.16.2 a
+Version publiée : **1.18.0** (voir le [CHANGELOG](CHANGELOG.md)). La 1.16.2 a
 fermé une élévation de privilèges du service des comptes d'Espaces, présente
 depuis la 1.15.0 ; la 1.16.3 remet en marche le bouclier anti-hameçonnage, muet
 depuis la 1.6.0, et lui fait reconnaître les adresses déguisées par d'autres
@@ -33,7 +33,10 @@ cœur du système en modules ; la 1.17.1 fait aussi revenir les fichiers d'un
 Espace quand on lui retire « Compte séparé », comme promis. La 1.17.2
 ferme une élévation de privilèges par le remplissage du dossier « Modèles »,
 présente depuis la 1.10.0, et donne à Codebyr son visage dès l'allumage :
-avatar des comptes, écran de démarrage, ouverture de session. Le lot de
+avatar des comptes, écran de démarrage, ouverture de session. **La 1.18.0
+parle anglais** : tout ce que Codebyr affiche sur une machine installée existe
+aussi en anglais (*Codebyr now speaks English: choose English in Settings →
+Region & Language*). Le lot de
 sécurité de septembre est publié (frontières des fichiers, restauration non
 destructive, aucun repli sans isolation, réseau restreint par namespace, filtre
 d'appels système).

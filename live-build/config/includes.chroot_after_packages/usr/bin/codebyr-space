@@ -435,44 +435,25 @@ def _oublier_echecs_de_vignettes(home):
 
 
 def _lancer(espaces, esp, extra, fichier, session):
-    """Le lancement proprement dit. `session` : compte dédié tenu, ou None."""
+    """Le lancement proprement dit. `session` : compte dédié tenu, ou None.
+
+    Les étapes, dans l'ordre (les plus longues ont leur fonction, plus bas) :
+      1. préparer le dossier de l'Espace, relever les envois (_preparer_dossier) ;
+      2. fixer le niveau d'isolation — une pièce jointe s'examine sous cloche
+         (_deposer_piece_jointe) ;
+      3. choisir l'application ; refuser une application Flatpak qui sortirait
+         de l'Espace (_flatpak_admise) ;
+      4. la commande, son bus privé, son environnement (_environnement) ;
+      5. sous compte dédié : déménager les données, puis faire préparer le
+         dossier PAR l'Espace ;
+      6. les notifications (_ouvrir_notifications) et le filtre réseau ;
+      7. envelopper : Flatpak (_envelopper_flatpak) ou bac à sable
+         (_envelopper_bac_a_sable) ;
+      8. exécuter, marquer les processus pour l'extension, tout refermer.
+    Ce qui détient une ressource à refermer reste ici, dans le « finally ».
+    """
     home = session.home if session else espace_home(esp)
-    if not _espace_courant():
-        # Le Fichiers du bureau, lui aussi, a pu noter ces échecs.
-        _oublier_echecs_de_vignettes(os.path.expanduser("~"))
-    # Dans un Espace, un fichier venu d'ailleurs s'ouvre sous cloche. Câblé au
-    # lancement plutôt qu'à la création : un Espace existant en profite aussi,
-    # sans quoi le correctif n'atteindrait que les Espaces créés après lui.
-    envoi = None
-    if session:
-        # Le dossier de l'Espace n'est plus accessible au bureau — c'est tout
-        # l'objet du compte dédié. Ce qui s'y prépare (associations, modèles,
-        # profil de navigateur, bouclier) est donc fait PAR l'Espace, sur
-        # ordre, plus bas (voir cmd_interne_preparer).
-        #
-        # Sa boîte de départ, préparée par le service hors de son dossier,
-        # apparaît au même endroit que pour un Espace ordinaire.
-        envoi = session.envois
-        if not _espace_courant():
-            envois.relever_envois(espaces)
-    elif not esp.get("ephemere"):
-        _preparer_ouverture(home)
-        # « Nouveau document » n'existe dans Fichiers que si le dossier Modèles
-        # contient quelque chose. Chaque Espace a le sien : sans cela, créer un
-        # fichier texte y oblige à passer par un terminal.
-        modeles.installer(home)
-        _oublier_echecs_de_vignettes(home)
-        # La boîte d'envoi de CET Espace, et la relève de ce que les autres ont
-        # déposé. Les deux se font ICI, depuis l'hôte : c'est le seul endroit
-        # d'où l'on voit tous les Espaces, et le moment où l'on va justement
-        # chercher ses fichiers.
-        envoi = envois.boite_envoi(esp["id"])
-        try:
-            fichiers_surs.mkdir(envoi)
-        except OSError:
-            envoi = None
-        if not _espace_courant():
-            envois.relever_envois(espaces)
+    envoi = _preparer_dossier(espaces, esp, home, session)
     # Le dossier personnel tel que l'application le voit : celui de l'Espace
     # est monté par bubblewrap au chemin du bureau (voir wrap_bwrap, « chez »).
     # Il n'y a pas d'autre cas : aucun Espace ne s'ouvre sans bac à sable —
@@ -493,31 +474,8 @@ def _lancer(espaces, esp, extra, fichier, session):
     # Fichier partagé dans l'Espace (ouverture jetable d'une pièce jointe) :
     # copié dans l'Espace pour être visible dans le bac à sable isolé.
     if fichier and os.path.isfile(fichier):
-        nom = os.path.basename(fichier)
         try:
-            if session:
-                # Le bureau n'écrit pas chez l'Espace : la pièce jointe va dans
-                # sa boîte d'arrivée, dans un lot au nom choisi ici, que
-                # l'Espace recueillira tel quel dans « Partagé » juste avant
-                # l'ouverture. Le chemin final est donc connu d'avance.
-                # Horodaté ET tiré au sort : deux pièces jointes ouvertes dans la
-                # même seconde ne doivent pas se retrouver dans le même lot, où
-                # la seconde prendrait un autre nom que celui qu'on ouvrira.
-                dossier = "%s %s-%s" % (chemins.PIECE_JOINTE, time.strftime("%Y-%m-%d %Hh%M%S"),
-                                       secrets.token_hex(2))
-                lot = os.path.join(session.arrivees, dossier)
-                fichiers_surs.mkdir(lot)
-                with fichiers_surs.dossier(lot) as fd:
-                    # L'Espace doit pouvoir le vider ; seuls lui et le bureau
-                    # traversent la boîte d'arrivée.
-                    os.fchmod(fd, 0o777)
-                nom = fichiers_surs.copier_unique(fichier, lot, nom, mode=0o644)
-                relatif = os.path.join(chemins.PARTAGE, dossier, nom)
-            else:
-                partage = os.path.join(home, chemins.PARTAGE)
-                fichiers_surs.mkdir(partage)
-                nom = fichiers_surs.copier_unique(fichier, partage, nom)
-                relatif = os.path.join(chemins.PARTAGE, nom)
+            nom, relatif = _deposer_piece_jointe(fichier, home, session)
         except OSError as exc:
             sys.stderr.write("codebyr-space : copie du fichier impossible (%s)\n" % exc)
             return 1
@@ -534,28 +492,9 @@ def _lancer(espaces, esp, extra, fichier, session):
     # peut ni l'enfermer dans le nôtre (sandbox imbriqué = échec), ni lui donner
     # un bus de session privé (elle a besoin du vrai bus pour ses portails).
     est_flatpak = os.path.basename(app_cmd[0]) == "flatpak" or app_cmd[0].endswith("/flatpak")
-    if est_flatpak:
-        refus = permissions_flatpak.incompatibilite(esp, renforce, hors_ligne,
-                                                    sous_compte=bool(session))
-        if refus:
-            _prevenir("Application incompatible avec cet Espace", refus)
-            return 1
     appid = permissions_flatpak.identifiant(app_cmd) if est_flatpak else None
-    if est_flatpak and not session:
-        # Espace ordinaire : l'application ne passe pas par notre bac à sable,
-        # et ses permissions s'exercent sous le compte du bureau. Celles qui la
-        # font sortir de l'Espace la font refuser — sinon le liseré de l'Espace
-        # mentirait. Sous compte séparé, le compte de l'Espace les borne.
-        refus = flatpak_espace.sorties(esp, app_cmd, appid)
-        if refus:
-            nom_app = appid or os.path.basename(app_cmd[0])
-            _prevenir("%s ne s'ouvre pas dans %s" % (nom_app, esp["nom"]),
-                      "Elle pourrait %s. Ouvrez-la hors des Espaces, ou activez "
-                      "« Compte séparé » pour %s dans Configuration Codebyr : elle "
-                      "y serait bornée au compte de l'Espace." % (refus[0], esp["nom"]))
-            journal("Espace %s : application Flatpak %s refusée (%s)"
-                    % (esp["id"], nom_app, " ; ".join(refus)))
-            return 1
+    if est_flatpak and not _flatpak_admise(esp, app_cmd, appid, renforce, hors_ligne, session):
+        return 1
     cmd = build_command(esp, home, app_cmd)
 
     # Bus de session privé par Espace : les apps « mono-instance » (Fichiers,
@@ -570,23 +509,7 @@ def _lancer(espaces, esp, extra, fichier, session):
             sys.stderr.write("codebyr-space : dbus-run-session absent — l'application "
                              "n'aura aucun bus de session (paquet « dbus » manquant ?).\n")
 
-    env = dict(os.environ)
-    # Le service de notifications n'est déclaré QUE pour les Espaces : son
-    # fichier .service vit dans un dossier de données à part, ajouté ici. Sur
-    # le bureau, c'est GNOME Shell qui fournit ce nom, et rien ne le remplace.
-    env["XDG_DATA_DIRS"] = "/usr/share/codebyr/bus:" + env.get(
-        "XDG_DATA_DIRS", "/usr/local/share:/usr/share")
-    env["CODEBYR_ESPACE"] = esp["id"]
-    env["CODEBYR_ESPACE_COULEUR"] = esp["couleur"]
-    # Sous Wayland, c'est MOZ_APP_REMOTINGNAME qui fixe l'app_id de Firefox
-    # (donc la « classe » que lit l'extension pour colorer la fenêtre).
-    if "firefox" in os.path.basename(app_cmd[0]):
-        env["MOZ_APP_REMOTINGNAME"] = "codebyr-" + esp["id"]
-        # Force Firefox à utiliser NOTRE profil (profiles.ini Default=1) au lieu
-        # d'en créer un « dédié par installation » — sinon les réglages proxy du
-        # filtre réseau ne s'appliquent pas.
-        env["MOZ_LEGACY_PROFILES"] = "1"
-        env["MOZ_ALLOW_DOWNGRADE"] = "1"
+    env = _environnement(esp, app_cmd)
 
     ephemere = esp.get("ephemere")
     liste_blanche = (esp.get("reseau") or {}).get("mode") == "liste-blanche"
@@ -606,36 +529,7 @@ def _lancer(espaces, esp, extra, fichier, session):
                                          liste_blanche and not hors_ligne):
             return _refuser_compte_dedie(
                 esp, "son dossier n'a pas pu être préparé (voir le journal)")
-    # Notifications : une socket par Espace, servie par l'hôte tant que
-    # l'Espace vit. Le service qui la joint tourne DANS l'Espace, sur son bus
-    # privé — celui-ci n'est jamais remplacé (voir relais_notifications.py).
-    if session:
-        # Dans le dépôt, que le compte de l'Espace traverse ; un nom par
-        # lanceur, car deux applications du même Espace s'y côtoient.
-        notif_tmp = None
-        notif = os.path.join(session.depot, "notif-%d" % os.getpid())
-    else:
-        notif_tmp = tempfile.TemporaryDirectory(prefix="codebyr-notif-")
-        notif = os.path.join(notif_tmp.name, "notif")
-    try:
-        notif_srv = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-        notif_srv.bind(notif)
-        if session:
-            # Le dépôt fait le tri (seuls le bureau et cet Espace le
-            # traversent) ; sur la socket, il faut le droit d'écrire pour s'y
-            # connecter.
-            os.chmod(notif, 0o666)
-        notif_srv.listen(8)
-        threading.Thread(
-            target=relais_notifications.servir,
-            args=(notif_srv, esp["nom"]),
-            kwargs={"journal": journal}, daemon=True).start()
-    except OSError as exc:
-        # Sans notifications, l'Espace s'ouvre quand même : elles sont un
-        # confort, pas une frontière de sécurité.
-        sys.stderr.write("codebyr-space : notifications indisponibles (%s)\n" % exc)
-        notif_srv = None
-        notif = None
+    notif_srv, notif, notif_tmp = _ouvrir_notifications(esp, session)
     proxy = None
     filtre = None
     filtre_tmp = None
@@ -656,83 +550,10 @@ def _lancer(espaces, esp, extra, fichier, session):
         cmd = ["python3", "/usr/share/codebyr/relais_reseau.py",
                "/run/codebyr-proxy", "17890", "--"] + cmd
     if est_flatpak:
-        if session:
-            # Sous compte dédié, c'est l'Espace qui lance — son compte, son
-            # dossier d'exécution, son bus, son installation Flatpak. Le bureau
-            # ne peut rien lire de tout cela : il ne vérifie donc pas où
-            # l'application est installée, il la nomme et laisse flatpak
-            # chercher chez l'Espace d'abord, puis sur la machine.
-            env = flatpak_espace.env_dedie(esp, session, env)
-            run = cmd
-            print("Application Flatpak dans l'Espace %s, sous son compte." % esp["nom"])
-            message = ("Ses accès aux fichiers et au réseau dépendent des "
-                       "permissions de cette application, dans les limites du "
-                       "compte de l'Espace.")
-            if renforce:
-                # Accepté dans un Espace blindé parce que le compte la borne
-                # (voir permissions_flatpak.incompatibilite) : le 🛡 du menu
-                # ne doit pas laisser croire qu'elle a le Blindage.
-                message += (" Elle a le bac à sable de Flatpak, pas le "
-                            "Blindage de l'Espace.")
-            _prevenir("Permissions Flatpak", message)
-            journal("Espace %s : application Flatpak %s sous compte dédié%s"
-                    % (esp["id"], appid or "?", " (Espace blindé)" if renforce else ""))
-        elif appid and flatpak_espace.app_dans_espace(esp["id"], appid):
-            # Installée DANS l'Espace : installation Flatpak dédiée +
-            # données isolées (HOME de l'Espace → ~/.var/app séparé).
-            env["FLATPAK_USER_DIR"] = chemins.flatpak(esp["id"])
-            env["HOME"] = home
-            # Les dossiers XDG se déduisent de HOME… sauf si la session les
-            # fixe : ils désigneraient alors les VÔTRES, et « xdg-config »
-            # ouvrirait à l'application les réglages du bureau.
-            for variable in ("XDG_CONFIG_HOME", "XDG_DATA_HOME",
-                             "XDG_CACHE_HOME", "XDG_STATE_HOME"):
-                env.pop(variable, None)
-            run = cmd
-            print("Application Flatpak dédiée à %s : permissions Flatpak applicables." % esp["nom"])
-            _prevenir("Permissions Flatpak", "Installation dédiée ; les accès aux fichiers et au réseau dépendent des permissions de cette application.")
-        else:
-            # App Flatpak SYSTÈME : installée pour toute la machine. Elle a son
-            # propre bac à sable Flatpak, mais ses données sont communes à tous
-            # les Espaces — ce qu'elle enregistre depuis Travail, elle le
-            # retrouve depuis Personnel.
-            #
-            # L'avertissement existait, dans le terminal : c'est-à-dire nulle
-            # part, pour quelqu'un qui a cliqué dans un menu. L'utilisateur
-            # croyait son application cloisonnée alors qu'elle ne l'est pas, et
-            # le liseré coloré le lui confirmait à tort.
-            run = cmd
-            nom_app = os.path.basename(app_cmd[-1] if len(app_cmd) >= 2
-                                       else app_cmd[0])
-            print("Note : application Flatpak système — son propre bac à sable "
-                  "Flatpak ; le liseré de l'Espace reste indicatif.")
-            _prevenir(
-                "%s n'est pas cloisonnée dans %s" % (nom_app, esp["nom"]),
-                "Cette application est installée pour toute la machine : ses "
-                "données sont les mêmes dans tous les Espaces. Pour l'isoler, "
-                "installez-la DANS l'Espace depuis « Configuration Codebyr ».")
-            journal("Espace %s : application Flatpak système %s (non cloisonnée)"
-                    % (esp["id"], nom_app))
+        run, env = _envelopper_flatpak(esp, session, cmd, env, home, app_cmd, appid, renforce)
     else:
-        run = bac_a_sable.wrap_bwrap(home, cmd, env, renforce=renforce, hors_ligne=hors_ligne,
-                         audio=audio, envoi=envoi, filtre=filtre, gpu=gpu,
-                         notifications=notif,
-                         # Le dossier d'un Espace dédié apparaît au MÊME chemin
-                         # qu'avant (celui du bureau) : les applications gardent
-                         # des chemins absolus — dossier de téléchargement de
-                         # Firefox, fichiers récents, signets. Déménagés vers un
-                         # autre chemin, ils pointeraient dans le vide.
-                         runtime_espace=session.runtime if session else None)
-        if renforce:
-            if not session:
-                # Sous compte dédié, les plafonds sont déjà posés par le service
-                # sur l'Espace ENTIER ; « systemd-run --user » ne traverserait
-                # de toute façon pas le changement de compte.
-                run = bac_a_sable.plafonner_ressources(run, *bac_a_sable.plafonds_de(esp))
-            detail = "Blindage actif" + (" · hors-ligne (aucun réseau)" if hors_ligne else "")
-            print("🛡  %s dans l'Espace %s." % (detail, esp["nom"]))
-        if not audio:
-            print("🎤 Son et micro coupés dans l'Espace %s." % esp["nom"])
+        run = _envelopper_bac_a_sable(esp, session, cmd, env, home, renforce, hors_ligne,
+                                      audio, envoi, filtre, gpu, notif)
 
     print("Ouverture de « %s » dans l'Espace %s…" % (os.path.basename(cmd[0]), esp["nom"]))
     journal("Espace %s : ouverture de %s%s%s"
@@ -829,6 +650,259 @@ def _lancer(espaces, esp, extra, fichier, session):
             shutil.rmtree(home, ignore_errors=True)
             print("Espace jetable détruit.")
     return rc
+
+
+def _preparer_dossier(espaces, esp, home, session):
+    """Étape 1 : le dossier de l'Espace, et la relève des envois. Renvoie sa boîte d'envoi."""
+    if not _espace_courant():
+        # Le Fichiers du bureau, lui aussi, a pu noter ces échecs.
+        _oublier_echecs_de_vignettes(os.path.expanduser("~"))
+    # Dans un Espace, un fichier venu d'ailleurs s'ouvre sous cloche. Câblé au
+    # lancement plutôt qu'à la création : un Espace existant en profite aussi,
+    # sans quoi le correctif n'atteindrait que les Espaces créés après lui.
+    envoi = None
+    if session:
+        # Le dossier de l'Espace n'est plus accessible au bureau — c'est tout
+        # l'objet du compte dédié. Ce qui s'y prépare (associations, modèles,
+        # profil de navigateur, bouclier) est donc fait PAR l'Espace, sur
+        # ordre, plus bas (voir cmd_interne_preparer).
+        #
+        # Sa boîte de départ, préparée par le service hors de son dossier,
+        # apparaît au même endroit que pour un Espace ordinaire.
+        envoi = session.envois
+        if not _espace_courant():
+            envois.relever_envois(espaces)
+    elif not esp.get("ephemere"):
+        _preparer_ouverture(home)
+        # « Nouveau document » n'existe dans Fichiers que si le dossier Modèles
+        # contient quelque chose. Chaque Espace a le sien : sans cela, créer un
+        # fichier texte y oblige à passer par un terminal.
+        modeles.installer(home)
+        _oublier_echecs_de_vignettes(home)
+        # La boîte d'envoi de CET Espace, et la relève de ce que les autres ont
+        # déposé. Les deux se font ICI, depuis l'hôte : c'est le seul endroit
+        # d'où l'on voit tous les Espaces, et le moment où l'on va justement
+        # chercher ses fichiers.
+        envoi = envois.boite_envoi(esp["id"])
+        try:
+            fichiers_surs.mkdir(envoi)
+        except OSError:
+            envoi = None
+        if not _espace_courant():
+            envois.relever_envois(espaces)
+    return envoi
+
+
+def _deposer_piece_jointe(fichier, home, session):
+    """Étape 2 : copie une pièce jointe là où l'Espace la verra.
+
+    Renvoie (nom, chemin relatif au dossier de l'Espace) ; lève OSError si la
+    copie échoue.
+    """
+    nom = os.path.basename(fichier)
+    if session:
+        # Le bureau n'écrit pas chez l'Espace : la pièce jointe va dans
+        # sa boîte d'arrivée, dans un lot au nom choisi ici, que
+        # l'Espace recueillira tel quel dans « Partagé » juste avant
+        # l'ouverture. Le chemin final est donc connu d'avance.
+        # Horodaté ET tiré au sort : deux pièces jointes ouvertes dans la
+        # même seconde ne doivent pas se retrouver dans le même lot, où
+        # la seconde prendrait un autre nom que celui qu'on ouvrira.
+        dossier = "%s %s-%s" % (chemins.PIECE_JOINTE, time.strftime("%Y-%m-%d %Hh%M%S"),
+                               secrets.token_hex(2))
+        lot = os.path.join(session.arrivees, dossier)
+        fichiers_surs.mkdir(lot)
+        with fichiers_surs.dossier(lot) as fd:
+            # L'Espace doit pouvoir le vider ; seuls lui et le bureau
+            # traversent la boîte d'arrivée.
+            os.fchmod(fd, 0o777)
+        nom = fichiers_surs.copier_unique(fichier, lot, nom, mode=0o644)
+        relatif = os.path.join(chemins.PARTAGE, dossier, nom)
+    else:
+        partage = os.path.join(home, chemins.PARTAGE)
+        fichiers_surs.mkdir(partage)
+        nom = fichiers_surs.copier_unique(fichier, partage, nom)
+        relatif = os.path.join(chemins.PARTAGE, nom)
+    return nom, relatif
+
+
+def _flatpak_admise(esp, app_cmd, appid, renforce, hors_ligne, session):
+    """Étape 3 : cette application Flatpak peut-elle s'ouvrir dans cet Espace ?
+
+    Une application Flatpak s'isole DÉJÀ dans son propre bac à sable : on ne
+    peut ni l'enfermer dans le nôtre, ni lui donner un bus privé. Elle est donc
+    refusée là où ses permissions la feraient sortir de l'Espace — et
+    l'utilisateur est prévenu.
+    """
+    refus = permissions_flatpak.incompatibilite(esp, renforce, hors_ligne,
+                                                sous_compte=bool(session))
+    if refus:
+        _prevenir("Application incompatible avec cet Espace", refus)
+        return False
+    if not session:
+        # Espace ordinaire : l'application ne passe pas par notre bac à sable,
+        # et ses permissions s'exercent sous le compte du bureau. Celles qui la
+        # font sortir de l'Espace la font refuser — sinon le liseré de l'Espace
+        # mentirait. Sous compte séparé, le compte de l'Espace les borne.
+        refus = flatpak_espace.sorties(esp, app_cmd, appid)
+        if refus:
+            nom_app = appid or os.path.basename(app_cmd[0])
+            _prevenir("%s ne s'ouvre pas dans %s" % (nom_app, esp["nom"]),
+                      "Elle pourrait %s. Ouvrez-la hors des Espaces, ou activez "
+                      "« Compte séparé » pour %s dans Configuration Codebyr : elle "
+                      "y serait bornée au compte de l'Espace." % (refus[0], esp["nom"]))
+            journal("Espace %s : application Flatpak %s refusée (%s)"
+                    % (esp["id"], nom_app, " ; ".join(refus)))
+            return False
+    return True
+
+
+def _environnement(esp, app_cmd):
+    """Étape 4 : l'environnement de l'application dans l'Espace."""
+    env = dict(os.environ)
+    # Le service de notifications n'est déclaré QUE pour les Espaces : son
+    # fichier .service vit dans un dossier de données à part, ajouté ici. Sur
+    # le bureau, c'est GNOME Shell qui fournit ce nom, et rien ne le remplace.
+    env["XDG_DATA_DIRS"] = "/usr/share/codebyr/bus:" + env.get(
+        "XDG_DATA_DIRS", "/usr/local/share:/usr/share")
+    env["CODEBYR_ESPACE"] = esp["id"]
+    env["CODEBYR_ESPACE_COULEUR"] = esp["couleur"]
+    # Sous Wayland, c'est MOZ_APP_REMOTINGNAME qui fixe l'app_id de Firefox
+    # (donc la « classe » que lit l'extension pour colorer la fenêtre).
+    if "firefox" in os.path.basename(app_cmd[0]):
+        env["MOZ_APP_REMOTINGNAME"] = "codebyr-" + esp["id"]
+        # Force Firefox à utiliser NOTRE profil (profiles.ini Default=1) au lieu
+        # d'en créer un « dédié par installation » — sinon les réglages proxy du
+        # filtre réseau ne s'appliquent pas.
+        env["MOZ_LEGACY_PROFILES"] = "1"
+        env["MOZ_ALLOW_DOWNGRADE"] = "1"
+    return env
+
+
+def _ouvrir_notifications(esp, session):
+    """Étape 6 : la socket de notifications de l'Espace, servie par l'hôte.
+
+    Renvoie (socket, chemin, dossier temporaire) — None pour les deux premiers
+    si elle n'a pas pu s'ouvrir : l'Espace s'ouvre quand même.
+    """
+    # Notifications : une socket par Espace, servie par l'hôte tant que
+    # l'Espace vit. Le service qui la joint tourne DANS l'Espace, sur son bus
+    # privé — celui-ci n'est jamais remplacé (voir relais_notifications.py).
+    if session:
+        # Dans le dépôt, que le compte de l'Espace traverse ; un nom par
+        # lanceur, car deux applications du même Espace s'y côtoient.
+        notif_tmp = None
+        notif = os.path.join(session.depot, "notif-%d" % os.getpid())
+    else:
+        notif_tmp = tempfile.TemporaryDirectory(prefix="codebyr-notif-")
+        notif = os.path.join(notif_tmp.name, "notif")
+    try:
+        notif_srv = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        notif_srv.bind(notif)
+        if session:
+            # Le dépôt fait le tri (seuls le bureau et cet Espace le
+            # traversent) ; sur la socket, il faut le droit d'écrire pour s'y
+            # connecter.
+            os.chmod(notif, 0o666)
+        notif_srv.listen(8)
+        threading.Thread(
+            target=relais_notifications.servir,
+            args=(notif_srv, esp["nom"]),
+            kwargs={"journal": journal}, daemon=True).start()
+    except OSError as exc:
+        # Sans notifications, l'Espace s'ouvre quand même : elles sont un
+        # confort, pas une frontière de sécurité.
+        sys.stderr.write("codebyr-space : notifications indisponibles (%s)\n" % exc)
+        notif_srv = None
+        notif = None
+    return notif_srv, notif, notif_tmp
+
+
+def _envelopper_flatpak(esp, session, cmd, env, home, app_cmd, appid, renforce):
+    """Étape 7 : la commande d'une application Flatpak. Renvoie (commande, environnement)."""
+    if session:
+        # Sous compte dédié, c'est l'Espace qui lance — son compte, son
+        # dossier d'exécution, son bus, son installation Flatpak. Le bureau
+        # ne peut rien lire de tout cela : il ne vérifie donc pas où
+        # l'application est installée, il la nomme et laisse flatpak
+        # chercher chez l'Espace d'abord, puis sur la machine.
+        env = flatpak_espace.env_dedie(esp, session, env)
+        run = cmd
+        print("Application Flatpak dans l'Espace %s, sous son compte." % esp["nom"])
+        message = ("Ses accès aux fichiers et au réseau dépendent des "
+                   "permissions de cette application, dans les limites du "
+                   "compte de l'Espace.")
+        if renforce:
+            # Accepté dans un Espace blindé parce que le compte la borne
+            # (voir permissions_flatpak.incompatibilite) : le 🛡 du menu
+            # ne doit pas laisser croire qu'elle a le Blindage.
+            message += (" Elle a le bac à sable de Flatpak, pas le "
+                        "Blindage de l'Espace.")
+        _prevenir("Permissions Flatpak", message)
+        journal("Espace %s : application Flatpak %s sous compte dédié%s"
+                % (esp["id"], appid or "?", " (Espace blindé)" if renforce else ""))
+    elif appid and flatpak_espace.app_dans_espace(esp["id"], appid):
+        # Installée DANS l'Espace : installation Flatpak dédiée +
+        # données isolées (HOME de l'Espace → ~/.var/app séparé).
+        env["FLATPAK_USER_DIR"] = chemins.flatpak(esp["id"])
+        env["HOME"] = home
+        # Les dossiers XDG se déduisent de HOME… sauf si la session les
+        # fixe : ils désigneraient alors les VÔTRES, et « xdg-config »
+        # ouvrirait à l'application les réglages du bureau.
+        for variable in ("XDG_CONFIG_HOME", "XDG_DATA_HOME",
+                         "XDG_CACHE_HOME", "XDG_STATE_HOME"):
+            env.pop(variable, None)
+        run = cmd
+        print("Application Flatpak dédiée à %s : permissions Flatpak applicables." % esp["nom"])
+        _prevenir("Permissions Flatpak", "Installation dédiée ; les accès aux fichiers et au réseau dépendent des permissions de cette application.")
+    else:
+        # App Flatpak SYSTÈME : installée pour toute la machine. Elle a son
+        # propre bac à sable Flatpak, mais ses données sont communes à tous
+        # les Espaces — ce qu'elle enregistre depuis Travail, elle le
+        # retrouve depuis Personnel.
+        #
+        # L'avertissement existait, dans le terminal : c'est-à-dire nulle
+        # part, pour quelqu'un qui a cliqué dans un menu. L'utilisateur
+        # croyait son application cloisonnée alors qu'elle ne l'est pas, et
+        # le liseré coloré le lui confirmait à tort.
+        run = cmd
+        nom_app = os.path.basename(app_cmd[-1] if len(app_cmd) >= 2
+                                   else app_cmd[0])
+        print("Note : application Flatpak système — son propre bac à sable "
+              "Flatpak ; le liseré de l'Espace reste indicatif.")
+        _prevenir(
+            "%s n'est pas cloisonnée dans %s" % (nom_app, esp["nom"]),
+            "Cette application est installée pour toute la machine : ses "
+            "données sont les mêmes dans tous les Espaces. Pour l'isoler, "
+            "installez-la DANS l'Espace depuis « Configuration Codebyr ».")
+        journal("Espace %s : application Flatpak système %s (non cloisonnée)"
+                % (esp["id"], nom_app))
+    return run, env
+
+
+def _envelopper_bac_a_sable(esp, session, cmd, env, home, renforce, hors_ligne,
+                            audio, envoi, filtre, gpu, notif):
+    """Étape 7 : la commande enveloppée dans le bac à sable de l'Espace."""
+    run = bac_a_sable.wrap_bwrap(home, cmd, env, renforce=renforce, hors_ligne=hors_ligne,
+                     audio=audio, envoi=envoi, filtre=filtre, gpu=gpu,
+                     notifications=notif,
+                     # Le dossier d'un Espace dédié apparaît au MÊME chemin
+                     # qu'avant (celui du bureau) : les applications gardent
+                     # des chemins absolus — dossier de téléchargement de
+                     # Firefox, fichiers récents, signets. Déménagés vers un
+                     # autre chemin, ils pointeraient dans le vide.
+                     runtime_espace=session.runtime if session else None)
+    if renforce:
+        if not session:
+            # Sous compte dédié, les plafonds sont déjà posés par le service
+            # sur l'Espace ENTIER ; « systemd-run --user » ne traverserait
+            # de toute façon pas le changement de compte.
+            run = bac_a_sable.plafonner_ressources(run, *bac_a_sable.plafonds_de(esp))
+        detail = "Blindage actif" + (" · hors-ligne (aucun réseau)" if hors_ligne else "")
+        print("🛡  %s dans l'Espace %s." % (detail, esp["nom"]))
+    if not audio:
+        print("🎤 Son et micro coupés dans l'Espace %s." % esp["nom"])
+    return run
 
 
 PORT_FILTRE_INTERNE = 17890
@@ -1600,24 +1674,6 @@ def _espace_courant():
     """
     esp_id = os.environ.get("CODEBYR_ESPACE", "").strip()
     return esp_id if provenance.identifiant_valide(esp_id) else None
-
-
-def nom_libre(dossier, nom, existe=os.path.exists):
-    """Un nom qui n'écrase rien : « rapport.pdf » → « rapport (2).pdf ».
-
-    Décision pure (l'accès disque est injectable) parce qu'elle décide d'une
-    PERTE DE DONNÉES. Écraser en silence un fichier déjà présent dans un Espace
-    serait le pire comportement possible ici : l'utilisateur ne saurait même pas
-    qu'il a perdu quelque chose — le geste, lui, a l'air d'avoir réussi.
-    """
-    if not existe(os.path.join(dossier, nom)):
-        return nom
-    base, ext = os.path.splitext(nom)
-    for n in range(2, 1000):
-        candidat = "%s (%d)%s" % (base, n, ext)
-        if not existe(os.path.join(dossier, candidat)):
-            return candidat
-    return None
 
 
 def _deposer_pour_envoi(esp, depart, source):

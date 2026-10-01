@@ -347,12 +347,10 @@ class LesApplicationsFlatpakDansUnEspaceDedie(unittest.TestCase):
         # Il ne peut pas lire le dossier de l'Espace : y chercher l'application
         # répondrait toujours « absente », et le lanceur dirait le contraire de
         # la vérité à l'utilisateur.
-        lancer = _fonction(self.source, "_lancer", "_preparer_depuis_l_espace")
-        # Le DERNIER « if est_flatpak: » : celui du lancement. Le premier ne
-        # fait que décider si l'application est compatible avec l'Espace.
-        bloc = lancer.split("if est_flatpak:")[-1].split("else:")[0]
-        self.assertLess(bloc.index("if session:"),
-                        bloc.index("flatpak_espace.app_dans_espace"))
+        # Étape nommée de _lancer depuis la 1.17.1 : la commande d'une application Flatpak.
+        flatpak = _fonction(self.source, "_envelopper_flatpak", "_envelopper_bac_a_sable")
+        self.assertLess(flatpak.index("if session:"),
+                        flatpak.index("flatpak_espace.app_dans_espace"))
 
 
 class JamaisDeReplieSousLeCompteDuBureau(unittest.TestCase):
@@ -409,7 +407,8 @@ class LOrdreDesChoses(unittest.TestCase):
         self.assertIn("runtime_espace=session.runtime", appel)
 
     def test_le_bureau_n_ecrit_plus_dans_le_dossier_d_un_espace_dedie(self):
-        bloc = self.lancer.split("if session:")[1].split("elif not esp.get(\"ephemere\"):")[0]
+        dossier = _fonction(_source(), "_preparer_dossier", "_deposer_piece_jointe")
+        bloc = dossier.split("if session:")[1].split("elif not esp.get(\"ephemere\"):")[0]
         self.assertNotIn("_preparer_ouverture(", bloc)
         self.assertNotIn("modeles.installer(", bloc)
         self.assertIn("and not session", self.lancer.split("navigateur.installer_bouclier(home, espaces)")[0][-200:])
@@ -468,8 +467,8 @@ class LesBoites(unittest.TestCase):
     def test_la_boite_de_depart_est_montee_dans_l_espace(self):
         # Sans elle, « envoyer » depuis l'Espace écrirait dans un dossier
         # ordinaire : « Déposé », et le fichier ne partirait jamais.
-        lancer = _fonction(_source(), "_lancer", "_rundir")
-        bloc = lancer.split("if session:")[1].split("elif not esp.get(\"ephemere\"):")[0]
+        dossier = _fonction(_source(), "_preparer_dossier", "_deposer_piece_jointe")
+        bloc = dossier.split("if session:")[1].split("elif not esp.get(\"ephemere\"):")[0]
         self.assertIn("envoi = session.envois", bloc)
 
     @unittest.skipUnless(POSIX, "numéros de compte Unix (os.getuid)")
@@ -578,8 +577,8 @@ class LesBoites(unittest.TestCase):
             self.assertFalse(os.path.exists(os.path.join(home, chemins.PARTAGE, "piege.txt")))
 
     def test_la_piece_jointe_passe_par_la_boite_d_arrivee(self):
-        lancer = _fonction(_source(), "_lancer", "_rundir")
-        bloc = lancer.split("if fichier and os.path.isfile(fichier):")[1].split("app_cmd = ")[0]
+        piece = _fonction(_source(), "_deposer_piece_jointe", "_flatpak_admise")
+        bloc = piece.split("if session:")[1].split("else:")[0]
         self.assertIn("session.arrivees", bloc)
         self.assertIn("mode=0o644", bloc)
         self.assertIn("secrets.token_hex", bloc)
@@ -1023,3 +1022,29 @@ class LeProgrammeQueLEspaceExecute(unittest.TestCase):
     def test_codebyr_space_s_y_inscrit(self):
         self.assertIn("ordres_espace.PROGRAMME = os.path.realpath(__file__)", _source())
         self.assertEqual(os.path.basename(ordres_espace.PROGRAMME), "codebyr-space")
+
+
+class LesEtapesDuLancement(unittest.TestCase):
+    """1.17.1 : _lancer, 400 lignes d'un tenant, enchaîne des étapes nommées.
+
+    Leur ORDRE est une protection : le dossier est prêt avant qu'on y dépose une
+    pièce jointe ; une application Flatpak est refusée avant que rien ne se
+    prépare pour elle ; les données déménagent avant que l'Espace prépare son
+    dossier, qui précède le filtre réseau ; l'enveloppe vient en dernier.
+    """
+
+    def test_les_etapes_dans_l_ordre(self):
+        lancer = _fonction(_source(), "_lancer", "_preparer_dossier")
+        etapes = ["_preparer_dossier(", "_deposer_piece_jointe(", "_flatpak_admise(",
+                  "_environnement(", "ordres_espace.demenager_vers_compte_dedie(",
+                  "ordres_espace.preparer_depuis_l_espace(", "_ouvrir_notifications(",
+                  "_demarrer_filtre_reseau(", "_envelopper_flatpak(", "_envelopper_bac_a_sable(",
+                  "compte_dedie.executer("]
+        positions = [lancer.index(e) for e in etapes]
+        self.assertEqual(positions, sorted(positions), etapes)
+
+    def test_la_piece_jointe_est_examinee_sous_cloche(self):
+        lancer = _fonction(_source(), "_lancer", "_preparer_dossier")
+        cloche = lancer.split("_deposer_piece_jointe(")[1].split("app_cmd = ")[0]
+        for reglage in ("renforce = True", "hors_ligne = True", "gpu = False"):
+            self.assertIn(reglage, cloche)

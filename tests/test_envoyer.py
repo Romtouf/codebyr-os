@@ -21,48 +21,66 @@ import envois  # noqa: E402 — module partagé (voir outils)
 space = outils.charger("codebyr-space")
 
 
-class NomLibre(unittest.TestCase):
+@unittest.skipUnless(hasattr(os, "O_NOFOLLOW") and os.supports_dir_fd,
+                     "accès disque par descripteurs (O_NOFOLLOW, dir_fd) — Linux")
+class UnNomQuiNEcraseRien(unittest.TestCase):
     """Écraser en silence serait le pire comportement possible ici.
 
     L'utilisateur ne saurait même pas qu'il a perdu quelque chose : le geste,
     lui, a parfaitement l'air d'avoir réussi.
+
+    Ces règles visaient « nom_libre », une décision pure que plus rien
+    n'appelait : la copie passait déjà par fichiers_surs.copier_unique, qui
+    applique la même règle par création exclusive — sans course entre deux
+    transferts. nom_libre est retirée en 1.17.1 ; ses tests portent désormais
+    sur la fonction qui copie vraiment.
     """
 
+    def setUp(self):
+        self._t = tempfile.TemporaryDirectory()
+        self.addCleanup(self._t.cleanup)
+        self.cible = os.path.join(self._t.name, "cible")
+        os.mkdir(self.cible)
+        self.source = os.path.join(self._t.name, "source")
+        with open(self.source, "w") as f:
+            f.write("nouveau")
+
+    def _poser(self, *noms):
+        for nom in noms:
+            with open(os.path.join(self.cible, nom), "w") as f:
+                f.write("déjà là")
+
+    def _copier(self, nom):
+        import fichiers_surs
+        return fichiers_surs.copier_unique(self.source, self.cible, nom)
+
     def test_dossier_vide_garde_le_nom(self):
-        self.assertEqual(
-            space.nom_libre("/x", "rapport.pdf", existe=lambda p: False),
-            "rapport.pdf")
+        self.assertEqual(self._copier("rapport.pdf"), "rapport.pdf")
 
     def test_collision_numerote_sans_ecraser(self):
-        pris = {os.path.join("/x", "rapport.pdf")}
-        self.assertEqual(
-            space.nom_libre("/x", "rapport.pdf", existe=lambda p: p in pris),
-            "rapport (2).pdf")
+        self._poser("rapport.pdf")
+        self.assertEqual(self._copier("rapport.pdf"), "rapport (2).pdf")
+        with open(os.path.join(self.cible, "rapport.pdf")) as f:
+            self.assertEqual(f.read(), "déjà là")
 
     def test_collisions_successives(self):
-        pris = {os.path.join("/x", n) for n in
-                ("rapport.pdf", "rapport (2).pdf", "rapport (3).pdf")}
-        self.assertEqual(
-            space.nom_libre("/x", "rapport.pdf", existe=lambda p: p in pris),
-            "rapport (4).pdf")
+        self._poser("rapport.pdf", "rapport (2).pdf", "rapport (3).pdf")
+        self.assertEqual(self._copier("rapport.pdf"), "rapport (4).pdf")
 
     def test_extension_preservee(self):
         """« rapport (2).tar.gz » serait faux, mais « .gz » doit survivre."""
-        pris = {os.path.join("/x", "archive.tar.gz")}
-        obtenu = space.nom_libre("/x", "archive.tar.gz",
-                                 existe=lambda p: p in pris)
-        self.assertTrue(obtenu.endswith(".gz"), obtenu)
+        self._poser("archive.tar.gz")
+        self.assertTrue(self._copier("archive.tar.gz").endswith(".gz"))
 
     def test_fichier_sans_extension(self):
-        pris = {os.path.join("/x", "NOTES")}
-        self.assertEqual(
-            space.nom_libre("/x", "NOTES", existe=lambda p: p in pris),
-            "NOTES (2)")
+        self._poser("NOTES")
+        self.assertEqual(self._copier("NOTES"), "NOTES (2)")
 
     def test_abandonne_plutot_que_de_boucler(self):
         """Mille collisions : on rend la main au lieu de tourner sans fin."""
-        self.assertIsNone(
-            space.nom_libre("/x", "a.txt", existe=lambda p: True))
+        self._poser("a.txt", *("a (%d).txt" % n for n in range(2, 1000)))
+        with self.assertRaises(OSError):
+            self._copier("a.txt")
 
 
 @unittest.skipUnless(hasattr(os, "O_NOFOLLOW") and os.supports_dir_fd,

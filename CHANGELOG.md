@@ -18,6 +18,10 @@ GNOME (menu du Sceau, liserés colorés) ne se recharge pas à chaud.
   données, les rapatrier, préparer son dossier — : `ordres_espace.py`.
 - Ce que l'Espace fait chez lui, sous son propre compte — recevoir ses
   données, se restaurer, s'effacer, s'exporter — : `cote_espace.py`.
+- `_lancer`, la fonction qui ouvre un Espace (400 lignes d'un seul tenant),
+  enchaîne désormais des étapes nommées, dont l'ordre est vérifié par un test.
+- Une fonction que plus rien n'appelait est retirée ; ses tests portent sur
+  celle qui copie vraiment les fichiers.
 
 ---
 

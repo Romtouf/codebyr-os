@@ -108,6 +108,41 @@ assert ctypes.get_errno() == errno.EPERM
                                   capture_output=True, text=True, timeout=10)
         self.assertEqual(resultat.returncode, 0, resultat.stderr)
 
+    def test_seccomp_ne_laisse_ouvrir_que_les_sockets_utiles(self):
+        """1.20.0 : nf_tables, x_tables, AF_PACKET et les protocoles chargés
+        à la demande ne se joignent plus depuis un Espace blindé ; TCP, UDP,
+        ping, Unix et netlink des interfaces passent toujours."""
+        code = '''import ctypes, errno, socket
+from filtre_syscalls import appliquer
+appliquer()
+lib = ctypes.CDLL(None, use_errno=True)
+def essai(famille, type_, protocole):
+    fd = lib.socket(famille, type_, protocole)
+    if fd >= 0:
+        lib.close(fd)
+        return "ok"
+    return errno.errorcode.get(ctypes.get_errno(), "?")
+cloexec = socket.SOCK_CLOEXEC
+attendus = {
+    (1, 1, 0): "ok", (1, 5, 0): "ok",                     # Unix, flux et paquets
+    (2, 1 | cloexec, 0): "ok", (2, 1, 6): "ok",           # TCP
+    (10, 2, 17): "ok", (2, 2, 0): "ok",                   # UDP
+    (16, 3 | cloexec, 0): "ok",                           # netlink ROUTE
+    (16, 3, 12): "ENOSYS",                                # netlink NETFILTER : nf_tables
+    (16, 3, 16): "ENOSYS",                                # netlink GENERIC
+    (17, 3, 0): "ENOSYS",                                 # AF_PACKET
+    (2, 3, 255): "ENOSYS",                                # socket brute : x_tables
+    (2, 1, 132): "ENOSYS",                                # SCTP
+    (38, 5, 0): "ENOSYS", (40, 1, 0): "ENOSYS",           # AF_ALG, VSOCK
+}
+obtenus = {k: essai(*k) for k in attendus}
+assert obtenus == attendus, obtenus
+'''
+        resultat = subprocess.run([sys.executable, "-B", "-c", code],
+                                  env=dict(os.environ, PYTHONPATH=LIB),
+                                  capture_output=True, text=True, timeout=10)
+        self.assertEqual(resultat.returncode, 0, resultat.stderr)
+
     def test_seccomp_refuse_io_uring(self):
         """io_uring offrait un second chemin vers tout ce que le filtre refuse.
 

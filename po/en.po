@@ -1268,8 +1268,8 @@ msgid "Bus système joignable"
 msgstr "System bus reachable"
 
 #: usr/share/codebyr/bac_a_sable.py
-msgid "Socket X11 de l'hôte visible"
-msgstr "Host X11 socket visible"
+msgid "Serveur X11 de l'hôte joignable"
+msgstr "Host X11 server reachable"
 
 #: usr/share/codebyr/bac_a_sable.py
 msgid "Son et micro (PipeWire)"
@@ -1452,6 +1452,10 @@ msgstr "reach the desktop session bus, and so run programs there"
 #: usr/share/codebyr/permissions_flatpak.py
 msgid "atteindre votre dossier personnel, où vivent les données de tous les Espaces et les programmes lancés à l'ouverture de session"
 msgstr "reach your home folder, where the data of every Space lives, along with the programs launched at login"
+
+#: usr/share/codebyr/permissions_flatpak.py
+msgid "joindre le serveur X11 du bureau : lire le presse-papiers de tous les Espaces, voir les autres fenêtres et leur envoyer des frappes"
+msgstr "reach the desktop X11 server: read the clipboard of every Space, see other windows and send them keystrokes"
 
 #: usr/share/codebyr/permissions_flatpak.py
 msgid "Son réseau dépend de ses propres permissions : le réseau restreint de cet Espace ne serait pas tenu."

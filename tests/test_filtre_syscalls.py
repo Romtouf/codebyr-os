@@ -48,9 +48,13 @@ class LesListes(unittest.TestCase):
     def test_sont_autorises_les_connus_moins_refus_et_ecartes(self):
         autorises = filtre_syscalls.autorises()
         self.assertEqual(len(autorises), len(filtre_syscalls.CONNUS)
-                         - len(filtre_syscalls.REFUSES) - len(filtre_syscalls.ECARTES))
+                         - len(filtre_syscalls.REFUSES) - len(filtre_syscalls.ECARTES)
+                         - len(filtre_syscalls.SOUS_CONDITION))
         self.assertEqual(sorted(set(autorises) & set(filtre_syscalls.REFUSES)), [])
         self.assertEqual(sorted(set(autorises) & set(filtre_syscalls.ECARTES)), [])
+        # socket() n'est plus permis sans condition (1.20.0).
+        self.assertNotIn("socket", autorises)
+        self.assertIn("socket", filtre_syscalls.CONNUS)
 
     def test_ce_qui_protege_les_applications_n_est_jamais_ecarte(self):
         # Firefox construit son propre bac à sable (unshare, chroot, seccomp),
@@ -80,6 +84,41 @@ class LesListes(unittest.TestCase):
         # le poser lui-même. Il n'ouvre rien des refus (voir les tests
         # d'intégration), mais il laisserait passer les écartés.
         self.assertTrue(filtre_syscalls.MESURE.startswith("/etc/codebyr/"))
+
+
+class LesSockets(unittest.TestCase):
+    """1.20.0 : seules quelques familles de sockets passent (analyse externe
+    du 01/10/2026, point 3.1). Ce qu'un espace de noms imbriqué ouvre au
+    noyau — nf_tables, x_tables, AF_PACKET, les protocoles chargés à la
+    demande — n'est plus joignable depuis un Espace blindé."""
+
+    PERMIS = set(filtre_syscalls.SOCKETS_PERMIS)
+
+    def test_aucune_famille_de_la_surface_visee(self):
+        familles = {f for f, _t, _p in self.PERMIS}
+        self.assertEqual(familles, {1, 2, 10, 16})   # UNIX, INET, INET6, NETLINK
+        for interdite in (17, 38, 40, 30, 21, 44):   # PACKET, ALG, VSOCK, TIPC, RDS, XDP
+            self.assertNotIn(interdite, familles)
+
+    def test_netlink_ni_pare_feu_ni_generique(self):
+        protocoles = {p for f, _t, p in self.PERMIS if f == 16}
+        self.assertEqual(protocoles, {0, 15})        # ROUTE, KOBJECT_UEVENT
+        self.assertNotIn(12, protocoles)             # NETLINK_NETFILTER : nf_tables
+
+    def test_ni_socket_brute_ni_sctp_ni_dccp(self):
+        for famille, type_, protocole in self.PERMIS:
+            if famille in (2, 10):
+                self.assertIn(type_, (1, 2), (famille, type_))          # STREAM, DGRAM
+                self.assertIn(protocole, (0, 6, 17, 1, 58), (famille, protocole))
+
+    def test_les_drapeaux_du_type_ne_comptent_pas(self):
+        # socket(AF_INET, SOCK_STREAM | SOCK_CLOEXEC, 0) doit passer.
+        self.assertEqual(filtre_syscalls.comparaisons_socket(2, 1, 6),
+                         [(0, filtre_syscalls.SCMP_CMP_EQ, 2, 0),
+                          (1, filtre_syscalls.SCMP_CMP_MASKED_EQ, 0xf, 1),
+                          (2, filtre_syscalls.SCMP_CMP_EQ, 6, 0)])
+        self.assertEqual(filtre_syscalls.comparaisons_socket(1, None, None),
+                         [(0, filtre_syscalls.SCMP_CMP_EQ, 1, 0)])
 
 
 if __name__ == "__main__":

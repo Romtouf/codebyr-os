@@ -127,6 +127,13 @@ def wrap_bwrap(home, cmd, env, renforce=False, hors_ligne=False, audio=True,
         # rien dans le bac à sable : on le retire pour éviter toute confusion
         # (dbus-run-session posera la bonne valeur juste après).
         "--unsetenv", "DBUS_SESSION_BUS_ADDRESS",
+        # De même pour X11 : le cookie n'entre jamais dans le bac à sable, le
+        # serveur refuse donc la connexion ; une application qui le tenterait
+        # échouerait sur un message trompeur. Ce n'est pas CE retrait qui
+        # protège (un programme hostile se passe de DISPLAY) : voir
+        # sockets_abstraites.py.
+        "--unsetenv", "DISPLAY",
+        "--unsetenv", "XAUTHORITY",
     ]
     if envoi:
         # Seul passage par lequel un fichier sort vers un autre Espace. Chaque
@@ -163,6 +170,13 @@ def wrap_bwrap(home, cmd, env, renforce=False, hors_ligne=False, audio=True,
                   "--new-session", "--cap-drop", "ALL"]
     if renforce:
         cmd = ["python3", "/usr/share/codebyr/filtre_syscalls.py", "--"] + cmd
+    if not (hors_ligne or filtre):
+        # Réseau partagé avec l'hôte, donc ses sockets abstraites visibles —
+        # celle de X11 comprise. La cloison passe EN PREMIER, avant le filtre
+        # d'appels système, et tout ce qui suit en hérite. Sans réseau (ou
+        # derrière le filtre), l'Espace a son propre espace de noms réseau :
+        # il ne voit déjà aucune socket abstraite de l'hôte.
+        cmd = ["python3", "-I", "/usr/share/codebyr/sockets_abstraites.py", "--"] + cmd
     return bwrap + ["--"] + cmd
 
 
@@ -282,12 +296,29 @@ def joignable(chemin):
     finally:
         s.close()
 
+def x11_joignable():
+    # Le dossier des sockets X11, mais aussi leurs jumelles ABSTRAITES, qui ne
+    # sont pas des fichiers : aucun montage ne les cache, seul un espace de
+    # noms réseau à part ou la cloison Landlock les ferment.
+    if os.path.isdir("/tmp/.X11-unix"):
+        return True
+    for n in range(4):
+        s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        try:
+            s.connect("\0/tmp/.X11-unix/X%d" % n)
+            return True
+        except OSError:
+            pass
+        finally:
+            s.close()
+    return False
+
 runtime = os.environ.get("XDG_RUNTIME_DIR", "")
 mesures = {
     "bus_hote": joignable(os.path.join(runtime, "bus")) if runtime else False,
     "systemd_user": joignable(os.path.join(runtime, "systemd", "private")) if runtime else False,
     "bus_systeme": joignable("/run/dbus/system_bus_socket"),
-    "x11": os.path.isdir("/tmp/.X11-unix"),
+    "x11": x11_joignable(),
     "son": os.path.exists(os.path.join(runtime, "pipewire-0")) if runtime else False,
     "gpu": os.path.exists("/dev/dri"),
 }
@@ -310,7 +341,7 @@ CONTROLES = (
     ("bus_hote", _("Bus de session de l'hôte joignable")),
     ("systemd_user", "systemd --user joignable"),
     ("bus_systeme", _("Bus système joignable")),
-    ("x11", _("Socket X11 de l'hôte visible")),
+    ("x11", _("Serveur X11 de l'hôte joignable")),
     ("son", _("Son et micro (PipeWire)")),
     ("gpu", _("Carte graphique (accès direct)")),
     ("reseau", _("Accès au réseau")),

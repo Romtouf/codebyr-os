@@ -107,6 +107,21 @@ class CeQuiFaitSortirDeLEspace(unittest.TestCase):
         perms = {"Context": {"filesystems": "xdg-run/pipewire-0:ro;xdg-run/app/org.x.Y:create"}}
         self.assertEqual(pf.sorties(perms, True), [])
 
+    def test_x11_sans_repli_donne_le_serveur_du_bureau(self):
+        # Analyse externe du 01/10/2026, point 1.3 : Flatpak monte alors la
+        # socket de Xwayland et son cookie — presse-papiers de tous les
+        # Espaces, fenêtres, frappes.
+        self.assertEqual(pf.sorties(pf.lire(EDITEUR_TOUT_TERRAIN.replace(
+            "filesystems=host;", "").replace("org.freedesktop.Flatpak=talk", "")), True),
+            [pf.LE_X11])
+        self.assertEqual(pf.sorties({"Context": {"sockets": "x11;"}}, False), [pf.LE_X11])
+
+    def test_le_repli_x11_ne_sert_pas_sous_wayland(self):
+        # Sortie réelle de la Calculatrice : Flatpak écrit « x11 » ET
+        # « fallback-x11 », et ne donne pas X11 sous Wayland.
+        self.assertEqual(pf.sorties({"Context": {"sockets": "x11;wayland;fallback-x11;"}}, True), [])
+        self.assertEqual(pf.sorties({"Context": {"sockets": "!x11;wayland;"}}, True), [])
+
     def test_une_permission_retiree_ne_compte_pas(self):
         perms = {"Context": {"filesystems": "!host;!home;", "sockets": "!session-bus;"}}
         self.assertEqual(pf.sorties(perms, False), [])

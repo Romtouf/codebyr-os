@@ -10,6 +10,29 @@ GNOME (menu du Sceau, liserés colorés) ne se recharge pas à chaud.
 
 ---
 
+## 1.20.0 — non publiée
+
+**Les Espaces se cloisonnent davantage**, suite de l'analyse externe du code
+(détail dans [SECURITY.md](SECURITY.md)) :
+
+- **un Espace ne joint plus le serveur graphique X11 du bureau**, ni aucune
+  autre socket « abstraite » de la machine. GNOME refusait déjà la connexion
+  faute d'identifiant ; une cloison du noyau (Landlock) l'empêche désormais
+  d'arriver jusqu'à lui. `codebyr-space verifier-isolation` le contrôle pour
+  de vrai ;
+- **une application Flatpak qui demande X11** ne s'ouvre plus dans un Espace
+  sans « Compte séparé » : X11 lui donnerait le presse-papiers des autres
+  Espaces ;
+- **le Blindage ne laisse plus ouvrir que les connexions utiles** (Internet,
+  connexions locales, réseau de la machine) : les parties du noyau les plus
+  visées par les attaques — pare-feu, paquets bruts, protocoles rares — ne
+  sont plus joignables depuis un Espace blindé.
+
+Rien ne change à l'usage : les vignettes de Fichiers, le bac à sable propre
+de Firefox et les applications ajoutées fonctionnent comme avant.
+
+---
+
 ## 1.19.1 — 1er octobre 2026
 
 **Deux failles fermées, relevées par une analyse externe du code** (détail

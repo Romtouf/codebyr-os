@@ -112,7 +112,7 @@ def verifier_arbre(stage, racine):
             if not (theme / nom).is_file():
                 raise ValueError("Écran de démarrage « %s » absent : %s" % (langue, nom))
     for nom in ("fichiers_surs.py", "filtre_syscalls.py", "relais_reseau.py",
-                "permissions_flatpak.py", "navigateur.py"):
+                "permissions_flatpak.py", "navigateur.py", "sockets_abstraites.py"):
         if not (stage / "usr/share/codebyr" / nom).is_file():
             raise ValueError("Module de sécurité absent : " + nom)
     print("%d fichiers conformes aux sources ; permissions vérifiées." % controles)

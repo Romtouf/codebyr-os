@@ -48,6 +48,42 @@ REFUSES = (
 # « unshare » n'est VOLONTAIREMENT pas refuse : Firefox construit son propre
 # bac a sable avec, et le bloquer desactiverait une protection du navigateur
 # pour en ajouter une ici. On ne troque pas une defense contre une autre.
+# Les vignettes de Fichiers et les applications Electron s'en servent aussi
+# (un bwrap imbriqué, le bac à sable de Chromium). Interdire seulement le
+# réseau imbriqué casserait Firefox : il croirait les espaces de noms
+# disponibles, puis échouerait à lancer ses onglets.
+
+# ── LES SOCKETS, DEPUIS LA 1.20.0 ───────────────────────────────────────────
+# Ce qu'un processus gagne en créant ses propres espaces de noms, c'est
+# CAP_NET_ADMIN sur un réseau à lui — et, par là, les parties du noyau les
+# plus visées par les failles d'élévation de privilèges de ces dernières
+# années : nf_tables (pare-feu, par netlink), x_tables (par une socket brute),
+# AF_PACKET, et des protocoles rares que le noyau charge à la demande à la
+# première socket ouverte (SCTP, DCCP, TIPC, RDS, AF_ALG, VSOCK…). Aucune
+# application d'un Espace n'en a l'usage. « socket » n'est donc plus permis
+# sans condition : seules les familles ci-dessous passent, tout autre appel
+# reçoit ENOSYS. Analyse externe du 01/10/2026, point 3.1.
+#
+# Ce qui reste ouvert, et SECURITY.md le dit : dans un réseau qu'il a créé,
+# un processus peut encore régler la gestion du trafic (tc) par NETLINK_ROUTE,
+# dont les interfaces réseau et la résolution de noms ont besoin.
+AF_UNIX, AF_INET, AF_INET6, AF_NETLINK = 1, 2, 10, 16
+SOCK_STREAM, SOCK_DGRAM = 1, 2
+SOCK_TYPE_MASK = 0xf        # SOCK_NONBLOCK et SOCK_CLOEXEC vivent au-dessus
+NETLINK_ROUTE, NETLINK_KOBJECT_UEVENT = 0, 15
+SOCKETS_PERMIS = (
+    # (famille, type, protocole) ; None : quel qu'il soit
+    (AF_UNIX, None, None),
+    (AF_INET, SOCK_STREAM, 0), (AF_INET, SOCK_STREAM, 6),         # TCP
+    (AF_INET, SOCK_DGRAM, 0), (AF_INET, SOCK_DGRAM, 17),          # UDP
+    (AF_INET, SOCK_DGRAM, 1),                                      # ping (ICMP)
+    (AF_INET6, SOCK_STREAM, 0), (AF_INET6, SOCK_STREAM, 6),
+    (AF_INET6, SOCK_DGRAM, 0), (AF_INET6, SOCK_DGRAM, 17),
+    (AF_INET6, SOCK_DGRAM, 58),                                    # ping (ICMPv6)
+    (AF_NETLINK, None, NETLINK_ROUTE),            # interfaces et adresses
+    (AF_NETLINK, None, NETLINK_KOBJECT_UEVENT),   # événements udev
+)
+SOUS_CONDITION = ("socket",)
 
 # Tous les appels x86_64 que connaissait libseccomp 2.6.0 (Debian 13), relevés
 # le 29/09/2026. Liste FIGÉE, et c'est tout son intérêt : lue à l'exécution,
@@ -168,11 +204,32 @@ SCMP_ACT_ALLOW = 0x7fff0000
 SCMP_ACT_LOG = 0x7ffc0000
 SCMP_ACT_ERRNO = 0x00050000
 SCMP_FLTATR_CTL_OPTIMIZE = 8
+SCMP_CMP_EQ = 4
+SCMP_CMP_MASKED_EQ = 7
+
+
+class _Comparaison(ctypes.Structure):
+    """struct scmp_arg_cmp de libseccomp."""
+    _fields_ = [("arg", ctypes.c_uint), ("op", ctypes.c_int),
+                ("datum_a", ctypes.c_uint64), ("datum_b", ctypes.c_uint64)]
 
 
 def autorises():
-    """Ce que le Blindage laisse passer : les appels connus, moins refus et écartés."""
-    return [n for n in CONNUS if n not in REFUSES and n not in ECARTES]
+    """Ce que le Blindage laisse passer sans condition : les appels connus,
+    moins refus, écartés, et ceux qui ne passent que sous condition."""
+    return [n for n in CONNUS
+            if n not in REFUSES and n not in ECARTES and n not in SOUS_CONDITION]
+
+
+def comparaisons_socket(famille, type_, protocole):
+    """Les arguments de socket() à comparer pour une entrée de SOCKETS_PERMIS :
+    (numéro d'argument, opérateur, valeur A, valeur B)."""
+    resultat = [(0, SCMP_CMP_EQ, famille, 0)]
+    if type_ is not None:
+        resultat.append((1, SCMP_CMP_MASKED_EQ, SOCK_TYPE_MASK, type_))
+    if protocole is not None:
+        resultat.append((2, SCMP_CMP_EQ, protocole, 0))
+    return resultat
 
 
 def appliquer(mesure=None):
@@ -193,6 +250,10 @@ def appliquer(mesure=None):
     lib.seccomp_syscall_resolve_name.restype = ctypes.c_int
     lib.seccomp_rule_add.argtypes = [ctypes.c_void_p, ctypes.c_uint32,
                                     ctypes.c_int, ctypes.c_uint]
+    # La forme « tableau », et non la forme variadique : ctypes ne sait pas
+    # passer une structure par valeur à une fonction variadique.
+    lib.seccomp_rule_add_array.argtypes = [ctypes.c_void_p, ctypes.c_uint32, ctypes.c_int,
+                                          ctypes.c_uint, ctypes.POINTER(_Comparaison)]
     lib.seccomp_attr_set.argtypes = [ctypes.c_void_p, ctypes.c_int, ctypes.c_uint32]
     lib.seccomp_load.argtypes = [ctypes.c_void_p]
     lib.seccomp_release.argtypes = [ctypes.c_void_p]
@@ -212,6 +273,17 @@ def appliquer(mesure=None):
                 rc = lib.seccomp_rule_add(contexte, action, numero, 0)
                 if rc < 0:
                     raise OSError(-rc, "Règle seccomp impossible : %s" % nom)
+        # socket() : une règle par entrée de SOCKETS_PERMIS. Ce qui n'en
+        # vérifie aucune reçoit l'action par défaut — ENOSYS, ou un passage
+        # noté au journal en mode mesure.
+        numero = lib.seccomp_syscall_resolve_name(b"socket")
+        for permis in SOCKETS_PERMIS:
+            comparaisons = comparaisons_socket(*permis)
+            tableau = (_Comparaison * len(comparaisons))(*[_Comparaison(*c) for c in comparaisons])
+            rc = lib.seccomp_rule_add_array(contexte, SCMP_ACT_ALLOW, numero,
+                                            len(comparaisons), tableau)
+            if rc < 0:
+                raise OSError(-rc, "Règle seccomp impossible : %s" % ("socket %r" % (permis,)))
         rc = lib.seccomp_load(contexte)
         if rc < 0:
             raise OSError(-rc, "Chargement seccomp impossible")

@@ -72,6 +72,15 @@ TOUT_VOIR = _("voir tous vos fichiers, ceux des autres Espaces compris")
 LE_BUS = _("joindre le bus de session du bureau, donc y lancer des programmes")
 LE_DOSSIER = (_("atteindre votre dossier personnel, où vivent les données de tous "
                 "les Espaces et les programmes lancés à l'ouverture de session"))
+# « --socket=x11 » : Flatpak lui monte la socket de Xwayland ET le cookie qui
+# l'ouvre — ce que le bac à sable de Codebyr ne donne jamais. Sous le compte du
+# bureau, le serveur l'accepte. « fallback-x11 », lui, ne sert que hors
+# Wayland : sur le bureau de Codebyr, il ne donne rien. Attention, Flatpak
+# écrit alors AUSSI « x11 » dans ses permissions (« x11;wayland;fallback-x11 »
+# pour la Calculatrice) : seul « x11 » sans « fallback-x11 » ouvre X11 ici
+# (analyse externe du 01/10/2026, point 1.3).
+LE_X11 = (_("joindre le serveur X11 du bureau : lire le presse-papiers de tous les "
+            "Espaces, voir les autres fenêtres et leur envoyer des frappes"))
 
 
 def incompatibilite(esp, renforce, hors_ligne, sous_compte):
@@ -203,8 +212,11 @@ def sorties(permissions, dossier_de_l_espace):
     contexte = permissions.get("Context", {})
     raisons = []
 
-    if "session-bus" in _liste(contexte.get("sockets")):
+    sockets = _liste(contexte.get("sockets"))
+    if "session-bus" in sockets:
         raisons.append(LE_BUS)
+    if "x11" in sockets and "fallback-x11" not in sockets:
+        raisons.append(LE_X11)
 
     for politique, niveau in permissions.get("Session Bus Policy", {}).items():
         if niveau.strip() not in ("talk", "own"):

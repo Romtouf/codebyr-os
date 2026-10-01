@@ -14,17 +14,22 @@ le système de l'ISO avant d'être corrigé. Où en est chacun :
 - **En cours** — l'alerte du bouclier anti-hameçonnage vit dans la page
   qu'elle dénonce : un script de cette page peut la retirer, ou cliquer
   « Ce site est légitime » à la place de l'utilisateur ;
-- **En cours** — un Espace qui tourne sous le compte du bureau (ceux de
-  l'invité, ou un Espace sans « Compte séparé ») partage son espace de noms
-  réseau, donc pourrait joindre le serveur X11 du bureau par sa socket
-  abstraite : presse-papiers et frappes. Les Espaces à compte séparé, le
-  défaut, n'y sont pas exposés ;
-- **En cours** — le filtre d'appels système du Blindage laisse passer 316
-  appels sur 379, dont la création d'espaces de noms (`unshare`, `clone3`) et
-  les montages. Il ferme les appels les plus dangereux (`ptrace`, `bpf`,
-  `keyctl`, `setns`…), mais un processus compromis peut encore créer ses
-  propres espaces de noms et atteindre ainsi une large surface du noyau
-  (nf_tables). Ne le considérez pas, à ce jour, comme une barrière forte.
+- **Renforcé en 1.20.0** — un Espace à réseau libre partage l'espace de noms
+  réseau du bureau, donc voyait la socket abstraite du serveur X11. Mesuré :
+  GNOME refuse la connexion sans son cookie, que le bac à sable ne monte
+  jamais — ce n'était pas exploitable. Une cloison Landlock ferme désormais
+  toute socket abstraite de la machine, et une application Flatpak qui
+  demande X11 (elle reçoit le cookie) est refusée dans un Espace ordinaire
+  (voir l'historique) ;
+- **Resserré en 1.20.0** — le filtre d'appels système du Blindage ne laisse
+  plus ouvrir que les sockets utiles : un processus compromis qui crée ses
+  propres espaces de noms n'atteint plus nf_tables, x_tables, `AF_PACKET` ni
+  les protocoles rares (voir l'historique). **Reste ouvert, assumé** : la
+  création d'espaces de noms elle-même (`unshare`, `clone`) et les montages,
+  dont se servent le bac à sable de Firefox, celui des vignettes de Fichiers
+  et celui des applications Electron — les retirer troquerait leurs défenses
+  contre la nôtre — et, dans un réseau ainsi créé, la gestion du trafic
+  (`tc`, par la même interface netlink que les adresses réseau).
 
 ## Lot de sécurité de septembre 2026
 
@@ -344,6 +349,8 @@ surface applicative minimale (`--apt-recommends false`).
 
 | Version | Correctif |
 |---|---|
+| 1.20.0 | **Sockets abstraites du bureau visibles depuis un Espace.** Une socket Unix « abstraite » n'est pas un fichier : aucun montage ne la cache, elle appartient à l'espace de noms réseau. Un Espace à réseau libre partage celui du bureau, donc voyait celle de Xwayland (`@/tmp/.X11-unix/X0`). Mesuré sur la VM le 01/10/2026 : le serveur refuse toute connexion sans cookie, depuis un Espace comme depuis le bureau, et le bac à sable ne monte jamais ce cookie — la faille n'était pas exploitable, mais elle ne tenait qu'à ce réglage de GNOME. Chaque Espace à réseau libre commence désormais par une cloison Landlock (`LANDLOCK_SCOPE_ABSTRACT_UNIX_SOCKET`, Linux 6.12) : ses processus ne joignent plus aucune socket abstraite créée hors de lui ; son propre bus de session, créé dedans, reste joignable. Noyau qui l'offre mais refuse de la poser : l'Espace ne s'ouvre pas. `DISPLAY` et `XAUTHORITY` ne sont plus transmis. Et une application Flatpak qui demande `--socket=x11` — Flatpak lui monte la socket ET le cookie — est refusée dans un Espace sans compte séparé. Relevé par une analyse externe le 01/10/2026 ; vérifié sur la VM (connexion à X11 refusée par le noyau, « Operation not permitted »), et par `codebyr-space verifier-isolation`, qui tente désormais la socket abstraite. |
+| 1.20.0 | **Blindage : toutes les familles de sockets permises.** Le filtre d'appels système autorisait `socket()` sans condition. Un processus compromis qui crée ses propres espaces de noms (permis : Firefox, les vignettes de Fichiers et Chromium en ont besoin) obtient `CAP_NET_ADMIN` sur un réseau à lui, et par là les parties du noyau les plus visées par les failles d'élévation de privilèges : nf_tables (`NETLINK_NETFILTER`), x_tables (sockets brutes), `AF_PACKET`, et des protocoles que le noyau charge à la première socket ouverte (SCTP, DCCP, TIPC, RDS, `AF_ALG`, VSOCK…). Le Blindage n'autorise plus que les sockets Unix, TCP, UDP, ping, et netlink pour les interfaces réseau et udev ; tout autre appel reçoit ENOSYS. Relevé par une analyse externe le 01/10/2026 ; vérifié dans un vrai filtre (chaque famille essayée), et sur la VM (Firefox, vignettes, `verifier-isolation`). |
 | 1.19.1 | **Une notification d'Espace pouvait usurper l'en-tête d'un autre** (présent depuis 1.14.0). L'hôte affiche les notifications d'un Espace par `notify-send`, en imposant l'en-tête « Espace Jetable », « Espace Banque »… Mais `notify-send` lit ses options partout sur sa ligne de commande, et la dernière l'emporte : un titre `--app-name=Espace Banque`, envoyé par une application de Jetable — ou par une page web à qui l'on a permis les notifications —, remplaçait l'en-tête, et `--urgency=critical` ou `--action` passaient de même. Le nettoyage du texte retirait balises et caractères de contrôle, pas un tiret. Les textes sont désormais placés après `--`. Relevé par une analyse externe le 01/10/2026 ; attaque reproduite avec le vrai `notify-send` de Debian 13 face à un faux serveur de notifications, puis vérifiée fermée — un test rejoue les deux. Aucune exploitation connue. |
 | 1.19.1 | **Le compte invité modifiait les connexions réseau de la machine** (présent depuis 1.0). L'image le plaçait dans les groupes `netdev`, `audio`, `video` et `plugdev`. Sous Debian, une règle polkit de NetworkManager donne à `netdev` le droit de modifier sans mot de passe les connexions de toute la machine : l'invité pouvait changer le DNS ou le proxy du Wi-Fi du propriétaire, durablement. `audio` et `video` ouvraient micro et caméra même depuis une session invité laissée en arrière-plan. Ce que ces groupes donnent, logind l'accorde déjà à la session active : l'invité n'en a plus aucun, les machines installées sont rattrapées à la mise à jour, et le vérificateur du poste le contrôle. Relevé par une analyse externe le 01/10/2026 ; règle polkit lue sur le système de l'ISO 1.18.2. Aucune exploitation connue. |
 | 1.17.2 | **Élévation au rang de root par le remplissage du dossier « Modèles »** (présent depuis 1.10.0). `codebyr-durcir-poste` tourne en root à chaque mise à jour de `codebyr-tools`, donc sans personne devant l'écran (`unattended-upgrades`). Pour chaque compte de `/home`, il lisait `XDG_TEMPLATES_DIR` dans `~/.config/user-dirs.dirs`, créait ce dossier, y copiait les modèles, puis remettait le dossier au compte par `chown`. Ce fichier appartient au compte : y écrire `"$HOME/../../etc"` faisait remettre `/etc` au compte à la mise à jour suivante — donc tout le système. Un lien `~/Modèles` → `/etc` produisait le même effet (`chown` suit les liens). Atteignable depuis tout compte non administrateur, l'invité compris si une mise à jour tombait pendant sa session. Tout ce qui écrit dans un dossier personnel est désormais exécuté sous l'identité de son propriétaire (`setpriv`, les trois identifiants changés, `--no-new-privs`, environnement remis à zéro), et seulement si le dossier lui appartient : un chemin détourné ne mène plus qu'où le compte pouvait déjà écrire. Relevé le 01/10/2026 en relisant le script pour y ajouter l'avatar ; attaque reproduite (le dossier victime passait au compte attaquant), puis vérifiée fermée. Un test la rejoue, chemin détourné et lien, dans un espace de montage privé. Aucune exploitation connue. |

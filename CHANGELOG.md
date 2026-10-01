@@ -10,7 +10,7 @@ GNOME (menu du Sceau, liserés colorés) ne se recharge pas à chaud.
 
 ---
 
-## 1.18.2 — non publiée
+## 1.18.2 — 1er octobre 2026
 
 **L'écran de démarrage parle la langue du système.** Sur un disque chiffré,
 « Phrase de passe du disque » devient « Disk passphrase » quand Codebyr est

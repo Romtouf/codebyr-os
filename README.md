@@ -14,9 +14,9 @@ installée sur machine réelle. Voir la [feuille de route](#feuille-de-route).
 
 ![Bureau Codebyr OS — vue d'ensemble GNOME, fond d'écran au Sceau, dock des applications](site/captures/01-bureau.png)
 
-## Où en est le projet — 1er octobre 2026
+## Où en est le projet — 2 octobre 2026
 
-Version publiée : **1.19.1** (voir le [CHANGELOG](CHANGELOG.md)). La 1.16.2 a
+Version publiée : **1.20.0** (voir le [CHANGELOG](CHANGELOG.md)). La 1.16.2 a
 fermé une élévation de privilèges du service des comptes d'Espaces, présente
 depuis la 1.15.0 ; la 1.16.3 remet en marche le bouclier anti-hameçonnage, muet
 depuis la 1.6.0, et lui fait reconnaître les adresses déguisées par d'autres
@@ -45,7 +45,10 @@ plupart des portables) dès le logo du fabricant. La 1.19.1 ferme deux
 failles relevées par une analyse externe du code : une notification
 pouvait se signer d'un autre Espace, et le compte invité modifier le réseau
 de la machine (l'état de chaque point est tenu dans
-[SECURITY.md](SECURITY.md)). Le lot de
+[SECURITY.md](SECURITY.md)) ; la 1.20.0 en traite trois autres : le
+bouclier anti-hameçonnage (1.5) ne peut plus être neutralisé par la page
+qu'il dénonce, un Espace ne joint plus le serveur X11 du bureau, et le
+Blindage ne laisse plus ouvrir que les connexions utiles. Le lot de
 sécurité de septembre est publié (frontières des fichiers, restauration non
 destructive, aucun repli sans isolation, réseau restreint par namespace, filtre
 d'appels système).

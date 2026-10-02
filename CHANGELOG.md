@@ -10,7 +10,7 @@ GNOME (menu du Sceau, liserés colorés) ne se recharge pas à chaud.
 
 ---
 
-## 1.20.0 — non publiée
+## 1.20.0 — 2 octobre 2026
 
 **Les Espaces se cloisonnent davantage**, suite de l'analyse externe du code
 (détail dans [SECURITY.md](SECURITY.md)) :

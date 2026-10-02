@@ -43,6 +43,7 @@ LIB = os.path.join(LIVRE, "usr", "share", "codebyr")
 BANC = "/run/codebyr-banc"
 INIT = BANC + "/init"
 SECRET = "/etc/codebyr-banc-secret"
+DEJA_SOUS_ETC = set()
 BUREAU = "codebyr-banc-bureau"
 ESPACE = "banc"
 
@@ -102,6 +103,9 @@ def preparer_le_monde(temporaire):
         s.listen(1)
         os.chown(os.path.join(runtime, nom), bureau.pw_uid, bureau.pw_gid)
         sockets.append(s)
+    # Ce qui est déjà monté sous /etc avant que le service agisse : un
+    # conteneur Docker y monte hostname, hosts et resolv.conf.
+    DEJA_SOUS_ETC.update(montages_sous("/etc"))
     return bureau, sockets
 
 
@@ -208,7 +212,7 @@ def etat(uid_mod, bureau):
         # « /etc » lui-même est la copie du banc ; ce qui serait monté
         # DESSOUS viendrait d'un lien suivi.
         "montages": montages_sous(runtime, comptes.RACINE_DEPOTS, home)
-                    + [m for m in montages_sous("/etc") if m != "/etc"],
+                    + [m for m in montages_sous("/etc") if m not in DEJA_SOUS_ETC],
         "droits_wayland": acl_nominatives(socket_bureau + "wayland-0"),
         "droits_pipewire": acl_nominatives(socket_bureau + "pipewire-0"),
         "depot": os.path.isdir(depot),

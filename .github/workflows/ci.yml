@@ -193,7 +193,7 @@ jobs:
       - name: Installer les outils de test
         run: |
           apt-get update -qq
-          apt-get install -y --no-install-recommends git ca-certificates python3 bubblewrap dbus-daemon libseccomp2 firefox-esr nodejs libnotify-bin python3-gi
+          apt-get install -y --no-install-recommends git ca-certificates python3 bubblewrap dbus-daemon libseccomp2 firefox-esr nodejs libnotify-bin python3-gi acl
       - uses: actions/checkout@v7
       - name: Autoriser les espaces de noms utilisateur si possible
         # Ubuntu 24.04 les restreint par AppArmor et le conteneur en hérite :

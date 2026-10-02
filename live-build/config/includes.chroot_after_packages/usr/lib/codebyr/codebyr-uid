@@ -64,6 +64,7 @@ Pour l'essai sur une machine de test : codebyr-uid --essai /chemin/socket
 import json
 import os
 import pwd
+import re
 import select
 import shutil
 import socket
@@ -119,6 +120,35 @@ DELAI_REPOS = 120.0
 
 def journal(message):
     syslog.syslog(syslog.LOG_INFO, message)
+
+
+def monte(chemin):
+    """Ce chemin est-il un point de montage ?
+
+    os.path.ismount compare le périphérique du fichier à celui de son dossier :
+    il ne voit pas un montage lié venu du MÊME système de fichiers. Sur une
+    machine, le dossier d'exécution du bureau est un tmpfs à part (logind) et
+    la comparaison suffit — mais rien ne garantit ce découpage, et un montage
+    qui passe inaperçu ici survit à la fermeture, avec le droit sur le socket
+    du bureau qui va avec. Trouvé le 02/10/2026 par le banc d'essai du service
+    (tests/uid_harnais.py), sur un /run d'un seul tenant. On lit donc aussi
+    la table du noyau.
+    """
+    if os.path.ismount(chemin):
+        return True
+    try:
+        with open("/proc/self/mountinfo", encoding="utf-8", errors="replace") as f:
+            for ligne in f:
+                champs = ligne.split(" ")
+                # Le noyau écrit espace, tabulation, saut de ligne et barre
+                # oblique inverse en octal (« \040 »).
+                if len(champs) > 4 and re.sub(
+                        r"\\([0-7]{3})", lambda m: chr(int(m.group(1), 8)),
+                        champs[4]) == chemin:
+                    return True
+    except OSError:
+        pass
+    return False
 
 
 def demandeur(client):
@@ -299,7 +329,7 @@ def monter_jetable(home, utilisateur, memoire):
       d'abord : on n'empile pas, et on ne rouvre pas sur un contenu ancien.
     """
     for _ in range(8):
-        if not os.path.ismount(home):
+        if not monte(home):
             break
         subprocess.run(["/usr/bin/umount", home], check=True, capture_output=True)
     else:
@@ -520,7 +550,7 @@ def presenter(source, destination):
     d'abord ce qui est là, avant de monter.
     """
     for _ in range(8):
-        if not os.path.ismount(destination):
+        if not monte(destination):
             break
         subprocess.run(["/usr/bin/umount", destination],
                        check=True, capture_output=True)
@@ -546,7 +576,7 @@ def retirer(destination):
     fermeture se disait réussie en laissant le montage en place — constaté
     le 14/09/2026. Root ne prétend pas avoir rangé ce qu'il n'a pas rangé.
     """
-    if os.path.ismount(destination):
+    if monte(destination):
         r = subprocess.run(["/usr/bin/umount", destination],
                            capture_output=True, text=True)
         if r.returncode != 0:
@@ -772,7 +802,7 @@ def fermer(uid_demandeur, espace):
     echecs = []
     # Un Espace jetable : son tmpfs part maintenant, et son contenu avec lui.
     home = comptes.chemin_home(uid_demandeur, espace)
-    if os.path.ismount(home):
+    if monte(home):
         demontage = subprocess.run(["/usr/bin/umount", home], capture_output=True, text=True)
         if demontage.returncode != 0:
             # Encore utilisé par un processus qu'on n'a pas su arrêter : on le
@@ -787,7 +817,7 @@ def fermer(uid_demandeur, espace):
         # « .flatpak »). On démonte ce qui est monté, puis on efface le reste.
         for fichier in sorted(os.listdir(runtime)):
             chemin = os.path.join(runtime, fichier)
-            if not os.path.ismount(chemin):
+            if not monte(chemin):
                 continue        # un fichier de l'Espace : il partira avec le dossier
             # Le droit part AVANT le démontage, et du socket monté ici :
             # celui-là même qui l'a reçu, quoi que son nom désigne aujourd'hui

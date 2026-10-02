@@ -801,8 +801,13 @@ class LEspaceJetable(unittest.TestCase):
         self.assertLess(self.monter.index("umount"), self.monter.index("'/usr/bin/mount'"))
 
     def test_la_fermeture_le_demonte(self):
+        # Le démontage lui-même est éprouvé pour de vrai par
+        # test_uid_comportement (scénario « jetable »). Ici, seulement que la
+        # fermeture passe par monte(), qui voit aussi un montage venu du même
+        # système de fichiers — os.path.ismount ne le voyait pas.
         fermer = self.code.split("def fermer(")[1].split("def supprimer(")[0]
-        self.assertIn("os.path.ismount(home)", fermer)
+        self.assertIn("monte(home)", fermer)
+        self.assertNotIn("os.path.ismount", fermer)
         self.assertIn("umount", fermer)
 
 

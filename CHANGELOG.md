@@ -10,6 +10,19 @@ GNOME (menu du Sceau, liserés colorés) ne se recharge pas à chaud.
 
 ---
 
+## 1.20.1 — non publiée
+
+**Le service qui prépare les Espaces est désormais éprouvé par ce qu'il
+fait**, et plus seulement par la lecture de son code : un banc d'essai le
+fait tourner pour de vrai, en administrateur, dans une machine à part — ouvrir,
+fermer, échouer en cours de route, déjouer des liens piégés, ranger après un
+redémarrage. Ce banc a trouvé une fragilité, corrigée : sur une machine où le
+dossier d'exécution de l'utilisateur ne serait pas un disque en mémoire à
+part (ce que fait logind, donc pas le cas des machines Codebyr), la fermeture
+d'un Espace laissait derrière elle l'accès de l'Espace à l'affichage.
+
+---
+
 ## 1.20.0 — 2 octobre 2026
 
 **Les Espaces se cloisonnent davantage**, suite de l'analyse externe du code

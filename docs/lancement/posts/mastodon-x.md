@@ -16,7 +16,7 @@ Qubes, mais simple — pour vos parents, pas pour des sysadmins.
 📎 Pièce jointe douteuse → s'ouvre SANS réseau, s'autodétruit
 🏦 Banque : navigateur verrouillé sur VOS domaines bancaires
 
-Gratuit, GPL-3.0, base Debian, en français.
+Gratuit, GPL-3.0, base Debian, en français et en anglais.
 🌐 https://os.codebyr.dev
 ⬇ ISO signée + code : https://github.com/Romtouf/codebyr-os
 
@@ -31,7 +31,7 @@ enough for your parents.
 📎 Sketchy attachment? Opens with NO network, self-destructs on close
 🏦 Bank Space's browser locked to YOUR bank's domains only
 
-Free, GPL-3.0, Debian-based, French-first (150 locales).
+Free, GPL-3.0, Debian-based, in French and English.
 🌐 https://os.codebyr.dev
 ⬇ Signed ISO + source: https://github.com/Romtouf/codebyr-os
 

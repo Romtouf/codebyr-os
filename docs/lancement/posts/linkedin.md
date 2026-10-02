@@ -64,7 +64,9 @@ menaces du quotidien. Il ne rend pas invulnérable, et je ne le prétendrai
 jamais. Le modèle de sécurité complet est documenté publiquement, limites
 comprises.
 
-C'est gratuit, open source (GPL-3.0), en français, et l'ISO est signée.
+C'est gratuit, open source (GPL-3.0), en français et en anglais, et l'ISO
+est signée — et reproductible : chacun peut vérifier qu'elle sort bien du
+code publié.
 
 Je cherche maintenant des **testeurs** — et surtout des retours francs, y compris
 sur ce qui ne va pas.

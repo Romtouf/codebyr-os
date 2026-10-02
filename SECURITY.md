@@ -32,6 +32,34 @@ le système de l'ISO avant d'être corrigé. Où en est chacun :
   contre la nôtre — et, dans un réseau ainsi créé, la gestion du trafic
   (`tc`, par la même interface netlink que les adresses réseau).
 
+Les faiblesses de processus, traitées en 1.20.1 :
+
+- **la vérification automatique** couvre les programmes qui tournent en
+  administrateur (`codebyr-uid`, `codebyr-espace-init`, le filtre réseau, la
+  configuration du démarrage par l'installeur), reconnus à leur première
+  ligne ;
+- **le service des comptes d'Espaces est éprouvé par ce qu'il fait**, en root,
+  dans une machine à part (ouverture, fermeture, échec, liens piégés, Espaces
+  abandonnés) — et plus seulement par la lecture de son code. Ce banc a trouvé
+  une fragilité, corrigée (voir l'historique) ;
+- **le dépôt de Codebyr ne peut fournir que `codebyr-tools`** : une règle
+  d'apt, livrée par le paquet, refuse tout autre paquet venu de ce serveur ;
+- **deux canaux** : le stable, une version par semaine au plus sauf correctif
+  de sécurité, et un canal d'essai pour les testeurs
+  ([docs/canal-essai.md](docs/canal-essai.md)) ;
+- **le pare-feu** laisse passer la découverte des imprimantes (mDNS) et le
+  DHCPv6, au réseau local seulement, et il est désormais livré par les mises à
+  jour ;
+- **les commentaires** disent la règle ; leur histoire est dans
+  [docs/decisions.md](docs/decisions.md).
+
+Restent, hors du code : un **audit professionnel**, un **second relecteur**
+pour le code exécuté en root, des **testeurs** sur leur propre matériel ; la
+sous-clé de signature sur un **jeton matériel** (YubiKey ou Nitrokey) plutôt
+que dans le WSL du poste du mainteneur ; un **hébergement** du dépôt APT plus
+sûr qu'un serveur à domicile (une coupure de courant le 28/09/2026 l'a rendu
+injoignable).
+
 ## Lot de sécurité de septembre 2026
 
 **Publié en 1.11.0** : défauts de liens dans les échanges et la préparation des

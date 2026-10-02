@@ -33,6 +33,11 @@ reste du système vient de Debian ; une règle d'apt l'impose désormais : un
 paquet du même nom qu'un paquet Debian, publié par erreur sur le dépôt de
 Codebyr, ne serait jamais installé.
 
+**Un canal d'essai pour les testeurs volontaires** : les versions s'y
+éprouvent avant d'arriver sur toutes les machines, où elles s'installent
+désormais une fois par semaine au plus, sauf correctif de sécurité. Le
+rejoindre : [docs/canal-essai.md](docs/canal-essai.md).
+
 ---
 
 ## 1.20.0 — 2 octobre 2026

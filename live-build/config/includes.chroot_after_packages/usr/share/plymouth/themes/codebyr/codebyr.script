@@ -9,7 +9,6 @@
 // système — « Please unlock disk luks-… » apparaissait en appuyant sur Échap —
 // mais l'écran graphique, lui, restait muet : l'utilisateur voyait une machine
 // figée, sans aucun moyen de deviner qu'il fallait taper quelque chose.
-// Constaté le 13/09/2026, sur la première installation chiffrée.
 //
 // ── MISE EN PAGE ────────────────────────────────────────────────────────────
 // Une seule chose à lire à la fois. Pendant la saisie, le libellé « codebyr OS »
@@ -21,8 +20,8 @@
 // Plymouth démarre sur l'affichage du micrologiciel ; le pilote graphique
 // prend ensuite la main, souvent dans une autre résolution. Les positions,
 // calculées une fois au départ, restaient celles de l'ancien écran : le logo
-// et son libellé glissaient vers la gauche pendant le chargement. Constaté
-// le 01/10/2026 sur la VM. Tout est donc replacé dès que la taille change —
+// et son libellé glissaient vers la gauche pendant le chargement. Tout est
+// donc replacé dès que la taille change —
 // TOUT : le logo et son libellé d'abord (1.17.2~essai1), mais aussi le message
 // du bas et l'invite. Le message « cryptsetup: … set up successfully » arrive
 // juste avant le changement de définition, et glissait encore (même jour) ;

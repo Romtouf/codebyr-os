@@ -3,7 +3,7 @@
 
 Module partagé, chargé depuis /usr/share/codebyr (voir CODEBYR_LIB).
 
-Pourquoi cet outil existe, très concrètement. Le 20/08/2026, le clic droit
+Pourquoi cet outil existe, très concrètement. Un jour, le clic droit
 « Ouvrir en Jetable » a été livré, testé par 124 tests automatiques, empaqueté,
 et son contenu vérifié dans l'image. Il ne fonctionnait pas : le greffon qui
 charge l'extension n'était qu'une *recommandation*, donc absent, et Fichiers
@@ -93,7 +93,7 @@ def analyser_invite(champ_shadow):
 # propriétaire, durablement ; « audio » et « video » ouvrent micro, caméra et
 # carte graphique même quand sa session tourne en arrière-plan ; « plugdev »,
 # des périphériques USB. L'invité en faisait partie jusqu'à la 1.19.0
-# (analyse externe du 01/10/2026).
+# (voir SECURITY.md, « Analyse externe »).
 GROUPES_INTERDITS_INVITE = ("netdev", "audio", "video", "plugdev")
 
 
@@ -133,9 +133,9 @@ def analyser_homes(dossiers):
 def analyser_trousseau(empreintes):
     """Le trousseau apt doit connaître la clé qui signe aujourd'hui.
 
-    Il est gravé à l'installation. L'ajout d'une sous-clé de signature l'a rendu
-    obsolète d'un coup sur tout le parc, le 20/08/2026 : apt refusait une
-    signature parfaitement valide, faute de connaître la clé.
+    Il est gravé à l'installation. L'ajout d'une sous-clé de signature le rend
+    obsolète d'un coup sur tout le parc : apt refuse alors une signature
+    parfaitement valide, faute de connaître la clé.
     """
     if not empreintes:
         return False, _("trousseau illisible ou vide")

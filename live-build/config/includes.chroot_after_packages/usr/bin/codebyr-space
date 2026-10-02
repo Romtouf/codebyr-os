@@ -262,11 +262,11 @@ def _demarrer_filtre_reseau(esp, home, app_cmd, chemin_socket=None, compte_dedie
 
         # Le dossier du journal des refus existe AVANT le filtre. Son profil
         # AppArmor l'autorise à écrire ce fichier, pas à créer de dossier — et
-        # c'est voulu. Pour un Espace ordinaire le dossier existait déjà, créé
-        # avec ses données ; pour un Espace à compte dédié, personne ne le
-        # créait : les refus avaient bien lieu, mais n'étaient notés nulle part,
-        # et « Configuration Codebyr » ne pouvait plus proposer d'autoriser le
-        # domaine qui manque à la banque. Constaté le 14/09/2026.
+        # c'est voulu. Pour un Espace ordinaire le dossier existe déjà, créé
+        # avec ses données ; pour un Espace à compte dédié, personne d'autre ne
+        # le crée : les refus ne seraient notés nulle part, et « Configuration
+        # Codebyr » ne pourrait plus proposer d'autoriser le domaine qui manque
+        # à la banque.
         try:
             fichiers_surs.mkdir(os.path.dirname(journal_refus(esp["id"])))
         except OSError as exc:
@@ -414,8 +414,7 @@ def _oublier_echecs_de_vignettes(home):
     Jusqu'en 1.16.4, l'outil qui les fabrique manquait (voir build-deb.sh).
     Fichiers tentait les SVG, JXL et WebP, échouait, et notait l'échec — puis
     ne réessayait plus jamais pour ces fichiers, même l'outil installé.
-    Constaté le 29/09/2026 sur la VM : 45 échecs, tous antérieurs à la mise à
-    jour. Ce n'est qu'un cache : Fichiers le refait au besoin.
+    Ce n'est qu'un cache : Fichiers le refait au besoin.
 
     Le dossier est celui d'un Espace, qui peut y avoir posé des liens :
     chaque composante est ouverte sans les suivre (fichiers_surs), et l'on ne
@@ -1041,9 +1040,7 @@ def cmd_interne_preparer(brut):
         # _preparer_ouverture se tait sur ses échecs, et c'est juste pour un
         # réglage de confort. Mais ces associations sont ce qui ouvre SOUS
         # CLOCHE un fichier venu d'ailleurs : leur absence est une protection
-        # perdue. Constaté le 14/09/2026 — elles n'étaient pas posées, et la
-        # préparation se disait réussie. On vérifie donc le résultat, pas
-        # l'absence d'erreur.
+        # perdue. On vérifie donc le résultat, pas l'absence d'erreur.
         if types_ouvreur(os.path.join("/usr/share/applications", OUVREUR)) \
                 and not _ouvreur_associe(home):
             raise OSError("associations de fichiers non posées dans %s" % home)
@@ -1320,7 +1317,7 @@ def cmd_interne_flatpak(args):
            "HOME": compte.pw_dir, "FLATPAK_USER_DIR": dossier,
            # Flatpak monte un bac à sable pour ses propres besoins, et le fait
            # sous le dossier d'exécution : sans lui à la place attendue, il
-           # échoue (mesuré le 15/09/2026).
+           # échoue.
            "XDG_RUNTIME_DIR": "/run/user/%d" % os.getuid()}
     if geste == "liste":
         r = subprocess.run(["flatpak", "--user", "list", "--app",
@@ -1710,8 +1707,7 @@ def _deposer_pour_envoi(esp, depart, source):
         # d'une ACL par défaut — mais son masque suit le mode de création :
         # 0700 pour un dossier, 0600 pour une écriture sûre. Le droit existait
         # donc sur le papier, avec « effective: --- » : le bureau ne pouvait
-        # rien relever, et rien ne le disait. Reproduit dans le WSL avec deux
-        # comptes sans privilège, le 14/09/2026. Sur un objet qui porte une
+        # rien relever, et rien ne le disait. Sur un objet qui porte une
         # ACL, les bits de groupe SONT le masque ; ailleurs, ces modes ne
         # donnent rien à personne d'autre que le propriétaire.
         with fichiers_surs.dossier(dossier) as fd:

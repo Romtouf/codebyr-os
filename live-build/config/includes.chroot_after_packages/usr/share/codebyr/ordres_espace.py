@@ -119,8 +119,8 @@ def ordre_interne(session, action, produire=None, consommer=None, args=()):
     un fil à part : un tuyau plein bloquerait sinon les deux bouts.
 
     Renvoie (code, erreurs). Le bout transmis est TOUJOURS refermé ici, même
-    si l'ordre échoue : sans cela, le fil attendait à jamais un correspondant
-    disparu (vu dans le WSL le 14/09/2026).
+    si l'ordre échoue : sans cela, le fil attendrait à jamais un
+    correspondant disparu.
     """
     erreurs = []
     options = {}
@@ -211,7 +211,7 @@ def demenager_vers_compte_dedie(esp, session, prevenir):
         # réglage l'ouvrait alors VIDE, contrairement à ce que promet
         # Configuration Codebyr (« elles reviennent — rien n'est effacé ») :
         # ses fichiers n'étaient pas perdus, mais rien ne le laissait voir.
-        # Relevé le 01/10/2026 en relisant ce code. Une marque qui n'a pas pu
+        # Une marque qui n'a pas pu
         # s'écrire n'empêche pas l'ouverture : elle se retentera la prochaine.
         try:
             fichiers_surs.mkdir(chemins.dossier(esp["id"]))

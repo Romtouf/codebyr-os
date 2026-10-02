@@ -8,8 +8,8 @@ comportement.
 
 Le bac à sable monte le dossier de l'Espace PAR-DESSUS « ~ ». À l'intérieur,
 chemins.DONNEES désigne donc un dossier fantôme du bac à sable, sans rapport
-avec les vrais Espaces. « envoyer » y copiait le fichier et annonçait
-« Copié » : il n'arrivait jamais. Constaté le 24/08/2026.
+avec les vrais Espaces : « envoyer » y copierait le fichier et annoncerait
+« Copié », sans qu'il arrive jamais.
 
 L'Espace dépose donc dans SA boîte, montée à un chemin fixe ; l'hôte relève et
 distribue. Un Espace n'écrit jamais chez un autre.
@@ -115,8 +115,8 @@ def relever_envois(espaces):
                 except OSError as exc:
                     # Une destination listée mais illisible n'est pas normale :
                     # les fichiers y attendent, et quelqu'un doit pouvoir le
-                    # savoir. Ce silence a caché qu'aucun envoi ne partait d'un
-                    # Espace à compte dédié (14/09/2026).
+                    # savoir : ce silence a déjà caché qu'aucun envoi ne
+                    # partait d'un Espace à compte dédié.
                     journal.noter("relève impossible de %s vers %s : %s" % (source, dest, exc))
                     continue
         except OSError:

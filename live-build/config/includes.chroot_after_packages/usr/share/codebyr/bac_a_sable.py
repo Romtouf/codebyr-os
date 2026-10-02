@@ -68,7 +68,7 @@ def wrap_bwrap(home, cmd, env, renforce=False, hors_ligne=False, audio=True,
                  Il apparaît dans le bac à sable au même chemin qu'au dehors :
                  c'est celui que Flatpak et le reste de l'écosystème
                  supposent, et le déguiser sous un nom à nous empêchait une
-                 application Flatpak de démarrer (mesuré le 15/09/2026).
+                 application Flatpak de démarrer.
 
     chez       : chemin où le dossier personnel de l'Espace apparaît dans le
                  bac à sable. Par défaut celui de l'appelant, ce qui convient
@@ -119,9 +119,9 @@ def wrap_bwrap(home, cmd, env, renforce=False, hors_ligne=False, audio=True,
         "--die-with-parent",
         "--setenv", "HOME", chez,
         # On démarre DANS le dossier de l'Espace. Sans cela, l'application
-        # héritait du dossier courant de son lanceur — « / » sous compte séparé,
-        # où le premier processus travaille : un terminal s'y ouvrait, et « ls »
-        # montrait le système au lieu des fichiers de l'Espace (28/09/2026).
+        # hériterait du dossier courant de son lanceur — « / » sous compte
+        # séparé, où le premier processus travaille : un terminal s'y
+        # ouvrirait, et « ls » montrerait le système au lieu des fichiers.
         "--chdir", chez,
         # Le chemin du bus de l'hôte hérité de l'environnement ne mène plus à
         # rien dans le bac à sable : on le retire pour éviter toute confusion
@@ -430,10 +430,9 @@ def cmd_verifier_isolation():
     if depuis:
         # La sonde tournerait dans un bac à sable IMBRIQUÉ, héritant des
         # restrictions de l'Espace courant : elle mesurerait celles-ci, pas
-        # les nôtres. Lancée depuis Banque le 12/09/2026, elle a annoncé
-        # « aucun réseau » pour un Espace ordinaire, puis « au moins un
-        # contrôle a échoué, ne publiez pas cette version » — une accusation
-        # fausse dans un cas parfaitement normal.
+        # les nôtres : lancée depuis Banque, elle annoncerait « aucun réseau »
+        # pour un Espace ordinaire, puis « au moins un contrôle a échoué » —
+        # une accusation fausse dans un cas parfaitement normal.
         #
         # Un outil qui crie au loup quand on l'emploie depuis le mauvais
         # endroit finit ignoré, et c'est justement celui qu'il faudra croire

@@ -8,11 +8,11 @@ RÉSEAU. Un Espace à réseau libre partage celui de l'hôte, donc voit toutes
 ses sockets abstraites — dont celle de Xwayland, « @/tmp/.X11-unix/X0 ».
 
 Ce qui protège aujourd'hui, c'est le cookie : GNOME exige un identifiant, et
-le bac à sable ne monte jamais le fichier qui le contient (mesuré sur la VM
-le 01/10/2026 : connexion refusée, depuis un Espace comme depuis le bureau).
+le bac à sable ne monte jamais le fichier qui le contient (mesuré sur la VM :
+connexion refusée, depuis un Espace comme depuis le bureau).
 Mais une barrière unique, qui tient à un réglage de GNOME, ne suffit pas pour
 un serveur qui donnerait le presse-papiers de tous les Espaces et les frappes
-au clavier (analyse externe du 01/10/2026, point 1.3).
+au clavier (voir SECURITY.md, « Analyse externe »).
 
 ── CE QUE FAIT CE MODULE ───────────────────────────────────────────────────
 Lancé EN TÊTE de la commande, dans le bac à sable :

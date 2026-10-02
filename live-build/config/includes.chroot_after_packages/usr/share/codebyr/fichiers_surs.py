@@ -31,8 +31,8 @@ def dossier(chemin, creer=False):
             # n'exige que le droit de traverser. O_RDONLY exigeait de pouvoir
             # LIRE chacun d'eux — ce qu'un compte d'Espace ne peut pas faire
             # sur /var/lib/codebyr/espaces/<uid>, que root tient en 0711.
-            # Constaté le 14/09/2026 : toute écriture dans le dossier d'un
-            # Espace à compte dédié échouait. Seul le dernier dossier, dont on
+            # Toute écriture dans le dossier d'un Espace à compte dédié
+            # échouerait. Seul le dernier dossier, dont on
             # lit ou dans lequel on écrit, est ouvert en lecture.
             #
             # O_NOFOLLOW garde son effet avec O_PATH : sur un lien symbolique,

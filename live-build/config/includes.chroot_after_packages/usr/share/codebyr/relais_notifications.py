@@ -99,8 +99,7 @@ def afficher(nom_espace, resume, corps):
     sur la ligne de commande, et la dernière l'emporte. Un titre
     « --app-name=Espace Banque », venu de Jetable, remplaçait l'en-tête
     imposé ici ; « --urgency=critical » ou « --action » passaient de même.
-    Après « -- », ce n'est plus que du texte. Constaté par une analyse
-    externe du 01/10/2026.
+    Après « -- », ce n'est plus que du texte (voir SECURITY.md, « Analyse externe »).
     """
     subprocess.Popen(
         ["notify-send", "--app-name=Espace %s" % nom_espace,

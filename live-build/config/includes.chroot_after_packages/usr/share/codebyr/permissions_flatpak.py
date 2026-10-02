@@ -78,7 +78,7 @@ LE_DOSSIER = (_("atteindre votre dossier personnel, où vivent les données de t
 # Wayland : sur le bureau de Codebyr, il ne donne rien. Attention, Flatpak
 # écrit alors AUSSI « x11 » dans ses permissions (« x11;wayland;fallback-x11 »
 # pour la Calculatrice) : seul « x11 » sans « fallback-x11 » ouvre X11 ici
-# (analyse externe du 01/10/2026, point 1.3).
+# (voir SECURITY.md, « Analyse externe »).
 LE_X11 = (_("joindre le serveur X11 du bureau : lire le presse-papiers de tous les "
             "Espaces, voir les autres fenêtres et leur envoyer des frappes"))
 

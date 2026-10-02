@@ -18,7 +18,7 @@ set -e
 # COPIER, ET NON DÉPLACER (« --no-rename ») : base-files est un paquet
 # « Essential », dont les fichiers ne doivent jamais manquer, pas même le
 # temps d'une installation. « --rename » les déplaçait, et dpkg le signalait
-# à l'écran (« dangereux, utilisez --no-rename » — constaté le 28/09/2026).
+# à l'écran (« dangereux, utilisez --no-rename »).
 # On range donc une COPIE, et le fichier reste en place jusqu'à ce que celui
 # de Codebyr le remplace. Seulement à la création de la déviation : ensuite,
 # /usr/lib/os-release est celui de Codebyr, et la copie de base-files est
@@ -32,7 +32,7 @@ DEBIAN_OS_RELEASE=/usr/lib/os-release.debian
 #
 # C'est une conffile de desktop-base. dpkg suit la déviation : une mise à jour
 # de desktop-base compare et remplace la copie rangée, sans question (vérifié
-# le 01/10/2026 sur une copie du système de l'ISO 1.16.8). unattended-upgrades,
+# sur une copie du système de l'ISO 1.16.8). unattended-upgrades,
 # lui, lit /etc/skel/.face sans la suivre : il ne laisserait desktop-base de
 # côté que si Debian changeait cette image — un nouveau thème, donc une
 # nouvelle version majeure, qu'il n'installe pas de toute façon.

@@ -68,7 +68,7 @@ RACINE_ARRIVEES = "/var/lib/codebyr/arrivees"
 # (0700), et root y présente les SEULS sockets auxquels cet Espace a droit.
 #
 # Il a remplacé en 1.16.0 un dossier à nous, /run/codebyr/passerelles/<compte>.
-# Mesuré le 15/09/2026 : sous un chemin de notre invention, une application
+# Sous un chemin de notre invention, une application
 # Flatpak ne démarre pas. Son bac à sable tente de créer « .dbus-proxy » sous
 # ce chemin, remonte jusqu'à un dossier de root, et échoue — « Failed to sync
 # with dbus proxy ». À sa place canonique, tout fonctionne.
@@ -79,16 +79,16 @@ RACINE_ARRIVEES = "/var/lib/codebyr/arrivees"
 # propriétaire du dossier (mesuré : « Device or resource busy » chaque fois).
 #
 # Le dossier d'exécution du BUREAU, lui, n'est jamais ouvert à un Espace —
-# mesuré le 14/09/2026 : l'ouvrir rendait joignable le bus de session,
-# c'est-à-dire la faille fermée en 1.1.0.
+# l'ouvrir rendrait joignable le bus de session, c'est-à-dire la faille
+# fermée en 1.1.0.
 RACINE_RUNTIME = "/run/user"
 
 # Dépôt : un dossier par Espace où le BUREAU dépose les sockets qu'il sert
 # lui-même — notifications, filtre réseau. Root le tient, le bureau y écrit,
 # l'Espace ne fait que le TRAVERSER.
 #
-# Ce n'est PAS le dossier d'exécution du bureau, et la différence est toute la
-# leçon du 14/09/2026 : celui-là contient le bus de session, qu'aucun Espace ne
+# Ce n'est PAS le dossier d'exécution du bureau, et la différence est toute sa
+# raison d'être : celui-là contient le bus de session, qu'aucun Espace ne
 # doit joindre. Un dépôt ne contient que les sockets de CET Espace, déposées
 # pour lui. L'Espace n'y reçoit ni lecture ni écriture : il ne peut donc ni
 # découvrir ce qui s'y trouve, ni y fabriquer une socket pour se faire passer
@@ -301,8 +301,8 @@ def plafonds_valides(memoire, taches):
 
 RACINE_CARTES = "/dev/dri"
 # Un nœud de RENDU, et rien d'autre. « card0 » pilote l'écran — modes,
-# sorties, curseur ; une application ne fait que dessiner. Mesuré le
-# 15/09/2026 : le nœud de rendu suffit à obtenir l'accélération matérielle,
+# sorties, curseur ; une application ne fait que dessiner. Le nœud de rendu
+# suffit à obtenir l'accélération matérielle,
 # et il est le seul que logind ouvre à une application ordinaire.
 FORME_CARTE = re.compile(r"renderD[0-9]{1,3}\Z")
 

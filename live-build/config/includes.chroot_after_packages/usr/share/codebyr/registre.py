@@ -334,7 +334,7 @@ def identifiant_libre(nom):
     vingt caractères au plus, suffixe « -2 » compris —, celle qu'exige le
     compte Unix de l'Espace. Jusqu'en 1.16.1, « 2025 Projets » donnait
     « 2025-projets » : l'Espace se créait, puis refusait de s'ouvrir sous
-    compte séparé, qui est le défaut (constaté le 29/09/2026).
+    compte séparé, qui est le défaut.
     """
     base = unicodedata.normalize("NFKD", str(nom or "")).encode("ascii", "ignore")
     base = re.sub(r"[^a-z0-9]+", "-", base.decode().lower()).strip("-") or "espace"

@@ -311,7 +311,7 @@ function hexVersRGB(hex) {
 // barre : blanc sur thème sombre, sombre sur thème clair, sans réglage. Les
 // proportions sont choisies pour 16 points — la taille réelle d'une icône de
 // barre — et non héritées d'un fichier pensé pour l'affiche : c'est ce qui rend
-// le trait lisible à cette taille (variante retenue à l'aperçu du 15/09/2026,
+// le trait lisible à cette taille (variante retenue à l'aperçu,
 // tools/apercu_icone_sceau.py).
 const SCEAU_COTE = 16;          // taille d'une icône de barre
 const SCEAU_TRAIT = 2.3;        // épaisseur du trait, à cette taille
@@ -388,7 +388,7 @@ class Lisere extends St.Widget {
         // qu'on lui ajoute. Quand le liseré en est devenu un (1.0.4, pour le
         // pointillé), l'étiquette du nom, restée son enfant, a cessé de
         // s'afficher — sur toutes les fenêtres, pendant six semaines, sans
-        // rien qui le signale. Constaté le 13/09/2026. Le dessin et l'étiquette
+        // rien qui le signale. Le dessin et l'étiquette
         // sont donc FRÈRES dans un conteneur ordinaire, comme en 1.0.
         super._init({
             reactive: false, can_focus: false, track_hover: false,
@@ -450,7 +450,7 @@ class Lisere extends St.Widget {
         // fenêtre touche le haut de l'écran — maximisée, ou simplement placée
         // tout en haut —, sa moitié haute passerait SOUS la barre supérieure ;
         // rangée dans la fenêtre, elle recouvrirait le premier bouton de
-        // l'application (constaté sur Fichiers le 13/09/2026). Elle est alors
+        // l'application (Fichiers, par exemple). Elle est alors
         // masquée : la barre du haut affiche le nom de l'Espace de la fenêtre
         // active, à côté du Sceau, sans rien recouvrir.
         let h = 0;
@@ -1113,7 +1113,7 @@ class Indicateur extends PanelMenu.Button {
         // complète les textes traduits. Redéclaré ici, il la masquait dans
         // toute la méthode, et le titre de la fenêtre échouait avant elle
         // (ReferenceError) — « Autres applications… » ne s'ouvrait plus.
-        // Vu sur la VM le 01/10/2026 ; tests/test_traduction.py le refuse.
+        // tests/test_traduction.py le refuse.
         const peupler = (filtre) => {
             liste.destroy_all_children();
             const f = (filtre || '').trim().toLowerCase();
@@ -1284,7 +1284,7 @@ export default class CodebyrExtension extends Extension {
         // La session s'ouvre sur le bureau, pas sur la vue d'ensemble. GNOME y
         // affiche le dock par-dessus tout, et donc par-dessus la fenêtre
         // « Bienvenue » : l'icône d'une application venait se poser sur son
-        // bouton « Suivant ». Constaté le 01/10/2026.
+        // bouton « Suivant ».
         //
         // La vue d'ensemble n'est retirée que le temps du démarrage : GNOME ne
         // l'ouvre que s'il la croit disponible à cet instant. Elle revient dès
@@ -1328,7 +1328,7 @@ export default class CodebyrExtension extends Extension {
 
     // Vue d'ensemble : plus d'icône d'application à cheval sur le bas de
     // chaque fenêtre. Elle recouvrait son contenu — le bouton « Suivant » de
-    // « Bienvenue » le 01/10/2026 — et répétait ce que dit déjà le titre,
+    // « Bienvenue » — et répétait ce que dit déjà le titre,
     // affiché au survol. GNOME prévoit qu'elle soit masquée : son propre code
     // teste sa visibilité (WindowPreview.vfunc_has_overlaps).
     //

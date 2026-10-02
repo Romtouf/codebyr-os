@@ -184,7 +184,7 @@ if id invite >/dev/null 2>&1; then
 	#    « netdev » modifiait les connexions réseau de la machine sans mot de
 	#    passe (règle polkit de Debian), « audio » et « video » ouvraient micro
 	#    et caméra depuis une session en arrière-plan. L'image l'y mettait
-	#    jusqu'à la 1.19.0 (analyse externe du 01/10/2026).
+	#    jusqu'à la 1.19.0 (voir SECURITY.md, « Analyse externe »).
 	for groupe in netdev audio video plugdev; do
 		if id -nG invite 2>/dev/null | tr ' ' '\n' | grep -qx "$groupe"; then
 			gpasswd -d invite "$groupe" >/dev/null 2>&1 \
@@ -194,8 +194,8 @@ if id invite >/dev/null 2>&1; then
 fi
 
 # ── 3) Espace d'échange chiffré : la ligne que l'installeur laisse à moitié ──
-# Constaté le 28/09/2026 sur une installation neuve de la 1.16.0 ; vrai de toute
-# installation chiffrée avec espace d'échange depuis la 1.13.0.
+# Vrai de toute installation chiffrée avec espace d'échange, de la 1.13.0 à la
+# 1.16.0.
 #
 # Calamares chiffre l'espace d'échange à part, et prévoit de l'ouvrir avec un
 # fichier de clé rangé sur le disque principal (« keyscript=/bin/cat »). Ce

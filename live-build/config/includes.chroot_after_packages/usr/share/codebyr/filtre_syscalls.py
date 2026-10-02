@@ -62,7 +62,7 @@ REFUSES = (
 # première socket ouverte (SCTP, DCCP, TIPC, RDS, AF_ALG, VSOCK…). Aucune
 # application d'un Espace n'en a l'usage. « socket » n'est donc plus permis
 # sans condition : seules les familles ci-dessous passent, tout autre appel
-# reçoit ENOSYS. Analyse externe du 01/10/2026, point 3.1.
+# reçoit ENOSYS (voir SECURITY.md, « Analyse externe »).
 #
 # Ce qui reste ouvert, et SECURITY.md le dit : dans un réseau qu'il a créé,
 # un processus peut encore régler la gestion du trafic (tc) par NETLINK_ROUTE,
@@ -85,8 +85,8 @@ SOCKETS_PERMIS = (
 )
 SOUS_CONDITION = ("socket",)
 
-# Tous les appels x86_64 que connaissait libseccomp 2.6.0 (Debian 13), relevés
-# le 29/09/2026. Liste FIGÉE, et c'est tout son intérêt : lue à l'exécution,
+# Tous les appels x86_64 que connaît libseccomp 2.6.0 (Debian 13). Liste
+# FIGÉE, et c'est tout son intérêt : lue à l'exécution,
 # elle grandirait avec chaque bibliothèque et laisserait entrer les appels de
 # demain. Le Blindage n'autorise que ceux-ci, moins les refus et les écartés :
 # un appel ajouté par un futur noyau reçoit ENOSYS, la réponse qui
@@ -167,7 +167,7 @@ CONNUS = (
 )
 
 # Écartés : connus, mais qu'aucune application des Espaces n'a appelés pendant
-# les deux mesures du 29/09/2026 sur la VM (Firefox et une vidéo, Fichiers et
+# les mesures sur la VM (voir docs/decisions.md : Firefox et une vidéo, Fichiers et
 # ses vignettes, une application Flatpak, la console). Ils reçoivent ENOSYS,
 # comme un appel inconnu. Six candidats de départ ont servi, et restent donc
 # permis : quotactl (Firefox, pour la place disque), mount et pivot_root (bwrap

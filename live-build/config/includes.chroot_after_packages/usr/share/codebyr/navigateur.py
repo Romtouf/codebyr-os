@@ -54,8 +54,8 @@ def profil_firefox(home):
     alors le profil de Codebyr qu'ouvrira Firefox. Avec un profiles.ini — que
     Firefox a pu écrire lui-même, s'il a été ouvert avant qu'une banque soit
     déclarée —, on s'installe dans le profil qu'il désigne. Écrire dans
-    codebyr.default revenait à poser le bouclier dans un profil que personne
-    n'ouvre : constaté le 29/09/2026 sur la VM, aucune alerte dans Navigation.
+    codebyr.default reviendrait à poser le bouclier dans un profil que
+    personne n'ouvre : aucune alerte dans Navigation.
     Changer Firefox de profil, lui, ferait perdre marque-pages et historique.
     """
     ffbase = os.path.join(home, ".mozilla", "firefox")
@@ -171,7 +171,7 @@ def installer_bouclier_pour(home, doms):
     # le droit de lire les pages. Codebyr la déposait lui-même dans le profil ;
     # Firefox ne la découvrait pas toujours, et, découverte, ne lui accordait
     # pas toujours ce droit. Le bouclier restait chargé, et muet — depuis le
-    # passage à Manifest V3 (1.6.0). Constaté le 29/09/2026 sur la VM.
+    # passage à Manifest V3 (1.6.0) jusqu'à la 1.16.3.
     #
     # Reste à Codebyr ce que la politique ne sait pas faire : le profil, et la
     # liste des banques de CET utilisateur, fournie en donnée (l'extension reste
@@ -200,7 +200,7 @@ def retirer_copie_deposee(ffdir):
     Firefox refuse de réinstaller par la politique une version déjà présente :
     la copie déposée, souvent sans droit sur les pages, resterait donc à vie.
     On la retire ; Firefox la désinstalle au lancement suivant, et la politique
-    la réinstalle au suivant, avec son droit (mesuré le 29/09/2026). Une copie
+    la réinstalle au suivant, avec son droit. Une copie
     que Firefox a installée LUI-MÊME par la politique n'est jamais touchée.
     """
     nom = BOUCLIER_ID + ".xpi"

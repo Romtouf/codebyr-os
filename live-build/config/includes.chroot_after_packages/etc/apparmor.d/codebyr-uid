@@ -54,7 +54,7 @@ profile codebyr-uid /usr/lib/codebyr/codebyr-uid {
   # Python liste le dossier où il le cherche, puis tente d'y lire un fichier
   # compilé. Sans ces deux règles, le service ne démarrait pas du tout — et
   # AppArmor refusait en silence, sans autre trace qu'une ligne du journal du
-  # noyau. Constaté sur la machine d'essai le 14/09/2026.
+  # noyau.
   /usr/share/codebyr/ r,
   /usr/share/codebyr/** r,
   deny /usr/lib/python3.[0-9]*/**/__pycache__/{,*} w,
@@ -97,7 +97,7 @@ profile codebyr-uid /usr/lib/codebyr/codebyr-uid {
   # La table des processus : il la lit pour savoir si un Espace abandonné par
   # un service arrêté a encore des applications ouvertes — un Espace que
   # l'utilisateur utilise encore ne doit pas être refermé sous ses yeux.
-  # Constaté le 15/09/2026 : sans ces trois lignes, le rangement échouait sur
+  # Sans ces trois lignes, le rangement échouait sur
   # « Permission denied: '/proc' », et l'Espace restait ouvert indéfiniment
   # avec ses droits. Lecture seule, et rien de plus que la ligne de commande :
   # ni « environ », ni « mem », qui livreraient le contenu d'un processus.
@@ -150,7 +150,7 @@ profile codebyr-uid /usr/lib/codebyr/codebyr-uid {
   # Arrêter le premier processus d'un Espace, qui tourne SOUS UN AUTRE COMPTE.
   # Root y est ordinairement autorisé sans y penser ; sous profil, cela passe
   # par une capacité, et sans elle la fermeture d'un Espace échouait en
-  # silence. Constaté sur la machine d'essai le 14/09/2026.
+  # silence.
   capability kill,
 
   # ── Sockets ──────────────────────────────────────────────────────────────

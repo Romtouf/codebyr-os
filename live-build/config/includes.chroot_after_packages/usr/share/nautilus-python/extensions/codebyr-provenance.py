@@ -12,8 +12,8 @@ violets se remarque, exactement comme un liseré de fenêtre.
 
 Une COLONNE, et pas une pastille colorée. La pastille serait plus jolie, mais
 elle repose sur des emblèmes du thème d'icônes — et une icône qui ne se charge
-pas ne laisse rien à l'écran, sans le moindre message. Le projet a déjà perdu
-une soirée là-dessus le 23/08/2026. Du texte s'affiche ou ne s'affiche pas :
+pas ne laisse rien à l'écran, sans le moindre message. Du texte s'affiche
+ou ne s'affiche pas :
 on le voit tout de suite.
 
 Installé dans /usr/share/nautilus-python/extensions/ ; nécessite python3-nautilus.

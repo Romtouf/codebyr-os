@@ -61,8 +61,7 @@ def extraire_archive(tar, destination, filtre="data"):
         # impossible sur un vrai Espace. Un dossier personnel avec un profil
         # Firefox contient des liens symboliques : « Revenir à un instantané »
         # échouait donc toujours, sur une archive produite par Codebyr
-        # lui-même. On pouvait sauvegarder, jamais restaurer. Constaté le
-        # 12/09/2026 sur une VM.
+        # lui-même. On pouvait sauvegarder, jamais restaurer.
         #
         # Ce qu'il fallait refuser n'est pas le lien, c'est le lien qui SORT de
         # l'Espace. « filter="data" » s'en charge : chemins absolus, traversées

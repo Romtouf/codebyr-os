@@ -144,6 +144,16 @@ de référence pour qui ne lit pas le français).
 3. Les changements touchant à l'isolation ou au réseau doivent expliquer leur
    impact sécurité.
 
+## Commentaires : la règle, pas le journal
+
+Un commentaire dit **la règle** et **sa raison**, au présent : « un lien
+glissé ici serait suivi, et donnerait root », pas « constaté le 29/09/2026 sur
+la VM ». L'histoire d'une règle — ce qui a cassé, quand, comment on l'a
+trouvé — va dans [docs/decisions.md](docs/decisions.md) ; une faille, dans
+SECURITY.md ; une version, dans le CHANGELOG. Le code installé sur les
+machines ne porte aucune date (`tests/test_commentaires.py`). Avant de retirer
+une règle qui paraît excessive, lisez son histoire.
+
 ## Rythme des versions
 
 Une version publiée s'installe en root, par les mises à jour automatiques, sur

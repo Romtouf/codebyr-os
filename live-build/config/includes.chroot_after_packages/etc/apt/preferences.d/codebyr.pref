@@ -5,7 +5,7 @@
 # erreur ou par un tiers qui aurait la clé de signature, serait installé par
 # les mises à jour automatiques dès que sa version serait plus récente.
 # Priorité -1 : apt ne prend plus rien d'autre de ce dépôt, quelle qu'en soit
-# la version (analyse externe du 01/10/2026, point 3.3).
+# la version (voir SECURITY.md, « Analyse externe »).
 #
 # « origin » désigne le serveur tel que la source APT le nomme : il ne se
 # règle pas depuis le dépôt lui-même.

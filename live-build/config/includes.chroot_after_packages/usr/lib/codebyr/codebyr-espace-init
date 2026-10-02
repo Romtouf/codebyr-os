@@ -52,7 +52,7 @@ accepte donc les connexions même si personne n'y répond jamais.
 Au démarrage, il lance le bus de session de l'Espace, à sa place canonique :
 /run/user/<uid>/bus. Les applications Flatpak en ont besoin — c'est par lui
 qu'elles joignent les portails, qui dessinent « Ouvrir un fichier » et le
-reste. Mesuré le 15/09/2026 : sur ce bus, le portail démarre de lui-même à la
+reste. Sur ce bus, le portail démarre de lui-même à la
 première demande, et la fenêtre s'affiche.
 
 Ce n'est PAS le bus du bureau, qui n'entre jamais dans un Espace. C'est celui
@@ -288,10 +288,9 @@ def demarrer_bus(affichage):
 # Le compte d'un Espace est créé sans shell de connexion (/usr/sbin/nologin) :
 # il ne doit jamais pouvoir ouvrir de session. Mais un terminal lance le shell
 # du compte, lu dans /etc/passwd : sous compte séparé, la Console d'un Espace
-# lançait donc « nologin », qui se referme aussitôt — la fenêtre « moulinait »
-# et n'apparaissait jamais. Constaté le 28/09/2026, quand le compte séparé est
-# devenu le défaut ; tout terminal était touché (Console, GNOME Terminal, celui
-# d'un éditeur de code).
+# lancerait donc « nologin », qui se referme aussitôt — la fenêtre
+# « moulinerait » sans jamais apparaître, pour tout terminal (Console, GNOME
+# Terminal, celui d'un éditeur de code).
 #
 # Comme Flatpak, on présente au bac à sable SA liste des comptes : une copie
 # de /etc/passwd où seule la ligne de ce compte reçoit un vrai shell. Elle est

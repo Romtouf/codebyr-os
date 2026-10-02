@@ -33,9 +33,8 @@ case "$1" in
 		# Cache d'icônes. Dès qu'un cache existe, GTK s'y fie et IGNORE les
 		# fichiers qui n'y figurent pas : une icône livrée par ce paquet
 		# resterait invisible, remplacée par l'icône générique du bureau — un
-		# losange gris dans le dock et la vue d'ensemble. Constaté le
-		# 13/09/2026 sur une machine où une installation apt avait créé le
-		# cache avant que l'icône n'arrive.
+		# losange gris dans le dock et la vue d'ensemble, dès qu'une
+		# installation apt a créé le cache avant que l'icône n'arrive.
 		#
 		# L'image, elle, n'a aucun cache : GTK y parcourt les dossiers, et les
 		# icônes s'affichent sans rien faire.

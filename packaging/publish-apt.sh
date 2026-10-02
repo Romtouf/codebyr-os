@@ -31,22 +31,52 @@
 #   ./publish-apt.sh               publier la version de ../VERSION
 #   ./publish-apt.sh --resigner    re-signer le dépôt déjà généré, sans rien
 #                                  y changer, pour repousser sa péremption
+#   ./publish-apt.sh --essai       publier sur le CANAL D'ESSAI le dernier
+#                                  paquet <VERSION>~essaiN (voir plus bas)
+#   ./publish-apt.sh --essai --resigner
 #
-# Ensuite : envoyer apt-repo/ vers le conteneur qui sert apt.codebyr.dev (la
+# Ensuite : envoyer le dépôt vers le conteneur qui sert apt.codebyr.dev (la
 # commande exacte est affichée à la fin).
+#
+# ── DEUX CANAUX, DEPUIS LA 1.20.1 ────────────────────────────────────────────
+# Le parc suit le canal STABLE (apt.codebyr.dev) : une version par semaine au
+# plus, sauf correctif de sécurité — chaque publication s'installe en root, sans
+# personne devant l'écran, sur toutes les machines. Les testeurs ajoutent le
+# canal d'ESSAI (apt.codebyr.dev/essai) : les mêmes versions stables, plus le
+# dernier paquet d'essai, construit depuis un commit poussé et validé par la CI
+# comme le reste. Une version d'essai « 1.20.1~essai2 » est plus ancienne que
+# « 1.20.1 » pour apt : à la publication stable, les testeurs la reçoivent
+# comme tout le monde. Analyse externe du 01/10/2026, point 3.2.
 set -euo pipefail
 
 MODE=publier
-case "${1:-}" in
-	"") ;;
-	--resigner) MODE=resigner ;;
-	*) echo "Usage : $0 [--resigner]" >&2; exit 2 ;;
-esac
+CANAL=stable
+for argument in "$@"; do
+	case "$argument" in
+		--resigner) MODE=resigner ;;
+		--essai) CANAL=essai ;;
+		*) echo "Usage : $0 [--essai] [--resigner]" >&2; exit 2 ;;
+	esac
+done
 
 HERE="$(cd "$(dirname "$0")" && pwd)"
 REPO="${CODEBYR_REPO:-$(cd "$HERE/.." && pwd)}"
 DIST="$REPO/packaging/dist"
-REPODIR="$REPO/packaging/apt-repo"
+if [ "$CANAL" = essai ]; then
+	REPODIR="$REPO/packaging/apt-repo-essai"
+	# shellcheck disable=SC2088  # le dossier personnel DU SERVEUR, pas d'ici
+	DISTANT="~/docker/codebyr-apt/apt-repo/essai"
+	SUITE=essai
+	CODENAME=codebyr-essai
+	DESCRIPTION="Canal d'essai des outils Codebyr OS (testeurs)"
+else
+	REPODIR="$REPO/packaging/apt-repo"
+	# shellcheck disable=SC2088  # le dossier personnel DU SERVEUR, pas d'ici
+	DISTANT="~/docker/codebyr-apt/apt-repo"
+	SUITE=stable
+	CODENAME=codebyr
+	DESCRIPTION="Dépôt officiel des outils Codebyr OS"
+fi
 : "${GNUPGHOME:=/root/.gnupg-codebyr}"
 export GNUPGHOME
 
@@ -291,7 +321,26 @@ if [ "$MODE" = publier ]; then
 	# C'est le même piège que l'ISO périmée dans build.sh : un artefact daté
 	# que l'on republie en croyant publier le code. On compare donc les dates,
 	# et on refuse plutôt que d'avertir.
-	DEB_COURANT="$DIST/codebyr-tools_${VERSION_COURANTE}_all.deb"
+	if [ "$CANAL" = essai ]; then
+		# Le plus récent des paquets d'essai de CETTE version.
+		DEB_COURANT=""
+		for deb in "$DIST"/codebyr-tools_"${VERSION_COURANTE}"~essai*_all.deb; do
+			[ -f "$deb" ] || continue
+			if [ -z "$DEB_COURANT" ] || dpkg --compare-versions \
+					"$(dpkg-deb -f "$deb" Version)" gt "$(dpkg-deb -f "$DEB_COURANT" Version)"; then
+				DEB_COURANT="$deb"
+			fi
+		done
+		if [ -z "$DEB_COURANT" ]; then
+			echo "ERREUR : aucun paquet d'essai pour la version $VERSION_COURANTE." >&2
+			echo "         Lancez d'abord ./build-deb.sh ${VERSION_COURANTE}~essai1" >&2
+			exit 1
+		fi
+		VERSION_PUBLIEE="$(dpkg-deb -f "$DEB_COURANT" Version)"
+	else
+		DEB_COURANT="$DIST/codebyr-tools_${VERSION_COURANTE}_all.deb"
+		VERSION_PUBLIEE="$VERSION_COURANTE"
+	fi
 	if [ ! -f "$DEB_COURANT" ]; then
 		echo "ERREUR : aucun paquet pour la version $VERSION_COURANTE." >&2
 		echo "         Lancez d'abord ./build-deb.sh" >&2
@@ -302,13 +351,13 @@ if [ "$MODE" = publier ]; then
 		"$REPO/packaging/codebyr-tools.preinst" "$REPO/packaging/codebyr-tools.postrm" \
 		-newer "$DEB_COURANT" -print -quit 2>/dev/null || true)"
 	if [ -n "$RECENT" ]; then
-		echo "ERREUR : le paquet $VERSION_COURANTE est plus ancien que le code." >&2
+		echo "ERREUR : le paquet $VERSION_PUBLIEE est plus ancien que le code." >&2
 		echo "         Modifié depuis sa construction : $RECENT" >&2
 		echo "         Vous publieriez une version périmée sous un numéro juste." >&2
 		echo "         Lancez ./build-deb.sh puis recommencez." >&2
 		exit 1
 	fi
-	echo "    Paquet $VERSION_COURANTE postérieur au code : OK."
+	echo "    Paquet $VERSION_PUBLIEE postérieur au code : OK (canal $SUITE)."
 
 	if ! verifier_la_ci; then
 		# Échappatoire explicite, comme pour la clé nue : GitHub en panne, par
@@ -324,12 +373,17 @@ if [ "$MODE" = publier ]; then
 	# version en « ~ » (1.17.0~essai1) est plus récente que la version publiée
 	# précédente : unattended-upgrades l'installerait sur tout le parc. Et un
 	# paquet plus récent que VERSION n'a rien à faire dans cette publication.
+	# Le canal d'essai, lui, prend en plus SON paquet d'essai — un seul.
 	vus=" "
 	for deb in "$DIST"/*.deb; do
 		nom="$(dpkg-deb -f "$deb" Package)"
 		v="$(dpkg-deb -f "$deb" Version)"
 		case "$v" in
-			*"~"*) echo "    écarté (paquet d'essai) : $(basename "$deb") — $v"; continue ;;
+			*"~"*)
+				if [ "$deb" != "$DEB_COURANT" ]; then
+					echo "    écarté (paquet d'essai) : $(basename "$deb") — $v"
+					continue
+				fi ;;
 		esac
 		if [ "$nom" != codebyr-tools ]; then
 			echo "ERREUR : paquet inattendu dans $DIST : $(basename "$deb") ($nom)." >&2; exit 1
@@ -370,11 +424,11 @@ release_neuf="$(mktemp)"
 apt-ftparchive \
 	-o APT::FTPArchive::Release::Origin="Codebyr OS" \
 	-o APT::FTPArchive::Release::Label="Codebyr OS" \
-	-o APT::FTPArchive::Release::Suite=stable \
-	-o APT::FTPArchive::Release::Codename=codebyr \
+	-o APT::FTPArchive::Release::Suite="$SUITE" \
+	-o APT::FTPArchive::Release::Codename="$CODENAME" \
 	-o APT::FTPArchive::Release::Architectures=all \
 	-o APT::FTPArchive::Release::Components=main \
-	-o APT::FTPArchive::Release::Description="Dépôt officiel des outils Codebyr OS" \
+	-o APT::FTPArchive::Release::Description="$DESCRIPTION" \
 	"${validite[@]+"${validite[@]}"}" \
 	release . > "$release_neuf"
 mv "$release_neuf" Release
@@ -417,10 +471,17 @@ echo
 # plus cher que pas de mode d'emploi.
 echo
 echo "Déployer, depuis GIT BASH (la clé SSH n'existe que côté Windows) :"
-echo "    cd /c/Users/pcrom/codebyros/packaging/apt-repo && scp ./* vps-local:~/docker/codebyr-apt/apt-repo/"
+# Le dossier local et le dossier distant, nommés une fois (voir CANAL).
+if [ "$CANAL" = essai ]; then
+	echo "    ssh vps-local 'mkdir -p $DISTANT' && cd /c/Users/pcrom/codebyros/packaging/$(basename "$REPODIR") && scp ./* vps-local:$DISTANT/"
+	OPTION_RESIGNER="--essai --resigner"
+else
+	echo "    cd /c/Users/pcrom/codebyros/packaging/$(basename "$REPODIR") && scp ./* vps-local:$DISTANT/"
+	OPTION_RESIGNER="--resigner"
+fi
 if grep -q '^Valid-Until:' Release; then
 	echo
-	echo "À RETENIR : ce dépôt se périme le $(sed -n 's/^Valid-Until: //p' Release)."
+	echo "À RETENIR : ce dépôt ($SUITE) se périme le $(sed -n 's/^Valid-Until: //p' Release)."
 	echo "Avant cette date, republiez, ou re-signez sans rien changer :"
-	echo "    ./publish-apt.sh --resigner   (puis le même envoi)"
+	echo "    ./publish-apt.sh $OPTION_RESIGNER   (puis le même envoi)"
 fi

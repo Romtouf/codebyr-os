@@ -144,6 +144,15 @@ de référence pour qui ne lit pas le français).
 3. Les changements touchant à l'isolation ou au réseau doivent expliquer leur
    impact sécurité.
 
+## Rythme des versions
+
+Une version publiée s'installe en root, par les mises à jour automatiques, sur
+toutes les machines. Le canal **stable** reçoit donc une version par semaine au
+plus, qui regroupe ce qui est prêt ; un correctif de sécurité part sans
+attendre. Entre deux, les versions passent par le **canal d'essai**, que les
+testeurs volontaires ajoutent à leur machine : voir
+[docs/canal-essai.md](docs/canal-essai.md).
+
 ## Continuité du projet (à lire si vous dépendez de Codebyr OS)
 
 Codebyr OS est aujourd'hui maintenu par **une seule personne**, et le dépôt APT

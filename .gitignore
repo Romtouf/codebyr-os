@@ -14,8 +14,9 @@ binary/
 # fichier du site — un piège à retardement. Le répertoire généré par
 # live-build, lui, est sous l'arbre de build, jamais ici.
 
-# Dépôt APT généré (voir packaging/publish-apt.sh) et paquets construits
+# Dépôts APT générés, stable et essai (voir packaging/publish-apt.sh), et paquets construits
 apt-repo/
+apt-repo-essai/
 *.deb
 
 # Clés PRIVÉES, certificats de révocation et trousseaux binaires — ne JAMAIS

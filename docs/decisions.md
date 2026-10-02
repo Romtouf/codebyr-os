@@ -216,3 +216,22 @@ l'identifiant ; retirer le premier ne suffisait pas.
 **Des pastilles de même taille** — une pastille plus grande pour la fenêtre
 active passait pour une erreur (vu sur la VM le même jour) ; elle est
 seulement cerclée de blanc.
+
+**Alt+Tab : les mêmes pastilles, et le nom de l'Espace sous chaque vignette**
+— Alt+Tab a ses propres icônes (`altTab.js`), qui n'héritent pas de
+`AppDisplay.AppIcon`. Elles sont décorées à l'ouverture, une fois : GNOME y
+fige lui-même la liste des fenêtres. Sous les vignettes, le nom en clair, car
+la couleur seule ne se lit pas par tout le monde. Points d'accroche relevés
+dans GNOME Shell 48.7, celui de Debian 13 ; une erreur de l'extension n'y
+prive jamais d'Alt+Tab.
+
+## Firefox sans contenu sponsorisé ni articles recommandés
+
+Vu sur la VM le 02/10/2026 : raccourcis sponsorisés (Amazon, Temu…) sur le
+nouvel onglet. Coupés par politique d'entreprise, dans le fichier déjà livré
+pour le bouclier : elle vaut pour tous les profils, ceux des Espaces compris.
+Les articles recommandés aussi, à la demande de l'utilisateur après l'essai.
+Rien n'est verrouillé : l'utilisateur garde la main. `Stories` et
+`SponsoredStories` n'existent qu'à partir de Firefox 141 ; Firefox 140 ESR
+ignore une clé inconnue sans rejeter les autres (`allowAdditionalProperties`),
+elles serviront avec Firefox 153 ESR.

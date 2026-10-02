@@ -16,12 +16,21 @@ GNOME (menu du Sceau, liserés colorés) ne se recharge pas à chaud.
 portée de clic, sans ouvrir la vue d'ensemble — comme la barre des tâches de
 Windows. Sous chaque application ouverte, une pastille par fenêtre, à la
 couleur de son Espace : Firefox ouvert dans la Banque et dans la Navigation
-porte une pastille verte et une orange ; celle de la fenêtre active est plus
-grande. Un clic sur une application ouverte dans plusieurs Espaces montre ses
-fenêtres, pour choisir la bonne. Le dock vient de Debian (Dash to Dock) ; on
+porte une pastille verte et une orange ; celle de la fenêtre active est
+cerclée de blanc. Un clic sur une application ouverte dans plusieurs Espaces
+montre ses fenêtres, pour choisir la bonne. Alt+Tab montre les mêmes
+pastilles, et sous chaque fenêtre (flèche du bas), le nom de son Espace en
+clair. Le dock vient de Debian (Dash to Dock) ; on
 le règle, ou on le retire, dans l'application Extensions. Si vous avez déjà
 choisi vous-même vos extensions, activez-le là : Codebyr ne change pas un
 choix que vous avez fait.
+
+**Firefox n'affiche plus de contenu sponsorisé** : ni raccourcis payés par
+des marques sur le nouvel onglet (Amazon, Temu…), ni articles sponsorisés ou
+recommandés, ni suggestions sponsorisées dans la barre d'adresse, et ce que
+vous tapez n'est pas partagé pour « améliorer » ces suggestions. Le reste ne
+change pas : vos raccourcis, la recherche et les suggestions ordinaires
+restent, et tout se règle encore dans les paramètres de Firefox.
 
 **Le service qui prépare les Espaces est désormais éprouvé par ce qu'il
 fait**, et plus seulement par la lecture de son code : un banc d'essai le

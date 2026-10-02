@@ -21,6 +21,7 @@ import {Extension, InjectionManager} from 'resource:///org/gnome/shell/extension
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 import * as WindowPreview from 'resource:///org/gnome/shell/ui/windowPreview.js';
 import * as AppDisplay from 'resource:///org/gnome/shell/ui/appDisplay.js';
+import * as AltTab from 'resource:///org/gnome/shell/ui/altTab.js';
 import * as PanelMenu from 'resource:///org/gnome/shell/ui/panelMenu.js';
 import * as PopupMenu from 'resource:///org/gnome/shell/ui/popupMenu.js';
 import * as ModalDialog from 'resource:///org/gnome/shell/ui/modalDialog.js';
@@ -684,6 +685,30 @@ function stylePastille(pastille) {
         ` background-color: ${pastille.couleur}; border: 1px solid ${contour};`;
 }
 
+// Une rangée de pastilles, et le nom de l'Espace en clair quand il est donné :
+// la couleur seule ne se lit pas par tout le monde. Le nom passe en texte,
+// jamais en balisage.
+function rangeePastilles(pastilles, nom) {
+    const rangee = new St.BoxLayout({
+        x_align: Clutter.ActorAlign.CENTER,
+        style: 'spacing: 4px; padding-top: 6px;',
+    });
+    for (const pastille of pastilles) {
+        rangee.add_child(new St.Widget({
+            style: stylePastille(pastille),
+            y_align: Clutter.ActorAlign.CENTER,
+        }));
+    }
+    if (nom !== undefined) {
+        rangee.add_child(new St.Label({
+            text: nom,
+            y_align: Clutter.ActorAlign.CENTER,
+            style: 'font-size: 0.9em;',
+        }));
+    }
+    return rangee;
+}
+
 // Toute icône d'application de GNOME — le dock, la vue d'ensemble, la grille
 // des applications — est un AppDisplay.AppIcon, et le dock (Dash to Dock) en
 // hérite. On décore donc la classe de GNOME, pas les rouages internes du dock :
@@ -704,6 +729,39 @@ class Pastilles {
             original => function (...args) {
                 original.call(this, ...args);
                 pastilles._decorer(this);
+            });
+        // Alt+Tab a ses propres icônes. Sa fenêtre ne vit que le temps du
+        // choix et GNOME y fige la liste des fenêtres : on décore une fois,
+        // à l'ouverture. Une erreur ici ne doit jamais priver de Alt+Tab.
+        this._injections.overrideMethod(AltTab.AppSwitcherPopup.prototype, '_init',
+            original => function (...args) {
+                original.call(this, ...args);
+                try {
+                    for (const icone of this._items)
+                        pastilles._decorerAltTab(icone, icone.cachedWindows);
+                } catch (e) {
+                    logError(e, 'Codebyr: pastilles d\'Alt+Tab');
+                }
+            });
+        // Les vignettes des fenêtres d'une application (flèche du bas).
+        this._injections.overrideMethod(AltTab.AppSwitcherPopup.prototype, '_createThumbnails',
+            original => function (...args) {
+                original.call(this, ...args);
+                try {
+                    pastilles._decorerVignettes(this._thumbnails);
+                } catch (e) {
+                    logError(e, 'Codebyr: pastilles des vignettes');
+                }
+            });
+        // Le sélecteur de fenêtres, quand un raccourci l'ouvre.
+        this._injections.overrideMethod(AltTab.WindowIcon.prototype, '_init',
+            original => function (...args) {
+                original.call(this, ...args);
+                try {
+                    pastilles._decorerAltTab(this, [this.window]);
+                } catch (e) {
+                    logError(e, 'Codebyr: pastille du sélecteur de fenêtres');
+                }
             });
         // Les icônes qui existent déjà (le dock a pu s'ouvrir avant nous).
         this._parcourir(Main.layoutManager.uiGroup);
@@ -767,6 +825,32 @@ class Pastilles {
     _toutRedessiner() {
         for (const icone of this._icones)
             this._dessiner(icone);
+    }
+
+    // Sous l'image : les icônes d'Alt+Tab sont des colonnes [image, nom].
+    _decorerAltTab(icone, fenetres) {
+        const pastilles = pastillesDe(fenetres || [], w => this._coloriage.espaceDe(w),
+            global.display.focus_window);
+        if (pastilles.length)
+            icone.insert_child_at_index(rangeePastilles(pastilles), 1);
+    }
+
+    // Une vignette par fenêtre, chacune une colonne [image, titre]. Une
+    // fenêtre hors Espace garde une rangée vide de même hauteur : les titres
+    // restent alignés.
+    _decorerVignettes(vignettes) {
+        if (!vignettes)
+            return;
+        const active = global.display.focus_window;
+        vignettes._items.forEach((item, i) => {
+            const win = vignettes._windows[i];
+            if (!win || !item.child)
+                return;
+            const esp = this._coloriage.espaceDe(win);
+            const pastilles = pastillesDe([win], () => esp, active);
+            item.child.insert_child_at_index(
+                rangeePastilles(pastilles, esp ? esp.nom : ''), 1);
+        });
     }
 
     detruire() {

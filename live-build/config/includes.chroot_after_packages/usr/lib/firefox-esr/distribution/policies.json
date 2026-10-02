@@ -5,6 +5,17 @@
         "installation_mode": "normal_installed",
         "install_url": "file:///usr/share/codebyr/antiphishing/signed/711a18eca1064bc08760-1.5.xpi"
       }
+    },
+    "FirefoxHome": {
+      "SponsoredTopSites": false,
+      "Pocket": false,
+      "SponsoredPocket": false,
+      "Stories": false,
+      "SponsoredStories": false
+    },
+    "FirefoxSuggest": {
+      "SponsoredSuggestions": false,
+      "ImproveSuggest": false
     }
   }
 }

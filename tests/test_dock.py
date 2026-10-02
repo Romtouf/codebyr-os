@@ -176,5 +176,47 @@ class LeBranchement(unittest.TestCase):
         self.assertIn("rec && rec.lisere ? rec.esp : null", espace_de)
 
 
+class LAltTab(unittest.TestCase):
+    """Les mêmes pastilles dans Alt+Tab, et le nom de l'Espace sous chaque
+    vignette de fenêtre.
+
+    Points d'accroche relevés dans js/ui/altTab.js de GNOME Shell 48.7, celui
+    de Debian 13 (identique à la 48.4), le 02/10/2026."""
+
+    ACCROCHES = ("AltTab.AppSwitcherPopup.prototype, '_init'",
+                 "AltTab.AppSwitcherPopup.prototype, '_createThumbnails'",
+                 "AltTab.WindowIcon.prototype, '_init'")
+
+    def setUp(self):
+        self.source = _lire(EXTENSION)
+        self.classe = self.source.split("class Pastilles {", 1)[1].split("\n}\n", 1)[0]
+
+    def test_accroches(self):
+        self.assertIn("import * as AltTab from 'resource:///org/gnome/shell/ui/altTab.js';",
+                      self.source)
+        for accroche in self.ACCROCHES:
+            self.assertIn("overrideMethod(" + accroche, self.classe)
+
+    def test_une_erreur_ne_prive_jamais_d_alt_tab(self):
+        # GNOME fait d'abord son travail ; le nôtre vient après, sous try.
+        for accroche in self.ACCROCHES:
+            corps = self.classe.split(accroche, 1)[1].split("});", 1)[0]
+            self.assertLess(corps.index("original.call(this, ...args);"), corps.index("try {"))
+            self.assertIn("logError(e,", corps)
+
+    def test_les_couleurs_et_l_espace_comme_dans_le_dock(self):
+        for methode in ("_decorerAltTab(", "_decorerVignettes("):
+            corps = self.classe.split("    " + methode, 1)[1].split("\n    }\n", 1)[0]
+            self.assertIn("pastillesDe(", corps)
+        self.assertIn("this._coloriage.espaceDe(win)", self.classe)
+
+    def test_le_nom_de_l_espace_passe_en_texte(self):
+        # Le nom vient du registre, que l'utilisateur écrit.
+        rangee = self.source.split("function rangeePastilles(", 1)[1].split("\n}\n", 1)[0]
+        self.assertIn("text: nom,", rangee)
+        for balisage in ("markup", "clutter_text"):
+            self.assertNotIn(balisage, rangee)
+
+
 if __name__ == "__main__":
     unittest.main()

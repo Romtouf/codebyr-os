@@ -2,7 +2,7 @@
 
 Codebyr se met à jour tout seul, en administrateur, sans personne devant
 l'écran. Une version publiée arrive donc sur **toutes** les machines en
-quelques heures. D'où deux canaux, depuis la 1.20.1 :
+quelques heures. D'où deux canaux, depuis la 1.21.0 :
 
 | Canal | Adresse | Pour qui | Rythme |
 |---|---|---|---|
@@ -10,9 +10,9 @@ quelques heures. D'où deux canaux, depuis la 1.20.1 :
 | **essai** | `https://apt.codebyr.dev/essai` | les testeurs volontaires | dès qu'une version d'essai est prête |
 
 Le canal d'essai contient les versions stables, **plus** la dernière version
-d'essai (`1.20.1~essai2`, par exemple). Elle est construite depuis du code
+d'essai (`1.21.0~essai2`, par exemple). Elle est construite depuis du code
 poussé et validé par la CI, et signée par la même clé que le reste. Pour apt,
-`1.20.1~essai2` est plus ancienne que `1.20.1` : à la publication stable, un
+`1.21.0~essai2` est plus ancienne que `1.21.0` : à la publication stable, un
 testeur reçoit la version définitive comme tout le monde.
 
 Comme le canal stable, le canal d'essai ne peut fournir que `codebyr-tools` :
@@ -54,7 +54,7 @@ remplace d'elle-même.
 
 1. Le code est commité, poussé, et la CI est verte.
 2. Construire le paquet d'essai de la version en préparation :
-   `./build-deb.sh 1.20.1~essai1` (le numéro de VERSION, suivi de `~essaiN`).
+   `./build-deb.sh 1.21.0~essai1` (le numéro de VERSION, suivi de `~essaiN`).
 3. Dans le WSL : `./publish-apt.sh --essai`. Le script fait les mêmes
    vérifications que pour le stable (code commité, paquet plus récent que le
    code, CI verte, signature) et ne prend que le paquet d'essai le plus récent

@@ -20,6 +20,7 @@ import Cairo from 'cairo';
 import {Extension, InjectionManager} from 'resource:///org/gnome/shell/extensions/extension.js';
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 import * as WindowPreview from 'resource:///org/gnome/shell/ui/windowPreview.js';
+import * as AppDisplay from 'resource:///org/gnome/shell/ui/appDisplay.js';
 import * as PanelMenu from 'resource:///org/gnome/shell/ui/panelMenu.js';
 import * as PopupMenu from 'resource:///org/gnome/shell/ui/popupMenu.js';
 import * as ModalDialog from 'resource:///org/gnome/shell/ui/modalDialog.js';
@@ -475,6 +476,23 @@ class Coloriage {
         // Prévenu à chaque changement de fenêtre active, avec son Espace — ou
         // null. C'est ce qui alimente le nom affiché à côté du Sceau.
         this._surEspaceActif = surEspaceActif;
+        // Prévenu quand l'Espace d'une fenêtre est établi, ou qu'elle part :
+        // les pastilles du dock se redessinent.
+        this.surChangement = null;
+    }
+
+    // L'Espace d'une fenêtre, tel que son liseré l'a établi — ou null.
+    espaceDe(win) {
+        const rec = this._suivis.get(win);
+        return rec && rec.lisere ? rec.esp : null;
+    }
+
+    _prevenirChangement() {
+        if (!this.surChangement)
+            return;
+        try { this.surChangement(); } catch (e) {
+            logError(e, 'Codebyr: pastilles du dock');
+        }
     }
 
     // L'Espace de la fenêtre active, tel que CE liseré l'a établi : par
@@ -580,6 +598,7 @@ class Coloriage {
             // Fenêtre déjà active quand son Espace est enfin établi (retentatives) :
             // le nom apparaît sans attendre le prochain changement de focus.
             this._signalerEspaceActif();
+            this._prevenirChangement();
             rec.signals.push(win.connect('position-changed', sync));
             rec.signals.push(win.connect('size-changed', sync));
             sync();
@@ -619,6 +638,7 @@ class Coloriage {
             rec.lisere.destroy();
         this._suivis.delete(win);
         this._signalerEspaceActif();
+        this._prevenirChangement();
     }
 
     detruire() {
@@ -626,9 +646,144 @@ class Coloriage {
             try { global.display.disconnect(id); } catch (e) {}
         }
         this._displaySignals = [];
+        this.surChangement = null;
         for (const win of [...this._suivis.keys()])
             this._retirer(win);
         this._surEspaceActif = null;
+    }
+}
+
+// ── Les pastilles du dock ───────────────────────────────────────────────────
+// Sous chaque application ouverte, une pastille par fenêtre, à la couleur de
+// son Espace : Firefox ouvert dans Banque et dans Navigation porte une
+// pastille verte et une orange. Toutes ont la même taille — une pastille plus
+// grande pour la fenêtre active passait pour une erreur (vu sur la VM) : la
+// sienne est seulement cerclée de blanc, les autres de leur propre couleur.
+// Une fenêtre hors de tout Espace a une pastille blanche, comme le point de
+// GNOME. Au-delà de cinq fenêtres, les suivantes ne s'affichent pas : un dock
+// n'est pas une liste.
+//
+// Pures, et testées hors de GNOME : de quoi décider des pastilles, à partir
+// des fenêtres d'une application et de l'Espace de chacune.
+const PASTILLES_MAX = 5;
+const PASTILLE_NEUTRE = '#ffffff';
+
+function pastillesDe(fenetres, espaceDe, active) {
+    return fenetres.slice(0, PASTILLES_MAX).map(win => {
+        const esp = espaceDe(win);
+        return {
+            couleur: esp ? couleurSure(esp.couleur) : PASTILLE_NEUTRE,
+            active: win === active,
+        };
+    });
+}
+
+function stylePastille(pastille) {
+    const contour = pastille.active ? '#ffffff' : pastille.couleur;
+    return 'width: 8px; height: 8px; border-radius: 5px;' +
+        ` background-color: ${pastille.couleur}; border: 1px solid ${contour};`;
+}
+
+// Toute icône d'application de GNOME — le dock, la vue d'ensemble, la grille
+// des applications — est un AppDisplay.AppIcon, et le dock (Dash to Dock) en
+// hérite. On décore donc la classe de GNOME, pas les rouages internes du dock :
+// quand le dock change, les pastilles restent. Le point blanc de GNOME est
+// rendu transparent, pas caché : GNOME et le dock le montrent et le cachent
+// eux-mêmes.
+class Pastilles {
+    constructor(coloriage) {
+        this._coloriage = coloriage;
+        this._icones = new Set();
+        this._injections = new InjectionManager();
+        this._signaux = [];
+    }
+
+    activer() {
+        const pastilles = this;
+        this._injections.overrideMethod(AppDisplay.AppIcon.prototype, '_init',
+            original => function (...args) {
+                original.call(this, ...args);
+                pastilles._decorer(this);
+            });
+        // Les icônes qui existent déjà (le dock a pu s'ouvrir avant nous).
+        this._parcourir(Main.layoutManager.uiGroup);
+        this._signaux.push(global.display.connect('notify::focus-window',
+            () => this._toutRedessiner()));
+        this._coloriage.surChangement = () => this._toutRedessiner();
+    }
+
+    _parcourir(acteur) {
+        if (acteur instanceof AppDisplay.AppIcon)
+            this._decorer(acteur);
+        for (const enfant of acteur.get_children())
+            this._parcourir(enfant);
+    }
+
+    _decorer(icone) {
+        if (!icone.app || !icone._iconContainer || this._icones.has(icone))
+            return;
+        const boite = new St.BoxLayout({
+            x_expand: true, y_expand: true,
+            x_align: Clutter.ActorAlign.CENTER,
+            y_align: Clutter.ActorAlign.END,
+            style: 'spacing: 3px;',
+        });
+        icone._iconContainer.add_child(boite);
+        icone._codebyrPastilles = boite;
+        this._icones.add(icone);
+        // La boîte porte les connexions : détruite avec l'icône, elle les
+        // emporte ; GNOME garde les siennes sur l'application. Et c'est sa
+        // destruction, quelle qu'en soit la cause, qui fait oublier l'icône.
+        icone.app.connectObject('windows-changed', () => this._dessiner(icone), boite);
+        boite.connect('destroy', () => {
+            this._icones.delete(icone);
+            if (icone._codebyrPastilles === boite)
+                delete icone._codebyrPastilles;
+        });
+        this._dessiner(icone);
+    }
+
+    _dessiner(icone) {
+        const boite = icone._codebyrPastilles;
+        if (!boite)
+            return;
+        boite.destroy_all_children();
+        let fenetres = [];
+        try {
+            fenetres = icone.app.get_windows().filter(w => !w.skip_taskbar);
+        } catch (e) {}
+        const pastilles = pastillesDe(fenetres, w => this._coloriage.espaceDe(w),
+            global.display.focus_window);
+        // Le point de GNOME s'efface dès qu'une pastille le remplace, et
+        // revient sinon (application lancée sans fenêtre encore).
+        if (icone._dot)
+            icone._dot.opacity = pastilles.length ? 0 : 255;
+        for (const pastille of pastilles)
+            boite.add_child(new St.Widget({style: stylePastille(pastille)}));
+        // Même hauteur que le point de GNOME, quel que soit le thème.
+        boite.translation_y = icone._dot ? icone._dot.translation_y : 0;
+    }
+
+    _toutRedessiner() {
+        for (const icone of this._icones)
+            this._dessiner(icone);
+    }
+
+    detruire() {
+        this._injections.clear();
+        for (const id of this._signaux) {
+            try { global.display.disconnect(id); } catch (e) {}
+        }
+        this._signaux = [];
+        this._coloriage.surChangement = null;
+        for (const icone of [...this._icones]) {
+            try {
+                if (icone._dot)
+                    icone._dot.opacity = 255;
+                icone._codebyrPastilles?.destroy();
+            } catch (e) {}
+        }
+        this._icones.clear();
     }
 }
 
@@ -1310,6 +1465,14 @@ export default class CodebyrExtension extends Extension {
             logError(e, 'Codebyr: activation du coloriage');
         }
         try {
+            if (this._coloriage) {
+                this._pastilles = new Pastilles(this._coloriage);
+                this._pastilles.activer();
+            }
+        } catch (e) {
+            logError(e, 'Codebyr: activation des pastilles du dock');
+        }
+        try {
             this.pressePapiers = new PressePapiers(
                 () => chargerEspaces(), GLib.get_user_runtime_dir() + '/codebyr');
             this.pressePapiers.activer();
@@ -1360,6 +1523,8 @@ export default class CodebyrExtension extends Extension {
     disable() {
         this._rendreVueEnsemble();
         this._rendreIconesDesApercus();
+        this._pastilles?.detruire();
+        this._pastilles = null;
         this._coloriage?.detruire();
         this._coloriage = null;
         this.pressePapiers?.detruire();

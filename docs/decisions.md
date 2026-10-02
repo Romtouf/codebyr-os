@@ -65,7 +65,7 @@ destination.
 banc d'essai du service (`tests/uid_harnais.py`) : `os.path.ismount` ne voit
 pas un montage lié venu du même système de fichiers ; sur un `/run` d'un seul
 tenant, la fermeture laissait le montage et le droit sur le socket du bureau
-(SECURITY.md, 1.20.1).
+(SECURITY.md, 1.21.0).
 
 ## Le lanceur des Espaces (`usr/bin/codebyr-space`) et ses modules
 
@@ -194,3 +194,25 @@ sur la machine d'essai le 14/09/2026 : sans la lecture de `/usr/share/codebyr`,
 le service ne démarrait pas, AppArmor refusant en silence ; sans `capability
 kill`, la fermeture échouait en silence (même jour) ; sans `/proc`, le
 rangement des Espaces abandonnés échouait (15/09/2026).
+
+## Le dock
+
+**Variante A** — choisie sur maquette le 02/10/2026 parmi trois (A : toujours
+visible, une pastille par fenêtre ; B : une icône par Espace ; C : un dock qui
+se cache). La B s'allongeait d'une icône par Espace et par application ; la C
+cachait la couleur des Espaces la plupart du temps.
+
+**Dash to Dock, avec l'indicateur de GNOME** — ses propres points se dessinent
+d'une seule couleur, dans une classe qu'il n'expose pas. Les pastilles sont
+posées par l'extension Codebyr sur `AppDisplay.AppIcon`, dont ses icônes
+héritent : quand le dock change, les pastilles restent.
+
+**Firefox sans identifiant par Espace** — vu sur la VM le 02/10/2026 : ses
+fenêtres d'Espace apparaissaient à part, sous une icône générique.
+`MOZ_APP_REMOTINGNAME` et `--class codebyr-<Espace>` (deux restes de la 1.0,
+quand l'extension reconnaissait un Espace à sa classe) fixaient chacun
+l'identifiant ; retirer le premier ne suffisait pas.
+
+**Des pastilles de même taille** — une pastille plus grande pour la fenêtre
+active passait pour une erreur (vu sur la VM le même jour) ; elle est
+seulement cerclée de blanc.

@@ -38,8 +38,30 @@ xkb-options=['caps:shiftlock']
 
 [org.gnome.shell]
 favorite-apps=['io.codebyr.Assistant.desktop', 'firefox-esr.desktop', 'org.gnome.Nautilus.desktop', 'org.gnome.Software.desktop', 'org.gnome.Console.desktop', 'org.gnome.Settings.desktop']
-enabled-extensions=['codebyr@codebyr.io']
+enabled-extensions=['codebyr@codebyr.io', 'dash-to-dock@micxgx.gmail.com']
 disable-user-extensions=false
+
+[org.gnome.shell.extensions.dash-to-dock]
+# Le dock, toujours visible en bas de l'écran : qui vient de Windows y retrouve
+# ses applications sans ouvrir la vue d'ensemble. Sous chaque application
+# ouverte, l'extension Codebyr pose une pastille par fenêtre, à la couleur de
+# son Espace : c'est pourquoi le dock garde l'indicateur de GNOME (« DEFAULT »),
+# que l'extension remplace, plutôt que ses propres points.
+dock-position='BOTTOM'
+dock-fixed=true
+intellihide=false
+autohide=false
+extend-height=false
+dash-max-icon-size=48
+running-indicator-style='DEFAULT'
+show-trash=false
+show-mounts=false
+# Un clic sur une application ouverte dans plusieurs Espaces montre ses
+# fenêtres, pour choisir la bonne.
+click-action='focus-or-previews'
+# Super+1… reste le raccourci de GNOME, et la session s'ouvre sur le bureau.
+hot-keys=false
+disable-overview-on-startup=true
 
 [org.gnome.login-screen]
 # Logo affiché sur l'écran de connexion / déverrouillage (le Sceau, pas Debian)

@@ -10,7 +10,18 @@ GNOME (menu du Sceau, liserés colorés) ne se recharge pas à chaud.
 
 ---
 
-## 1.20.1 — non publiée
+## 1.21.0 — non publiée
+
+**Un dock, toujours visible en bas de l'écran.** Vos applications y sont à
+portée de clic, sans ouvrir la vue d'ensemble — comme la barre des tâches de
+Windows. Sous chaque application ouverte, une pastille par fenêtre, à la
+couleur de son Espace : Firefox ouvert dans la Banque et dans la Navigation
+porte une pastille verte et une orange ; celle de la fenêtre active est plus
+grande. Un clic sur une application ouverte dans plusieurs Espaces montre ses
+fenêtres, pour choisir la bonne. Le dock vient de Debian (Dash to Dock) ; on
+le règle, ou on le retire, dans l'application Extensions. Si vous avez déjà
+choisi vous-même vos extensions, activez-le là : Codebyr ne change pas un
+choix que vous avez fait.
 
 **Le service qui prépare les Espaces est désormais éprouvé par ce qu'il
 fait**, et plus seulement par la lecture de son code : un banc d'essai le

@@ -96,16 +96,17 @@ def espace_home(esp):
 
 
 def build_command(esp, home, app_cmd):
-    """Construit la ligne de commande, avec marqueur de fenêtre par Espace."""
-    wm_class = "codebyr-" + esp["id"]
-    prog = os.path.basename(app_cmd[0])
+    """La ligne de commande de l'application, telle quelle.
 
-    # Firefox : classe de fenêtre par Espace (colore la fenêtre).
-    # Pas de --profile : le dossier personnel isolé de l'Espace (HOME) suffit à
-    # séparer le profil, et un chemin --profile serait invalide dans le bac à
-    # sable bubblewrap (d'où l'erreur « Profile missing »).
-    if "firefox" in prog:
-        return app_cmd + ["--class", wm_class, "--name", wm_class]
+    Firefox ne reçoit ni « --class » ni « --name » : sa classe de fenêtre est
+    son identifiant pour GNOME, et une classe par Espace (« codebyr-banque »,
+    jusqu'à la 1.20.0) le sortait de l'icône Firefox du dock, sous une icône
+    générique. L'Espace d'une fenêtre se reconnaît par la filiation des
+    processus (voir l'extension), qu'une application ne choisit pas.
+    Pas de « --profile » non plus : le dossier personnel isolé de l'Espace
+    (HOME) suffit à séparer le profil, et un chemin --profile serait invalide
+    dans le bac à sable (« Profile missing »).
+    """
     return app_cmd
 
 
@@ -780,10 +781,14 @@ def _environnement(esp, app_cmd):
         "XDG_DATA_DIRS", "/usr/local/share:/usr/share")
     env["CODEBYR_ESPACE"] = esp["id"]
     env["CODEBYR_ESPACE_COULEUR"] = esp["couleur"]
-    # Sous Wayland, c'est MOZ_APP_REMOTINGNAME qui fixe l'app_id de Firefox
-    # (donc la « classe » que lit l'extension pour colorer la fenêtre).
+    # Firefox garde son identifiant ordinaire (firefox-esr) : ses fenêtres se
+    # rangent sous l'icône Firefox du dock, une pastille par Espace. Il en
+    # recevait un par Espace (« codebyr-banque ») jusqu'à la 1.20.0, quand
+    # l'extension reconnaissait un Espace à cet identifiant — elle le reconnaît
+    # désormais par la filiation des processus, qu'une application ne choisit
+    # pas. L'isolation n'en dépend pas : chaque Espace a son propre bus de
+    # session, où Firefox cherche ses autres fenêtres.
     if "firefox" in os.path.basename(app_cmd[0]):
-        env["MOZ_APP_REMOTINGNAME"] = "codebyr-" + esp["id"]
         # Force Firefox à utiliser NOTRE profil (profiles.ini Default=1) au lieu
         # d'en créer un « dédié par installation » — sinon les réglages proxy du
         # filtre réseau ne s'appliquent pas.

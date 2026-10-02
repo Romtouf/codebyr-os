@@ -225,7 +225,10 @@ TAILLE="$(du -sk "$STAGE" | cut -f1)"
 #   · libgdk-pixbuf2.0-bin — gdk-pixbuf-thumbnailer, qui fabrique les vignettes
 #     des images (PNG, JPEG, SVG, WebP…) dans Fichiers. Nautilus ne fait que le
 #     recommander : aucune image n'avait d'aperçu, nulle part dans Codebyr.
-#     Constaté le 29/09/2026.
+#     Constaté le 29/09/2026 ;
+#   · gnome-shell-extension-dashtodock — le dock toujours visible, où
+#     l'extension Codebyr pose une pastille par fenêtre à la couleur de son
+#     Espace (1.21.0). Réglé par 90_codebyr.gschema.override.
 mkdir -p "$STAGE/DEBIAN"
 cat > "$STAGE/DEBIAN/control" <<EOF
 Package: codebyr-tools
@@ -233,7 +236,7 @@ Version: $VERSION
 Architecture: all
 Maintainer: Codebyr OS <romain.formationoc@gmail.com>
 Installed-Size: $TAILLE
-Depends: python3 (>= 3.12), libseccomp2, python3-gi, gir1.2-gtk-4.0, gir1.2-adw-1, bubblewrap, dbus-user-session, firefox-esr | firefox, python3-nautilus, acl, libnotify-bin, systemd-cryptsetup, libgdk-pixbuf2.0-bin
+Depends: python3 (>= 3.12), libseccomp2, python3-gi, gir1.2-gtk-4.0, gir1.2-adw-1, bubblewrap, dbus-user-session, firefox-esr | firefox, python3-nautilus, acl, libnotify-bin, systemd-cryptsetup, libgdk-pixbuf2.0-bin, gnome-shell-extension-dashtodock
 Recommends: flatpak, gnome-shell
 Section: admin
 Priority: optional

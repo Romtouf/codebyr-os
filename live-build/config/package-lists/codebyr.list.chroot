@@ -36,6 +36,11 @@ systemd-cryptsetup
 # Dépendance du paquet codebyr-tools depuis la 1.16.5.
 libgdk-pixbuf2.0-bin
 
+# Le dock toujours visible en bas de l'écran, où l'extension Codebyr pose une
+# pastille par fenêtre à la couleur de son Espace. Dépendance du paquet
+# codebyr-tools depuis la 1.21.0 ; réglé par 90_codebyr.gschema.override.
+gnome-shell-extension-dashtodock
+
 # Bus de session PRIVÉ par Espace (dbus-run-session). Load-bearing pour la
 # sécurité : le bus de session de l'hôte n'est plus exposé au bac à sable, ce
 # bus privé est donc le seul que voit l'application. Listé explicitement car

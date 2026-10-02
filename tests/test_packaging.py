@@ -628,7 +628,7 @@ class LIsoEstReproductible(unittest.TestCase):
 
 
 class LeDepotNeFournitQueCodebyrTools(unittest.TestCase):
-    """1.20.1 : épinglage APT (analyse externe du 01/10/2026, point 3.3).
+    """1.21.0 : épinglage APT (analyse externe du 01/10/2026, point 3.3).
 
     Vérifié le 02/10/2026 avec un apt à part, contre le vrai dépôt : sans la
     règle, tout ce qu'il publie est à 500 ; avec, la source tombe à -1 et

@@ -38,14 +38,14 @@
 # Ensuite : envoyer le dépôt vers le conteneur qui sert apt.codebyr.dev (la
 # commande exacte est affichée à la fin).
 #
-# ── DEUX CANAUX, DEPUIS LA 1.20.1 ────────────────────────────────────────────
+# ── DEUX CANAUX, DEPUIS LA 1.21.0 ────────────────────────────────────────────
 # Le parc suit le canal STABLE (apt.codebyr.dev) : une version par semaine au
 # plus, sauf correctif de sécurité — chaque publication s'installe en root, sans
 # personne devant l'écran, sur toutes les machines. Les testeurs ajoutent le
 # canal d'ESSAI (apt.codebyr.dev/essai) : les mêmes versions stables, plus le
 # dernier paquet d'essai, construit depuis un commit poussé et validé par la CI
-# comme le reste. Une version d'essai « 1.20.1~essai2 » est plus ancienne que
-# « 1.20.1 » pour apt : à la publication stable, les testeurs la reçoivent
+# comme le reste. Une version d'essai « 1.21.0~essai2 » est plus ancienne que
+# « 1.21.0 » pour apt : à la publication stable, les testeurs la reçoivent
 # comme tout le monde. Analyse externe du 01/10/2026, point 3.2.
 set -euo pipefail
 

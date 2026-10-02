@@ -4,7 +4,7 @@
 Analyse externe du 01/10/2026, point 2.3 : environ un tiers des lignes du code
 Python étaient des commentaires, dont des dizaines de récits datés
 (« Constaté le 14/09/2026 : … »). Un récit vieillit, et noie la règle qu'il
-justifie. Depuis la 1.20.1, ce qui est installé sur une machine ne porte plus
+justifie. Depuis la 1.21.0, ce qui est installé sur une machine ne porte plus
 de date : l'histoire est dans docs/decisions.md, les failles dans SECURITY.md.
 """
 import os

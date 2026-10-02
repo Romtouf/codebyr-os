@@ -9,24 +9,9 @@ echo "P: Codebyr — durcissement du système"
 systemctl enable apparmor.service || true
 
 # — Pare-feu nftables : entrée fermée par défaut —
-cat > /etc/nftables.conf <<'EOF'
-#!/usr/sbin/nft -f
-flush ruleset
-table inet filter {
-	chain input {
-		type filter hook input priority 0; policy drop;
-		ct state established,related accept
-		iif "lo" accept
-		ct state invalid drop
-		ip protocol icmp accept
-		ip6 nexthdr ipv6-icmp accept
-		# Phase 2 : les Espaces déclareront ici leurs autorisations réseau.
-	}
-	chain forward { type filter hook forward priority 0; policy drop; }
-	chain output  { type filter hook output priority 0; policy accept; }
-}
-EOF
-chmod 755 /etc/nftables.conf
+# Les règles sont livrées par codebyr-tools (voir le fichier lui-même) : écrites
+# ici jusqu'à la 1.20.0, elles n'atteignaient jamais une machine installée.
+install -m 0755 /usr/share/codebyr/nftables.conf /etc/nftables.conf
 systemctl enable nftables.service || true
 
 # — Mises à jour de sécurité automatiques —

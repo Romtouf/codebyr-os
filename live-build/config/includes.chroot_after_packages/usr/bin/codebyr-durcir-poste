@@ -341,4 +341,30 @@ if [ -f "$RESILIENT" ] \
 		&& echo "codebyr : réglage APT de construction retiré (délais d'apt ordinaires)."
 fi
 
+# ── 5) Le pare-feu ───────────────────────────────────────────────────────────
+# Les règles sont livrées par ce paquet (/usr/share/codebyr/nftables.conf).
+# Jusqu'à la 1.20.0, l'image les écrivait elle-même : une correction n'arrivait
+# jamais aux machines installées. On ne remplace /etc/nftables.conf que s'il
+# est l'une des versions que Codebyr a livrées, à l'octet près — un pare-feu
+# réglé par l'administrateur reste le sien. Écrit à côté puis déplacé : jamais
+# un instant sans pare-feu sur le disque. Chargé aussitôt si le service tourne.
+PAREFEU=/etc/nftables.conf
+PAREFEU_CODEBYR=/usr/share/codebyr/nftables.conf
+if [ -f "$PAREFEU_CODEBYR" ] && [ -f "$PAREFEU" ] && ! cmp -s "$PAREFEU" "$PAREFEU_CODEBYR"; then
+	case "$(sha256sum < "$PAREFEU" | cut -d' ' -f1)" in
+	# Images 1.0 à 1.20.0 : entrée fermée, mDNS et DHCPv6 compris.
+	940ec40eab267d032896959f2bd3af7b0dc80177193803e04111200dc1ea98b9)
+		cp "$PAREFEU_CODEBYR" "$PAREFEU.codebyr-neuf"
+		chmod 755 "$PAREFEU.codebyr-neuf"
+		mv -f "$PAREFEU.codebyr-neuf" "$PAREFEU"
+		echo "codebyr : pare-feu mis à jour (découverte des imprimantes, DHCPv6)."
+		if [ -d /run/systemd/system ] && [ -x /usr/sbin/nft ] \
+				&& systemctl is-active --quiet nftables.service 2>/dev/null; then
+			/usr/sbin/nft -f "$PAREFEU" \
+				|| echo "codebyr : nouveau pare-feu non chargé — il le sera au redémarrage." >&2
+		fi
+		;;
+	esac
+fi
+
 exit 0

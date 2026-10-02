@@ -21,6 +21,13 @@ dossier d'exécution de l'utilisateur ne serait pas un disque en mémoire à
 part (ce que fait logind, donc pas le cas des machines Codebyr), la fermeture
 d'un Espace laissait derrière elle l'accès de l'Espace à l'affichage.
 
+**Les imprimantes du réseau se découvrent de nouveau**, et le DHCPv6 des
+réseaux IPv6 gérés fonctionne : le pare-feu jetait leurs réponses, qui
+arrivent d'une autre adresse que celle interrogée. Deux ouvertures étroites,
+au réseau local seulement ; tout le reste demeure fermé. Le pare-feu est
+désormais livré par la mise à jour : jusqu'ici, seule l'installation l'écrivait.
+Un pare-feu que vous avez modifié n'est pas remplacé.
+
 ---
 
 ## 1.20.0 — 2 octobre 2026

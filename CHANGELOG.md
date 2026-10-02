@@ -28,6 +28,13 @@ GNOME (menu du Sceau, liserés colorés) ne se recharge pas à chaud.
   visées par les attaques — pare-feu, paquets bruts, protocoles rares — ne
   sont plus joignables depuis un Espace blindé.
 
+**Le bouclier anti-hameçonnage ne peut plus être neutralisé par la page
+qu'il dénonce** (version 1.5, signée par Mozilla). L'alerte n'est plus posée
+sur le site piégé : elle le remplace, dans une page du bouclier que le site
+ne peut ni voir, ni retirer, ni cliquer à votre place. Le bouton Précédent
+ne ramène pas au site piégé, et « Ce site est légitime » ne répond qu'à un
+vrai clic.
+
 Rien ne change à l'usage : les vignettes de Fichiers, le bac à sable propre
 de Firefox et les applications ajoutées fonctionnent comme avant.
 

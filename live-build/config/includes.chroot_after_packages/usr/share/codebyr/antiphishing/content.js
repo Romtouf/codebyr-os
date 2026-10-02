@@ -14,6 +14,9 @@
  *   1. on ne déclenche que sur des signaux précis (ci-dessous), jamais sur une
  *      simple sous-chaîne présente n'importe où dans le nom d'hôte ;
  *   2. l'utilisateur peut lever l'alerte pour un site donné, définitivement.
+ *
+ * Ce fichier DÉTECTE ; il ne dessine plus l'alerte que par secours. Le dessin
+ * est dans rendu.js (chargé avant lui), la page d'alerte dans alerte.html.
  */
 (async function () {
     "use strict";
@@ -212,93 +215,57 @@
     if (!banque)
         return;
 
-    async function approuver() {
-        try {
-            const vus = await api.storage.local.get("approuves");
-            const liste = (vus && Array.isArray(vus.approuves)) ? vus.approuves : [];
-            if (liste.indexOf(host) === -1)
-                liste.push(host);
-            await api.storage.local.set({approuves: liste});
-        } catch (e) { /* rien à faire : au pire l'alerte reviendra */ }
-    }
+    // ── L'ALERTE, DEPUIS LA 1.5 ─────────────────────────────────────────────
+    // Jusqu'à la 1.4, l'alerte était un élément posé DANS la page piégée : un
+    // script de cette page pouvait la retirer, la masquer, ou cliquer « Ce
+    // site est légitime » à la place de l'utilisateur (analyse externe du
+    // 01/10/2026). Le cas normal est désormais une page de l'EXTENSION, qui
+    // remplace l'onglet (background.js) : la page piégée ne peut ni la voir,
+    // ni la toucher, ni y cliquer, et seule cette page approuve un site.
+    try {
+        const reponse = await api.runtime.sendMessage(
+            {codebyr: "imposteur", hote: host, lu: hoteLu, banque: banque});
+        if (reponse && reponse.ok)
+            return;
+    } catch (e) { /* arrière-plan injoignable : secours ci-dessous */ }
 
-    // Les textes de l'alerte dans la langue de Firefox (_locales/<langue>/
-    // messages.json, produits depuis les traductions de Codebyr). Une langue
-    // sans traduction reçoit l'anglais (default_locale), comme le reste de
-    // Codebyr. Les valeurs (le site, la banque) sont des « substitutions » :
-    // Firefox les insère telles quelles, et bloc() n'emploie que textContent.
+    // Secours, si la page d'alerte n'a pas pu s'ouvrir : l'alerte dans la
+    // page, mais enfermée (racine d'ombre fermée : aucun script de la page
+    // n'atteint ses boutons), remise en place si la page la retire, et
+    // sourde aux clics simulés (codebyrCarteAlerte).
+    //
+    // Les textes viennent de _locales/<langue>/messages.json, dans la langue
+    // de Firefox, l'anglais à défaut, comme le reste de Codebyr.
     function texte(cle, valeurs) {
         return (api.i18n && api.i18n.getMessage(cle, valeurs || [])) || cle;
     }
 
-    function bloc(contenu, style) {
-        const el = document.createElement("div");
-        el.setAttribute("style", style);
-        el.textContent = contenu;    // jamais innerHTML avec une donnée du site
-        return el;
-    }
+    const STYLE_HOTE = "all:initial !important;position:fixed !important;inset:0 !important;" +
+                       "z-index:2147483647 !important;display:block !important;";
+    let leve = false;
+    const enveloppe = document.createElement("div");
+    const ombre = enveloppe.attachShadow({mode: "closed"});
+    const fond = document.createElement("div");
+    fond.setAttribute("style", "position:fixed;inset:0;" + codebyrFondAlerte());
+    fond.appendChild(codebyrCarteAlerte(document, texte, {hote: host, lu: hoteLu, banque: banque}, {
+        quitter: function () { location.href = "about:blank"; },
+        legitime: async function () {
+            leve = true;
+            await codebyrApprouver(api, host);
+            enveloppe.remove();
+        },
+    }));
+    ombre.appendChild(fond);
 
-    function afficher() {
-        if (document.getElementById("codebyr-antiphishing"))
+    function poser() {
+        if (leve)
             return;
-        const o = document.createElement("div");
-        o.id = "codebyr-antiphishing";
-        o.setAttribute("style",
-            "position:fixed;inset:0;z-index:2147483647;background:#7f1d1d;color:#fff;" +
-            "display:flex;align-items:center;justify-content:center;padding:24px;" +
-            "font-family:system-ui,sans-serif;");
-
-        const carte = document.createElement("div");
-        carte.setAttribute("style", "max-width:560px;text-align:center;");
-        carte.appendChild(bloc("⚠️", "font-size:60px;line-height:1;"));
-        carte.appendChild(bloc(texte("titre"),
-            "font-size:26px;font-weight:700;margin:14px 0 8px;"));
-        carte.appendChild(bloc(texte("ressemble", [host, banque]),
-            "font-size:17px;line-height:1.6;"));
-        // L'adresse affichée par le navigateur peut être identique à l'œil
-        // à celle de la banque : on dit pourquoi elle ne l'est pas.
-        if (hoteLu !== host)
-            carte.appendChild(bloc(texte("deguise", [host]),
-                "font-size:17px;line-height:1.6;margin-top:12px;"));
-        carte.appendChild(bloc(texte("jamais"),
-            "font-size:17px;line-height:1.6;margin-top:12px;font-weight:700;"));
-
-        const boutons = document.createElement("div");
-        boutons.setAttribute("style",
-            "margin-top:18px;display:flex;gap:10px;justify-content:center;flex-wrap:wrap;");
-
-        const quitter = document.createElement("button");
-        quitter.textContent = texte("quitter");
-        quitter.setAttribute("style",
-            "padding:11px 22px;font-size:15px;border:0;border-radius:10px;" +
-            "background:#fff;color:#7f1d1d;font-weight:700;cursor:pointer;");
-        quitter.addEventListener("click", function () { location.href = "about:blank"; });
-        boutons.appendChild(quitter);
-
-        // Soupape indispensable : sans elle, un seul faux positif transforme le
-        // bouclier en gêne qu'on apprend à ignorer.
-        const continuer = document.createElement("button");
-        continuer.textContent = texte("legitime");
-        continuer.setAttribute("style",
-            "padding:11px 22px;font-size:15px;border:1px solid rgba(255,255,255,.5);" +
-            "border-radius:10px;background:transparent;color:#fff;cursor:pointer;");
-        continuer.addEventListener("click", async function () {
-            await approuver();
-            o.remove();
-        });
-        boutons.appendChild(continuer);
-
-        carte.appendChild(boutons);
-        carte.appendChild(bloc(texte("protection"),
-            "margin-top:18px;opacity:.75;font-size:13px;"));
-        o.appendChild(carte);
-        (document.body || document.documentElement).appendChild(o);
+        if (enveloppe.getAttribute("style") !== STYLE_HOTE)
+            enveloppe.setAttribute("style", STYLE_HOTE);
+        const racine = document.documentElement;
+        if (racine && enveloppe.parentNode !== racine)
+            racine.appendChild(enveloppe);
     }
-
-    if (document.body) afficher();
-    document.addEventListener("DOMContentLoaded", afficher);
-    const iv = setInterval(function () {
-        if (document.body) { afficher(); clearInterval(iv); }
-    }, 40);
-    setTimeout(function () { clearInterval(iv); }, 6000);
+    poser();
+    setInterval(poser, 200);
 })();

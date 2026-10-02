@@ -15,6 +15,7 @@ import re
 import shutil
 import subprocess
 import unittest
+import urllib.parse
 import zipfile
 
 from outils import RACINE
@@ -23,6 +24,8 @@ SRC = os.path.join(RACINE, "live-build", "config",
                    "includes.chroot_after_packages", "usr", "share",
                    "codebyr", "antiphishing")
 SIGNES = os.path.join(SRC, "signed")
+# Le code de l'extension, tel qu'il part à la signature (1.5).
+CODE = ("content.js", "rendu.js", "background.js", "alerte.html", "alerte.js")
 
 
 class Manifeste(unittest.TestCase):
@@ -42,7 +45,23 @@ class Manifeste(unittest.TestCase):
         self.assertEqual(navigateur.BOUCLIER_ID, "antiphishing@codebyr.io")
 
     def test_permissions_minimales(self):
+        # Remplacer l'onglet par la page d'alerte (tabs.update) ne demande
+        # aucune permission de plus : seule la lecture des adresses des
+        # onglets en demanderait une, et le bouclier ne lit que la sienne.
         self.assertEqual(self.manifeste["permissions"], ["storage"])
+
+    def test_la_page_d_alerte_n_est_pas_accessible_aux_sites(self):
+        # Sinon une page pourrait l'ouvrir elle-même, l'encadrer, et lui
+        # passer l'adresse à approuver.
+        self.assertNotIn("web_accessible_resources", self.manifeste)
+        self.assertEqual(self.manifeste["background"], {"scripts": ["background.js"]})
+
+    def test_le_dessin_est_charge_avant_la_detection(self):
+        self.assertEqual(self.manifeste["content_scripts"][0]["js"], ["rendu.js", "content.js"])
+        with open(os.path.join(SRC, "alerte.html"), encoding="utf-8") as f:
+            page = f.read()
+        self.assertLess(page.index('src="rendu.js"'), page.index('src="alerte.js"'))
+        self.assertNotIn("<script>", page)    # la politique des pages d'extension
 
 
 class CodeStatique(unittest.TestCase):
@@ -64,7 +83,11 @@ class CodeStatique(unittest.TestCase):
     def test_pas_d_innerhtml_avec_des_donnees_du_site(self):
         # On construit l'avertissement avec textContent : le nom d'hôte affiché
         # vient du site visité, il n'a rien à faire dans du HTML interprété.
-        self.assertEqual(re.findall(r"\.innerHTML\s*=", self.code), [])
+        for nom in CODE:
+            if nom.endswith(".js"):
+                with open(os.path.join(SRC, nom), encoding="utf-8") as f:
+                    self.assertEqual(re.findall(r"\.(?:inner|outer)HTML\s*=|insertAdjacentHTML",
+                                                f.read()), [], nom)
 
 
 HARNAIS = os.path.join(os.path.dirname(os.path.abspath(__file__)), "bouclier_harnais.cjs")
@@ -94,8 +117,13 @@ class Langues(unittest.TestCase):
     def setUp(self):
         with open(os.path.join(SRC, "manifest.json"), encoding="utf-8") as f:
             self.manifeste = json.load(f)
-        with open(os.path.join(SRC, "content.js"), encoding="utf-8") as f:
-            self.code = f.read()
+        # Depuis la 1.5, le dessin de l'alerte est dans rendu.js, partagé par
+        # la page d'alerte (alerte.js) et le secours (content.js).
+        self.code = ""
+        for nom in CODE:
+            if nom.endswith(".js"):
+                with open(os.path.join(SRC, nom), encoding="utf-8") as f:
+                    self.code += f.read()
 
     def test_l_anglais_est_la_langue_par_defaut(self):
         self.assertEqual(self.manifeste["default_locale"], "en")
@@ -233,6 +261,127 @@ class Detection(unittest.TestCase):
         self.assertEqual(r["ecarts"], [])
         # Un test qui n'a rien comparé ne prouve rien.
         self.assertGreater(r["comparees"], 300)
+
+
+@unittest.skipUnless(shutil.which("node"), "node absent : le bouclier ne peut pas être exécuté")
+class LAlerteHorsDeLaPage(unittest.TestCase):
+    """1.5 : l'alerte n'est plus un élément de la page piégée, mais une page de
+    l'extension qui la remplace. Analyse externe du 01/10/2026 : un script de
+    la page pouvait retirer l'alerte, ou cliquer « Ce site est légitime »."""
+
+    PIEGE = "https://mabanque.piege.com/connexion?x=1"
+    VALIDE = {"message": {"codebyr": "imposteur", "hote": "mabanque.piege.com",
+                          "lu": "mabanque.piege.com", "banque": "mabanque.fr"},
+              "sender": {"id": "antiphishing@codebyr.io", "tab": {"id": 7}, "frameId": 0,
+                         "url": PIEGE}}
+
+    def test_la_detection_ne_touche_plus_a_la_page(self):
+        r = _node({"mode": "adresses", "proteges": ["mabanque.fr"], "adresses": [self.PIEGE]})[0]
+        self.assertTrue(r["alerte"])
+        self.assertEqual(r["message"], self.VALIDE["message"])
+        self.assertEqual(r["dans_la_page"], 0)
+
+    def test_l_onglet_est_remplace_par_la_page_d_alerte(self):
+        r = _node({"mode": "fond", "cas": [self.VALIDE]})[0]
+        self.assertEqual(r["reponse"], {"ok": True})
+        self.assertEqual(len(r["mises_a_jour"]), 1)
+        maj = r["mises_a_jour"][0]
+        self.assertEqual(maj["id"], 7)
+        # Et la page piégée quitte l'historique : Précédent ne la rouvre pas.
+        self.assertTrue(maj["proprietes"]["loadReplace"])
+        adresse = maj["proprietes"]["url"]
+        self.assertTrue(adresse.startswith("moz-extension://uuid-du-profil/alerte.html?"), adresse)
+        parametres = dict(urllib.parse.parse_qsl(adresse.split("?", 1)[1]))
+        self.assertEqual(parametres, {"retour": self.PIEGE, "lu": "mabanque.piege.com",
+                                      "banque": "mabanque.fr"})
+
+    def test_seule_une_demande_venue_du_bouclier_compte(self):
+        def avec(**changements):
+            cas = json.loads(json.dumps(self.VALIDE))
+            for chemin, valeur in changements.items():
+                partie, cle = chemin.split("__")
+                cas[partie][cle] = valeur
+            return cas
+        refusees = [
+            avec(sender__id="autre@extension"),            # une autre extension
+            avec(sender__tab=None),                         # pas un onglet
+            avec(sender__frameId=3),                        # un cadre de la page
+            avec(message__hote="autre.fr"),                 # l'adresse ne colle pas
+            avec(sender__url="file:///etc/passwd"),         # ni http ni https
+            avec(message__codebyr="autre chose"),
+            avec(message__banque=""),
+            avec(message__lu="x" * 300),
+        ]
+        for r in _node({"mode": "fond", "cas": refusees}):
+            self.assertIsNone(r["reponse"])
+            self.assertEqual(r["mises_a_jour"], [])
+
+
+@unittest.skipUnless(shutil.which("node"), "node absent : le bouclier ne peut pas être exécuté")
+class LaPageDAlerte(unittest.TestCase):
+    """alerte.js : seule à pouvoir déclarer un site légitime, sur un vrai clic."""
+
+    RECHERCHE = "?" + urllib.parse.urlencode({"retour": "https://xn--mbanque-2fg.fr/compte",
+                                              "lu": "mаbanque.fr", "banque": "mabanque.fr"})
+
+    def _page(self, **demande):
+        demande.setdefault("recherche", self.RECHERCHE)
+        return _node(dict({"mode": "page"}, **demande))
+
+    def test_elle_dit_ce_qu_est_l_adresse(self):
+        p = self._page(langue="fr")
+        self.assertEqual(p["titre"], "Attention — site suspect")
+        self.assertEqual(p["langue"], "fr")
+        self.assertIn("Ce site (xn--mbanque-2fg.fr) ressemble au site de votre banque "
+                      "(mabanque.fr) mais ce n'en est pas le site officiel.", p["textes"])
+        self.assertTrue(any("s'écrit « xn--" in t for t in p["textes"]), p["textes"])
+
+    def test_un_clic_simule_n_approuve_rien(self):
+        p = self._page(clic="legitime", vrai=False)
+        self.assertEqual(p["approuves"], [])
+        self.assertIsNone(p["navigation"])
+
+    def test_un_vrai_clic_approuve_le_site_et_y_retourne(self):
+        p = self._page(clic="legitime", vrai=True)
+        self.assertEqual(p["approuves"], ["xn--mbanque-2fg.fr"])
+        self.assertEqual(p["navigation"], "https://xn--mbanque-2fg.fr/compte")
+
+    def test_quitter(self):
+        self.assertIsNone(self._page(clic="quitter", vrai=False)["navigation"])
+        self.assertEqual(self._page(clic="quitter", vrai=True)["navigation"], "about:blank")
+
+    def test_une_adresse_de_retour_douteuse_n_est_ni_approuvee_ni_suivie(self):
+        for retour in ("javascript:alert(1)", "file:///etc/passwd", "pas une adresse"):
+            recherche = "?" + urllib.parse.urlencode({"retour": retour, "lu": "x", "banque": "y"})
+            p = self._page(recherche=recherche, clic="legitime", vrai=True)
+            self.assertEqual(p["approuves"], [], retour)
+            self.assertIsNone(p["navigation"], retour)
+
+
+@unittest.skipUnless(shutil.which("node"), "node absent : le bouclier ne peut pas être exécuté")
+class LeSecours(unittest.TestCase):
+    """Si la page d'alerte ne peut pas s'ouvrir, l'alerte revient dans la page —
+    mais enfermée, remise en place, et sourde aux clics simulés."""
+
+    def setUp(self):
+        self.s = _node({"mode": "secours", "proteges": ["mabanque.fr"],
+                        "adresse": "https://mabanque.com/"})
+
+    def test_elle_est_posee_et_enfermee(self):
+        self.assertTrue(self.s["posee"])
+        self.assertEqual(self.s["ombre"], "closed")
+        self.assertIn("Attention — site suspect", self.s["textes"])
+        self.assertIn("!important", self.s["style"])
+
+    def test_retiree_ou_masquee_elle_revient(self):
+        self.assertTrue(self.s["remise"])
+
+    def test_un_clic_simule_n_approuve_rien(self):
+        self.assertEqual(self.s["apres_clic_simule"], {"approuves": [], "presente": True})
+
+    def test_un_vrai_clic_approuve_et_la_retire(self):
+        self.assertEqual(self.s["apres_vrai_clic"], {"approuves": ["mabanque.com"],
+                                                     "presente": False})
 
 
 class ProfilUtilise(unittest.TestCase):
@@ -424,12 +573,12 @@ class XpiSigne(unittest.TestCase):
     def test_le_code_du_xpi_signe_correspond_a_la_source(self):
         xpi = self._xpi()
         with zipfile.ZipFile(xpi) as z:
-            self.assertIn("content.js", z.namelist())
-            embarque = z.read("content.js").replace(b"\r\n", b"\n")
-        with open(os.path.join(SRC, "content.js"), "rb") as f:
-            source = f.read().replace(b"\r\n", b"\n")
-        self.assertEqual(embarque, source,
-                         "content.js diffère du .xpi signé." + self.RAPPEL)
+            for nom in CODE:
+                self.assertIn(nom, z.namelist(), nom + " absent du .xpi signé." + self.RAPPEL)
+                embarque = z.read(nom).replace(b"\r\n", b"\n")
+                with open(os.path.join(SRC, nom), "rb") as f:
+                    source = f.read().replace(b"\r\n", b"\n")
+                self.assertEqual(embarque, source, nom + " diffère du .xpi signé." + self.RAPPEL)
 
     def test_la_version_du_xpi_signe_correspond_au_manifeste(self):
         # AMO ré-encode le JSON (échappements \\uXXXX) : on compare le SENS,
@@ -439,7 +588,8 @@ class XpiSigne(unittest.TestCase):
             embarque = json.loads(z.read("manifest.json").decode("utf-8"))
         with open(os.path.join(SRC, "manifest.json"), encoding="utf-8") as f:
             source = json.load(f)
-        for cle in ("manifest_version", "content_scripts", "host_permissions", "browser_specific_settings"):
+        for cle in ("manifest_version", "content_scripts", "host_permissions",
+                    "browser_specific_settings", "background", "web_accessible_resources"):
             self.assertEqual(embarque.get(cle), source.get(cle),
                              "Manifeste signé différent : " + cle + self.RAPPEL)
         self.assertEqual(embarque.get("version"), source.get("version"),

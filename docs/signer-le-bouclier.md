@@ -9,13 +9,13 @@ en désactivant la vérification des signatures d'extensions pour y installer un
 protection. Ce contournement a été **supprimé** : aujourd'hui, sans `.xpi` signé,
 `codebyr-space` n'installe rien et le dit.
 
-Conséquence à retenir : **un `.xpi` signé est scellé.** Modifier `content.js`
-dans le dépôt ne change strictement rien sur les machines tant que l'extension
+Conséquence à retenir : **un `.xpi` signé est scellé.** Modifier son code
+(`content.js`, `rendu.js`, `background.js`, `alerte.html`, `alerte.js`) dans le dépôt ne change strictement rien sur les machines tant que l'extension
 n'a pas été re-signée. C'est contre-intuitif, et c'est la raison d'être du test
 `tests/test_bouclier.py::XpiSigne` : il compare le code du dépôt à celui du
 `.xpi` livré et passe au rouge dès qu'ils divergent.
 
-**À faire donc à chaque modification de `content.js`, de `manifest.json` ou
+**À faire donc à chaque modification de ce code, de `manifest.json` ou
 des textes de l'alerte (`_locales/`).**
 
 ## Les langues de l'alerte (depuis la 1.4)
@@ -58,14 +58,14 @@ sh live-build/scripts/sign-extension.sh
 ```
 
 Le script fait tout : il vérifie que le numéro de version n'a pas déjà été
-signé (Mozilla refuse un doublon), n'envoie que `manifest.json`, `content.js`
+signé (Mozilla refuse un doublon), n'envoie que `manifest.json`, le code
 et `_locales/` — surtout pas le sous-dossier `signed/`, qui embarquerait
 l'ancien `.xpi` dans le nouveau —, récupère le paquet signé, l'installe dans
 `…/antiphishing/signed/` en remplaçant le précédent, puis vérifie que le code,
 le manifeste et les textes du `.xpi` sont bien ceux du dépôt.
 
 Avant de signer, un contrôle sans compte ni envoi :
-`web-ext lint --source-dir <copie de manifest.json, content.js et _locales>`.
+`web-ext lint --source-dir <copie de manifest.json, du code et de _locales>`.
 Une version signée ne se resoumet pas : mieux vaut qu'elle soit juste du
 premier coup.
 

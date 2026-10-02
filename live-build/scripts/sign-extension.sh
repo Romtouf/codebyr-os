@@ -93,12 +93,18 @@ done
 # .xpi, ~200 Ko) à l'intérieur du nouveau paquet.
 STAGE="$(mktemp -d)"
 trap 'rm -rf "$STAGE"' EXIT
-cp "$SRC/manifest.json" "$SRC/content.js" "$STAGE/"
+# Le code (depuis la 1.5) : la détection, le dessin partagé, l'arrière-plan et
+# la page d'alerte. La même liste sert à la vérification, plus bas.
+CODE="content.js rendu.js background.js alerte.html alerte.js"
+cp "$SRC/manifest.json" "$STAGE/"
+for fichier in $CODE; do
+	cp "$SRC/$fichier" "$STAGE/"
+done
 # Les textes de l'alerte, par langue (depuis la 1.4) : le manifeste les
 # désigne (« __MSG_… », default_locale), Firefox refuserait l'extension sans.
 cp -r "$SRC/_locales" "$STAGE/"
 [ -f "$SRC/.amo-upload-uuid" ] && cp "$SRC/.amo-upload-uuid" "$STAGE/"
-echo "    Contenu envoyé : manifest.json, content.js, _locales ($(ls "$SRC/_locales" | tr '\n' ' '))"
+echo "    Contenu envoyé : manifest.json, $CODE, _locales ($(ls "$SRC/_locales" | tr '\n' ' '))"
 
 # ── 5) Signature (canal « unlisted » : distribution privée, pas de revue) ───
 mkdir -p "$OUT"
@@ -147,17 +153,20 @@ if [ -z "$PY" ]; then
 	echo "    (Python introuvable : vérification automatique du .xpi ignorée.)"
 fi
 if [ -n "$PY" ]; then
-	"$PY" - "$SIGNES/$(basename "$nouveau")" "$SRC/content.js" "$SRC/manifest.json" "$SRC/_locales" <<'VERIF'
+	# shellcheck disable=SC2086  # découpage voulu : un argument par fichier
+	"$PY" - "$SIGNES/$(basename "$nouveau")" "$SRC" "$SRC/manifest.json" "$SRC/_locales" $CODE <<'VERIF'
 import json, os, sys, zipfile
-xpi, source, manifeste, locales = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4]
+xpi, dossier, manifeste, locales = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4]
+code = sys.argv[5:]
 with zipfile.ZipFile(xpi) as z:
-    embarque = z.read("content.js").replace(b"\r\n", b"\n")
     scelle = json.loads(z.read("manifest.json").decode("utf-8"))
-with open(source, "rb") as f:
-    attendu = f.read().replace(b"\r\n", b"\n")
-if embarque != attendu:
-    sys.exit("ECHEC : le .xpi signe ne correspond pas a content.js du depot.")
-print("    content.js du .xpi = content.js du depot : OK")
+    for nom in code:
+        embarque = z.read(nom).replace(b"\r\n", b"\n")
+        with open(os.path.join(dossier, nom), "rb") as f:
+            attendu = f.read().replace(b"\r\n", b"\n")
+        if embarque != attendu:
+            sys.exit("ECHEC : le .xpi signe ne correspond pas a %s du depot." % nom)
+print("    code du .xpi = code du depot (%s) : OK" % ", ".join(code))
 
 # Le manifeste aussi. Il porte la version de l'API (MV2/MV3), l'identifiant et
 # le plancher de version Firefox : un .xpi scelle sur un ancien manifeste
@@ -166,7 +175,8 @@ print("    content.js du .xpi = content.js du depot : OK")
 with open(manifeste, "rb") as f:
     voulu = json.loads(f.read().decode("utf-8"))
 ecarts = [c for c in ("manifest_version", "version", "permissions",
-                      "host_permissions", "content_scripts", "default_locale")
+                      "host_permissions", "content_scripts", "default_locale",
+                      "background", "web_accessible_resources")
           if scelle.get(c) != voulu.get(c)]
 if ecarts:
     sys.exit("ECHEC : le manifeste du .xpi differe du depot sur : "

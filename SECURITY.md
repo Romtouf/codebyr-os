@@ -57,10 +57,11 @@ Restent, hors du code : un **audit professionnel**, un **second relecteur**
 pour le code exécuté en root, des **testeurs** sur leur propre matériel. Deux
 points décidés le 2 octobre 2026 :
 
-- **la sous-clé de signature ira sur un jeton matériel** (YubiKey 5 ou
-  Nitrokey 3) : un logiciel malveillant sur le poste du mainteneur ne pourra
-  plus la copier. En attendant le jeton, elle reste dans le WSL du poste,
-  protégée par une phrase de passe, la clé maîtresse hors ligne ;
+- **la sous-clé de signature sur un jeton matériel** (YubiKey 5 ou
+  Nitrokey 3, environ 55 €), pour qu'un logiciel malveillant sur le poste du
+  mainteneur ne puisse plus la copier : **reporté, à reprendre prochainement**.
+  En attendant, elle reste dans le WSL du poste, protégée par une phrase de
+  passe, la clé maîtresse hors ligne, et expire en août 2027 ;
 - **le dépôt APT reste hébergé à domicile**, sur un serveur allumé en
   permanence. Une coupure (comme le 28/09/2026) n'empêche aucune machine de
   fonctionner : elles ne reçoivent simplement pas de mise à jour le temps

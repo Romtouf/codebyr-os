@@ -53,7 +53,8 @@ def verifier_arbre(stage, racine):
     attendus += [source / "etc/codebyr/espaces.json",
                  source / "usr/share/applications/io.codebyr.Ouvrir.desktop",
                  source / "usr/share/glib-2.0/schemas/90_codebyr.gschema.override",
-                 source / "usr/lib/firefox-esr/distribution/policies.json"]
+                 source / "usr/lib/firefox-esr/distribution/policies.json",
+                 source / "etc/apt/preferences.d/codebyr.pref"]
     attendus += [source / "usr/bin" / n for n in (
         "codebyr-space", "codebyr-net-proxy", "codebyr-jetable", "codebyr-config",
         "codebyr-assistant", "codebyr-bienvenue", "codebyr-verifier", "codebyr-durcir-poste")]

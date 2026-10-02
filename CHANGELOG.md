@@ -28,6 +28,11 @@ au réseau local seulement ; tout le reste demeure fermé. Le pare-feu est
 désormais livré par la mise à jour : jusqu'ici, seule l'installation l'écrivait.
 Un pare-feu que vous avez modifié n'est pas remplacé.
 
+**Le dépôt de Codebyr ne peut plus fournir que les outils Codebyr.** Tout le
+reste du système vient de Debian ; une règle d'apt l'impose désormais : un
+paquet du même nom qu'un paquet Debian, publié par erreur sur le dépôt de
+Codebyr, ne serait jamais installé.
+
 ---
 
 ## 1.20.0 — 2 octobre 2026

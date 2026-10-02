@@ -56,6 +56,7 @@ for chemin in \
 	etc/default/grub.d/90-codebyr-noyau.cfg \
 	etc/default/grub.d/91-codebyr-demarrage.cfg \
 	etc/grub.d/35_codebyr_menu \
+	etc/apt/preferences.d/codebyr.pref \
 	etc/apparmor.d/codebyr-net-proxy \
 	etc/apparmor.d/codebyr-uid
 do
@@ -176,6 +177,10 @@ find "$STAGE/etc/skel" -type d -exec chmod 755 {} + 2>/dev/null || true
 # Options du noyau : un « \r » collé à la dernière la rendrait invalide, et le
 # noyau l'ignorerait sans rien dire.
 [ -d "$STAGE/etc/default/grub.d" ] && sed -i 's/\r$//' "$STAGE"/etc/default/grub.d/*.cfg
+# L'épinglage APT (le dépôt Codebyr ne fournit que codebyr-tools) : un « \r »
+# ferait lire « apt.codebyr.dev\r », qui ne désigne aucun serveur — et la règle
+# ne protégerait plus rien.
+[ -d "$STAGE/etc/apt/preferences.d" ] && sed -i 's/\r$//' "$STAGE"/etc/apt/preferences.d/*.pref
 # Scripts de GRUB : update-grub les exécute à chaque nouveau noyau. Sans le
 # bit d'exécution, grub-mkconfig les saute en silence ; avec un « \r », il
 # échoue, et le noyau ne s'installe pas.

@@ -627,6 +627,51 @@ class LIsoEstReproductible(unittest.TestCase):
                 self.assertNotIn(commande, code, "%s : %s" % (os.path.basename(hook), commande))
 
 
+class LeDepotNeFournitQueCodebyrTools(unittest.TestCase):
+    """1.20.1 : épinglage APT (analyse externe du 01/10/2026, point 3.3).
+
+    Vérifié le 02/10/2026 avec un apt à part, contre le vrai dépôt : sans la
+    règle, tout ce qu'il publie est à 500 ; avec, la source tombe à -1 et
+    seul codebyr-tools reste à 500, toujours candidat.
+    """
+
+    PREF = os.path.join(RACINE, "live-build", "config", "includes.chroot_after_packages",
+                        "etc", "apt", "preferences.d", "codebyr.pref")
+
+    def _strophes(self):
+        with open(self.PREF, encoding="utf-8") as f:
+            lignes = [l for l in f.read().splitlines() if not l.startswith("#")]
+        strophes, courante = [], {}
+        for ligne in lignes + [""]:
+            if not ligne.strip():
+                if courante:
+                    strophes.append(courante)
+                courante = {}
+                continue
+            cle, valeur = ligne.split(":", 1)
+            courante[cle] = valeur.strip()
+        return strophes
+
+    def test_rien_d_autre_que_codebyr_tools(self):
+        self.assertEqual(self._strophes(), [
+            {"Package": "*", "Pin": 'origin "apt.codebyr.dev"', "Pin-Priority": "-1"},
+            {"Package": "codebyr-tools", "Pin": 'origin "apt.codebyr.dev"', "Pin-Priority": "500"},
+        ])
+
+    def test_le_serveur_est_celui_de_la_source(self):
+        with open(os.path.join(RACINE, "live-build", "config", "hooks", "normal",
+                               "1000-canal-maj.hook.chroot"), encoding="utf-8") as f:
+            self.assertIn("URIs: https://apt.codebyr.dev\n", f.read())
+
+    def test_un_nom_qu_apt_lit(self):
+        # apt ignore en silence un fichier de preferences.d dont le nom porte
+        # une autre extension que « .pref » (ou un caractère hors [A-Za-z0-9_.-]).
+        self.assertRegex(os.path.basename(self.PREF), r"^[A-Za-z0-9_.-]+\.pref$")
+
+    def test_livre_par_le_paquet(self):
+        self.assertIn("etc/apt/preferences.d/codebyr.pref", chemins_du_paquet())
+
+
 class LeNoyauDurciAuDemarrage(unittest.TestCase):
     """1.16.8 : options de durcissement du noyau (audit, point 11).
 

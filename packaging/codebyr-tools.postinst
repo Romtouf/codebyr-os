@@ -23,6 +23,12 @@ case "$1" in
 			ln -s ../usr/lib/os-release /etc/os-release.codebyr-neuf
 			mv -f /etc/os-release.codebyr-neuf /etc/os-release
 		fi
+		# Le nom de code de Debian, aussi dans /etc/lsb-release, que l'image
+		# écrivait avec celui de Codebyr : certains scripts le lisent pour
+		# choisir leurs paquets (voir os-release dans packaging/build-deb.sh).
+		if grep -q '^DISTRIB_CODENAME=codebyr$' /etc/lsb-release 2>/dev/null; then
+			sed -i 's/^DISTRIB_CODENAME=codebyr$/DISTRIB_CODENAME=trixie/' /etc/lsb-release
+		fi
 		# L'extension GNOME est déjà activable par l'utilisateur ; on ne force
 		# rien ici (pas de session graphique garantie pendant apt). Un
 		# rechargement de l'extension nécessite une reconnexion — signalé au

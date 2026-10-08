@@ -205,6 +205,40 @@ class Paquet(unittest.TestCase):
                          "origines autorisées : plus aucune dépendance "
                          "nouvelle ne pourrait s'installer seule")
 
+    def test_le_nom_de_code_designe_l_archive_debian(self):
+        """Les origines Debian permises s'écrivent « codename=${distro_codename} »,
+        et unattended-upgrades le lit par lsb_release -c, c'est-à-dire dans
+        os-release. Codebyr y mettait « codebyr » : aucune archive Debian ne
+        porte ce nom, et rien de Debian ne s'installait seul, mises à jour de
+        sécurité comprises. Le test précédent ne le voyait pas : il lisait la
+        liste, pas ce qu'elle désigne. Trouvé le 08/10/2026 en faisant tourner
+        unattended-upgrades sur la VM, de 1.20.0 vers 1.21.0 (le dock, paquet
+        Debian, restait « kept back »)."""
+        with open(os.path.join(RACINE, "live-build", "auto", "config"), encoding="utf-8") as f:
+            debian = re.search(r"--distribution (\w+)", f.read()).group(1)
+        with open(os.path.join(RACINE, "packaging", "build-deb.sh"), encoding="utf-8") as f:
+            construction = f.read()
+        os_release = construction.split('cat > "$STAGE/usr/lib/os-release" <<EOF', 1)[1]
+        os_release = os_release.split("\nEOF", 1)[0]
+        self.assertIn("\nVERSION_CODENAME=%s\n" % debian, os_release + "\n")
+        with open(os.path.join(RACINE, "live-build", "config", "hooks", "normal",
+                               "0500-debrand.hook.chroot"), encoding="utf-8") as f:
+            self.assertIn("\nDISTRIB_CODENAME=%s\n" % debian, f.read())
+        with open(os.path.join(RACINE, "packaging", "codebyr-tools.postinst"),
+                  encoding="utf-8") as f:
+            self.assertIn("DISTRIB_CODENAME=%s/" % debian, f.read(),
+                          "les machines déjà installées gardaient « codebyr »")
+
+    def test_aucune_dependance_debian_que_la_mise_a_jour_ne_sache_installer(self):
+        """Tant que des machines refusent encore Debian (jusqu'à la 1.20.0),
+        exiger un paquet Debian qu'elles n'ont pas les bloque pour toujours :
+        apt ne vise que la version la plus récente. Le dock ne sera exigé
+        qu'une fois le nom de code corrigé partout (1.21.1)."""
+        with open(os.path.join(RACINE, "packaging", "build-deb.sh"), encoding="utf-8") as f:
+            depends = re.search(r"^Depends: (.*)$", f.read(), re.M).group(1)
+        self.assertNotIn("gnome-shell-extension-dashtodock",
+                         [d.strip() for d in depends.split(",")])
+
     def test_la_cle_publique_voyage_avec_l_image(self):
         """Une procédure de vérification qu'on ne peut pas suivre ne vaut rien.
 

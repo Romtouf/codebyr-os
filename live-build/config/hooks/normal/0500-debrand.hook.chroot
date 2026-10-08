@@ -13,11 +13,13 @@ VER="1.0"
 # packaging/build-deb.sh et packaging/codebyr-tools.preinst. Le hook 1000
 # vérifie qu'elle est bien en place à la fin de la construction.
 
-# — lsb-release (lu par lsb_release, certains outils système) —
+# — lsb-release (lu par certains outils système) —
+# Le nom de code reste celui de Debian, comme dans os-release (voir
+# packaging/build-deb.sh) : c'est par lui qu'on choisit les paquets Debian.
 cat > /etc/lsb-release <<EOF
 DISTRIB_ID=Codebyr
 DISTRIB_RELEASE=$VER
-DISTRIB_CODENAME=codebyr
+DISTRIB_CODENAME=trixie
 DISTRIB_DESCRIPTION="Codebyr OS $VER"
 EOF
 

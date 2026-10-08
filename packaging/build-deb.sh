@@ -89,13 +89,19 @@ find "$STAGE" -type f \( -name 'codebyr-*' -o -name '*.py' -o -name '*.sh' \) \
 #
 #    Les adresses sont vérifiées par tests/test_coherence.py : un domaine
 #    « codebyr » qui ne serait pas codebyr.dev y échoue.
+#
+#    Le nom de code reste celui de Debian. La mise à jour automatique le lit
+#    (lsb_release -c) pour choisir les paquets Debian qu'elle accepte
+#    (« codename=${distro_codename} ») : avec « codebyr », elle n'en acceptait
+#    aucun, mises à jour de sécurité comprises. Les instructions des dépôts
+#    tiers le lisent aussi. Le nom de Codebyr est porté par NAME et ID.
 mkdir -p "$STAGE/usr/lib"
 cat > "$STAGE/usr/lib/os-release" <<EOF
 PRETTY_NAME="Codebyr OS $VERSION"
 NAME="Codebyr OS"
 VERSION_ID="$VERSION"
 VERSION="$VERSION"
-VERSION_CODENAME=codebyr
+VERSION_CODENAME=trixie
 ID=codebyr
 ID_LIKE=debian
 LOGO=codebyr-logo
@@ -226,9 +232,13 @@ TAILLE="$(du -sk "$STAGE" | cut -f1)"
 #     des images (PNG, JPEG, SVG, WebP…) dans Fichiers. Nautilus ne fait que le
 #     recommander : aucune image n'avait d'aperçu, nulle part dans Codebyr.
 #     Constaté le 29/09/2026 ;
-#   · gnome-shell-extension-dashtodock — le dock toujours visible, où
-#     l'extension Codebyr pose une pastille par fenêtre à la couleur de son
-#     Espace (1.21.0). Réglé par 90_codebyr.gschema.override.
+#
+# gnome-shell-extension-dashtodock (le dock toujours visible, réglé par
+# 90_codebyr.gschema.override) n'est PAS ENCORE exigé. Jusqu'à la 1.20.0, la
+# mise à jour automatique n'acceptait aucun paquet Debian (voir le nom de code,
+# plus haut) : exiger un paquet Debian absent de la machine y fait abandonner
+# la mise à jour entière, en silence. Il ne le sera qu'une fois ce correctif
+# installé partout ; l'image l'installe déjà (codebyr.list.chroot).
 mkdir -p "$STAGE/DEBIAN"
 cat > "$STAGE/DEBIAN/control" <<EOF
 Package: codebyr-tools
@@ -236,7 +246,7 @@ Version: $VERSION
 Architecture: all
 Maintainer: Codebyr OS <romain.formationoc@gmail.com>
 Installed-Size: $TAILLE
-Depends: python3 (>= 3.12), libseccomp2, python3-gi, gir1.2-gtk-4.0, gir1.2-adw-1, bubblewrap, dbus-user-session, firefox-esr | firefox, python3-nautilus, acl, libnotify-bin, systemd-cryptsetup, libgdk-pixbuf2.0-bin, gnome-shell-extension-dashtodock
+Depends: python3 (>= 3.12), libseccomp2, python3-gi, gir1.2-gtk-4.0, gir1.2-adw-1, bubblewrap, dbus-user-session, firefox-esr | firefox, python3-nautilus, acl, libnotify-bin, systemd-cryptsetup, libgdk-pixbuf2.0-bin
 Recommends: flatpak, gnome-shell
 Section: admin
 Priority: optional

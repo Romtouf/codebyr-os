@@ -12,18 +12,31 @@ GNOME (menu du Sceau, liserés colorés) ne se recharge pas à chaud.
 
 ## 1.21.0 — non publiée
 
-**Un dock, toujours visible en bas de l'écran.** Vos applications y sont à
-portée de clic, sans ouvrir la vue d'ensemble — comme la barre des tâches de
-Windows. Sous chaque application ouverte, une pastille par fenêtre, à la
-couleur de son Espace : Firefox ouvert dans la Banque et dans la Navigation
-porte une pastille verte et une orange ; celle de la fenêtre active est
-cerclée de blanc. Un clic sur une application ouverte dans plusieurs Espaces
-montre ses fenêtres, pour choisir la bonne. Alt+Tab montre les mêmes
-pastilles, et sous chaque fenêtre (flèche du bas), le nom de son Espace en
-clair. Le dock vient de Debian (Dash to Dock) ; on
-le règle, ou on le retire, dans l'application Extensions. Si vous avez déjà
-choisi vous-même vos extensions, activez-le là : Codebyr ne change pas un
-choix que vous avez fait.
+**Les mises à jour de Debian s'installent enfin toutes seules, sécurité
+comprise.** Jusqu'ici, seuls les outils Codebyr se mettaient à jour d'eux-mêmes :
+le reste du système — noyau, Firefox, bibliothèques — attendait que vous
+acceptiez ses mises à jour dans l'application Logiciels. Codebyr avait remplacé
+le nom de code de Debian par le sien, et la mise à jour automatique ne
+reconnaissait plus l'archive Debian. Après cette version, la mise à jour
+automatique suivante installe tout ce qui attendait. Détail :
+[SECURITY.md](SECURITY.md).
+
+**Les Espaces se voient partout.** Sous chaque application ouverte, une
+pastille par fenêtre, à la couleur de son Espace : Firefox ouvert dans la
+Banque et dans la Navigation porte une pastille verte et une orange ; celle de
+la fenêtre active est cerclée de blanc. Dans la vue d'ensemble, et dans
+Alt+Tab, qui montre en plus, sous chaque fenêtre (flèche du bas), le nom de
+son Espace en clair.
+
+**Un dock toujours visible en bas de l'écran arrive avec la 1.21.1** : vos
+applications à portée de clic, sans ouvrir la vue d'ensemble — comme la barre
+des tâches de Windows —, avec les mêmes pastilles ; un clic sur une
+application ouverte dans plusieurs Espaces montre ses fenêtres, pour choisir la
+bonne. Il vient de Debian (Dash to Dock) : la mise à jour automatique ne savait
+pas installer un paquet Debian avant cette version-ci, il viendra donc avec la
+suivante. On le règle, ou on le retire, dans l'application Extensions. Si vous
+avez déjà choisi vous-même vos extensions, activez-le là : Codebyr ne change
+pas un choix que vous avez fait.
 
 **Firefox n'affiche plus de contenu sponsorisé** : ni raccourcis payés par
 des marques sur le nouvel onglet (Amazon, Temu…), ni articles sponsorisés ou

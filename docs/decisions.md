@@ -235,3 +235,26 @@ Rien n'est verrouillé : l'utilisateur garde la main. `Stories` et
 `SponsoredStories` n'existent qu'à partir de Firefox 141 ; Firefox 140 ESR
 ignore une clé inconnue sans rejeter les autres (`allowAdditionalProperties`),
 elles serviront avec Firefox 153 ESR.
+
+## Le nom de code de Debian
+
+`VERSION_CODENAME` reste celui de Debian (`trixie`), dans `/etc/os-release` et
+`/etc/lsb-release`. De la 1.0 à la 1.20.0, Codebyr y mettait `codebyr` :
+unattended-upgrades, qui désigne les archives Debian permises par
+`codename=${distro_codename}` (lu par `lsb_release -c`), n'en acceptait plus
+aucune, et rien de Debian ne s'installait seul, sécurité comprise. Trouvé le
+08/10/2026 en faisant tourner unattended-upgrades sur la VM, de 1.20.0 vers
+1.21.0~essai6 : le dock, exigé par le paquet, restait « kept back ».
+Le nom de code est corrigé plutôt que les origines permises (des motifs
+`codename=trixie` dans le fichier 51) : il est lu aussi par les instructions
+des dépôts tiers.
+
+**Le dock attend la 1.21.1** — le correctif voyage dans `codebyr-tools`, et une
+machine non corrigée refuse toute version qui exige un paquet Debian qu'elle
+n'a pas ; apt ne visant que la version la plus récente, elle y resterait
+bloquée pour toujours. La 1.21.0 corrige donc sans rien exiger de nouveau ; la
+1.21.1, une semaine plus tard au moins, exigera le dock. Avant elle, une
+nouvelle image : celles jusqu'à la 1.18.2 portent le défaut, et une machine
+fraîchement installée depuis l'une d'elles serait bloquée de même. Un
+« Recommends » ne contourne rien : unattended-upgrades suit aussi les
+recommandations (`follow_deps`).

@@ -10,7 +10,7 @@ GNOME (menu du Sceau, liserés colorés) ne se recharge pas à chaud.
 
 ---
 
-## 1.21.0 — non publiée
+## 1.21.0 — 9 octobre 2026
 
 **Les mises à jour de Debian s'installent enfin toutes seules, sécurité
 comprise.** Jusqu'ici, seuls les outils Codebyr se mettaient à jour d'eux-mêmes :

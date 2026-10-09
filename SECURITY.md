@@ -383,6 +383,9 @@ surface applicative minimale (`--apt-recommends false`).
 
 ## Historique des correctifs de sécurité
 
+Les failles les plus graves ont aussi un avis public, en anglais, dans la
+base d'avis de GitHub : [onglet Sécurité du dépôt](https://github.com/Romtouf/codebyr-os/security/advisories).
+
 | Version | Correctif |
 |---|---|
 | 1.21.0 | **Mises à jour de Debian jamais installées automatiquement, sécurité comprise** (présent depuis 1.0). Codebyr remplaçait le nom de code de Debian (`trixie`) par le sien dans `/etc/os-release`. La mise à jour automatique (unattended-upgrades) le lit (`lsb_release -c`) pour désigner les archives Debian qu'elle accepte : elle cherchait une archive « codebyr », qui n'existe pas, et n'installait que les outils Codebyr. Les correctifs de Debian — noyau, Firefox, bibliothèques — ne s'installaient que par l'application Logiciels ou à la main. Le nom de code est de nouveau celui de Debian (`/etc/os-release`, et `/etc/lsb-release` sur les machines déjà installées) ; la mise à jour automatique qui suit la 1.21.0 installe ce qui attendait. Trouvé en faisant tourner la mise à jour automatique sur une machine d'essai, de 1.20.0 vers 1.21.0 : elle refusait le dock, un paquet Debian. Un test vérifie désormais que le nom de code est celui de l'archive Debian de l'image. |

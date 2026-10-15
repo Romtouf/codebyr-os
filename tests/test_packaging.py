@@ -229,15 +229,25 @@ class Paquet(unittest.TestCase):
             self.assertIn("DISTRIB_CODENAME=%s/" % debian, f.read(),
                           "les machines déjà installées gardaient « codebyr »")
 
-    def test_aucune_dependance_debian_que_la_mise_a_jour_ne_sache_installer(self):
-        """Tant que des machines refusent encore Debian (jusqu'à la 1.20.0),
-        exiger un paquet Debian qu'elles n'ont pas les bloque pour toujours :
-        apt ne vise que la version la plus récente. Le dock ne sera exigé
-        qu'une fois le nom de code corrigé partout (1.21.1)."""
-        with open(os.path.join(RACINE, "packaging", "build-deb.sh"), encoding="utf-8") as f:
-            depends = re.search(r"^Depends: (.*)$", f.read(), re.M).group(1)
-        self.assertNotIn("gnome-shell-extension-dashtodock",
-                         [d.strip() for d in depends.split(",")])
+    def test_le_diaporama_de_l_installeur_trouve_ses_modules(self):
+        """Calamares 3.3 est construit avec Qt 6 ; calamares-settings-debian ne
+        tire que les modules QML de Qt 5. Sans leurs équivalents Qt 6, le
+        diaporama ne se charge pas et reste blanc pendant toute l'installation
+        (vu à l'essai de l'ISO 1.21.0). Chaque module qu'il importe doit donc
+        être dans l'image."""
+        base = os.path.join(RACINE, "live-build", "config")
+        with open(os.path.join(base, "package-lists", "installeur.list.chroot"),
+                  encoding="utf-8") as f:
+            paquets = {l.strip() for l in f if l.strip() and not l.startswith("#")}
+        with open(os.path.join(base, "includes.chroot_after_packages", "etc", "calamares",
+                               "branding", "debian", "show.qml"), encoding="utf-8") as f:
+            imports = set(re.findall(r"^import (\S+)", f.read(), re.M))
+        # Ceux du module calamares.slideshow lui-même (Presentation.qml).
+        imports |= {"QtQuick", "QtQuick.Window"}
+        imports.discard("calamares.slideshow")
+        for module in imports:
+            paquet = "qml6-module-" + module.lower().replace(".", "-")
+            self.assertIn(paquet, paquets, "module QML %s sans son paquet Qt 6" % module)
 
     def test_la_cle_publique_voyage_avec_l_image(self):
         """Une procédure de vérification qu'on ne peut pas suivre ne vaut rien.

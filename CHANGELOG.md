@@ -10,6 +10,24 @@ GNOME (menu du Sceau, liserés colorés) ne se recharge pas à chaud.
 
 ---
 
+## 1.21.1 — non publiée
+
+**Le dock arrive.** Toujours visible en bas de l'écran, il met vos
+applications à portée de clic, sans ouvrir la vue d'ensemble — comme la barre
+des tâches de Windows. Sous chaque application ouverte, une pastille par
+fenêtre, à la couleur de son Espace ; un clic sur une application ouverte dans
+plusieurs Espaces montre ses fenêtres, pour choisir la bonne. Il vient de
+Debian (Dash to Dock) : la mise à jour automatique sait l'installer depuis la
+1.21.0. Il apparaît à la reconnexion suivante. On le règle, ou on le retire,
+dans l'application Extensions ; si vous avez déjà choisi vous-même vos
+extensions, activez-le là : Codebyr ne change pas un choix que vous avez fait.
+
+Une machine restée en 1.20.0 ou avant ne reçoit pas cette version d'elle-même :
+tapez une fois `sudo apt update && sudo apt upgrade`, ou passez par
+l'application Logiciels.
+
+---
+
 ## 1.21.0 — 9 octobre 2026
 
 **Les mises à jour de Debian s'installent enfin toutes seules, sécurité

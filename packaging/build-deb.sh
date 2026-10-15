@@ -232,13 +232,14 @@ TAILLE="$(du -sk "$STAGE" | cut -f1)"
 #     des images (PNG, JPEG, SVG, WebP…) dans Fichiers. Nautilus ne fait que le
 #     recommander : aucune image n'avait d'aperçu, nulle part dans Codebyr.
 #     Constaté le 29/09/2026 ;
+#   · gnome-shell-extension-dashtodock — le dock toujours visible, réglé par
+#     90_codebyr.gschema.override, où l'extension Codebyr pose une pastille
+#     par fenêtre à la couleur de son Espace.
 #
-# gnome-shell-extension-dashtodock (le dock toujours visible, réglé par
-# 90_codebyr.gschema.override) n'est PAS ENCORE exigé. Jusqu'à la 1.20.0, la
-# mise à jour automatique n'acceptait aucun paquet Debian (voir le nom de code,
-# plus haut) : exiger un paquet Debian absent de la machine y fait abandonner
-# la mise à jour entière, en silence. Il ne le sera qu'une fois ce correctif
-# installé partout ; l'image l'installe déjà (codebyr.list.chroot).
+# Exiger un paquet Debian ABSENT des machines n'est possible que parce que la
+# mise à jour automatique accepte Debian depuis la 1.21.0 (le nom de code,
+# plus haut). Une machine restée en 1.20.0 ou avant refuse toute version qui
+# en exige un, en silence : « sudo apt upgrade » la débloque.
 mkdir -p "$STAGE/DEBIAN"
 cat > "$STAGE/DEBIAN/control" <<EOF
 Package: codebyr-tools
@@ -246,7 +247,7 @@ Version: $VERSION
 Architecture: all
 Maintainer: Codebyr OS <romain.formationoc@gmail.com>
 Installed-Size: $TAILLE
-Depends: python3 (>= 3.12), libseccomp2, python3-gi, gir1.2-gtk-4.0, gir1.2-adw-1, bubblewrap, dbus-user-session, firefox-esr | firefox, python3-nautilus, acl, libnotify-bin, systemd-cryptsetup, libgdk-pixbuf2.0-bin
+Depends: python3 (>= 3.12), libseccomp2, python3-gi, gir1.2-gtk-4.0, gir1.2-adw-1, bubblewrap, dbus-user-session, firefox-esr | firefox, python3-nautilus, acl, libnotify-bin, systemd-cryptsetup, libgdk-pixbuf2.0-bin, gnome-shell-extension-dashtodock
 Recommends: flatpak, gnome-shell
 Section: admin
 Priority: optional

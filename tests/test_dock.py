@@ -57,9 +57,13 @@ class LeDock(unittest.TestCase):
         dock = _section(_lire(OVERRIDE), "org.gnome.shell.extensions.dash-to-dock")
         self.assertEqual(dock["running-indicator-style"], "'DEFAULT'")
 
-    def test_livre_par_l_image(self):
-        # Le paquet ne l'exige pas encore : voir test_packaging,
-        # test_aucune_dependance_debian_que_la_mise_a_jour_ne_sache_installer.
+    def test_livre_par_le_paquet_et_l_image(self):
+        # Exigé par le paquet depuis la 1.21.1 seulement : il fallait d'abord
+        # que la mise à jour automatique accepte Debian (1.21.0, voir
+        # test_packaging.test_le_nom_de_code_designe_l_archive_debian).
+        construction = _lire(os.path.join(RACINE, "packaging", "build-deb.sh"))
+        depends = re.search(r"^Depends: (.*)$", construction, re.M).group(1)
+        self.assertIn("gnome-shell-extension-dashtodock", [d.strip() for d in depends.split(",")])
         liste = _lire(os.path.join(RACINE, "live-build", "config", "package-lists",
                                    "codebyr.list.chroot"))
         self.assertIn("\ngnome-shell-extension-dashtodock\n", liste)

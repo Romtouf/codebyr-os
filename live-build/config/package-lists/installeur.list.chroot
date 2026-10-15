@@ -2,6 +2,12 @@
 calamares
 calamares-settings-debian
 
+# Le diaporama de l'installation (branding/debian/show.qml). Calamares 3.3 est
+# construit avec Qt 6, et calamares-settings-debian ne tire que les modules QML
+# de Qt 5 : sans ceux-ci, le diaporama ne se charge pas et reste blanc.
+qml6-module-qtquick
+qml6-module-qtquick-window
+
 # Contrôle de qualité des mots de passe (libpwquality exige ce dictionnaire ;
 # sans lui, TOUT mot de passe est rejeté avec « error loading dictionary »)
 cracklib-runtime

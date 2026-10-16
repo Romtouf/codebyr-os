@@ -10,7 +10,7 @@ GNOME (menu du Sceau, liserés colorés) ne se recharge pas à chaud.
 
 ---
 
-## 1.21.1 — non publiée
+## 1.21.1 — 16 octobre 2026
 
 **Le dock arrive.** Toujours visible en bas de l'écran, il met vos
 applications à portée de clic, sans ouvrir la vue d'ensemble — comme la barre

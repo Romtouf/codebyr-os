@@ -14,9 +14,9 @@ installée sur machine réelle. Voir la [feuille de route](#feuille-de-route).
 
 ![Bureau Codebyr OS — vue d'ensemble GNOME, fond d'écran au Sceau, dock des applications](site/captures/01-bureau.png)
 
-## Où en est le projet — 9 octobre 2026
+## Où en est le projet — 16 octobre 2026
 
-Version publiée : **1.21.0** (voir le [CHANGELOG](CHANGELOG.md)). La 1.16.2 a
+Version publiée : **1.21.1** (voir le [CHANGELOG](CHANGELOG.md)). La 1.16.2 a
 fermé une élévation de privilèges du service des comptes d'Espaces, présente
 depuis la 1.15.0 ; la 1.16.3 remet en marche le bouclier anti-hameçonnage, muet
 depuis la 1.6.0, et lui fait reconnaître les adresses déguisées par d'autres
@@ -52,7 +52,8 @@ Blindage ne laisse plus ouvrir que les connexions utiles. **La 1.21.0 corrige
 un défaut présent depuis la 1.0** : les mises à jour de Debian, sécurité
 comprise, ne s'installaient pas toutes seules — elles le font désormais. Elle
 montre aussi la couleur des Espaces dans Alt+Tab, et retire de Firefox le
-contenu sponsorisé. Le lot de
+contenu sponsorisé. **La 1.21.1 apporte le dock** : toujours visible en bas de
+l'écran, avec une pastille par fenêtre à la couleur de son Espace. Le lot de
 sécurité de septembre est publié (frontières des fichiers, restauration non
 destructive, aucun repli sans isolation, réseau restreint par namespace, filtre
 d'appels système).

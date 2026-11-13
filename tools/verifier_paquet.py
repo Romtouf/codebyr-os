@@ -47,6 +47,7 @@ def verifier_arbre(stage, racine):
     source = racine / "live-build/config/includes.chroot_after_packages"
     attendus = list((source / "usr/share/codebyr").rglob("*"))
     for arbre in ("usr/share/gnome-shell/extensions/codebyr@codebyr.io",
+                  "usr/share/gnome-shell/extensions/codebyr-connexion@codebyr.io",
                   "usr/share/nautilus-python", "etc/skel",
                   "usr/share/plymouth/themes/codebyr"):
         attendus += list((source / arbre).rglob("*"))

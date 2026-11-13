@@ -1,0 +1,29 @@
+#!/bin/sh
+# Codebyr OS — l'image de démarrage de l'ISO porte le microcode des DEUX
+# fabricants : elle démarrera sur n'importe quel processeur.
+#
+# Le script d'AMD (amd64-microcode), en mode « auto », n'embarque le microcode
+# que si la machine qui CONSTRUIT a un processeur AMD : construite sur Intel,
+# l'ISO n'en avait aucun, et deux constructions du même commit sur deux
+# machines différaient — l'ISO n'était plus reproductible. Celui d'Intel, avec
+# MODULES=most (le défaut), embarque déjà tout, quelle que soit la machine.
+#
+# Le réglage vit dans un fichier de configuration du paquet. Modifié pour de
+# bon, chaque mise à jour du microcode poserait une question que la mise à
+# jour automatique ne pose pas : elle laisserait le paquet de côté, pour
+# toujours. On le modifie donc le temps de construire l'image de démarrage,
+# puis on le rend à l'identique. live-build, prévenu par son propre repère,
+# ne la reconstruit pas derrière nous (chroot_hacks), et retire le repère.
+#
+# Dernier crochet, après tout ce qui entre dans l'image de démarrage. Sur le
+# système installé, elle est refaite pour SON processeur (mode « auto »).
+set -e
+
+echo "P: Codebyr — microcode des deux fabricants dans l'image de démarrage"
+REGLAGE=/etc/default/amd64-microcode
+cp -p "$REGLAGE" /tmp/codebyr-amd64-microcode
+echo "AMD64UCODE_INITRAMFS=early" >> "$REGLAGE"
+update-initramfs -k all -t -u
+cp -p /tmp/codebyr-amd64-microcode "$REGLAGE"
+rm -f /tmp/codebyr-amd64-microcode
+touch /initrd.img_has_already_been_regenerated

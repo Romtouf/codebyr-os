@@ -46,6 +46,35 @@ class Inerte(unittest.TestCase):
         self.assertIn("chmod 0755 /usr/libexec/codebyr-essai-demarrage", crochet)
 
 
+class LeMicrocodeDeLImage(unittest.TestCase):
+    """Construite sur une machine Intel, l'ISO n'avait aucun microcode AMD, et
+    ne se reconstruisait plus à l'identique ailleurs (vu le 13/11/2026 : WSL
+    sur Intel, GitHub sur AMD, deux initrd différents)."""
+
+    def setUp(self):
+        self.crochet = _lire(os.path.join(RACINE, "live-build", "config", "hooks", "normal",
+                                          "9000-microcode-initrd.hook.chroot"))
+
+    def test_les_deux_fabricants_quelle_que_soit_la_machine(self):
+        self.assertIn('echo "AMD64UCODE_INITRAMFS=early" >> "$REGLAGE"', self.crochet)
+        self.assertIn("update-initramfs -k all -t -u", self.crochet)
+
+    def test_le_reglage_du_paquet_est_rendu_a_l_identique(self):
+        # Modifié, il ferait poser une question à chaque mise à jour du
+        # microcode — que la mise à jour automatique laisserait alors de côté.
+        avant = self.crochet.index("cp -p \"$REGLAGE\" /tmp/codebyr-amd64-microcode")
+        apres = self.crochet.index("cp -p /tmp/codebyr-amd64-microcode \"$REGLAGE\"")
+        self.assertLess(avant, self.crochet.index("update-initramfs"))
+        self.assertGreater(apres, self.crochet.index("update-initramfs"))
+
+    def test_live_build_ne_la_refait_pas_derriere(self):
+        self.assertTrue(self.crochet.rstrip().endswith("touch /initrd.img_has_already_been_regenerated"))
+
+    def test_dernier_crochet(self):
+        crochets = sorted(os.listdir(os.path.join(RACINE, "live-build", "config", "hooks", "normal")))
+        self.assertEqual(crochets[-1], "9000-microcode-initrd.hook.chroot")
+
+
 class LeVerdict(unittest.TestCase):
 
     def setUp(self):
@@ -71,6 +100,12 @@ class LeVerdict(unittest.TestCase):
     def test_le_compte_de_l_espace_est_celui_du_service(self):
         compte = re.search(r"^compte=(\S+)$", self.script, re.M).group(1)
         self.assertEqual(compte, comptes.nom_compte(1000, "travail"))
+
+    def test_un_port_serie_a_lui_seul(self):
+        # Sur ttyS0, la console, systemd ouvre une invite de connexion qui
+        # coupait la parole à l'essai (vu dans la CI, 13/11/2026).
+        self.assertIn("TTYPath=/dev/ttyS1", _lire(SERVICE))
+        self.assertIn('-serial file:"$console" -serial file:"$journal"', self.lanceur)
 
     def test_lance_par_la_ci_hors_du_conteneur(self):
         flux = _lire(os.path.join(RACINE, ".github", "workflows", "construire-iso.yml"))

@@ -9,9 +9,13 @@ After=graphical.target
 [Service]
 Type=oneshot
 ExecStart=/usr/libexec/codebyr-essai-demarrage
+# Un port série à lui seul : sur ttyS0, la console du noyau, systemd ouvre une
+# invite de connexion qui, en prenant le port, coupe la parole à l'essai.
 StandardOutput=tty
 StandardError=tty
-TTYPath=/dev/ttyS0
+TTYPath=/dev/ttyS1
+TTYReset=no
+TTYVHangup=no
 TimeoutStartSec=40min
 
 [Install]

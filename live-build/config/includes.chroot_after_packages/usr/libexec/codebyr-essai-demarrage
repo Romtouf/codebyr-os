@@ -11,7 +11,7 @@
 #
 # Il ne tourne que si le noyau a reçu « codebyr.essai=1 »
 # (codebyr-essai-demarrage.service) — ce que seule la CI lui passe. Il écrit
-# sur la console série une ligne par contrôle, « CODEBYR-ESSAI OK|ECHEC … »,
+# sur le second port série (ttyS1) une ligne par contrôle, « CODEBYR-ESSAI OK|ECHEC … »,
 # puis « CODEBYR-ESSAI FIN », et éteint la machine.
 set -u
 
@@ -57,6 +57,17 @@ for paquet in codebyr-tools gnome-shell-extension-dashtodock intel-microcode amd
 		ok "paquet $paquet"
 	else
 		ko "paquet $paquet absent"
+	fi
+done
+
+# Le microcode des deux fabricants dans l'image de démarrage elle-même : un
+# paquet installé ne suffit pas, c'est elle qui le charge au démarrage.
+contenu=$(lsinitramfs /boot/initrd.img-"$(uname -r)" 2>/dev/null)
+for fabricant in AuthenticAMD GenuineIntel; do
+	if echo "$contenu" | grep -q "kernel/x86/microcode/$fabricant.bin"; then
+		ok "microcode $fabricant dans l'image de démarrage"
+	else
+		ko "microcode $fabricant absent de l'image de démarrage"
 	fi
 done
 

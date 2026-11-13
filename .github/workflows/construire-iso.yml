@@ -157,5 +157,7 @@ jobs:
         if: always()
         with:
           name: essai-demarrage
-          path: essai-demarrage.log
+          path: |
+            essai-demarrage.log
+            essai-console.log
           retention-days: 7

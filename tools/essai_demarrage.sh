@@ -6,9 +6,10 @@
 # L'image porte un service inerte (codebyr-essai-demarrage.service) que
 # « codebyr.essai=1 » sur la ligne du noyau réveille : il observe la session
 # live — GNOME, extensions, isolation, un Espace sous son compte — et écrit
-# sur la console série une ligne « CODEBYR-ESSAI OK|ECHEC … » par contrôle.
-# Ce script démarre l'image avec ce paramètre, garde la console série, et
-# échoue si un contrôle échoue ou si l'essai ne va pas au bout.
+# sur le second port série (ttyS1) une ligne « CODEBYR-ESSAI OK|ECHEC … » par
+# contrôle. Ce script démarre l'image avec ce paramètre, garde les deux ports
+# série (ttyS0 : la console du noyau et de systemd), et échoue si un contrôle
+# échoue ou si l'essai ne va pas au bout.
 #
 # Avec KVM (la CI de GitHub), une dizaine de minutes ; sans (un WSL sans
 # virtualisation imbriquée), l'émulation est bien plus lente :
@@ -17,6 +18,7 @@ set -euo pipefail
 
 iso=${1:?usage : essai_demarrage.sh <iso>}
 journal=${CODEBYR_JOURNAL_SERIE:-$PWD/essai-demarrage.log}
+console=${CODEBYR_JOURNAL_CONSOLE:-$PWD/essai-console.log}
 delai=${CODEBYR_DELAI_ESSAI:-2400}
 travail=$(mktemp -d)
 trap 'rm -rf "$travail"' EXIT
@@ -38,10 +40,12 @@ noyau="boot=live components locales=fr_FR.UTF-8 keyboard-layouts=fr"
 noyau="$noyau live-config.hostname=codebyr console=tty0 console=ttyS0,115200 codebyr.essai=1"
 
 : >"$journal"
+: >"$console"
+# Premier port série (ttyS0) : la console ; second (ttyS1) : l'essai seul.
 timeout "$delai" qemu-system-x86_64 "${acceleration[@]}" -m 4096 -smp 2 \
 	-kernel "$travail/vmlinuz" -initrd "$travail/initrd.img" -append "$noyau" \
 	-drive file="$iso",media=cdrom,readonly=on \
-	-display none -vga std -serial file:"$journal" \
+	-display none -vga std -serial file:"$console" -serial file:"$journal" \
 	-nic user,model=virtio-net-pci -no-reboot &
 qemu=$!
 
@@ -55,7 +59,7 @@ wait "$qemu" 2>/dev/null || true
 
 grep -a "CODEBYR-ESSAI" "$journal" || true
 if ! grep -aq "CODEBYR-ESSAI FIN" "$journal"; then
-	echo "L'essai n'est pas allé au bout : voir $journal" >&2
+	echo "L'essai n'est pas allé au bout : voir $journal et $console" >&2
 	exit 1
 fi
 if grep -aq "CODEBYR-ESSAI ECHEC" "$journal"; then

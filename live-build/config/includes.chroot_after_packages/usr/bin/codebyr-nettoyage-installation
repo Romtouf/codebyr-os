@@ -10,6 +10,12 @@
 userdel -r user 2>/dev/null || true
 rm -f /etc/sudoers.d/codebyr-live
 
+# L'essai de démarrage de la CI (inerte sans « codebyr.essai=1 ») n'a rien à
+# faire sur un système installé.
+systemctl disable codebyr-essai-demarrage.service >/dev/null 2>&1 || true
+rm -f /usr/lib/systemd/system/codebyr-essai-demarrage.service \
+      /usr/libexec/codebyr-essai-demarrage
+
 if grep -q '^AutomaticLogin=user$' /etc/gdm3/daemon.conf 2>/dev/null; then
     sed -i -e 's/^AutomaticLoginEnable=.*/AutomaticLoginEnable=false/' \
            -e '/^AutomaticLogin=user$/d' /etc/gdm3/daemon.conf

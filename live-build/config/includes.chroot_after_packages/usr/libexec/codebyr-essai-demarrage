@@ -1,0 +1,126 @@
+#!/bin/bash
+# Codebyr OS — essai de démarrage de l'image, pour la CI (construire-iso.yml).
+#
+# Une image qui se construit ne prouve pas qu'elle démarre, ni que ses
+# protections agissent : l'extension GNOME peut planter sans un mot (le menu du
+# Sceau disparaît), un Espace peut ne plus s'ouvrir. On démarre donc l'ISO dans
+# QEMU, et ce programme observe la session live comme le ferait quelqu'un
+# devant l'écran : session GNOME ouverte, extensions actives et sans erreur,
+# sonde d'isolation dans de vrais bacs à sable, programme lancé dans un Espace
+# sous son propre compte.
+#
+# Il ne tourne que si le noyau a reçu « codebyr.essai=1 »
+# (codebyr-essai-demarrage.service) — ce que seule la CI lui passe. Il écrit
+# sur la console série une ligne par contrôle, « CODEBYR-ESSAI OK|ECHEC … »,
+# puis « CODEBYR-ESSAI FIN », et éteint la machine.
+set -u
+
+UTILISATEUR=user
+RUNDIR=/run/user/1000
+echecs=0
+
+ok() { echo "CODEBYR-ESSAI OK $*"; }
+ko() { echo "CODEBYR-ESSAI ECHEC $*"; echecs=$((echecs + 1)); }
+detail() { sed 's/^/CODEBYR-ESSAI DETAIL /'; }
+
+# attendre <secondes> <commande…> : vrai dès que la commande réussit.
+attendre() {
+	reste=$1
+	shift
+	while [ "$reste" -gt 0 ]; do
+		"$@" && return 0
+		sleep 5
+		reste=$((reste - 5))
+	done
+	return 1
+}
+
+# Une commande dans la session graphique de l'utilisateur live.
+dans_la_session() {
+	runuser -u "$UTILISATEUR" -- env XDG_RUNTIME_DIR="$RUNDIR" \
+		DBUS_SESSION_BUS_ADDRESS="unix:path=$RUNDIR/bus" WAYLAND_DISPLAY=wayland-0 "$@"
+}
+
+echo "CODEBYR-ESSAI DEBUT"
+
+# — L'identité et ce que l'image doit contenir —
+. /etc/os-release
+if [ "${VERSION_CODENAME:-}" = trixie ]; then
+	ok "nom de code trixie"
+else
+	ko "nom de code « ${VERSION_CODENAME:-} » au lieu de trixie"
+fi
+echo "CODEBYR-ESSAI INFO codebyr-tools $(dpkg-query -W -f='${Version}' codebyr-tools 2>/dev/null)"
+for paquet in codebyr-tools gnome-shell-extension-dashtodock intel-microcode amd64-microcode \
+	qml6-module-qtquick qml6-module-qtquick-window firefox-esr; do
+	if dpkg-query -W -f='${Status}' "$paquet" 2>/dev/null | grep -q "ok installed"; then
+		ok "paquet $paquet"
+	else
+		ko "paquet $paquet absent"
+	fi
+done
+
+# — La session graphique —
+session_prete() {
+	pgrep -u "$UTILISATEUR" -x gnome-shell >/dev/null &&
+		[ -S "$RUNDIR/bus" ] && [ -S "$RUNDIR/wayland-0" ]
+}
+if attendre 900 session_prete; then
+	ok "session GNOME de l'utilisateur live"
+else
+	ko "aucune session GNOME après 15 minutes"
+fi
+# Le temps que les extensions s'activent et que la session se pose.
+sleep 30
+
+for extension in codebyr@codebyr.io dash-to-dock@micxgx.gmail.com; do
+	etat=$(dans_la_session gnome-extensions info "$extension" 2>&1 | sed -n 's/^ *State: *//p')
+	if [ "$(echo "$etat" | tr '[:lower:]' '[:upper:]')" = ACTIVE ]; then
+		ok "extension $extension active"
+	else
+		ko "extension $extension : état « $etat »"
+	fi
+done
+
+# Une erreur de l'extension ne se voit pas : le menu du Sceau disparaît, ou une
+# fonction se tait. Elle est au journal de GNOME Shell.
+erreurs=$(journalctl -b -o cat _COMM=gnome-shell 2>/dev/null |
+	grep -E "JS ERROR|Codebyr:|codebyr@codebyr.io" | grep -v "^$" || true)
+if [ -z "$erreurs" ]; then
+	ok "aucune erreur de l'extension au journal de GNOME Shell"
+else
+	ko "erreurs au journal de GNOME Shell"
+	echo "$erreurs" | head -40 | detail
+fi
+
+# — L'isolation, mesurée dans de vrais bacs à sable —
+if dans_la_session codebyr-space verifier-isolation >/tmp/codebyr-isolation.txt 2>&1; then
+	ok "verifier-isolation"
+else
+	ko "verifier-isolation"
+fi
+detail </tmp/codebyr-isolation.txt
+
+# — Un programme dans un Espace, sous le compte séparé de l'Espace —
+compte=cbyr-1000-travail
+dans_la_session codebyr-space launch travail -- /bin/sleep 600 >/tmp/codebyr-lancement.txt 2>&1 &
+sous_son_compte() {
+	ps -eo user:32=,comm= | awk -v c="$compte" '$1 == c && $2 == "sleep" { trouve = 1 } END { exit !trouve }'
+}
+if attendre 180 sous_son_compte; then
+	ok "programme lancé dans l'Espace Travail, sous le compte $compte"
+else
+	ko "aucun programme de l'Espace Travail sous le compte $compte"
+	detail </tmp/codebyr-lancement.txt
+	journalctl -b -o cat -t codebyr -t codebyr-uid 2>/dev/null | tail -30 | detail
+fi
+dans_la_session codebyr-space close travail >/dev/null 2>&1 || true
+
+# — Le poste, tel que verifier-poste le voit (affiché, sans verdict : la
+# session live n'est pas un poste installé) —
+codebyr-space verifier-poste 2>&1 | detail
+
+echo "CODEBYR-ESSAI BILAN $echecs échec(s)"
+echo "CODEBYR-ESSAI FIN"
+systemctl --no-block poweroff
+exit 0

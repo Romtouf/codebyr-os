@@ -1,0 +1,18 @@
+# Codebyr OS — essai de démarrage de l'image, pour la CI (construire-iso.yml).
+# Inerte sans « codebyr.essai=1 » sur la ligne du noyau, que seule la CI pose ;
+# retiré du système installé par codebyr-nettoyage-installation.
+[Unit]
+Description=Codebyr OS — essai de démarrage (CI)
+ConditionKernelCommandLine=codebyr.essai=1
+After=graphical.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/libexec/codebyr-essai-demarrage
+StandardOutput=tty
+StandardError=tty
+TTYPath=/dev/ttyS0
+TimeoutStartSec=40min
+
+[Install]
+WantedBy=graphical.target

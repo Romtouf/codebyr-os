@@ -1,0 +1,10 @@
+#!/bin/sh
+# Codebyr OS — l'essai de démarrage de la CI (construire-iso.yml).
+# Le service est activé, mais ne tourne que si le noyau reçoit
+# « codebyr.essai=1 », que seule la CI pose (ConditionKernelCommandLine).
+# codebyr-nettoyage-installation le retire du système installé.
+set -e
+
+echo "P: Codebyr — essai de démarrage (inerte hors de la CI)"
+chmod 0755 /usr/libexec/codebyr-essai-demarrage
+systemctl enable codebyr-essai-demarrage.service

@@ -80,6 +80,14 @@ class LaConfiguration(unittest.TestCase):
         corps = code.split("def _ajouter_banque(self, banque):", 1)[1].split("\n    def ", 1)[0]
         self.assertIn("self._ajouter_domaine(d)", corps)
 
+    def test_le_choix_survit_a_l_ajout(self):
+        # La page se reconstruit après chaque ajout : la liste revenait à sa
+        # première banque (vu sur la VM), qu'un second clic aurait ajoutée.
+        with open(os.path.join(BIN, "codebyr-config"), encoding="utf-8") as f:
+            code = f.read()
+        self.assertIn('choix.set_selected(min(getattr(self, "_banque_choisie", 0)', code)
+        self.assertIn('setattr(self, "_banque_choisie", r.get_selected())', code)
+
 
 if __name__ == "__main__":
     unittest.main()

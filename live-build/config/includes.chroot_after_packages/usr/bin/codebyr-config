@@ -167,6 +167,11 @@ class Fenetre(Adw.ApplicationWindow):
                 title=_("Choisir ma banque"),
                 subtitle=_("Absente de la liste ? Ajoutez son site juste en dessous."),
                 model=Gtk.StringList.new([nom for nom, _doms in liste]))
+            # La page se reconstruit après chaque ajout : sans ceci, la liste
+            # revenait à sa première banque, qu'un second clic aurait ajoutée.
+            choix.set_selected(min(getattr(self, "_banque_choisie", 0), len(liste) - 1))
+            choix.connect("notify::selected",
+                          lambda r, _p: setattr(self, "_banque_choisie", r.get_selected()))
             bchoix = Gtk.Button(label=_("Ajouter"), valign=Gtk.Align.CENTER)
             bchoix.connect("clicked", lambda _b: self._ajouter_banque(liste[choix.get_selected()]))
             choix.add_suffix(bchoix)

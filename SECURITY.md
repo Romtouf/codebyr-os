@@ -378,8 +378,12 @@ surface applicative minimale (`--apt-recommends false`).
 - **Sites bancaires réels et liste blanche** : beaucoup de banques chargent des
   ressources depuis des domaines tiers (CDN, prestataire 3-D Secure, captcha).
   Une liste blanche saisie à la main peut donc casser une authentification
-  forte. Ajoutez le domaine signalé dans la page de blocage, ou utilisez un
-  autre Espace le temps de l'opération — mais ne désactivez pas la protection.
+  forte. Les domaines refusés sont notés dans Configuration Codebyr →
+  « Sites bloqués », d'où un clic les autorise ; ou utilisez un autre Espace le
+  temps de l'opération — mais ne désactivez pas la protection. Pour un site en
+  HTTPS, Firefox n'affiche que sa propre erreur (« connexion refusée par le
+  serveur proxy ») : la page d'explication de Codebyr n'apparaît que pour un
+  site en HTTP simple.
 
 ## Historique des correctifs de sécurité
 

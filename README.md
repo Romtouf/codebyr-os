@@ -14,9 +14,9 @@ installée sur machine réelle. Voir la [feuille de route](#feuille-de-route).
 
 ![Bureau Codebyr OS — vue d'ensemble GNOME, fond d'écran au Sceau, dock des applications](site/captures/01-bureau.png)
 
-## Où en est le projet — 16 octobre 2026
+## Où en est le projet — 13 novembre 2026
 
-Version publiée : **1.21.1** (voir le [CHANGELOG](CHANGELOG.md)). La 1.16.2 a
+Version publiée : **1.21.2** (voir le [CHANGELOG](CHANGELOG.md)). La 1.16.2 a
 fermé une élévation de privilèges du service des comptes d'Espaces, présente
 depuis la 1.15.0 ; la 1.16.3 remet en marche le bouclier anti-hameçonnage, muet
 depuis la 1.6.0, et lui fait reconnaître les adresses déguisées par d'autres
@@ -26,7 +26,7 @@ d'autorisation ; la 1.16.5 rend leur aperçu aux images dans Fichiers, et la
 d'un Espace à compte séparé. La 1.16.7 protège le lanceur de l'écran de
 bienvenue, modifiable par tous les comptes depuis la 1.13.0, et la 1.16.8
 ajoute deux protections du noyau au démarrage (détail dans
-[SECURITY.md](SECURITY.md)). **Les ISO 1.16.8, 1.18.2 et 1.21.0 sont reproductibles** :
+[SECURITY.md](SECURITY.md)). **Les ISO 1.16.8, 1.18.2, 1.21.0 et 1.21.2 sont reproductibles** :
 chacun peut les reconstruire depuis le code publié et retrouver la même
 empreinte (voir « Reconstruire l'ISO vous-même » plus bas). **Depuis la 1.18.2, l'ISO
 démarre aussi en anglais** (*boot menu → « Live session (English) »*). Les 1.17.0 et 1.17.1 rangent le
@@ -53,7 +53,9 @@ un défaut présent depuis la 1.0** : les mises à jour de Debian, sécurité
 comprise, ne s'installaient pas toutes seules — elles le font désormais. Elle
 montre aussi la couleur des Espaces dans Alt+Tab, et retire de Firefox le
 contenu sponsorisé. **La 1.21.1 apporte le dock** : toujours visible en bas de
-l'écran, avec une pastille par fenêtre à la couleur de son Espace. Le lot de
+l'écran, avec une pastille par fenêtre à la couleur de son Espace. **La 1.21.2 installe le
+microcode du processeur**, dit quand redémarrer après un correctif du noyau,
+et coupe la télémétrie de Firefox. Le lot de
 sécurité de septembre est publié (frontières des fichiers, restauration non
 destructive, aucun repli sans isolation, réseau restreint par namespace, filtre
 d'appels système).
@@ -312,14 +314,14 @@ la release, quelle que soit la machine. Deux façons de le vérifier :
 
 - **Sans rien installer** : copiez le dépôt sur GitHub (*Fork*), puis dans
   l'onglet *Actions* → « Construire l'ISO » → *Run workflow*, choisissez
-  l'étiquette de la version (`v1.21.0`…) et collez dans « SHA256 attendu »
+  l'étiquette de la version (`v1.21.2`…) et collez dans « SHA256 attendu »
   l'empreinte du fichier `SHA256SUMS` de la release. La construction (environ
   20 minutes) échoue si l'image obtenue diffère.
 - **Sur une machine Debian 13** :
 
   ```bash
   git clone https://github.com/Romtouf/codebyr-os && cd codebyr-os
-  git checkout v1.21.0
+  git checkout v1.21.2
   sudo apt install live-build rsync librsvg2-bin python3
   sudo CODEBYR_REPO="$PWD" bash live-build/scripts/build.sh
   sha256sum dist/*.iso      # → la même empreinte que SHA256SUMS

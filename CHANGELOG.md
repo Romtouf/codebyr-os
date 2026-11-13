@@ -10,7 +10,7 @@ GNOME (menu du Sceau, liserés colorés) ne se recharge pas à chaud.
 
 ---
 
-## 1.21.2 — non publiée
+## 1.21.2 — 13 novembre 2026
 
 **Le microcode du processeur est installé.** Ce sont les correctifs du
 fabricant contre les failles du processeur lui-même (Spectre, Downfall,
@@ -40,8 +40,15 @@ GNOME. Il apparaît après un redémarrage.
 
 Et aussi : les applications Codebyr ont la même allure (marges, taille,
 en-tête), chaque Espace s'y reconnaît à sa pastille plutôt qu'à son code
-couleur, et trois phrases qui restaient en français dans une session anglaise
-sont traduites. Le mode clair reste le réglage par défaut, comme dans GNOME.
+couleur, et quatre textes qui restaient en français dans une session
+anglaise sont traduits. Le mode clair reste le réglage par défaut, comme dans
+GNOME.
+
+**L'ISO 1.21.2** : l'installeur montre enfin son diaporama, blanc depuis
+toujours ; l'image de démarrage porte le microcode d'Intel et d'AMD, quelle
+que soit la machine qui l'a construite ; et chaque construction démarre
+désormais l'image dans une machine virtuelle pour y vérifier session,
+extensions, isolation et ouverture d'un Espace avant toute publication.
 
 ---
 

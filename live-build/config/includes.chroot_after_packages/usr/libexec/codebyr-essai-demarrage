@@ -84,13 +84,18 @@ fi
 # Le temps que les extensions s'activent et que la session se pose.
 sleep 30
 
+# En anglais : la session live parle français, et « gnome-extensions » aussi
+# (« État : … » au lieu de « State: … »).
 for extension in codebyr@codebyr.io dash-to-dock@micxgx.gmail.com; do
-	etat=$(dans_la_session gnome-extensions info "$extension" 2>&1 | sed -n 's/^ *State: *//p')
-	if [ "$(echo "$etat" | tr '[:lower:]' '[:upper:]')" = ACTIVE ]; then
-		ok "extension $extension active"
-	else
+	info=$(dans_la_session env LC_ALL=C.UTF-8 gnome-extensions info "$extension" 2>&1)
+	etat=$(echo "$info" | sed -n 's/^ *State: *//p' | tr '[:lower:]' '[:upper:]')
+	case "$etat" in
+	ACTIVE | ENABLED) ok "extension $extension active" ;;
+	*)
 		ko "extension $extension : état « $etat »"
-	fi
+		echo "$info" | detail
+		;;
+	esac
 done
 
 # Une erreur de l'extension ne se voit pas : le menu du Sceau disparaît, ou une

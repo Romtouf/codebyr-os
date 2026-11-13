@@ -258,3 +258,40 @@ nouvelle image : celles jusqu'à la 1.18.2 portent le défaut, et une machine
 fraîchement installée depuis l'une d'elles serait bloquée de même. Un
 « Recommends » ne contourne rien : unattended-upgrades suit aussi les
 recommandations (`follow_deps`).
+
+## Liste de banques
+
+Lue le 13/11/2026 sur le site officiel de chaque banque : la page d'accueil,
+et, quand la page le contient, l'hôte du lien « Espace client ». Domaine retenu :
+le domaine enregistré de cet hôte (`monespace.lcl.fr` → `lcl.fr`), que la
+configuration étend à ses sous-domaines. Lien de connexion lu pour 14 banques ;
+pour Caisse d'Épargne, Banque Populaire et Crédit Mutuel, seule la page
+d'accueil (le lien n'est pas dans le HTML servi). BNP Paribas, Hello bank! et
+Revolut refusent la lecture automatique (HTTP 403) : absentes, faute de
+vérification, plutôt que devinées. Un domaine manquant pour la connexion se
+voit dans « Sites bloqués », que la configuration propose d'ajouter.
+
+## L'écran de connexion
+
+GNOME 48 n'a aucun réglage pour son fond, qui vient du thème de GNOME Shell
+(`#lockDialogGroup`). Remplacer ce thème (`gnome-shell-theme.gresource`)
+changerait toute l'interface et casserait à chaque version — refusé, comme le
+thème GTK sur mesure. Une extension système qui ne déclare que le mode
+« gdm » ajoute sa feuille de style ; la session de l'écran de connexion lit
+`enabled-extensions` par défaut comme les autres. Fond : celui de l'écran de
+verrouillage (`codebyr-sombre.png`), sur lequel le texte clair de GDM reste
+lisible.
+
+## Mode sombre
+
+Clair par défaut, comme GNOME — décidé le 13/11/2026. Les applications
+Codebyr suivent le réglage (libadwaita), le fond d'écran a ses deux versions,
+et la barre de GNOME reste sombre dans les deux cas.
+
+## Microcode et redémarrage
+
+Le microcode est RECOMMANDÉ par le paquet, non exigé : il vient de la section
+non-free-firmware, qu'une machine peut ne pas avoir dans ses sources ; exigé,
+il y bloquerait toute mise à jour de Codebyr, comme le dock l'aurait fait en
+1.21.0. Le redémarrage attendu se lit dans `/run/reboot-required`, que le
+hook noyau d'unattended-upgrades écrit déjà : pas de détection maison.

@@ -158,7 +158,9 @@ class Fenetre(Adw.ApplicationWindow):
         contenu.append(bas)
 
         tv = Adw.ToolbarView()
-        tv.add_top_bar(Adw.HeaderBar())
+        header = Adw.HeaderBar()
+        header.set_title_widget(Adw.WindowTitle(title=_("Bienvenue"), subtitle="Codebyr OS"))
+        tv.add_top_bar(header)
         tv.set_content(contenu)
         self.set_content(tv)
 

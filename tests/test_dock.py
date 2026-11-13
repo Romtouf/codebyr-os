@@ -43,7 +43,7 @@ class LeDock(unittest.TestCase):
     def test_active_par_defaut_avec_codebyr(self):
         shell = _section(_lire(OVERRIDE), "org.gnome.shell")
         self.assertEqual(shell["enabled-extensions"],
-                         "['codebyr@codebyr.io', '%s']" % UUID_DOCK)
+                         "['codebyr@codebyr.io', '%s', 'codebyr-connexion@codebyr.io']" % UUID_DOCK)
 
     def test_toujours_visible_en_bas(self):
         dock = _section(_lire(OVERRIDE), "org.gnome.shell.extensions.dash-to-dock")

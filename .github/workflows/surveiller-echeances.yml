@@ -1,0 +1,48 @@
+name: Surveiller les échéances
+
+# Un dépôt apt périmé, ou une sous-clé de signature expirée, arrête les mises
+# à jour de toutes les machines sans rien afficher. Chaque lundi, on lit les
+# vraies échéances (tools/surveiller_echeances.py) ; si l'une approche, un
+# ticket s'ouvre — GitHub en prévient le mainteneur par courriel.
+#
+# GitHub suspend les tâches planifiées d'un dépôt public resté 60 jours sans
+# commit : il le signale lui-même par courriel, et un commit les relance.
+
+on:
+  schedule:
+    - cron: "17 6 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  echeances:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Lire les échéances
+        id: lecture
+        run: |
+          set +e
+          python3 tools/surveiller_echeances.py | tee rapport.txt
+          echo "code=${PIPESTATUS[0]}" >> "$GITHUB_OUTPUT"
+
+      - name: Ouvrir un ticket si une échéance approche
+        if: steps.lecture.outputs.code != '0'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          titre="Échéance proche : dépôt apt ou clé de signature"
+          corps="$(printf 'Relevé du %s :\n\n```\n%s\n```\n' "$(date -u +%F)" "$(cat rapport.txt)")"
+          ouvert=$(gh issue list --state open --search "\"$titre\" in:title" --json number --jq '.[0].number')
+          if [ -n "$ouvert" ]; then
+            gh issue comment "$ouvert" --body "$corps"
+          else
+            gh issue create --title "$titre" --body "$corps"
+          fi
+          exit 1

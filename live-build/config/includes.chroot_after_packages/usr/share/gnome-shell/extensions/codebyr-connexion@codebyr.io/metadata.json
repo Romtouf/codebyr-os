@@ -1,0 +1,9 @@
+{
+  "uuid": "codebyr-connexion@codebyr.io",
+  "name": "Codebyr — écran de connexion",
+  "description": "Le fond de l'écran de connexion aux couleurs de Codebyr OS. N'agit que sur l'écran de connexion : dans une session, elle reste sans effet.",
+  "shell-version": ["46", "47", "48"],
+  "session-modes": ["gdm"],
+  "url": "https://os.codebyr.dev",
+  "version": 1
+}

@@ -178,8 +178,47 @@ def analyser_bac_a_sable(bwrap, userns, dbus_run_session):
     if not dbus_run_session:
         manques.append("dbus-run-session")
     if manques:
-        return False, "manque : " + ", ".join(manques)
+        return False, _("manque : {elements}").format(elements=", ".join(manques))
     return True, _("bubblewrap, espaces de noms et bus privé disponibles")
+
+
+# Le paquet du microcode de chaque fabricant (vendor_id de /proc/cpuinfo).
+MICROCODE = {"GenuineIntel": "intel-microcode", "AuthenticAMD": "amd64-microcode"}
+
+
+def analyser_microcode(fabricant, installes):
+    """Le microcode du fabricant du processeur doit être installé.
+
+    Ce sont ses correctifs contre les failles du processeur lui-même, chargés
+    au démarrage. Les images jusqu'à la 1.21.1 ne les avaient pas : rien ne le
+    montre, un processeur sans correctif fonctionne exactement pareil.
+
+    fabricant : le vendor_id du processeur, ou "" s'il ne se lit pas.
+    installes : les noms des paquets de MICROCODE installés.
+    """
+    paquet = MICROCODE.get(fabricant)
+    if paquet is None:
+        return True, _("processeur ni Intel ni AMD : sans objet")
+    if paquet in installes:
+        return True, _("{paquet} installé").format(paquet=paquet)
+    return False, _("{paquet} absent — sudo apt install {paquet}").format(paquet=paquet)
+
+
+def analyser_redemarrage(attendu, paquets):
+    """Une mise à jour qui n'agit qu'au redémarrage doit être signalée.
+
+    Depuis la 1.21.0, les noyaux se mettent à jour tout seuls : le nouveau est
+    installé, l'ancien continue de tourner — avec ses failles — jusqu'au
+    redémarrage. Debian le note dans /run/reboot-required.
+
+    attendu : le fichier existe ; paquets : ceux qui l'ont demandé.
+    """
+    if not attendu:
+        return True, _("aucun en attente")
+    if paquets:
+        return False, _("redémarrez pour appliquer : {paquets}").format(
+            paquets=", ".join(sorted(set(paquets))))
+    return False, _("redémarrez pour appliquer une mise à jour")
 
 
 # ── Collecte — la seule partie qui touche à la machine ──────────────────────
@@ -281,6 +320,20 @@ def _groupes_invite():
     return [g.gr_name for g in grp.getgrall() if INVITE in g.gr_mem]
 
 
+def _fabricant_processeur():
+    for ligne in _lire("/proc/cpuinfo").splitlines():
+        if ligne.startswith("vendor_id"):
+            return ligne.split(":", 1)[1].strip()
+    return ""
+
+
+REDEMARRAGE = "/run/reboot-required"
+
+
+def _paquets_redemarrage():
+    return [l.strip() for l in _lire(REDEMARRAGE + ".pkgs").splitlines() if l.strip()]
+
+
 def relever():
     """Toutes les mesures de la machine, en une passe."""
     champ = _champ_shadow(INVITE)
@@ -298,6 +351,11 @@ def relever():
         "bac_a_sable": analyser_bac_a_sable(
             bool(shutil.which("bwrap")), _userns_dispo(),
             bool(shutil.which("dbus-run-session"))),
+        "microcode": analyser_microcode(
+            _fabricant_processeur(),
+            [p for p in MICROCODE.values() if _paquet_installe(p)]),
+        "redemarrage": analyser_redemarrage(
+            os.path.exists(REDEMARRAGE), _paquets_redemarrage()),
     }
 
 
@@ -309,6 +367,8 @@ LIBELLES = (
     ("trousseau", _("Trousseau à jour pour les mises à jour")),
     ("maj", _("Mises à jour automatiques armées")),
     ("bac_a_sable", _("Bac à sable opérationnel")),
+    ("microcode", _("Microcode du processeur")),
+    ("redemarrage", _("Redémarrage en attente")),
 )
 
 

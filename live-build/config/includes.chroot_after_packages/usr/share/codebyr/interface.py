@@ -23,6 +23,18 @@ from gi.repository import Gdk, Gtk  # noqa: E402
 
 _CLASSES_POSEES = set()
 
+# Les fenêtres de Codebyr se ressemblent : même marge autour du contenu (la
+# grille de 6 px de GNOME, ×2), même taille pour les fenêtres principales.
+MARGE = 12
+TAILLE_FENETRE = (720, 640)
+
+
+def marges(widget, valeur=MARGE):
+    """La même marge des quatre côtés."""
+    for cote in ("top", "bottom", "start", "end"):
+        getattr(widget, "set_margin_" + cote)(valeur)
+    return widget
+
 
 def classe_pastille(couleur, rayon):
     """Nom d'une classe CSS pour cette couleur, déclarée au besoin."""

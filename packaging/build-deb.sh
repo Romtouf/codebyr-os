@@ -42,6 +42,7 @@ for chemin in \
 	usr/lib/systemd/system/codebyr-uid.service \
 	usr/lib/firefox-esr/distribution/policies.json \
 	usr/share/gnome-shell/extensions/codebyr@codebyr.io \
+	usr/share/gnome-shell/extensions/codebyr-connexion@codebyr.io \
 	usr/share/codebyr \
 	usr/share/nautilus-python \
 	usr/share/applications/io.codebyr.Ouvrir.desktop \
@@ -240,6 +241,13 @@ TAILLE="$(du -sk "$STAGE" | cut -f1)"
 # mise à jour automatique accepte Debian depuis la 1.21.0 (le nom de code,
 # plus haut). Une machine restée en 1.20.0 ou avant refuse toute version qui
 # en exige un, en silence : « sudo apt upgrade » la débloque.
+#
+# Le microcode du processeur (intel-microcode, amd64-microcode) n'est que
+# RECOMMANDÉ, par exception à la règle ci-dessus : il vient de la section
+# non-free-firmware, qu'une machine peut ne pas avoir dans ses sources. Exigé,
+# il y bloquerait toute mise à jour de Codebyr ; recommandé, la mise à jour
+# automatique l'installe là où il existe. L'image l'installe d'office, et
+# « verifier-poste » signale une machine qui ne l'a pas.
 mkdir -p "$STAGE/DEBIAN"
 cat > "$STAGE/DEBIAN/control" <<EOF
 Package: codebyr-tools
@@ -248,7 +256,7 @@ Architecture: all
 Maintainer: Codebyr OS <romain.formationoc@gmail.com>
 Installed-Size: $TAILLE
 Depends: python3 (>= 3.12), libseccomp2, python3-gi, gir1.2-gtk-4.0, gir1.2-adw-1, bubblewrap, dbus-user-session, firefox-esr | firefox, python3-nautilus, acl, libnotify-bin, systemd-cryptsetup, libgdk-pixbuf2.0-bin, gnome-shell-extension-dashtodock
-Recommends: flatpak, gnome-shell
+Recommends: flatpak, gnome-shell, intel-microcode, amd64-microcode
 Section: admin
 Priority: optional
 Homepage: https://os.codebyr.dev

@@ -252,6 +252,14 @@ msgid "Configuration Codebyr"
 msgstr "Codebyr Settings"
 
 #: usr/bin/codebyr-config
+msgid "Blindé : zéro privilège, session neuve"
+msgstr "Hardened: zero privileges, fresh session"
+
+#: usr/bin/codebyr-config
+msgid "Isolation ordinaire"
+msgstr "Ordinary isolation"
+
+#: usr/bin/codebyr-config
 msgid "Bac à sable (bubblewrap)"
 msgstr "Sandbox (bubblewrap)"
 
@@ -286,6 +294,18 @@ msgstr "No site yet"
 #: usr/bin/codebyr-config
 msgid "Ajoutez le site de votre banque ci-dessous."
 msgstr "Add your bank's site below."
+
+#: usr/bin/codebyr-config
+msgid "Choisir ma banque"
+msgstr "Choose my bank"
+
+#: usr/bin/codebyr-config
+msgid "Absente de la liste ? Ajoutez son site juste en dessous."
+msgstr "Not in the list? Add its website just below."
+
+#: usr/bin/codebyr-config
+msgid "Ajouter"
+msgstr "Add"
 
 #: usr/bin/codebyr-config
 msgid "Ajouter un site (ex. mabanque.fr)"
@@ -330,6 +350,14 @@ msgstr "Codebyr adapts to the hardware. A Disposable for an attachment always op
 #: usr/bin/codebyr-config
 msgid "Un Espace sous compte séparé possède ses fichiers sous une identité à lui. Ce qui s'échapperait de son bac à sable ne pourrait plus lire les autres Espaces, ni votre dossier personnel. Ses données le suivent à sa prochaine ouverture, et reviennent si vous le désactivez — rien n'est effacé."
 msgstr "A Space with a separate account owns its files under an identity of its own. Whatever escaped its sandbox could no longer read the other Spaces, nor your home folder. Its data follows it the next time it opens, and comes back if you turn it off — nothing is erased."
+
+#: usr/bin/codebyr-config
+msgid "Session invitée : ses Espaces n'ont jamais de compte séparé — ils s'effacent avec elle, à la déconnexion."
+msgstr "Guest session: its Spaces never have a separate account — they are erased with it, at logout."
+
+#: usr/bin/codebyr-config
+msgid "Le service des comptes d'Espaces n'est pas actif sur cette machine : ce réglage reste sans effet."
+msgstr "The Space accounts service is not running on this machine: this setting has no effect."
 
 #: usr/bin/codebyr-config
 msgid "Compte séparé, par Espace"
@@ -578,6 +606,10 @@ msgstr "Could not add this program."
 #: usr/bin/codebyr-config
 msgid "« {adresse} » n'est pas une adresse de site valable."
 msgstr "“{adresse}” is not a valid site address."
+
+#: usr/bin/codebyr-config
+msgid "Sites de « {banque} » ajoutés"
+msgstr "“{banque}” websites added"
 
 #: usr/bin/codebyr-installer
 msgid "Codebyr OS est déjà installé sur cette machine : rien à installer."
@@ -1169,8 +1201,36 @@ msgid "espaces de noms utilisateur"
 msgstr "user namespaces"
 
 #: usr/share/codebyr/autotest.py
+msgid "manque : {elements}"
+msgstr "missing: {elements}"
+
+#: usr/share/codebyr/autotest.py
 msgid "bubblewrap, espaces de noms et bus privé disponibles"
 msgstr "bubblewrap, namespaces and private bus available"
+
+#: usr/share/codebyr/autotest.py
+msgid "processeur ni Intel ni AMD : sans objet"
+msgstr "neither an Intel nor an AMD processor: not applicable"
+
+#: usr/share/codebyr/autotest.py
+msgid "{paquet} installé"
+msgstr "{paquet} installed"
+
+#: usr/share/codebyr/autotest.py
+msgid "{paquet} absent — sudo apt install {paquet}"
+msgstr "{paquet} missing — sudo apt install {paquet}"
+
+#: usr/share/codebyr/autotest.py
+msgid "aucun en attente"
+msgstr "none pending"
+
+#: usr/share/codebyr/autotest.py
+msgid "redémarrez pour appliquer : {paquets}"
+msgstr "restart to apply: {paquets}"
+
+#: usr/share/codebyr/autotest.py
+msgid "redémarrez pour appliquer une mise à jour"
+msgstr "restart to apply an update"
 
 #: usr/share/codebyr/autotest.py
 msgid "Clic droit « Ouvrir en Jetable »"
@@ -1199,6 +1259,14 @@ msgstr "Automatic updates armed"
 #: usr/share/codebyr/autotest.py
 msgid "Bac à sable opérationnel"
 msgstr "Sandbox operational"
+
+#: usr/share/codebyr/autotest.py
+msgid "Microcode du processeur"
+msgstr "Processor microcode"
+
+#: usr/share/codebyr/autotest.py
+msgid "Redémarrage en attente"
+msgstr "Pending restart"
 
 #: usr/share/codebyr/autotest.py
 msgid "Cet autotest porte sur LE POSTE, et doit être lancé depuis le bureau."
@@ -1545,6 +1613,14 @@ msgid "Codebyr — Espace actif : {nom}"
 msgstr "Codebyr — active Space: {nom}"
 
 #: usr/share/gnome-shell/extensions/codebyr@codebyr.io/extension.js
+msgid "Redémarrer pour finir la mise à jour"
+msgstr "Restart to finish the update"
+
+#: usr/share/gnome-shell/extensions/codebyr@codebyr.io/extension.js
+msgid "Redémarrez depuis le menu en haut à droite."
+msgstr "Restart from the menu at the top right."
+
+#: usr/share/gnome-shell/extensions/codebyr@codebyr.io/extension.js
 msgid "Ouvrir une app dans un Espace"
 msgstr "Open an app in a Space"
 
@@ -1605,12 +1681,32 @@ msgid "Créer"
 msgstr "Create"
 
 #: usr/share/gnome-shell/extensions/codebyr@codebyr.io/extension.js
+msgid "Prêter le PC à un invité"
+msgstr "Lend the PC to a guest"
+
+#: usr/share/gnome-shell/extensions/codebyr@codebyr.io/extension.js
+msgid "Votre session reste ouverte et se verrouille : l'invité ne voit ni vos fichiers ni vos Espaces."
+msgstr "Your session stays open and locks: the guest sees neither your files nor your Spaces."
+
+#: usr/share/gnome-shell/extensions/codebyr@codebyr.io/extension.js
+msgid "Sur l'écran qui s'ouvre, choisissez « Invité » : aucun mot de passe n'est demandé."
+msgstr "On the screen that opens, choose “Invité” (the guest account): no password is asked."
+
+#: usr/share/gnome-shell/extensions/codebyr@codebyr.io/extension.js
+msgid "Tout ce que l'invité fait est effacé à la fin de sa session."
+msgstr "Everything the guest does is erased when their session ends."
+
+#: usr/share/gnome-shell/extensions/codebyr@codebyr.io/extension.js
 msgid "Codebyr — Mode invité"
 msgstr "Codebyr — Guest mode"
 
 #: usr/share/gnome-shell/extensions/codebyr@codebyr.io/extension.js
 msgid "Ouvrez le menu en haut à droite → Changer d'utilisateur → Invité (aucun mot de passe demandé)."
-msgstr "Open the menu at the top right → Switch User → Guest (no password needed)."
+msgstr "Open the menu at the top right → Switch User → “Invité” (the guest account, no password needed)."
+
+#: usr/share/gnome-shell/extensions/codebyr@codebyr.io/extension.js
+msgid "Passer à l'invité"
+msgstr "Switch to the guest"
 
 #: usr/share/gnome-shell/extensions/codebyr@codebyr.io/extension.js
 msgid "Ouvrir un lien en Jetable"
@@ -1759,6 +1855,14 @@ msgstr "Could not restore {nom}"
 #: usr/share/gnome-shell/extensions/codebyr@codebyr.io/extension.js
 msgid "{nom} restauré à l'instantané du {date}"
 msgstr "{nom} restored to the snapshot of {date}"
+
+#: usr/share/gnome-shell/extensions/codebyr@codebyr.io/extension.js
+msgid "Redémarrage conseillé"
+msgstr "Restart recommended"
+
+#: usr/share/gnome-shell/extensions/codebyr@codebyr.io/extension.js
+msgid "Une mise à jour de sécurité est installée : elle n'agira qu'au prochain redémarrage. Menu du Sceau → « Redémarrer pour finir la mise à jour »."
+msgstr "A security update is installed: it will only take effect at the next restart. Seal menu → “Restart to finish the update”."
 
 #: etc/codebyr/espaces.json
 msgid "Calculatrice"

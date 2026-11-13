@@ -1,0 +1,21 @@
+{
+  "banques": [
+    {"nom": "BoursoBank", "domaines": ["boursobank.com"]},
+    {"nom": "Caisse d'Épargne", "domaines": ["caisse-epargne.fr"]},
+    {"nom": "Banque Populaire", "domaines": ["banquepopulaire.fr"]},
+    {"nom": "CCF", "domaines": ["ccf.fr"]},
+    {"nom": "CIC", "domaines": ["cic.fr"]},
+    {"nom": "Crédit Agricole", "domaines": ["credit-agricole.fr"]},
+    {"nom": "Crédit Mutuel", "domaines": ["creditmutuel.fr"]},
+    {"nom": "Crédit Mutuel de Bretagne", "domaines": ["cmb.fr"]},
+    {"nom": "Fortuneo", "domaines": ["fortuneo.fr"]},
+    {"nom": "La Banque Postale", "domaines": ["labanquepostale.fr"]},
+    {"nom": "LCL", "domaines": ["lcl.fr"]},
+    {"nom": "Monabanq", "domaines": ["monabanq.com"]},
+    {"nom": "N26", "domaines": ["n26.com"]},
+    {"nom": "Nickel", "domaines": ["nickel.eu"]},
+    {"nom": "Qonto", "domaines": ["qonto.com"]},
+    {"nom": "Shine", "domaines": ["shine.fr"]},
+    {"nom": "Société Générale", "domaines": ["sg.fr"]}
+  ]
+}

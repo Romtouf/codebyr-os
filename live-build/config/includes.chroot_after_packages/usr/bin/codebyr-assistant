@@ -22,6 +22,7 @@ GLib.set_prgname("io.codebyr.Assistant")
 
 # Registre partagé : vue fusionnée (défauts du système + choix de l'utilisateur).
 sys.path.insert(0, os.environ.get("CODEBYR_LIB", "/usr/share/codebyr"))
+import interface  # noqa: E402
 import registre  # noqa: E402
 from traduction import _, n_  # noqa: E402
 
@@ -108,7 +109,7 @@ def _espaces_ouverts():
 class Fenetre(Adw.ApplicationWindow):
     def __init__(self, app):
         super().__init__(application=app, title=_("Assistant de sécurité"))
-        self.set_default_size(720, 620)
+        self.set_default_size(*interface.TAILLE_FENETRE)
 
         page = Adw.PreferencesPage()
 
@@ -174,10 +175,7 @@ class Fenetre(Adw.ApplicationWindow):
     def _qa(self, question, reponse):
         exp = Adw.ExpanderRow(title=question)
         lbl = Gtk.Label(label=reponse, wrap=True, xalign=0)
-        lbl.set_margin_top(6)
-        lbl.set_margin_bottom(12)
-        lbl.set_margin_start(14)
-        lbl.set_margin_end(14)
+        interface.marges(lbl)
         lbl.add_css_class("body")
         exp.add_row(lbl)
         return exp

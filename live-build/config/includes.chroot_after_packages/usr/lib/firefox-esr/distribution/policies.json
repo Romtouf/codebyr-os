@@ -16,6 +16,13 @@
     "FirefoxSuggest": {
       "SponsoredSuggestions": false,
       "ImproveSuggest": false
+    },
+    "DisableTelemetry": true,
+    "DisableFirefoxStudies": true,
+    "UserMessaging": {
+      "ExtensionRecommendations": false,
+      "FeatureRecommendations": false,
+      "MoreFromMozilla": false
     }
   }
 }

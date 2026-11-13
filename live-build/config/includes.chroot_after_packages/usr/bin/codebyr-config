@@ -29,6 +29,7 @@ GLib.set_prgname("io.codebyr.Config")
 sys.path.insert(0, os.environ.get("CODEBYR_LIB", "/usr/share/codebyr"))
 import applications  # noqa: E402
 import bac_a_sable  # noqa: E402
+import banques  # noqa: E402
 import chemins  # noqa: E402
 import compte_dedie  # noqa: E402
 import interface  # noqa: E402
@@ -36,6 +37,12 @@ import registre  # noqa: E402
 from traduction import _, n_  # noqa: E402
 
 GLib.set_application_name(_("Configuration Codebyr"))
+
+
+def sous_titre_blindage(blinde):
+    """Ce que fait le réglage, plutôt que la couleur de l'Espace en hexadécimal."""
+    return (_("Blindé : zéro privilège, session neuve") if blinde
+            else _("Isolation ordinaire"))
 
 
 def load_registry():
@@ -77,7 +84,7 @@ def capacites_machine():
 class Fenetre(Adw.ApplicationWindow):
     def __init__(self, app):
         super().__init__(application=app, title=_("Configuration Codebyr"))
-        self.set_default_size(720, 640)
+        self.set_default_size(*interface.TAILLE_FENETRE)
         self._data = load_registry()
         self._scope_idx = 0  # 0 = liste commune ; 1..N = un Espace
 
@@ -152,6 +159,19 @@ class Fenetre(Adw.ApplicationWindow):
             row.add_suffix(btn)
             grp.add(row)
 
+        # Choisir sa banque plutôt que taper son adresse : la liste ne contient
+        # que des domaines lus sur le site de chaque banque (module banques).
+        liste = banques.charger()
+        if liste:
+            choix = Adw.ComboRow(
+                title=_("Choisir ma banque"),
+                subtitle=_("Absente de la liste ? Ajoutez son site juste en dessous."),
+                model=Gtk.StringList.new([nom for nom, _doms in liste]))
+            bchoix = Gtk.Button(label=_("Ajouter"), valign=Gtk.Align.CENTER)
+            bchoix.connect("clicked", lambda _b: self._ajouter_banque(liste[choix.get_selected()]))
+            choix.add_suffix(bchoix)
+            grp.add(choix)
+
         ajout = Adw.EntryRow(title=_("Ajouter un site (ex. mabanque.fr)"))
         badd = Gtk.Button(icon_name="list-add-symbolic", valign=Gtk.Align.CENTER)
         badd.add_css_class("flat")
@@ -171,9 +191,10 @@ class Fenetre(Adw.ApplicationWindow):
         self._groupes.append(gesp)
         for e in self._data.get("espaces", []):
             tag = "  " + _("(éphémère)") if e.get("ephemere") else ""
+            blinde = e.get("blindage") == "renforce"
             row = Adw.SwitchRow(title=e.get("nom", e.get("id")) + tag,
-                                subtitle=e.get("couleur", ""))
-            row.set_active(e.get("blindage") == "renforce")
+                                subtitle=sous_titre_blindage(blinde))
+            row.set_active(blinde)
             row.add_prefix(interface.pastille(e.get("couleur", "#888888"), 18))
             row.connect("notify::active", self._basculer_blindage, e.get("id"))
             gesp.add(row)
@@ -196,6 +217,7 @@ class Fenetre(Adw.ApplicationWindow):
                 subtitle=_("Son et micro autorisés") if actif
                          else _("Aucun son, aucun micro"))
             row.set_active(actif)
+            row.add_prefix(interface.pastille(e.get("couleur", "#888888"), 18))
             row.connect("notify::active", self._basculer_audio, e.get("id"))
             gson.add(row)
 
@@ -238,12 +260,12 @@ class Fenetre(Adw.ApplicationWindow):
         if invite:
             # Voir comptes.COMPTE_INVITE : ce réglage ne s'applique jamais ici,
             # et un bouton sans effet mentirait.
-            description += ("\n\nSession invitée : ses Espaces n'ont jamais de "
-                            "compte séparé — ils s'effacent avec elle, à la "
-                            "déconnexion.")
+            description += "\n\n" + _("Session invitée : ses Espaces n'ont jamais de "
+                                       "compte séparé — ils s'effacent avec elle, à la "
+                                       "déconnexion.")
         elif not service:
-            description += ("\n\nLe service des comptes d'Espaces n'est pas actif "
-                            "sur cette machine : ce réglage reste sans effet.")
+            description += "\n\n" + _("Le service des comptes d'Espaces n'est pas actif "
+                                       "sur cette machine : ce réglage reste sans effet.")
         groupe = Adw.PreferencesGroup(title=_("Compte séparé, par Espace"),
                                       description=description)
         self._page.add(groupe)
@@ -511,9 +533,7 @@ class Fenetre(Adw.ApplicationWindow):
                          default_width=460, default_height=560, title=_("Ajouter une application"))
         tv = Adw.ToolbarView()
         tv.add_top_bar(Adw.HeaderBar())
-        boite = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
-        boite.set_margin_top(6); boite.set_margin_bottom(6)
-        boite.set_margin_start(6); boite.set_margin_end(6)
+        boite = interface.marges(Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6))
         recherche = Gtk.SearchEntry(placeholder_text=_("Rechercher une application…"))
         boite.append(recherche)
         defilement = Gtk.ScrolledWindow(vexpand=True)
@@ -556,9 +576,7 @@ class Fenetre(Adw.ApplicationWindow):
                          title=_("Installer dans « {nom} »").format(nom=esp.get("nom", "")))
         tv = Adw.ToolbarView()
         tv.add_top_bar(Adw.HeaderBar())
-        boite = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
-        for m in ("top", "bottom", "start", "end"):
-            getattr(boite, "set_margin_" + m)(8)
+        boite = interface.marges(Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6))
         recherche = Gtk.SearchEntry(
             placeholder_text=_("Rechercher sur Flathub (ex. brave, gimp, vlc)…"))
         boite.append(recherche)
@@ -694,9 +712,7 @@ class Fenetre(Adw.ApplicationWindow):
                          title=_("Programmes de « {nom} »").format(nom=esp.get("nom", "")))
         tv = Adw.ToolbarView()
         tv.add_top_bar(Adw.HeaderBar())
-        boite = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
-        for m in ("top", "bottom", "start", "end"):
-            getattr(boite, "set_margin_" + m)(10)
+        boite = interface.marges(Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6))
         aide = (_("Pour en ajouter un autre, téléchargez-le avec le navigateur de "
                   "l'Espace, ou envoyez-le-lui (clic droit sur le fichier → « Envoyer "
                   "vers l'Espace »), puis revenez ici."))
@@ -762,9 +778,7 @@ class Fenetre(Adw.ApplicationWindow):
         grp.add(sw)
         page.add(grp)
 
-        bar = Gtk.Box(halign=Gtk.Align.END, spacing=8)
-        for m in ("top", "bottom", "start", "end"):
-            getattr(bar, "set_margin_" + m)(12)
+        bar = interface.marges(Gtk.Box(halign=Gtk.Align.END, spacing=6))
         annuler = Gtk.Button(label=_("Annuler"))
         annuler.connect("clicked", lambda _b: dlg.close())
         ajouter = Gtk.Button(label=_("Ajouter au menu"))
@@ -825,11 +839,19 @@ class Fenetre(Adw.ApplicationWindow):
         registre.modifier_espace(banque["id"], {"reseau": banque["reseau"]})
         self._construire()
 
+    def _ajouter_banque(self, banque):
+        nom, domaines = banque
+        for d in domaines:
+            self._ajouter_domaine(d)
+        self._toaster.add_toast(Adw.Toast(
+            title=_("Sites de « {banque} » ajoutés").format(banque=nom)))
+
     def _basculer_blindage(self, row, _pspec, esp_id):
         # On écrit explicitement « None » pour désactiver : retirer la clé
         # laisserait simplement revenir la valeur par défaut du système, et le
         # bouton semblerait ne servir à rien.
         valeur = "renforce" if row.get_active() else None
+        row.set_subtitle(sous_titre_blindage(valeur == "renforce"))
         for e in self._data.get("espaces", []):
             if e.get("id") == esp_id:
                 e["blindage"] = valeur

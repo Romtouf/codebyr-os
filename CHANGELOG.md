@@ -10,6 +10,41 @@ GNOME (menu du Sceau, liserés colorés) ne se recharge pas à chaud.
 
 ---
 
+## 1.21.2 — non publiée
+
+**Le microcode du processeur est installé.** Ce sont les correctifs du
+fabricant contre les failles du processeur lui-même (Spectre, Downfall,
+Zenbleed…), chargés dès le démarrage. Aucune image de Codebyr ne les
+contenait. Ils arrivent par la mise à jour automatique là où Debian les
+fournit, et `codebyr-space verifier-poste` dit si votre machine les a.
+
+**Codebyr vous dit quand redémarrer.** Les noyaux se mettent à jour tout
+seuls, mais l'ancien continue de tourner — avec ses failles — jusqu'au
+redémarrage. Une notification le signale désormais, et le menu du Sceau
+propose « Redémarrer pour finir la mise à jour » tant qu'il le faut.
+
+**Firefox n'envoie plus rien chez Mozilla** : ni mesures d'usage, ni
+« études » lancées à distance, et il ne vous suggère plus d'installer des
+extensions.
+
+**Choisissez votre banque dans une liste** (Configuration Codebyr → Sites de
+votre banque) : 17 banques, dont chaque adresse a été lue sur le site officiel
+de la banque. La vôtre n'y est pas ? Ajoutez son site à la main, comme avant.
+
+**Prêter le PC devient plus clair** : avant d'ouvrir l'écran de connexion, le
+menu du Sceau dit quoi y choisir (« Invité », sans mot de passe) et ce qui
+arrivera (votre session verrouillée, tout effacé à la fin de la sienne).
+
+**L'écran de connexion prend les couleurs de Codebyr**, à la place du gris de
+GNOME. Il apparaît après un redémarrage.
+
+Et aussi : les applications Codebyr ont la même allure (marges, taille,
+en-tête), chaque Espace s'y reconnaît à sa pastille plutôt qu'à son code
+couleur, et trois phrases qui restaient en français dans une session anglaise
+sont traduites. Le mode clair reste le réglage par défaut, comme dans GNOME.
+
+---
+
 ## 1.21.1 — 16 octobre 2026
 
 **Le dock arrive.** Toujours visible en bas de l'écran, il met vos

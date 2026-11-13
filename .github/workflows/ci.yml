@@ -24,9 +24,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
-      - uses: actions/setup-python@v7
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7
         with:
           python-version: '3.13'
 
@@ -147,7 +147,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - name: Construire le .deb
         run: |
@@ -176,7 +176,7 @@ jobs:
               || { echo "$outil n'est pas exécutable dans le paquet !" >&2; exit 1; }
           done
 
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: codebyr-tools-deb
           path: packaging/dist/*.deb
@@ -194,7 +194,7 @@ jobs:
         run: |
           apt-get update -qq
           apt-get install -y --no-install-recommends git ca-certificates python3 bubblewrap dbus-daemon libseccomp2 firefox-esr nodejs libnotify-bin python3-gi acl nftables iproute2
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - name: Autoriser les espaces de noms utilisateur si possible
         # Ubuntu 24.04 les restreint par AppArmor et le conteneur en hérite :
         # bwrap échoue alors sur « setting up uid map: Permission denied ».

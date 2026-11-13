@@ -129,6 +129,55 @@ class BacASable(unittest.TestCase):
             self.assertIn(attendu, detail)
 
 
+class Microcode(unittest.TestCase):
+    """Les images jusqu'à la 1.21.1 n'avaient aucun microcode : firmware-linux
+    ne fait que le recommander, et l'image se construit sans recommandations."""
+
+    def test_le_paquet_du_fabricant(self):
+        ok, detail = autotest.analyser_microcode("GenuineIntel", ["intel-microcode"])
+        self.assertTrue(ok)
+        ok, detail = autotest.analyser_microcode("AuthenticAMD", ["intel-microcode"])
+        self.assertFalse(ok)
+        self.assertIn("sudo apt install amd64-microcode", detail)
+
+    def test_un_autre_fabricant_n_est_pas_une_faute(self):
+        self.assertTrue(autotest.analyser_microcode("", [])[0])
+        self.assertTrue(autotest.analyser_microcode("HygonGenuine", [])[0])
+
+    def test_l_image_et_le_paquet_l_apportent(self):
+        import os
+        from outils import RACINE
+        with open(os.path.join(RACINE, "live-build", "config", "package-lists",
+                               "hardening.list.chroot"), encoding="utf-8") as f:
+            liste = f.read().split()
+        with open(os.path.join(RACINE, "packaging", "build-deb.sh"), encoding="utf-8") as f:
+            construction = f.read()
+        recommande = [l for l in construction.splitlines() if l.startswith("Recommends:")][0]
+        depend = [l for l in construction.splitlines() if l.startswith("Depends:")][0]
+        for paquet in autotest.MICROCODE.values():
+            self.assertIn(paquet, liste)
+            self.assertIn(paquet, recommande)
+            # Exigé, il bloquerait les mises à jour d'une machine sans
+            # la section non-free-firmware dans ses sources.
+            self.assertNotIn(paquet, depend)
+
+
+class Redemarrage(unittest.TestCase):
+
+    def test_rien_en_attente(self):
+        self.assertEqual(autotest.analyser_redemarrage(False, [])[0], True)
+
+    def test_un_noyau_attend(self):
+        ok, detail = autotest.analyser_redemarrage(
+            True, ["linux-image-6.12.57+deb13-amd64", "linux-image-6.12.57+deb13-amd64"])
+        self.assertFalse(ok)
+        self.assertEqual(detail.count("linux-image-6.12.57+deb13-amd64"), 1)
+
+    def test_le_fichier_de_debian(self):
+        # Écrit par /etc/kernel/postinst.d/unattended-upgrades, à chaque noyau.
+        self.assertEqual(autotest.REDEMARRAGE, "/run/reboot-required")
+
+
 class Coherence(unittest.TestCase):
     def test_chaque_controle_a_un_libelle(self):
         """Un contrôle sans libellé ne s'afficherait jamais — donc n'existerait pas."""

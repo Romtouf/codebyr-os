@@ -1072,6 +1072,19 @@ class Indicateur extends PanelMenu.Button {
         this._apps = chargerApps();
         const espaces = chargerEspaces();
 
+        if (redemarrageAttendu()) {
+            // GNOME demande confirmation, avec son compte à rebours habituel.
+            this.menu.addAction('🔄  ' + _('Redémarrer pour finir la mise à jour'), () => {
+                try {
+                    SystemActions.getDefault().activateRestart();
+                } catch (e) {
+                    logError(e, 'Codebyr: redémarrage');
+                    Main.notify('Codebyr', _('Redémarrez depuis le menu en haut à droite.'));
+                }
+            });
+            this.menu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
+        }
+
         const entete = new PopupMenu.PopupMenuItem(_('Ouvrir une app dans un Espace'), {reactive: false});
         entete.label.add_style_class_name('codebyr-entete');
         this.menu.addMenuItem(entete);
@@ -1168,13 +1181,38 @@ class Indicateur extends PanelMenu.Button {
         global.stage.set_key_focus(entry.clutter_text);
     }
 
+    // L'écran de connexion de GNOME ne se laisse pas présélectionner un compte :
+    // on dit donc AVANT d'y aller ce qu'il faudra choisir, et ce qui arrivera.
     _modeInvite() {
-        try {
-            SystemActions.getDefault().activateSwitchUser();
-        } catch (e) {
-            Main.notify(_('Codebyr — Mode invité'),
-                _('Ouvrez le menu en haut à droite → Changer d\'utilisateur → Invité (aucun mot de passe demandé).'));
+        const dlg = new ModalDialog.ModalDialog({destroyOnClose: true});
+        const boite = new St.BoxLayout({vertical: true, style: 'spacing: 10px; max-width: 460px;'});
+        boite.add_child(new St.Label({text: _('Prêter le PC à un invité'),
+            style: 'font-weight: 700; font-size: 15px;'}));
+        for (const texte of [
+            _('Votre session reste ouverte et se verrouille : l\'invité ne voit ni vos fichiers ni vos Espaces.'),
+            _('Sur l\'écran qui s\'ouvre, choisissez « Invité » : aucun mot de passe n\'est demandé.'),
+            _('Tout ce que l\'invité fait est effacé à la fin de sa session.'),
+        ]) {
+            const ligne = new St.Label({text: '•  ' + texte});
+            ligne.clutter_text.line_wrap = true;
+            boite.add_child(ligne);
         }
+        dlg.contentLayout.add_child(boite);
+        const passer = () => {
+            dlg.close();
+            try {
+                SystemActions.getDefault().activateSwitchUser();
+            } catch (e) {
+                logError(e, 'Codebyr: changement d\'utilisateur');
+                Main.notify(_('Codebyr — Mode invité'),
+                    _('Ouvrez le menu en haut à droite → Changer d\'utilisateur → Invité (aucun mot de passe demandé).'));
+            }
+        };
+        dlg.setButtons([
+            {label: _('Annuler'), action: () => dlg.close(), key: Clutter.KEY_Escape},
+            {label: _('Passer à l\'invité'), action: passer, default: true},
+        ]);
+        dlg.open();
     }
 
     _dialogueLienJetable() {
@@ -1518,6 +1556,40 @@ class Indicateur extends PanelMenu.Button {
     }
 });
 
+// Un correctif qui n'agit qu'au redémarrage — un noyau, avant tout. La mise à
+// jour automatique l'installe sans personne devant l'écran ; l'ancien noyau
+// continue de tourner, avec ses failles, jusqu'au redémarrage, et rien ne le
+// montre. Debian le note dans ce fichier (hook noyau d'unattended-upgrades) :
+// on le dit une fois par session, et le menu du Sceau propose de redémarrer
+// tant qu'il est là.
+const REDEMARRAGE = '/run/reboot-required';
+
+function redemarrageAttendu() {
+    return GLib.file_test(REDEMARRAGE, GLib.FileTest.EXISTS);
+}
+
+class Redemarrage {
+    activer() {
+        this._prevenu = false;
+        this._suivi = Gio.File.new_for_path(REDEMARRAGE).monitor_file(Gio.FileMonitorFlags.NONE, null);
+        this._suivi.connect('changed', () => this._prevenir());
+        this._prevenir();
+    }
+
+    _prevenir() {
+        if (this._prevenu || !redemarrageAttendu())
+            return;
+        this._prevenu = true;
+        Main.notify(_('Redémarrage conseillé'),
+            _('Une mise à jour de sécurité est installée : elle n\'agira qu\'au prochain redémarrage. Menu du Sceau → « Redémarrer pour finir la mise à jour ».'));
+    }
+
+    detruire() {
+        this._suivi?.cancel();
+        this._suivi = null;
+    }
+}
+
 export default class CodebyrExtension extends Extension {
     enable() {
         // La session s'ouvre sur le bureau, pas sur la vue d'ensemble. GNOME y
@@ -1562,6 +1634,12 @@ export default class CodebyrExtension extends Extension {
             this.pressePapiers.activer();
         } catch (e) {
             logError(e, 'Codebyr: activation du presse-papiers');
+        }
+        try {
+            this._redemarrage = new Redemarrage();
+            this._redemarrage.activer();
+        } catch (e) {
+            logError(e, 'Codebyr: suivi du redémarrage');
         }
     }
 
@@ -1613,6 +1691,8 @@ export default class CodebyrExtension extends Extension {
         this._coloriage = null;
         this.pressePapiers?.detruire();
         this.pressePapiers = null;
+        this._redemarrage?.detruire();
+        this._redemarrage = null;
         this._indicateur?.destroy();
         this._indicateur = null;
         this._espaces = null;

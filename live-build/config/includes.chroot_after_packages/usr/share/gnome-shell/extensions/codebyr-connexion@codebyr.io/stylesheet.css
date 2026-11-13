@@ -1,0 +1,10 @@
+/* Le fond sombre de Codebyr, celui de l'écran de verrouillage, à la place du
+   gris uni de GNOME. La couleur reste si l'image manque : celle du fond
+   sombre de la charte (branding/couleurs.md). Le texte de l'écran de
+   connexion est clair, il reste lisible sur l'une comme sur l'autre. */
+#lockDialogGroup {
+  background-color: #0B1419;
+  background-image: url("file:///usr/share/backgrounds/codebyr/codebyr-sombre.png");
+  background-size: cover;
+  background-position: center;
+}

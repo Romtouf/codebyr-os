@@ -44,10 +44,28 @@ class SansSponsorises(unittest.TestCase):
     def test_le_reste_de_firefox_reste_tel_quel(self):
         # Seul le sponsorisé part : raccourcis, recherche et suggestions
         # ordinaires restent, et l'utilisateur garde la main (rien de verrouillé).
-        for regle in ("FirefoxHome", "FirefoxSuggest"):
+        for regle in ("FirefoxHome", "FirefoxSuggest", "UserMessaging"):
             self.assertNotIn("Locked", _politiques()[regle])
         self.assertEqual(set(_politiques()),
-                         {"ExtensionSettings", "FirefoxHome", "FirefoxSuggest"})
+                         {"ExtensionSettings", "FirefoxHome", "FirefoxSuggest",
+                          "DisableTelemetry", "DisableFirefoxStudies", "UserMessaging"})
+
+
+class SansTelemetrie(unittest.TestCase):
+    """Rien ne part chez Mozilla sans qu'on l'ait demandé : ni mesures d'usage,
+    ni « études » lancées à distance (elles installent du code dans le
+    navigateur), ni suggestions d'installer une extension — une extension est
+    exactement ce qu'un Espace ne devrait pas recevoir sur un conseil.
+    Noms vérifiés dans le schéma des politiques de Firefox ESR 140."""
+
+    def test_ni_mesures_ni_etudes(self):
+        self.assertIs(_politiques()["DisableTelemetry"], True)
+        self.assertIs(_politiques()["DisableFirefoxStudies"], True)
+
+    def test_ni_recommandations(self):
+        self.assertEqual(_politiques()["UserMessaging"],
+                         {"ExtensionRecommendations": False, "FeatureRecommendations": False,
+                          "MoreFromMozilla": False})
 
 
 if __name__ == "__main__":

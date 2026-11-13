@@ -24,6 +24,13 @@ firmware-iwlwifi
 firmware-realtek
 firmware-atheros
 
+# Microcode du processeur : les correctifs du fabricant contre les failles du
+# processeur lui-même (Spectre, Downfall, Zenbleed…), chargés dès le démarrage.
+# firmware-linux ne fait que les recommander, et l'image se construit sans les
+# recommandations : ils manquaient. Chacun ne s'applique qu'à son fabricant.
+intel-microcode
+amd64-microcode
+
 # Vérification GPG des téléchargements Codebyr (codebyr-verifier)
 gnupg
 

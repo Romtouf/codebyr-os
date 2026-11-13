@@ -15,8 +15,8 @@ GNOME (menu du Sceau, liserés colorés) ne se recharge pas à chaud.
 **Le microcode du processeur est installé.** Ce sont les correctifs du
 fabricant contre les failles du processeur lui-même (Spectre, Downfall,
 Zenbleed…), chargés dès le démarrage. Aucune image de Codebyr ne les
-contenait. Ils arrivent par la mise à jour automatique là où Debian les
-fournit, et `codebyr-space verifier-poste` dit si votre machine les a.
+contenait. Ils arrivent par la mise à jour automatique, et
+`codebyr-space verifier-poste` dit si votre machine les a.
 
 **Codebyr vous dit quand redémarrer.** Les noyaux se mettent à jour tout
 seuls, mais l'ancien continue de tourner — avec ses failles — jusqu'au

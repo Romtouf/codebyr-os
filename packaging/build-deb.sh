@@ -235,19 +235,19 @@ TAILLE="$(du -sk "$STAGE" | cut -f1)"
 #     Constaté le 29/09/2026 ;
 #   · gnome-shell-extension-dashtodock — le dock toujours visible, réglé par
 #     90_codebyr.gschema.override, où l'extension Codebyr pose une pastille
-#     par fenêtre à la couleur de son Espace.
+#     par fenêtre à la couleur de son Espace ;
+#   · intel-microcode, amd64-microcode — les correctifs du fabricant contre
+#     les failles du processeur lui-même, chargés au démarrage. Une simple
+#     recommandation n'atteint pas les machines installées : la mise à jour
+#     automatique n'installe que les dépendances nouvelles, jamais les
+#     recommandations (essayé sur la VM). Ils viennent de la section
+#     non-free-firmware, que l'image écrit dans les sources de toute machine
+#     installée depuis la 1.0 (auto/config, --archive-areas).
 #
 # Exiger un paquet Debian ABSENT des machines n'est possible que parce que la
 # mise à jour automatique accepte Debian depuis la 1.21.0 (le nom de code,
 # plus haut). Une machine restée en 1.20.0 ou avant refuse toute version qui
 # en exige un, en silence : « sudo apt upgrade » la débloque.
-#
-# Le microcode du processeur (intel-microcode, amd64-microcode) n'est que
-# RECOMMANDÉ, par exception à la règle ci-dessus : il vient de la section
-# non-free-firmware, qu'une machine peut ne pas avoir dans ses sources. Exigé,
-# il y bloquerait toute mise à jour de Codebyr ; recommandé, la mise à jour
-# automatique l'installe là où il existe. L'image l'installe d'office, et
-# « verifier-poste » signale une machine qui ne l'a pas.
 mkdir -p "$STAGE/DEBIAN"
 cat > "$STAGE/DEBIAN/control" <<EOF
 Package: codebyr-tools
@@ -255,8 +255,8 @@ Version: $VERSION
 Architecture: all
 Maintainer: Codebyr OS <romain.formationoc@gmail.com>
 Installed-Size: $TAILLE
-Depends: python3 (>= 3.12), libseccomp2, python3-gi, gir1.2-gtk-4.0, gir1.2-adw-1, bubblewrap, dbus-user-session, firefox-esr | firefox, python3-nautilus, acl, libnotify-bin, systemd-cryptsetup, libgdk-pixbuf2.0-bin, gnome-shell-extension-dashtodock
-Recommends: flatpak, gnome-shell, intel-microcode, amd64-microcode
+Depends: python3 (>= 3.12), libseccomp2, python3-gi, gir1.2-gtk-4.0, gir1.2-adw-1, bubblewrap, dbus-user-session, firefox-esr | firefox, python3-nautilus, acl, libnotify-bin, systemd-cryptsetup, libgdk-pixbuf2.0-bin, gnome-shell-extension-dashtodock, intel-microcode, amd64-microcode
+Recommends: flatpak, gnome-shell
 Section: admin
 Priority: optional
 Homepage: https://os.codebyr.dev

@@ -152,14 +152,20 @@ class Microcode(unittest.TestCase):
             liste = f.read().split()
         with open(os.path.join(RACINE, "packaging", "build-deb.sh"), encoding="utf-8") as f:
             construction = f.read()
-        recommande = [l for l in construction.splitlines() if l.startswith("Recommends:")][0]
         depend = [l for l in construction.splitlines() if l.startswith("Depends:")][0]
+        # Exigé, pas seulement recommandé : la mise à jour automatique
+        # n'installe pas les recommandations nouvelles (vu sur la VM, 1.21.2~essai1).
         for paquet in autotest.MICROCODE.values():
             self.assertIn(paquet, liste)
-            self.assertIn(paquet, recommande)
-            # Exigé, il bloquerait les mises à jour d'une machine sans
-            # la section non-free-firmware dans ses sources.
-            self.assertNotIn(paquet, depend)
+            self.assertIn(paquet, [d.strip() for d in depend[len("Depends:"):].split(",")])
+
+    def test_la_section_qui_les_fournit_est_dans_les_sources(self):
+        # Exiger un paquet de non-free-firmware n'est sûr que parce que
+        # l'image écrit cette section dans les sources de toute machine.
+        import os
+        from outils import RACINE
+        with open(os.path.join(RACINE, "live-build", "auto", "config"), encoding="utf-8") as f:
+            self.assertIn("non-free-firmware", f.read().split("--archive-areas", 1)[1].splitlines()[0])
 
 
 class Redemarrage(unittest.TestCase):

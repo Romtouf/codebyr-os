@@ -290,8 +290,11 @@ et la barre de GNOME reste sombre dans les deux cas.
 
 ## Microcode et redémarrage
 
-Le microcode est RECOMMANDÉ par le paquet, non exigé : il vient de la section
-non-free-firmware, qu'une machine peut ne pas avoir dans ses sources ; exigé,
-il y bloquerait toute mise à jour de Codebyr, comme le dock l'aurait fait en
-1.21.0. Le redémarrage attendu se lit dans `/run/reboot-required`, que le
+Le microcode est EXIGÉ par le paquet. D'abord seulement recommandé, par
+crainte d'une machine sans la section non-free-firmware dans ses sources :
+essayé sur la VM le 13/11/2026, la mise à jour automatique n'installe pas les
+recommandations nouvelles — le microcode n'arrivait sur aucune machine
+installée. Or l'image écrit non-free-firmware dans les sources de toute
+machine depuis la 1.0 (`--archive-areas`) : l'exiger est sûr, et un test le
+vérifie. Le redémarrage attendu se lit dans `/run/reboot-required`, que le
 hook noyau d'unattended-upgrades écrit déjà : pas de détection maison.

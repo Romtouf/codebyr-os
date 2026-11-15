@@ -64,7 +64,7 @@ class CouleursDesEspaces(unittest.TestCase):
     alors qu'il est dans un autre. C'est le seul repère visuel du cloisonnement.
     """
 
-    ESPACES = ("--esp-personnel", "--esp-travail", "--esp-banque",
+    ESPACES = ("--esp-personnel", "--esp-travail", "--esp-banque", "--esp-coffre",
                "--esp-navigation", "--esp-jetable", "--esp-systeme")
 
     def setUp(self):

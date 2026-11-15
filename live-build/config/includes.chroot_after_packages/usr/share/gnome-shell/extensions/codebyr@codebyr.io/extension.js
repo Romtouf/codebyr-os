@@ -1105,6 +1105,15 @@ class Indicateur extends PanelMenu.Button {
         this.menu.addAction('📋  ' + _('Transférer le presse-papiers vers…'),
             () => this._ouvrirFenetre(() => this._dialogueTransfert(espaces)));
         this.menu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
+        // L'état du poste : ce qui ne se voit pas à l'usage.
+        const etat = etatMisesAJour(ageDuTemoin());
+        const ligne = new PopupMenu.PopupMenuItem(
+            (etat.ok ? '✔  ' : '⚠  ') + etat.texte, {reactive: false});
+        this.menu.addMenuItem(ligne);
+        this.menu.addAction('🩺  ' + _('Vérifier ce poste'), () => this._executer(
+            'kgx -- sh -c ' + GLib.shell_quote('codebyr-space verifier-poste; echo; read _'),
+            _('Vérification du poste indisponible')));
+        this.menu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
         this.menu.addAction('🛡  ' + _('Assistant de sécurité'),
             () => this._executer('/usr/bin/codebyr-assistant',
                 _('Assistant de sécurité indisponible')));
@@ -1566,6 +1575,39 @@ const REDEMARRAGE = '/run/reboot-required';
 
 function redemarrageAttendu() {
     return GLib.file_test(REDEMARRAGE, GLib.FileTest.EXISTS);
+}
+
+// L'état du poste, dit dans le menu du Sceau : la dernière mise à jour
+// automatique, d'après le témoin qu'apt pose à chaque passage. Un poste qui
+// ne se met plus à jour se tait, exactement comme un poste sain : on le dit.
+const TEMOIN_MISES_A_JOUR = '/var/lib/apt/periodic/upgrade-stamp';
+const JOURS_SANS_MISE_A_JOUR = 4;
+
+// ageSecondes : l'âge du témoin, ou null s'il n'existe pas.
+function etatMisesAJour(ageSecondes) {
+    if (ageSecondes === null || ageSecondes < 0)
+        return {ok: false, texte: _('Mises à jour : jamais vérifiées sur ce poste')};
+    const jours = Math.floor(ageSecondes / 86400);
+    if (jours < 1)
+        return {ok: true, texte: _('Mises à jour vérifiées aujourd\'hui')};
+    if (jours < JOURS_SANS_MISE_A_JOUR) {
+        return {ok: true, texte: remplir(
+            n_('Mises à jour vérifiées il y a {n} jour', 'Mises à jour vérifiées il y a {n} jours', jours),
+            {n: String(jours)})};
+    }
+    return {ok: false, texte: remplir(
+        n_('Aucune mise à jour vérifiée depuis {n} jour', 'Aucune mise à jour vérifiée depuis {n} jours', jours),
+        {n: String(jours)})};
+}
+
+function ageDuTemoin() {
+    try {
+        const info = Gio.File.new_for_path(TEMOIN_MISES_A_JOUR).query_info(
+            'time::modified', Gio.FileQueryInfoFlags.NONE, null);
+        return Math.floor(Date.now() / 1000) - info.get_attribute_uint64('time::modified');
+    } catch (e) {
+        return null;
+    }
 }
 
 class Redemarrage {

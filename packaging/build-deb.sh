@@ -243,6 +243,9 @@ TAILLE="$(du -sk "$STAGE" | cut -f1)"
 #     recommandations (essayé sur la VM). Ils viennent de la section
 #     non-free-firmware, que l'image écrit dans les sources de toute machine
 #     installée depuis la 1.0 (auto/config, --archive-areas).
+#   · keepassxc-minimal, qtwayland5 — le gestionnaire de mots de passe de
+#     l'Espace Coffre (variante sans aucune fonction réseau), et de quoi
+#     afficher une application Qt sous Wayland : un Espace ne voit pas X11.
 #
 # Exiger un paquet Debian ABSENT des machines n'est possible que parce que la
 # mise à jour automatique accepte Debian depuis la 1.21.0 (le nom de code,
@@ -255,7 +258,7 @@ Version: $VERSION
 Architecture: all
 Maintainer: Codebyr OS <romain.formationoc@gmail.com>
 Installed-Size: $TAILLE
-Depends: python3 (>= 3.12), libseccomp2, python3-gi, gir1.2-gtk-4.0, gir1.2-adw-1, bubblewrap, dbus-user-session, firefox-esr | firefox, python3-nautilus, acl, libnotify-bin, systemd-cryptsetup, libgdk-pixbuf2.0-bin, gnome-shell-extension-dashtodock, intel-microcode, amd64-microcode
+Depends: python3 (>= 3.12), libseccomp2, python3-gi, gir1.2-gtk-4.0, gir1.2-adw-1, bubblewrap, dbus-user-session, firefox-esr | firefox, python3-nautilus, acl, libnotify-bin, systemd-cryptsetup, libgdk-pixbuf2.0-bin, gnome-shell-extension-dashtodock, intel-microcode, amd64-microcode, keepassxc-minimal, qtwayland5
 Recommends: flatpak, gnome-shell
 Section: admin
 Priority: optional

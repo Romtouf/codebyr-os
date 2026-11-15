@@ -4,6 +4,8 @@
     { "id": "personnel",  "nom": "Personnel",  "couleur": "#4E8FEF", "app": "org.gnome.Nautilus.desktop", "ephemere": false, "compte": "dedie", "blindage": "renforce", "plafonds": { "memoire": "75%", "taches": 4096 } },
     { "id": "travail",    "nom": "Travail",    "couleur": "#8F6CF0", "app": "org.gnome.Nautilus.desktop", "ephemere": false, "compte": "dedie", "blindage": "renforce", "plafonds": { "memoire": "75%", "taches": 4096 } },
     { "id": "banque",     "nom": "Banque",     "couleur": "#2FA36B", "app": "firefox-esr.desktop",        "ephemere": false, "compte": "dedie", "blindage": "renforce", "audio": false, "gpu": false, "reseau": { "mode": "liste-blanche", "domaines": [] } },
+    { "id": "coffre",     "nom": "Coffre",     "couleur": "#E65CAE", "app": "org.keepassxc.KeePassXC.desktop", "ephemere": false, "compte": "dedie", "blindage": "renforce", "audio": false, "gpu": false, "reseau": { "mode": "coupe" },
+      "apps": [ { "nom": "Mots de passe", "cmd": "keepassxc" }, { "nom": "Fichiers", "cmd": "nautilus" } ] },
     { "id": "navigation", "nom": "Navigation", "couleur": "#BF7600", "app": "firefox-esr.desktop",        "ephemere": false, "compte": "dedie", "blindage": "renforce", "plafonds": { "memoire": "75%", "taches": 4096 } },
     { "id": "jetable",    "nom": "Jetable",    "couleur": "#E25551", "app": "firefox-esr.desktop",        "ephemere": true,  "compte": "dedie", "blindage": "renforce", "audio": false, "gpu": false }
   ],

@@ -43,7 +43,7 @@ def marquer_vu():
 # #E09A32, l'ambre abandonné en 1.12.2 faute de contraste.
 ESPACES = [
     (_("Personnel"), "#4E8FEF"), (_("Travail"), "#8F6CF0"), (_("Banque"), "#2FA36B"),
-    (_("Navigation"), "#BF7600"), (_("Jetable"), "#E25551"),
+    (_("Coffre"), "#E65CAE"), (_("Navigation"), "#BF7600"), (_("Jetable"), "#E25551"),
 ]
 
 

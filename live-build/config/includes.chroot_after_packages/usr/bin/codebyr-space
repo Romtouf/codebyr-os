@@ -781,6 +781,10 @@ def _environnement(esp, app_cmd):
         "XDG_DATA_DIRS", "/usr/local/share:/usr/share")
     env["CODEBYR_ESPACE"] = esp["id"]
     env["CODEBYR_ESPACE_COULEUR"] = esp["couleur"]
+    # Une application Qt (KeePassXC, dans le Coffre) choisit X11 par défaut,
+    # qu'un Espace ne voit pas : elle ne s'ouvrirait pas. Wayland d'abord, X11
+    # ensuite pour qui n'a pas le greffon Wayland — hors Espace, donc.
+    env.setdefault("QT_QPA_PLATFORM", "wayland;xcb")
     # Firefox garde son identifiant ordinaire (firefox-esr) : ses fenêtres se
     # rangent sous l'icône Firefox du dock, une pastille par Espace. Il en
     # recevait un par Espace (« codebyr-banque ») jusqu'à la 1.20.0, quand

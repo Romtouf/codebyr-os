@@ -9,6 +9,13 @@ gnome-software-plugin-flatpak
 # Métadonnées de catalogue (noms, icônes, descriptions des applications)
 appstream
 
+# Le gestionnaire de mots de passe de l'Espace Coffre. La variante minimale
+# n'a AUCUNE fonction réseau (ni greffon de navigateur, ni vérification en
+# ligne) : c'est celle qu'il faut à un Espace sans réseau. qtwayland5 : sans
+# lui, une application Qt ne s'affiche que par X11, qu'un Espace ne voit pas.
+keepassxc-minimal
+qtwayland5
+
 # Certificats racines TLS — SANS eux, AUCUN HTTPS système ne fonctionne
 # (flatpak : « [77] Problem with the SSL CA cert »). Recommends éliminé
 # par --apt-recommends false, d'où sa présence explicite ici.

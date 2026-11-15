@@ -31,6 +31,7 @@ l'appartenance d'une fenêtre ou d'un contenu à un Espace.
 | Personnel | Azur | `#4E8FEF` | Vie quotidienne |
 | Travail | Améthyste | `#8F6CF0` | Professionnel |
 | Banque | Émeraude | `#2FA36B` | Financier, isolement maximal |
+| Coffre | Orchidée | `#E65CAE` | Mots de passe, aucun réseau |
 | Navigation | Ambre | `#BF7600` | Web ordinaire |
 | Jetable | Braise | `#E25551` | Éphémère, autodétruit |
 | Système | Ardoise | `#6E7E89` | Réservé au système, non attribuable |

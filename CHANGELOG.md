@@ -10,6 +10,24 @@ GNOME (menu du Sceau, liserés colorés) ne se recharge pas à chaud.
 
 ---
 
+## 1.22.0 — non publiée
+
+**Un Espace « Coffre » pour vos mots de passe.** Un gestionnaire de mots de
+passe (KeePassXC) y tourne sous son propre compte, **sans aucun réseau** : un
+programme piégé ailleurs ne peut pas lire le coffre, et le coffre ne peut rien
+envoyer. Pour utiliser un mot de passe dans un autre Espace : copiez-le, puis
+menu du Sceau → « Transférer le presse-papiers vers… ». Le Coffre apparaît de
+lui-même dans le menu du Sceau, en rose orchidée.
+
+**Le menu du Sceau dit l'état du poste** : depuis quand les mises à jour ont
+été vérifiées, avec un avertissement si elles ne l'ont plus été depuis
+plusieurs jours, et « Vérifier ce poste » pour lancer l'autotest complet.
+
+L'installeur : le diaporama couvre désormais toute sa zone (une bordure
+blanche l'entourait).
+
+---
+
 ## 1.21.2 — 13 novembre 2026
 
 **Le microcode du processeur est installé.** Ce sont les correctifs du

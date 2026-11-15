@@ -166,6 +166,11 @@ msgstr "Bank"
 
 #: usr/bin/codebyr-bienvenue
 #: etc/codebyr/espaces.json
+msgid "Coffre"
+msgstr "Vault"
+
+#: usr/bin/codebyr-bienvenue
+#: etc/codebyr/espaces.json
 msgid "Navigation"
 msgstr "Browsing"
 
@@ -1641,6 +1646,14 @@ msgid "Transférer le presse-papiers vers…"
 msgstr "Send the clipboard to…"
 
 #: usr/share/gnome-shell/extensions/codebyr@codebyr.io/extension.js
+msgid "Vérifier ce poste"
+msgstr "Check this computer"
+
+#: usr/share/gnome-shell/extensions/codebyr@codebyr.io/extension.js
+msgid "Vérification du poste indisponible"
+msgstr "Computer check unavailable"
+
+#: usr/share/gnome-shell/extensions/codebyr@codebyr.io/extension.js
 msgid "Assistant de sécurité indisponible"
 msgstr "Security Assistant unavailable"
 
@@ -1857,12 +1870,36 @@ msgid "{nom} restauré à l'instantané du {date}"
 msgstr "{nom} restored to the snapshot of {date}"
 
 #: usr/share/gnome-shell/extensions/codebyr@codebyr.io/extension.js
+msgid "Mises à jour : jamais vérifiées sur ce poste"
+msgstr "Updates: never checked on this computer"
+
+#: usr/share/gnome-shell/extensions/codebyr@codebyr.io/extension.js
+msgid "Mises à jour vérifiées aujourd'hui"
+msgstr "Updates checked today"
+
+#: usr/share/gnome-shell/extensions/codebyr@codebyr.io/extension.js
+msgid "Mises à jour vérifiées il y a {n} jour"
+msgid_plural "Mises à jour vérifiées il y a {n} jours"
+msgstr[0] "Updates checked {n} day ago"
+msgstr[1] "Updates checked {n} days ago"
+
+#: usr/share/gnome-shell/extensions/codebyr@codebyr.io/extension.js
+msgid "Aucune mise à jour vérifiée depuis {n} jour"
+msgid_plural "Aucune mise à jour vérifiée depuis {n} jours"
+msgstr[0] "No update checked for {n} day"
+msgstr[1] "No update checked for {n} days"
+
+#: usr/share/gnome-shell/extensions/codebyr@codebyr.io/extension.js
 msgid "Redémarrage conseillé"
 msgstr "Restart recommended"
 
 #: usr/share/gnome-shell/extensions/codebyr@codebyr.io/extension.js
 msgid "Une mise à jour de sécurité est installée : elle n'agira qu'au prochain redémarrage. Menu du Sceau → « Redémarrer pour finir la mise à jour »."
 msgstr "A security update is installed: it will only take effect at the next restart. Seal menu → “Restart to finish the update”."
+
+#: etc/codebyr/espaces.json
+msgid "Mots de passe"
+msgstr "Passwords"
 
 #: etc/codebyr/espaces.json
 msgid "Calculatrice"
@@ -1873,8 +1910,8 @@ msgid "Bienvenue dans Codebyr OS\n\nLa sécurité par compartimentation, simple 
 msgstr "Welcome to Codebyr OS\n\nSecurity through compartmentalization, simple for everyone."
 
 #: etc/calamares/branding/debian/show.qml
-msgid "Vos Espaces isolés et colorés\n\nPersonnel, Travail, Banque, Navigation, Jetable. Si l'un est piégé, les autres restent intacts."
-msgstr "Your isolated, color-coded Spaces\n\nPersonal, Work, Bank, Browsing, Disposable. If one is compromised, the others stay intact."
+msgid "Vos Espaces isolés et colorés\n\nPersonnel, Travail, Banque, Coffre, Navigation, Jetable. Si l'un est piégé, les autres restent intacts."
+msgstr "Your isolated, color-coded Spaces\n\nPersonal, Work, Bank, Vault, Browsing, Disposable. If one is compromised, the others stay intact."
 
 #: etc/calamares/branding/debian/show.qml
 msgid "Le Blindage\n\nBac à sable renforcé, coupure réseau et zéro privilège pour les tâches sensibles."

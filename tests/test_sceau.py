@@ -1,6 +1,10 @@
 # -*- coding: utf-8 -*-
 """Le menu du Sceau : ce qu'il propose de lui-même, au bon moment."""
+import json
 import os
+import re
+import shutil
+import subprocess
 import unittest
 
 from outils import RACINE
@@ -48,6 +52,44 @@ class LeRedemarrage(unittest.TestCase):
     def test_active_et_retire_avec_l_extension(self):
         self.assertIn("this._redemarrage = new Redemarrage();", self.source)
         self.assertIn("this._redemarrage?.detruire();", self.source)
+
+
+@unittest.skipUnless(shutil.which("node"), "node absent : l'extension ne peut pas être exécutée")
+class LEtatDuPoste(unittest.TestCase):
+    """Un poste qui ne se met plus à jour se tait, comme un poste sain."""
+
+    def _etat(self, age):
+        source = _source()
+        fonctions = "\n".join((
+            "const _ = t => t; const n_ = (s, p, n) => n <= 1 ? s : p;",
+            r"const remplir = (t, v) => t.replace(/\{(\w+)\}/g, (m, c) => v[c]);",
+            re.search(r"const JOURS_SANS_MISE_A_JOUR = [^\n]*", source).group(),
+            re.search(r"function etatMisesAJour\([\s\S]*?\n\}", source).group(),
+            "console.log(JSON.stringify(etatMisesAJour(%s)));" % age))
+        r = subprocess.run(["node", "-e", fonctions],
+                           capture_output=True, text=True, encoding="utf-8", timeout=10)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        return json.loads(r.stdout)
+
+    def test_a_jour(self):
+        self.assertTrue(self._etat(3600)["ok"])
+        etat = self._etat(2 * 86400 + 5)
+        self.assertTrue(etat["ok"])
+        self.assertIn("il y a 2 jours", etat["texte"])
+
+    def test_en_retard_ou_jamais(self):
+        etat = self._etat(9 * 86400)
+        self.assertFalse(etat["ok"])
+        self.assertIn("depuis 9 jours", etat["texte"])
+        self.assertFalse(self._etat("null")["ok"])
+
+    def test_lu_sur_le_temoin_d_apt_et_dit_dans_le_menu(self):
+        source = _source()
+        # Posé par apt.systemd.daily après chaque passage d'unattended-upgrades.
+        self.assertIn("const TEMOIN_MISES_A_JOUR = '/var/lib/apt/periodic/upgrade-stamp';", source)
+        menu = _methode(source, "_rebuild")
+        self.assertIn("etatMisesAJour(ageDuTemoin())", menu)
+        self.assertIn("codebyr-space verifier-poste", menu)
 
 
 class LeModeInvite(unittest.TestCase):

@@ -16,7 +16,7 @@ Presentation {
     // ne les modifiez pas à la main. Une langue sans traduction reçoit
     // l'anglais, comme le reste de Codebyr.
     // traductions:début
-    readonly property var traductions: ({"en": {"Bienvenue dans Codebyr OS\n\nLa sécurité par compartimentation, simple pour tout le monde.": "Welcome to Codebyr OS\n\nSecurity through compartmentalization, simple for everyone.", "Installation en cours…\n\nDans quelques minutes, votre ordinateur sera à la fois sûr et simple.": "Installing…\n\nIn a few minutes, your computer will be both secure and simple.", "Le Blindage\n\nBac à sable renforcé, coupure réseau et zéro privilège pour les tâches sensibles.": "Hardening\n\nReinforced sandbox, network cut-off and zero privileges for sensitive tasks.", "Vos Espaces isolés et colorés\n\nPersonnel, Travail, Banque, Navigation, Jetable. Si l'un est piégé, les autres restent intacts.": "Your isolated, color-coded Spaces\n\nPersonal, Work, Bank, Browsing, Disposable. If one is compromised, the others stay intact."}})
+    readonly property var traductions: ({"en": {"Bienvenue dans Codebyr OS\n\nLa sécurité par compartimentation, simple pour tout le monde.": "Welcome to Codebyr OS\n\nSecurity through compartmentalization, simple for everyone.", "Installation en cours…\n\nDans quelques minutes, votre ordinateur sera à la fois sûr et simple.": "Installing…\n\nIn a few minutes, your computer will be both secure and simple.", "Le Blindage\n\nBac à sable renforcé, coupure réseau et zéro privilège pour les tâches sensibles.": "Hardening\n\nReinforced sandbox, network cut-off and zero privileges for sensitive tasks.", "Vos Espaces isolés et colorés\n\nPersonnel, Travail, Banque, Coffre, Navigation, Jetable. Si l'un est piégé, les autres restent intacts.": "Your isolated, color-coded Spaces\n\nPersonal, Work, Bank, Vault, Browsing, Disposable. If one is compromised, the others stay intact."}})
     // traductions:fin
 
     function traduire(texte) {
@@ -29,7 +29,10 @@ Presentation {
 
     Slide {
         Rectangle {
-            anchors.fill: parent
+            // Toute la zone, pas seulement la diapositive : Calamares la
+            // place en retrait (Slide.qml), et le fond restait blanc autour.
+            x: -parent.x; y: -parent.y
+            width: parent.masterWidth; height: parent.masterHeight
             color: "#0E1B24"
             Text {
                 anchors.centerIn: parent
@@ -44,7 +47,10 @@ Presentation {
     }
     Slide {
         Rectangle {
-            anchors.fill: parent
+            // Toute la zone, pas seulement la diapositive : Calamares la
+            // place en retrait (Slide.qml), et le fond restait blanc autour.
+            x: -parent.x; y: -parent.y
+            width: parent.masterWidth; height: parent.masterHeight
             color: "#0E1B24"
             Text {
                 anchors.centerIn: parent
@@ -53,13 +59,16 @@ Presentation {
                 wrapMode: Text.WordWrap
                 color: "#FFFFFF"
                 font.pixelSize: 26
-                text: traduire("Vos Espaces isolés et colorés\n\nPersonnel, Travail, Banque, Navigation, Jetable. Si l'un est piégé, les autres restent intacts.")
+                text: traduire("Vos Espaces isolés et colorés\n\nPersonnel, Travail, Banque, Coffre, Navigation, Jetable. Si l'un est piégé, les autres restent intacts.")
             }
         }
     }
     Slide {
         Rectangle {
-            anchors.fill: parent
+            // Toute la zone, pas seulement la diapositive : Calamares la
+            // place en retrait (Slide.qml), et le fond restait blanc autour.
+            x: -parent.x; y: -parent.y
+            width: parent.masterWidth; height: parent.masterHeight
             color: "#0E1B24"
             Text {
                 anchors.centerIn: parent
@@ -77,7 +86,10 @@ Presentation {
     }
     Slide {
         Rectangle {
-            anchors.fill: parent
+            // Toute la zone, pas seulement la diapositive : Calamares la
+            // place en retrait (Slide.qml), et le fond restait blanc autour.
+            x: -parent.x; y: -parent.y
+            width: parent.masterWidth; height: parent.masterHeight
             color: "#0E1B24"
             Text {
                 anchors.centerIn: parent

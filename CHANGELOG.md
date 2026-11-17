@@ -19,6 +19,13 @@ envoyer. Pour utiliser un mot de passe dans un autre Espace : copiez-le, puis
 menu du Sceau → « Transférer le presse-papiers vers… ». Le Coffre apparaît de
 lui-même dans le menu du Sceau, en rose orchidée.
 
+**Sauvegardez tous vos Espaces, chiffrés, sur une clé USB** (Configuration
+Codebyr → Sauvegarde chiffrée). Une phrase de passe les protège : la clé peut
+être perdue ou volée sans rien livrer. Chaque Espace se restaure à part, y
+compris sur une autre machine Codebyr — et, faute de Codebyr, sur n'importe
+quel Linux, avec `gpg` (le mode d'emploi est sur la clé). Les Espaces que vous
+avez créés reviennent avec leur nom et leur couleur.
+
 **Le menu du Sceau dit l'état du poste** : depuis quand les mises à jour ont
 été vérifiées, avec un avertissement si elles ne l'ont plus été depuis
 plusieurs jours, et « Vérifier ce poste » pour lancer l'autotest complet.

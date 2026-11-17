@@ -34,6 +34,7 @@ import chemins  # noqa: E402
 import compte_dedie  # noqa: E402
 import interface  # noqa: E402
 import registre  # noqa: E402
+import sauvegarde  # noqa: E402
 from traduction import _, n_  # noqa: E402
 
 GLib.set_application_name(_("Configuration Codebyr"))
@@ -227,6 +228,7 @@ class Fenetre(Adw.ApplicationWindow):
             gson.add(row)
 
         self._groupe_comptes_dedies()
+        self._groupe_sauvegarde()
 
         # Capacités réelles de la machine (transparence)
         gcap = Adw.PreferencesGroup(
@@ -244,6 +246,173 @@ class Fenetre(Adw.ApplicationWindow):
             gcap.add(r)
 
         self._groupe_applications()
+
+    # ---- Sauvegarde chiffrée (voir sauvegarde.py) ----
+    def _groupe_sauvegarde(self):
+        """Tous les Espaces, chiffrés, vers un support qu'on range ailleurs.
+
+        La phrase de passe ne quitte jamais cette fenêtre que par l'entrée
+        standard de codebyr-space : ni argument, ni variable, ni fichier."""
+        groupe = Adw.PreferencesGroup(
+            title=_("Sauvegarde chiffrée"),
+            description=_("Tous vos Espaces, chiffrés par une phrase de passe, vers une clé "
+                          "USB ou un disque externe. Sans cette phrase, rien ne peut être "
+                          "relu — pas même par Codebyr : notez-la et rangez-la à part."))
+        self._page.add(groupe)
+        self._groupes.append(groupe)
+        sauver = Adw.ActionRow(title=_("Sauvegarder maintenant"),
+                               subtitle=_("Choisissez la clé USB ou le disque de destination."),
+                               activatable=True)
+        sauver.add_suffix(Gtk.Image.new_from_icon_name("document-save-symbolic"))
+        sauver.connect("activated", lambda _r: self._choisir_destination())
+        groupe.add(sauver)
+        restaurer = Adw.ActionRow(
+            title=_("Restaurer un Espace"),
+            subtitle=_("Choisissez son fichier « .tar.gz.gpg » dans une sauvegarde."),
+            activatable=True)
+        restaurer.add_suffix(Gtk.Image.new_from_icon_name("document-revert-symbolic"))
+        restaurer.connect("activated", lambda _r: self._choisir_archive())
+        groupe.add(restaurer)
+
+    def _dossier_des_supports(self):
+        """Là où GNOME monte les clés USB de cet utilisateur, s'il en a une."""
+        dossier = os.path.join("/media", os.environ.get("USER", ""))
+        return Gio.File.new_for_path(dossier) if os.path.isdir(dossier) else None
+
+    def _choisir_destination(self):
+        dialogue = Gtk.FileDialog(title=_("Où ranger la sauvegarde ?"))
+        supports = self._dossier_des_supports()
+        if supports:
+            dialogue.set_initial_folder(supports)
+
+        def choisi(d, resultat):
+            try:
+                dossier = d.select_folder_finish(resultat)
+            except GLib.Error:
+                return
+            if dossier is not None:
+                self._demander_phrase(
+                    _("Phrase de passe de la sauvegarde"),
+                    _("Au moins {n} caractères. Elle sera demandée pour toute "
+                      "restauration : sans elle, la sauvegarde est perdue.").format(
+                        n=sauvegarde.PHRASE_MINIMALE),
+                    True, lambda phrase: self._lancer_sauvegarde(dossier.get_path(), phrase))
+        dialogue.select_folder(self, None, choisi)
+
+    def _choisir_archive(self):
+        dialogue = Gtk.FileDialog(title=_("Quel Espace restaurer ?"))
+        filtre = Gtk.FileFilter()
+        filtre.set_name(_("Espaces sauvegardés (.tar.gz.gpg)"))
+        filtre.add_pattern("*" + sauvegarde.SUFFIXE)
+        filtres = Gio.ListStore.new(Gtk.FileFilter)
+        filtres.append(filtre)
+        dialogue.set_filters(filtres)
+        supports = self._dossier_des_supports()
+        if supports:
+            dialogue.set_initial_folder(supports)
+
+        def choisi(d, resultat):
+            try:
+                fichier = d.open_finish(resultat)
+            except GLib.Error:
+                return
+            if fichier is None:
+                return
+            chemin = fichier.get_path()
+            esp_id = sauvegarde.espace_du_fichier(chemin)
+            if not esp_id:
+                self._toaster.add_toast(Adw.Toast(
+                    title=_("Ce fichier n'est pas un Espace sauvegardé.")))
+                return
+            esp = registre.espaces().get(esp_id) or {}
+            nom = esp.get("nom", esp_id)
+            self._demander_phrase(
+                _("Restaurer « {espace} »").format(espace=nom),
+                _("L'Espace est fermé, et ses données actuelles sont mises de côté, "
+                  "pas effacées. Phrase de passe de la sauvegarde :"),
+                False, lambda phrase: self._lancer_restauration(chemin, nom, phrase))
+        dialogue.open(self, None, choisi)
+
+    def _demander_phrase(self, titre, explication, confirmer, suite):
+        """La phrase de passe ; deux fois pour une sauvegarde, une erreur de
+        frappe la rendant irrécupérable."""
+        dialogue = Adw.AlertDialog(heading=titre, body=explication)
+        liste = Gtk.ListBox(selection_mode=Gtk.SelectionMode.NONE)
+        liste.add_css_class("boxed-list")
+        premiere = Adw.PasswordEntryRow(title=_("Phrase de passe"))
+        liste.append(premiere)
+        seconde = Adw.PasswordEntryRow(title=_("La même, une seconde fois"))
+        if confirmer:
+            liste.append(seconde)
+        dialogue.set_extra_child(liste)
+        dialogue.add_response("annuler", _("Annuler"))
+        dialogue.add_response("valider", _("Continuer"))
+        dialogue.set_response_appearance("valider", Adw.ResponseAppearance.SUGGESTED)
+        dialogue.set_default_response("valider")
+        dialogue.set_close_response("annuler")
+
+        def verifier(*_args):
+            phrase = premiere.get_text()
+            bonne = (sauvegarde.phrase_acceptable(phrase)[0] if confirmer else bool(phrase))
+            identiques = not confirmer or seconde.get_text() == phrase
+            dialogue.set_response_enabled("valider", bonne and identiques)
+        premiere.connect("changed", verifier)
+        seconde.connect("changed", verifier)
+        verifier()
+
+        def repondu(_d, reponse):
+            if reponse == "valider":
+                suite(premiere.get_text())
+        dialogue.connect("response", repondu)
+        dialogue.present(self)
+
+    def _lancer(self, commande, phrase, reussi, rate):
+        """codebyr-space, la phrase de passe sur son entrée standard."""
+        try:
+            proc = Gio.Subprocess.new(
+                commande, Gio.SubprocessFlags.STDIN_PIPE | Gio.SubprocessFlags.STDOUT_PIPE
+                | Gio.SubprocessFlags.STDERR_PIPE)
+        except GLib.Error as exc:
+            rate(exc.message)
+            return
+
+        def fini(p, resultat):
+            try:
+                _ok, sortie, erreurs = p.communicate_utf8_finish(resultat)
+            except GLib.Error as exc:
+                rate(exc.message)
+                return
+            if p.get_exit_status() == 0:
+                reussi((sortie or "").strip().splitlines()[-1:] or [""])
+            else:
+                rate((erreurs or sortie or "").strip())
+        proc.communicate_utf8_async(phrase + "\n", None, fini)
+
+    def _signaler_echec(self, titre, detail):
+        dialogue = Adw.AlertDialog(heading=titre, body=detail[-800:] or _("Erreur inconnue."))
+        dialogue.add_response("ok", _("Fermer"))
+        dialogue.present(self)
+
+    def _lancer_sauvegarde(self, dossier, phrase):
+        self._toaster.add_toast(Adw.Toast(
+            title=_("Sauvegarde en cours… Ne retirez pas le support."), timeout=10))
+        self._lancer(["codebyr-space", "sauvegarder", dossier], phrase,
+                     lambda lignes: self._toaster.add_toast(Adw.Toast(title=lignes[0], timeout=10)),
+                     lambda detail: self._signaler_echec(
+                         _("La sauvegarde n'est pas complète"), detail))
+
+    def _lancer_restauration(self, chemin, nom, phrase):
+        self._toaster.add_toast(Adw.Toast(
+            title=_("Restauration de « {espace} » en cours…").format(espace=nom), timeout=10))
+
+        def reussie(_lignes):
+            self._data = load_registry()
+            self._construire()
+            self._toaster.add_toast(Adw.Toast(
+                title=_("« {espace} » est restauré.").format(espace=nom), timeout=10))
+        self._lancer(["codebyr-space", "restaurer-sauvegarde", chemin], phrase, reussie,
+                     lambda detail: self._signaler_echec(
+                         _("Restauration impossible"), detail))
 
     # ---- Compte séparé par Espace (le réglage, pas un fichier à éditer) ----
     def _groupe_comptes_dedies(self):

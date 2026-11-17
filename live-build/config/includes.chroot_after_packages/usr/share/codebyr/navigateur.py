@@ -104,17 +104,37 @@ def domaines_proteges(espaces):
     return out
 
 
-def ecrire_stockage_manage(home, doms):
+def filtre_de(esp):
+    """La liste de sites d'un Espace à réseau restreint, ou None s'il n'en a pas.
+
+    Donnée au bouclier pour qu'il EXPLIQUE un site refusé (filtre.js). Ce n'est
+    pas lui qui refuse : le filtre réseau le fait, hors du navigateur.
+    """
+    reseau = (esp or {}).get("reseau") or {}
+    if reseau.get("mode") != "liste-blanche":
+        return None
+    return [d.strip() for d in (reseau.get("domaines") or [])
+            if isinstance(d, str) and d.strip()]
+
+
+def ecrire_stockage_manage(home, doms, filtre=None, espace=""):
     """Écrit le manifeste de STOCKAGE MANAGÉ Firefox : les domaines protégés sont
     fournis en DONNÉE (pas injectés dans le code), pour que l'extension reste
-    statique et signable. Firefox lit ce fichier par utilisateur sous Linux."""
+    statique et signable. Firefox lit ce fichier par utilisateur sous Linux.
+
+    « filtre » n'y figure que pour un Espace à liste de sites : son absence
+    dit au bouclier qu'il n'a aucun refus à expliquer."""
     msdir = os.path.join(home, ".mozilla", "managed-storage")
     fichiers_surs.mkdir(msdir)
+    donnees = {"domaines": doms}
+    if filtre is not None:
+        donnees["filtre"] = list(filtre)
+        donnees["espace"] = str(espace or "")
     manifeste = {
         "name": BOUCLIER_ID,
         "description": "Domaines bancaires protégés par Codebyr.",
         "type": "storage",
-        "data": {"domaines": doms},
+        "data": donnees,
     }
     with fichiers_surs.ouvrir(os.path.join(msdir, BOUCLIER_ID + ".json"), "w", encoding="utf-8") as f:
         json.dump(manifeste, f, ensure_ascii=False)
@@ -142,7 +162,7 @@ def ajouter_prefs(chemin, prefs):
         f.write("\n".join(existantes) + "\n")
 
 
-def installer_bouclier(home, espaces):
+def installer_bouclier(home, espaces, esp=None):
     """Prépare le bouclier anti-hameçonnage pour le Firefox d'un Espace : il
     avertit si un site imite une banque protégée.
 
@@ -153,10 +173,11 @@ def installer_bouclier(home, espaces):
     xpinstall.signatures.required=false, c'est-à-dire à désactiver la
     vérification des signatures d'extensions — un affaiblissement réel du
     navigateur pour installer une protection."""
-    installer_bouclier_pour(home, domaines_proteges(espaces))
+    installer_bouclier_pour(home, domaines_proteges(espaces),
+                            filtre_de(esp), (esp or {}).get("nom", ""))
 
 
-def installer_bouclier_pour(home, doms):
+def installer_bouclier_pour(home, doms, filtre=None, espace=""):
     """Le bouclier, à partir de la seule liste des domaines protégés.
 
     Séparé pour pouvoir être posé DEPUIS un Espace à compte dédié : celui-ci
@@ -178,7 +199,7 @@ def installer_bouclier_pour(home, doms):
     # statique, donc signable). Écrite même vide : une banque retirée ne doit
     # pas rester protégée par une liste périmée.
     ffdir = profil_firefox(home)
-    ecrire_stockage_manage(home, list(doms or []))
+    ecrire_stockage_manage(home, list(doms or []), filtre, espace)
     retirer_copie_deposee(ffdir)
     # Firefox fait attendre l'accord de l'utilisateur avant d'activer une
     # extension déposée en silence dans le profil (3 : son réglage par défaut).

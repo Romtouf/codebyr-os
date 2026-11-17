@@ -44,7 +44,7 @@ INTERNE_CONTAGION = "interne-contagion"
 INTERNE_RENDU = "interne-rendu"
 
 
-def preparer_depuis_l_espace(session, espaces, app_cmd, filtre_reseau):
+def preparer_depuis_l_espace(session, espaces, app_cmd, filtre_reseau, esp=None):
     """Fait préparer le dossier de l'Espace PAR l'Espace. Renvoie True si fait.
 
     Le bureau n'a plus accès à ce dossier : ce qui s'y écrivait à chaque
@@ -62,6 +62,9 @@ def preparer_depuis_l_espace(session, espaces, app_cmd, filtre_reseau):
         "firefox": "firefox" in os.path.basename(app_cmd[0]),
         "filtre_reseau": bool(filtre_reseau),
         "domaines_proteges": navigateur.domaines_proteges(espaces),
+        # Pour que le bouclier explique un site refusé (voir navigateur.filtre_de).
+        "filtre": navigateur.filtre_de(esp),
+        "espace": (esp or {}).get("nom", ""),
     }
     env = {"PATH": "/usr/bin:/bin", "LANG": os.environ.get("LANG", "C.UTF-8"),
            "HOME": session.home,

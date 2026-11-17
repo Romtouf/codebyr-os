@@ -95,7 +95,7 @@ STAGE="$(mktemp -d)"
 trap 'rm -rf "$STAGE"' EXIT
 # Le code (depuis la 1.5) : la détection, le dessin partagé, l'arrière-plan et
 # la page d'alerte. La même liste sert à la vérification, plus bas.
-CODE="content.js rendu.js background.js alerte.html alerte.js"
+CODE="content.js rendu.js background.js alerte.html alerte.js filtre.js refus.html refus.js"
 cp "$SRC/manifest.json" "$STAGE/"
 for fichier in $CODE; do
 	cp "$SRC/$fichier" "$STAGE/"

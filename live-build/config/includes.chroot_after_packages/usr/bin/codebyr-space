@@ -535,7 +535,7 @@ def _lancer(espaces, esp, extra, fichier, session):
         # pointer vers le filtre avant que celui-ci existe. Dans l'ordre
         # inverse, un filtre absent laissait Banque avec Internet en entier.
         if not ordres_espace.preparer_depuis_l_espace(session, espaces, app_cmd,
-                                         liste_blanche and not hors_ligne):
+                                         liste_blanche and not hors_ligne, esp):
             return _refuser_compte_dedie(
                 esp, _("son dossier n'a pas pu être préparé (voir le journal)"))
     notif_srv, notif, notif_tmp = _ouvrir_notifications(esp, session)
@@ -593,7 +593,7 @@ def _lancer(espaces, esp, extra, fichier, session):
     # Sous compte dédié, l'Espace l'a déjà installé lui-même, dans son dossier.
     if "firefox" in os.path.basename(app_cmd[0]) and not session:
         try:
-            navigateur.installer_bouclier(home, espaces)
+            navigateur.installer_bouclier(home, espaces, esp)
         except OSError as exc:
             sys.stderr.write("codebyr-space : bouclier indisponible (%s)\n" % exc)
 
@@ -1060,7 +1060,11 @@ def cmd_interne_preparer(brut):
                 navigateur.preparer_profil_firefox(home, PORT_FILTRE_INTERNE)
             doms = [d for d in (charge.get("domaines_proteges") or [])
                     if isinstance(d, str) and d]
-            navigateur.installer_bouclier_pour(home, doms)
+            filtre = charge.get("filtre")
+            if not (isinstance(filtre, list) and all(isinstance(m, str) for m in filtre)):
+                filtre = None
+            navigateur.installer_bouclier_pour(home, doms, filtre,
+                                               str(charge.get("espace") or "")[:80])
     except OSError as exc:
         sys.stderr.write("codebyr-space : préparation du dossier impossible (%s)\n" % exc)
         return 1

@@ -25,7 +25,8 @@ SRC = os.path.join(RACINE, "live-build", "config",
                    "codebyr", "antiphishing")
 SIGNES = os.path.join(SRC, "signed")
 # Le code de l'extension, tel qu'il part à la signature (1.5).
-CODE = ("content.js", "rendu.js", "background.js", "alerte.html", "alerte.js")
+CODE = ("content.js", "rendu.js", "background.js", "alerte.html", "alerte.js",
+        "filtre.js", "refus.html", "refus.js")
 
 
 class Manifeste(unittest.TestCase):
@@ -54,7 +55,8 @@ class Manifeste(unittest.TestCase):
         # Sinon une page pourrait l'ouvrir elle-même, l'encadrer, et lui
         # passer l'adresse à approuver.
         self.assertNotIn("web_accessible_resources", self.manifeste)
-        self.assertEqual(self.manifeste["background"], {"scripts": ["background.js"]})
+        self.assertEqual(self.manifeste["background"],
+                         {"scripts": ["background.js", "filtre.js"]})
 
     def test_le_dessin_est_charge_avant_la_detection(self):
         self.assertEqual(self.manifeste["content_scripts"][0]["js"], ["rendu.js", "content.js"])

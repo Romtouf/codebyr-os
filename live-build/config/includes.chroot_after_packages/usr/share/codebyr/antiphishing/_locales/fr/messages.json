@@ -33,5 +33,33 @@
   },
   "protection": {
     "message": "Protection Codebyr OS"
+  },
+  "refus_onglet": {
+    "message": "Site hors de la liste — Codebyr",
+    "description": "Titre de l'onglet de la page qui remplace un site refusé par le filtre d'un Espace."
+  },
+  "refus_titre": {
+    "message": "Ce site n'est pas dans la liste de l'Espace « $ESPACE$ »",
+    "placeholders": {
+      "espace": { "content": "$1", "example": "Banque" }
+    }
+  },
+  "refus_titre_sans_nom": {
+    "message": "Ce site n'est pas dans la liste de cet Espace"
+  },
+  "refus_detail": {
+    "message": "Codebyr n'a pas ouvert $HOTE$ : cet Espace n'ouvre que les sites que vous y avez autorisés.",
+    "placeholders": {
+      "hote": { "content": "$1", "example": "exemple.fr" }
+    }
+  },
+  "refus_ajouter": {
+    "message": "S'il appartient à votre banque : menu du Sceau → Configuration Codebyr → « Sites bloqués », cliquez sur le + à côté de son nom, puis fermez et rouvrez cet Espace."
+  },
+  "refus_ailleurs": {
+    "message": "Sinon, ouvrez-le dans l'Espace Navigation."
+  },
+  "refus_retour": {
+    "message": "Revenir en arrière"
   }
 }

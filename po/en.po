@@ -1972,3 +1972,31 @@ msgstr "This site is legitimate, don't warn me again"
 #: usr/share/codebyr/antiphishing/_locales/fr/messages.json
 msgid "Protection Codebyr OS"
 msgstr "Codebyr OS protection"
+
+#: usr/share/codebyr/antiphishing/_locales/fr/messages.json
+msgid "Site hors de la liste — Codebyr"
+msgstr "Site not in the list — Codebyr"
+
+#: usr/share/codebyr/antiphishing/_locales/fr/messages.json
+msgid "Ce site n'est pas dans la liste de l'Espace « {espace} »"
+msgstr "This site is not in the list of the “{espace}” Space"
+
+#: usr/share/codebyr/antiphishing/_locales/fr/messages.json
+msgid "Ce site n'est pas dans la liste de cet Espace"
+msgstr "This site is not in this Space's list"
+
+#: usr/share/codebyr/antiphishing/_locales/fr/messages.json
+msgid "Codebyr n'a pas ouvert {hote} : cet Espace n'ouvre que les sites que vous y avez autorisés."
+msgstr "Codebyr did not open {hote}: this Space only opens the sites you have allowed in it."
+
+#: usr/share/codebyr/antiphishing/_locales/fr/messages.json
+msgid "S'il appartient à votre banque : menu du Sceau → Configuration Codebyr → « Sites bloqués », cliquez sur le + à côté de son nom, puis fermez et rouvrez cet Espace."
+msgstr "If it belongs to your bank: Seal menu → Codebyr Settings → “Sites blocked”, click the + next to its name, then close and reopen this Space."
+
+#: usr/share/codebyr/antiphishing/_locales/fr/messages.json
+msgid "Sinon, ouvrez-le dans l'Espace Navigation."
+msgstr "Otherwise, open it in the Browsing Space."
+
+#: usr/share/codebyr/antiphishing/_locales/fr/messages.json
+msgid "Revenir en arrière"
+msgstr "Go back"

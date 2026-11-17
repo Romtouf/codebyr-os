@@ -41,5 +41,38 @@
   },
   "protection": {
     "message": "Codebyr OS protection"
+  },
+  "refus_onglet": {
+    "message": "Site not in the list — Codebyr"
+  },
+  "refus_titre": {
+    "message": "This site is not in the list of the “$ESPACE$” Space",
+    "placeholders": {
+      "espace": {
+        "content": "$1",
+        "example": "Banque"
+      }
+    }
+  },
+  "refus_titre_sans_nom": {
+    "message": "This site is not in this Space's list"
+  },
+  "refus_detail": {
+    "message": "Codebyr did not open $HOTE$: this Space only opens the sites you have allowed in it.",
+    "placeholders": {
+      "hote": {
+        "content": "$1",
+        "example": "exemple.fr"
+      }
+    }
+  },
+  "refus_ajouter": {
+    "message": "If it belongs to your bank: Seal menu → Codebyr Settings → “Sites blocked”, click the + next to its name, then close and reopen this Space."
+  },
+  "refus_ailleurs": {
+    "message": "Otherwise, open it in the Browsing Space."
+  },
+  "refus_retour": {
+    "message": "Go back"
   }
 }

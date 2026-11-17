@@ -14,7 +14,7 @@
   "permissions": ["storage"],
   "host_permissions": ["<all_urls>"],
   "background": {
-    "scripts": ["background.js"]
+    "scripts": ["background.js", "filtre.js"]
   },
   "content_scripts": [
     {

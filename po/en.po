@@ -353,6 +353,108 @@ msgid "Codebyr s'adapte au matériel. Le Jetable d'une pièce jointe s'ouvre tou
 msgstr "Codebyr adapts to the hardware. A Disposable for an attachment always opens hardened AND without network."
 
 #: usr/bin/codebyr-config
+msgid "Sauvegarde chiffrée"
+msgstr "Encrypted backup"
+
+#: usr/bin/codebyr-config
+msgid "Tous vos Espaces, chiffrés par une phrase de passe, vers une clé USB ou un disque externe. Sans cette phrase, rien ne peut être relu — pas même par Codebyr : notez-la et rangez-la à part."
+msgstr "All your Spaces, encrypted with a passphrase, to a USB stick or an external disk. Without this passphrase nothing can be read back — not even by Codebyr: write it down and keep it somewhere else."
+
+#: usr/bin/codebyr-config
+msgid "Sauvegarder maintenant"
+msgstr "Back up now"
+
+#: usr/bin/codebyr-config
+msgid "Choisissez la clé USB ou le disque de destination."
+msgstr "Choose the destination USB stick or disk."
+
+#: usr/bin/codebyr-config
+msgid "Restaurer un Espace"
+msgstr "Restore a Space"
+
+#: usr/bin/codebyr-config
+msgid "Choisissez son fichier « .tar.gz.gpg » dans une sauvegarde."
+msgstr "Choose its “.tar.gz.gpg” file in a backup."
+
+#: usr/bin/codebyr-config
+msgid "Où ranger la sauvegarde ?"
+msgstr "Where should the backup go?"
+
+#: usr/bin/codebyr-config
+msgid "Phrase de passe de la sauvegarde"
+msgstr "Backup passphrase"
+
+#: usr/bin/codebyr-config
+msgid "Au moins {n} caractères. Elle sera demandée pour toute restauration : sans elle, la sauvegarde est perdue."
+msgstr "At least {n} characters. It will be asked for any restore: without it, the backup is lost."
+
+#: usr/bin/codebyr-config
+msgid "Quel Espace restaurer ?"
+msgstr "Which Space should be restored?"
+
+#: usr/bin/codebyr-config
+msgid "Espaces sauvegardés (.tar.gz.gpg)"
+msgstr "Backed-up Spaces (.tar.gz.gpg)"
+
+#: usr/bin/codebyr-config
+msgid "Ce fichier n'est pas un Espace sauvegardé."
+msgstr "This file is not a backed-up Space."
+
+#: usr/bin/codebyr-config
+msgid "Restaurer « {espace} »"
+msgstr "Restore “{espace}”"
+
+#: usr/bin/codebyr-config
+msgid "L'Espace est fermé, et ses données actuelles sont mises de côté, pas effacées. Phrase de passe de la sauvegarde :"
+msgstr "The Space is closed, and its current data is set aside, not erased. Backup passphrase:"
+
+#: usr/bin/codebyr-config
+msgid "Phrase de passe"
+msgstr "Passphrase"
+
+#: usr/bin/codebyr-config
+msgid "La même, une seconde fois"
+msgstr "The same, once more"
+
+#: usr/bin/codebyr-config
+#: usr/share/gnome-shell/extensions/codebyr@codebyr.io/extension.js
+msgid "Annuler"
+msgstr "Cancel"
+
+#: usr/bin/codebyr-config
+msgid "Continuer"
+msgstr "Continue"
+
+#: usr/bin/codebyr-config
+msgid "Erreur inconnue."
+msgstr "Unknown error."
+
+#: usr/bin/codebyr-config
+#: usr/share/gnome-shell/extensions/codebyr@codebyr.io/extension.js
+msgid "Fermer"
+msgstr "Close"
+
+#: usr/bin/codebyr-config
+msgid "Sauvegarde en cours… Ne retirez pas le support."
+msgstr "Backup in progress… Do not remove the drive."
+
+#: usr/bin/codebyr-config
+msgid "La sauvegarde n'est pas complète"
+msgstr "The backup is not complete"
+
+#: usr/bin/codebyr-config
+msgid "Restauration de « {espace} » en cours…"
+msgstr "Restoring “{espace}”…"
+
+#: usr/bin/codebyr-config
+msgid "« {espace} » est restauré."
+msgstr "“{espace}” is restored."
+
+#: usr/bin/codebyr-config
+msgid "Restauration impossible"
+msgstr "Restore failed"
+
+#: usr/bin/codebyr-config
 msgid "Un Espace sous compte séparé possède ses fichiers sous une identité à lui. Ce qui s'échapperait de son bac à sable ne pourrait plus lire les autres Espaces, ni votre dossier personnel. Ses données le suivent à sa prochaine ouverture, et reviennent si vous le désactivez — rien n'est effacé."
 msgstr "A Space with a separate account owns its files under an identity of its own. Whatever escaped its sandbox could no longer read the other Spaces, nor your home folder. Its data follows it the next time it opens, and comes back if you turn it off — nothing is erased."
 
@@ -596,11 +698,6 @@ msgid "Ajoute les options Wayland + « --no-sandbox » (VS Code, Antigravity, na
 msgstr "Adds the Wayland options + “--no-sandbox” (VS Code, Antigravity, browsers…)"
 
 #: usr/bin/codebyr-config
-#: usr/share/gnome-shell/extensions/codebyr@codebyr.io/extension.js
-msgid "Annuler"
-msgstr "Cancel"
-
-#: usr/bin/codebyr-config
 msgid "« {application} » ajouté au menu de {espace}"
 msgstr "“{application}” added to the {espace} menu"
 
@@ -836,6 +933,44 @@ msgstr "%s Space restored."
 #: usr/bin/codebyr-space
 msgid "Anciennes données conservées : %s"
 msgstr "Previous data kept: %s"
+
+#: usr/bin/codebyr-space
+msgid "La sauvegarde se lance depuis le bureau, pas depuis un Espace.\n"
+msgstr "The backup is started from the desktop, not from a Space.\n"
+
+#: usr/bin/codebyr-space
+msgid "Dossier introuvable : %s\n"
+msgstr "Folder not found: %s\n"
+
+#: usr/bin/codebyr-space
+msgid "Impossible d'écrire dans {dossier} : {raison}\n"
+msgstr "Cannot write to {dossier}: {raison}\n"
+
+#: usr/bin/codebyr-space
+msgid "l'Espace n'a pas pu être lu"
+msgstr "the Space could not be read"
+
+#: usr/bin/codebyr-space
+msgid "Espace {espace} non sauvegardé : {raison}\n"
+msgstr "Space {espace} not backed up: {raison}\n"
+
+#: usr/bin/codebyr-space
+msgid "Réglages non sauvegardés : %s\n"
+msgstr "Settings not backed up: %s\n"
+
+#: usr/bin/codebyr-space
+msgid "Sauvegarde chiffrée : {n} Espace dans {dossier}"
+msgid_plural "Sauvegarde chiffrée : {n} Espaces dans {dossier}"
+msgstr[0] "Encrypted backup: {n} Space in {dossier}"
+msgstr[1] "Encrypted backup: {n} Spaces in {dossier}"
+
+#: usr/bin/codebyr-space
+msgid "Ce fichier ne désigne aucun Espace : %s\n"
+msgstr "This file does not name any Space: %s\n"
+
+#: usr/bin/codebyr-space
+msgid "Restauration refusée : %s\n"
+msgstr "Restore refused: %s\n"
 
 #: usr/bin/codebyr-space
 msgid "Flatpak n'est pas installé.\n"
@@ -1546,6 +1681,42 @@ msgstr "Its sandbox is Flatpak's, not this Space's Hardening. Turn on “Separat
 msgid "recevoir une permission ajoutée à sa ligne de commande (%s)"
 msgstr "receive a permission added to its command line (%s)"
 
+#: usr/share/codebyr/sauvegarde.py
+msgid "La phrase de passe doit compter au moins {n} caractères."
+msgstr "The passphrase must be at least {n} characters long."
+
+#: usr/share/codebyr/sauvegarde.py
+msgid "La phrase de passe ne peut pas contenir de saut de ligne."
+msgstr "The passphrase cannot contain a line break."
+
+#: usr/share/codebyr/sauvegarde.py
+msgid "phrase de passe incorrecte, ou sauvegarde abîmée"
+msgstr "wrong passphrase, or damaged backup"
+
+#: usr/share/codebyr/sauvegarde.py
+msgid "Sauvegarde chiffrée de Codebyr OS"
+msgstr "Codebyr OS encrypted backup"
+
+#: usr/share/codebyr/sauvegarde.py
+msgid "Chaque fichier « .tar.gz.gpg » est un Espace, chiffré par votre phrase de passe."
+msgstr "Each “.tar.gz.gpg” file is a Space, encrypted with your passphrase."
+
+#: usr/share/codebyr/sauvegarde.py
+msgid "Sans elle, rien ne peut être relu — pas même par Codebyr."
+msgstr "Without it, nothing can be read back — not even by Codebyr."
+
+#: usr/share/codebyr/sauvegarde.py
+msgid "Restaurer : Configuration Codebyr → Sauvegarde chiffrée → Restaurer un Espace."
+msgstr "To restore: Codebyr Settings → Encrypted backup → Restore a Space."
+
+#: usr/share/codebyr/sauvegarde.py
+msgid "Sans Codebyr, sur n'importe quel Linux :"
+msgstr "Without Codebyr, on any Linux:"
+
+#: usr/share/codebyr/sauvegarde.py
+msgid "Espaces sauvegardés :"
+msgstr "Backed-up Spaces:"
+
 #: usr/share/nautilus-python/extensions/codebyr-envoyer.py
 msgid "Envoyer vers l'Espace"
 msgid_plural "Envoyer {n} fichiers vers l'Espace"
@@ -1804,10 +1975,6 @@ msgstr "Open an application in “{nom}”"
 #: usr/share/gnome-shell/extensions/codebyr@codebyr.io/extension.js
 msgid "Aucune application trouvée."
 msgstr "No application found."
-
-#: usr/share/gnome-shell/extensions/codebyr@codebyr.io/extension.js
-msgid "Fermer"
-msgstr "Close"
 
 #: usr/share/gnome-shell/extensions/codebyr@codebyr.io/extension.js
 msgid "Détail : ouvrez un terminal et tapez  journalctl -t codebyr -n 20"

@@ -56,6 +56,7 @@ import programmes  # noqa: E402
 import provenance  # noqa: E402
 import registre  # noqa: E402
 import relais_notifications  # noqa: E402
+import sauvegarde  # noqa: E402
 
 # Les ordres donnés à un Espace font exécuter CE programme (voir ordres_espace).
 ordres_espace.PROGRAMME = os.path.realpath(__file__)
@@ -1289,6 +1290,150 @@ def cmd_import(espaces, esp_id, source=None):
         return 1
 
 
+# ── La sauvegarde chiffrée (voir sauvegarde.py) ────────────────────────────
+
+def _emballer_vers(esp, sortie):
+    """Écrit l'archive .tar.gz d'un Espace dans le flux « sortie » — la même
+    archive que « export ». Faux si elle n'a pas pu l'être entièrement."""
+    if compte_dedie.demande(esp):
+        def compresser(flux):
+            import gzip
+            with gzip.GzipFile(fileobj=sortie, mode="wb") as gz:
+                shutil.copyfileobj(flux, gz)
+
+        code, erreurs = ordres_espace.geste_dans_l_espace(
+            esp, ordres_espace.INTERNE_EXPORTER, consommer=compresser)
+        if code != 0 or erreurs:
+            sys.stderr.write("codebyr-space : sauvegarde de %s interrompue (%s).\n"
+                             % (esp["nom"], "; ".join(erreurs) or "code %s" % code))
+            return False
+        return True
+    home = os.path.join(chemins.DONNEES, esp["id"], "home")
+    with tarfile.open(fileobj=sortie, mode="w|gz") as tar:
+        # Un Espace jamais ouvert donne une archive vide : il se restaure, vide.
+        if os.path.isdir(home):
+            tar.add(home, arcname=".")
+    return True
+
+
+def _lire_phrase():
+    """La phrase de passe : une ligne sur l'entrée standard, jamais un
+    argument — une ligne de commande se lit par tous les comptes."""
+    return sys.stdin.readline().rstrip("\r\n")
+
+
+def cmd_sauvegarder(espaces, destination):
+    """Sauvegarde chiffrée de tous les Espaces dans un dossier daté de « destination »."""
+    if _espace_courant():
+        sys.stderr.write(_("La sauvegarde se lance depuis le bureau, pas depuis un Espace.\n"))
+        return 2
+    phrase = _lire_phrase()
+    acceptable, raison = sauvegarde.phrase_acceptable(phrase)
+    if not acceptable:
+        sys.stderr.write(raison + "\n")
+        return 2
+    if not os.path.isdir(destination):
+        sys.stderr.write(_("Dossier introuvable : %s\n") % destination)
+        return 2
+    dossier = os.path.join(destination, sauvegarde.nom_du_dossier())
+    try:
+        os.mkdir(dossier, 0o700)
+    except OSError as exc:
+        sys.stderr.write(_("Impossible d'écrire dans {dossier} : {raison}\n").format(
+            dossier=destination, raison=exc))
+        return 1
+    faits, rates = [], []
+    for esp in espaces.values():
+        if esp.get("ephemere"):
+            continue        # un Jetable n'a rien à garder
+        chemin = os.path.join(dossier, esp["id"] + sauvegarde.SUFFIXE)
+        try:
+            with sauvegarde.Chiffrement(chemin, phrase) as flux:
+                if not _emballer_vers(esp, flux):
+                    raise sauvegarde.Echec(_("l'Espace n'a pas pu être lu"))
+            faits.append(esp["nom"])
+        except (sauvegarde.Echec, OSError, tarfile.TarError) as exc:
+            rates.append(esp["nom"])
+            sys.stderr.write(_("Espace {espace} non sauvegardé : {raison}\n").format(
+                espace=esp["nom"], raison=exc))
+    try:
+        # Les réglages de l'utilisateur : les Espaces qu'il a créés s'y trouvent.
+        with sauvegarde.Chiffrement(os.path.join(dossier, sauvegarde.REGLAGES), phrase) as flux:
+            flux.write(json.dumps(registre.couche(), ensure_ascii=False).encode("utf-8"))
+        with open(os.path.join(dossier, sauvegarde.LISEZ_MOI), "w", encoding="utf-8") as f:
+            f.write(sauvegarde.lisez_moi(faits))
+    except (sauvegarde.Echec, OSError) as exc:
+        rates.append(sauvegarde.REGLAGES)
+        sys.stderr.write(_("Réglages non sauvegardés : %s\n") % exc)
+    print(n_("Sauvegarde chiffrée : {n} Espace dans {dossier}",
+             "Sauvegarde chiffrée : {n} Espaces dans {dossier}",
+             len(faits)).format(n=len(faits), dossier=dossier))
+    return 1 if rates else 0
+
+
+def _dossier_de_travail():
+    """Un dossier privé SUR LE DISQUE pour déchiffrer avant de restaurer :
+    /tmp est en mémoire vive, où une archive de plusieurs gigaoctets ne tient pas."""
+    cache = os.path.join(os.path.expanduser("~"), ".cache", "codebyr")
+    os.makedirs(cache, mode=0o700, exist_ok=True)
+    return tempfile.mkdtemp(prefix="restauration-", dir=cache)
+
+
+def _recreer_espace(fichier, esp_id, phrase, travail):
+    """Un Espace créé par l'utilisateur, absent de cette machine : on le
+    recrée d'après les réglages sauvegardés à côté de l'archive. Seuls son
+    nom et sa couleur en sont repris, vérifiés comme à la création."""
+    reglages = os.path.join(os.path.dirname(os.path.abspath(fichier)), sauvegarde.REGLAGES)
+    clair = os.path.join(travail, "reglages.json")
+    try:
+        sauvegarde.dechiffrer(reglages, phrase, clair)
+        with open(clair, encoding="utf-8") as f:
+            data = json.load(f)
+    except (sauvegarde.Echec, OSError, ValueError):
+        return False
+    for entree in (data.get("espaces") or []) if isinstance(data, dict) else []:
+        if not isinstance(entree, dict) or entree.get("id") != esp_id:
+            continue
+        nom, couleur = entree.get("nom"), entree.get("couleur")
+        if not (isinstance(nom, str) and nom.strip() and isinstance(couleur, str)
+                and re.fullmatch(r"#(?:[0-9A-Fa-f]{3}|[0-9A-Fa-f]{6})", couleur)):
+            return False
+        registre.ajouter_espace({
+            "id": esp_id, "nom": nom.strip()[:60], "couleur": couleur,
+            "app": "org.gnome.Nautilus.desktop", "ephemere": False, "compte": "dedie",
+        })
+        return True
+    return False
+
+
+def cmd_restaurer_sauvegarde(espaces, fichier, esp_id=None):
+    """Restaure un Espace depuis une archive de sauvegarde chiffrée."""
+    phrase = _lire_phrase()
+    esp_id = esp_id or sauvegarde.espace_du_fichier(fichier)
+    if not esp_id or not provenance.identifiant_valide(esp_id):
+        sys.stderr.write(_("Ce fichier ne désigne aucun Espace : %s\n") % fichier)
+        return 2
+    if not os.path.isfile(fichier):
+        sys.stderr.write(_("Archive introuvable : %s\n") % fichier)
+        return 1
+    travail = _dossier_de_travail()
+    try:
+        if esp_id not in espaces:
+            if not _recreer_espace(fichier, esp_id, phrase, travail):
+                sys.stderr.write(_("Espace inconnu : %s\n") % esp_id)
+                return 2
+            espaces = load_espaces()
+        clair = os.path.join(travail, esp_id + ".tar.gz")
+        try:
+            sauvegarde.dechiffrer(fichier, phrase, clair)
+        except sauvegarde.Echec as exc:
+            sys.stderr.write(_("Restauration refusée : %s\n") % exc)
+            return 1
+        return cmd_import(espaces, esp_id, clair)
+    finally:
+        shutil.rmtree(travail, ignore_errors=True)
+
+
 INTERNE_FLATPAK = "interne-flatpak"
 
 
@@ -2034,6 +2179,12 @@ ACTIONS = {
     "import":     (1, "import <espace> [fichier]",
                    lambda espaces, a: cmd_import(espaces, a[0],
                                                  a[1] if len(a) > 1 else None)),
+    "sauvegarder": (1, "sauvegarder <dossier>   (phrase de passe sur l'entrée standard)",
+                    lambda espaces, a: cmd_sauvegarder(espaces, a[0])),
+    "restaurer-sauvegarde": (1, "restaurer-sauvegarde <archive.tar.gz.gpg> [espace]   "
+                                "(phrase de passe sur l'entrée standard)",
+                             lambda espaces, a: cmd_restaurer_sauvegarde(
+                                 espaces, a[0], a[1] if len(a) > 1 else None)),
     "create":     (2, "create <nom> <couleur>",
                    lambda espaces, a: cmd_create(a[0], a[1])),
     "delete":     (1, "delete <espace>", lambda espaces, a: cmd_delete(a[0])),

@@ -144,6 +144,13 @@ utilisateur non technique.
 - Un fichier ouvert « en Jetable » s'exécute **sans réseau** (namespace réseau
   isolé) et dans un dossier personnel jetable : pas d'exfiltration, pas de
   persistance après fermeture.
+- Depuis 1.22.0, un document (PDF, bureautique, HTML) ouvert directement
+  depuis une **clé USB ou un disque externe inconnu** part de lui-même dans le
+  Jetable. Limites : une clé est reconnue à l'identifiant de son système de
+  fichiers, que l'on peut recopier sur une autre clé (la confiance est une
+  commodité, pas une frontière) ; un fichier copié de la clé vers vos dossiers
+  s'ouvre normalement ; votre propre choix « toujours ouvrir avec… » passe
+  avant celui de Codebyr ; les archives et les images ne sont pas concernées.
 - Une application compromise dans un Espace n'accède pas aux fichiers des
   autres Espaces : dossiers personnels séparés, `/tmp` isolés, et **bus de
   session privé** — le socket du bus de session de l'hôte n'est jamais monté

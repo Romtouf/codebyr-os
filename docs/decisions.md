@@ -298,3 +298,18 @@ installée. Or l'image écrit non-free-firmware dans les sources de toute
 machine depuis la 1.0 (`--archive-areas`) : l'exiger est sûr, et un test le
 vérifie. Le redémarrage attendu se lit dans `/run/reboot-required`, que le
 hook noyau d'unattended-upgrades écrit déjà : pas de détection maison.
+
+## Clés USB
+
+Un document ouvert depuis une clé USB inconnue part dans le Jetable (1.22.0).
+Mesuré dans l'image le 17/11/2026 avant d'être bâti : un `mimeapps.list` posé
+dans `/etc/xdg` passe bien devant le `gnome-mimeapps.list` de GNOME, et la
+liste de secours de GNOME place le Jetable devant Evince pour un PDF — d'où
+`associations.py`, qui relit les préférences en sautant celles de Codebyr au
+lieu de redemander à GNOME. Écartés : un réglage par type de fichier ne peut
+pas dépendre de l'endroit où vit le fichier, et Fichiers n'offre aucun moyen
+d'intercepter un double-clic. Les archives restent hors du fichier système :
+Fichiers ne les décompresse lui-même que s'il en est l'application par
+défaut. La confiance se donne clé par clé, sur le modèle de « Ce fichier
+m'appartient », pour que la fonction ne soit pas coupée par ceux dont la clé
+est la leur.

@@ -1,0 +1,24 @@
+# Codebyr OS — les documents du bureau passent par l'ouvreur de Codebyr.
+#
+# Il les ouvre exactement comme avant (votre visionneuse, votre traitement de
+# texte), SAUF ceux d'une clé USB ou d'un disque externe que vous n'avez pas
+# déclaré de confiance : ceux-là s'ouvrent dans le Jetable, isolés et sans
+# réseau. Voir /usr/share/codebyr/supports.py.
+#
+# Vos propres choix (~/.config/mimeapps.list) passent avant ce fichier.
+#
+# Les archives n'y figurent pas, volontairement : Fichiers ne les décompresse
+# lui-même que s'il en est l'application par défaut. Ce qu'on en extrait sur
+# la clé reste sur la clé, et s'ouvre donc sous cloche.
+#
+# Fichier remplacé à chaque mise à jour de codebyr-tools.
+[Default Applications]
+application/pdf=io.codebyr.Ouvrir.desktop
+application/rtf=io.codebyr.Ouvrir.desktop
+application/msword=io.codebyr.Ouvrir.desktop
+application/vnd.openxmlformats-officedocument.wordprocessingml.document=io.codebyr.Ouvrir.desktop
+application/vnd.oasis.opendocument.text=io.codebyr.Ouvrir.desktop
+application/vnd.ms-excel=io.codebyr.Ouvrir.desktop
+application/vnd.openxmlformats-officedocument.spreadsheetml.sheet=io.codebyr.Ouvrir.desktop
+application/vnd.oasis.opendocument.spreadsheet=io.codebyr.Ouvrir.desktop
+text/html=io.codebyr.Ouvrir.desktop

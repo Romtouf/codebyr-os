@@ -50,6 +50,10 @@ except ImportError:      # pragma: no cover — modules partagés absents
     chemins = None
     provenance = None
     registre = None
+try:
+    import supports
+except ImportError:      # pragma: no cover — paquet plus ancien que l'extension
+    supports = None
 
 SPACE = "/usr/bin/codebyr-space"
 ATTRIBUT = "codebyr::origine"
@@ -123,6 +127,82 @@ class CodebyrAdopter(GObject.GObject, Nautilus.MenuProvider):
 
     def get_background_items(self, *args):
         return []
+
+
+class CodebyrConfianceCle(GObject.GObject, Nautilus.MenuProvider):
+    """« Faire confiance à cette clé » — pour que VOTRE clé ne paie pas pour
+    les autres.
+
+    Les documents d'une clé USB inconnue s'ouvrent sous cloche (supports.py).
+    Sans ce geste, ceux de votre propre clé partiraient eux aussi dans le
+    Jetable, sans jamais pouvoir être modifiés, et la fonction serait coupée
+    dans la semaine.
+
+    L'entrée n'apparaît que sur le bureau, sur des fichiers d'UNE seule clé
+    qu'on sait reconnaître ; elle propose de retirer la confiance si elle est
+    déjà donnée. Elle figure aussi au clic droit dans le vide d'un dossier de
+    la clé, là où l'on cherche un réglage qui vaut pour tout le support.
+    """
+
+    def _lancer(self, _element, action, chemin):
+        try:
+            subprocess.Popen([SPACE, action, chemin],
+                             stdout=subprocess.DEVNULL,
+                             stderr=subprocess.DEVNULL)
+        except OSError:
+            pass
+
+    def _construire(self, fichiers):
+        if supports is None or os.environ.get("CODEBYR_ESPACE", "").strip():
+            return []
+        if not fichiers or not os.path.exists(SPACE):
+            return []
+        uuids = set()
+        etats = set()
+        premier = None
+        confiance = supports.lire_confiance()
+        montages = None
+        for f in fichiers:
+            if f.get_uri_scheme() != "file":
+                return []
+            chemin = f.get_location().get_path()
+            if not chemin:
+                return []
+            if montages is None:
+                # Une lecture par clic droit, pas une par fichier choisi — et
+                # aucune hors d'une clé : decrire() s'arrête avant.
+                if supports.decrire(chemin, montages=[]) is None:
+                    return []
+                montages = supports.montages_du_systeme()
+            support = supports.decrire(chemin, montages)
+            if support is None or not support["uuid"]:
+                return []
+            uuids.add(support["uuid"])
+            etats.add(supports.etat(True, support["uuid"], confiance))
+            premier = premier or chemin
+        if len(uuids) != 1 or len(etats) != 1:
+            return []    # plusieurs clés à la fois : un geste, un support
+        if etats == {supports.CONFIANT}:
+            element = Nautilus.MenuItem(
+                name="Codebyr::RetirerConfianceCle",
+                label=_("Ne plus faire confiance à cette clé"),
+                tip=_("Ses documents s'ouvriront de nouveau isolés et sans réseau."))
+            element.connect("activate", self._lancer, "retirer-confiance", premier)
+        else:
+            element = Nautilus.MenuItem(
+                name="Codebyr::FaireConfianceCle",
+                label=_("Faire confiance à cette clé"),
+                tip=_("Si cette clé est la vôtre : ses documents s'ouvriront "
+                      "normalement, au lieu de partir sous cloche."))
+            element.connect("activate", self._lancer, "faire-confiance", premier)
+        return [element]
+
+    def get_file_items(self, *args):
+        return self._construire(args[-1] if args else None)
+
+    def get_background_items(self, *args):
+        dossier = args[-1] if args else None
+        return self._construire([dossier] if dossier is not None else None)
 
 
 class CodebyrProvenance(GObject.GObject,

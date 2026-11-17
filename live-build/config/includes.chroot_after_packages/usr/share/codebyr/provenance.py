@@ -83,7 +83,10 @@ def doit_isoler(origine, espace_courant):
     Vrai quand le fichier vient d'AILLEURS. Un fichier sans origine connue ne
     déclenche rien : la marque est un indice, pas une frontière, et traiter
     l'absence d'indice comme une accusation rendrait le système inutilisable
-    dès le premier fichier venu d'une clé USB.
+    dès le premier fichier sans marque.
+
+    Les clés USB ne passent pas par ici : ce n'est pas l'absence de marque qui
+    les désigne, c'est l'endroit où elles sont montées (voir supports.py).
     """
     if not origine or not espace_courant:
         return False

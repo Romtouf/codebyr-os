@@ -36,6 +36,7 @@ import time
 sys.path.insert(0, os.environ.get("CODEBYR_LIB", "/usr/share/codebyr"))
 import applications  # noqa: E402
 import archives  # noqa: E402
+import associations  # noqa: E402
 import autotest  # noqa: E402
 import bac_a_sable  # noqa: E402
 import chemins  # noqa: E402
@@ -57,6 +58,7 @@ import provenance  # noqa: E402
 import registre  # noqa: E402
 import relais_notifications  # noqa: E402
 import sauvegarde  # noqa: E402
+import supports  # noqa: E402
 
 # Les ordres donnés à un Espace font exécuter CE programme (voir ordres_espace).
 ordres_espace.PROGRAMME = os.path.realpath(__file__)
@@ -309,10 +311,14 @@ def _demarrer_filtre_reseau(esp, home, app_cmd, chemin_socket=None, compte_dedie
             srv.close()
 
 
-def _visionneuse_pour(nom):
+def _visionneuse_pour(nom, repli=True):
     """Choisit une visionneuse CONCRÈTE selon le type de fichier, pour ouvrir une
     pièce jointe sans passer par xdg-open/gvfs — qui échoue dans le bac à sable
-    blindé et hors-ligne (pas de service de lancement, pas de fuse)."""
+    blindé et hors-ligne (pas de service de lancement, pas de fuse).
+
+    Sans `repli`, rend None plutôt que l'éditeur de texte quand aucune
+    application du type n'est installée : sur le bureau, ouvrir un .docx en
+    texte brut ne rendrait service à personne."""
     ext = os.path.splitext(nom)[1].lower()
 
     def premier(*cands):
@@ -335,8 +341,10 @@ def _visionneuse_pour(nom):
     elif ext in (".zip", ".7z", ".rar", ".tar", ".gz", ".xz", ".bz2"):
         v = premier("file-roller", "engrampa")
     # Défaut (texte, sans extension, type inconnu) : éditeur de texte.
-    if v is None:
+    if v is None and repli:
         v = premier("gnome-text-editor", "gedit", "evince", "papers")
+    if v is None and not repli:
+        return None
     return v or ["xdg-open"]
 
 
@@ -1995,6 +2003,12 @@ def cmd_provenance(espaces, chemin):
         sys.stderr.write(_("Fichier introuvable : %s\n") % chemin)
         return 2
     venue = provenance.origine(cible, chemins.DONNEES)
+    support = supports.etat_de(cible)
+    if support == supports.INCONNU:
+        print(_("Sur une clé USB ou un disque externe inconnu : ce fichier s'ouvre "
+                "sous cloche."))
+    elif support == supports.CONFIANT:
+        print(_("Sur une clé USB ou un disque externe de confiance."))
     if not venue:
         print(_("Origine inconnue — ce fichier n'a jamais transité par un Espace,"
                 "\nou il a perdu sa marque (clé USB, pièce jointe, partage réseau)."))
@@ -2009,27 +2023,66 @@ def cmd_provenance(espaces, chemin):
     return 0
 
 
-def decider_ouverture(origine, espace_courant):
+def decider_ouverture(origine, espace_courant, support=None):
     """« jetable » ou « normale ». Décision pure, pour être testable.
 
     Un fichier venu d'un AUTRE Espace s'ouvre sous cloche : blindé, sans
     réseau, détruit à la fermeture. C'est le seul moment où la marque sert
     vraiment à quelque chose — jusqu'ici elle informait, elle protège.
 
-    Le doute profite à l'ouverture normale. Un fichier sans origine connue, ou
-    déjà chez lui, s'ouvre comme d'habitude : refuser d'ouvrir des documents
-    ordinaires ferait désactiver la fonction dès la première semaine, et une
-    protection désactivée ne protège personne.
+    Un document posé sur une clé USB ou un disque externe INCONNU aussi
+    (support = « inconnu », voir supports.py). Ce n'est pas l'absence de
+    marque qui l'accuse : c'est l'endroit où il se trouve, qui dit qu'il vient
+    de l'extérieur du poste.
+
+    Pour tout le reste, le doute profite à l'ouverture normale. Un fichier
+    sans origine connue, ou déjà chez lui, s'ouvre comme d'habitude : refuser
+    d'ouvrir des documents ordinaires ferait désactiver la fonction dès la
+    première semaine, et une protection désactivée ne protège personne.
     """
-    return "jetable" if provenance.doit_isoler(origine, espace_courant) else "normale"
+    if provenance.doit_isoler(origine, espace_courant):
+        return "jetable"
+    if support == supports.INCONNU:
+        return "jetable"
+    return "normale"
+
+
+def _commande_normale(cible):
+    """La commande qui ouvre ce fichier « comme d'habitude », ou None.
+
+    Dans un Espace : une visionneuse concrète, comme toujours — le lanceur de
+    GNOME échoue dans le bac à sable blindé et hors ligne.
+
+    Sur le bureau : l'application que GNOME aurait choisie sans l'ouvreur de
+    Codebyr, retrouvée par associations.py — y compris une application
+    Flatpak. Faute de mieux, la visionneuse concrète.
+
+    Jamais « xdg-open » : les documents ont l'ouvreur de Codebyr pour
+    application par défaut, il se rappellerait lui-même sans fin.
+    """
+    if _espace_courant():
+        argv = _visionneuse_pour(cible)
+    else:
+        argv = None
+        try:
+            argv = associations.commande_habituelle(cible)
+        except (OSError, ValueError, UnicodeError) as exc:
+            sys.stderr.write("codebyr-space : préférences d'ouverture illisibles (%s)\n" % exc)
+        if not argv:
+            argv = _visionneuse_pour(cible, repli=False)
+    if not argv or argv == ["xdg-open"]:
+        return None
+    return argv + [cible]
 
 
 def cmd_ouvrir(espaces, chemin, lanceur=None):
-    """Ouvre un fichier, sous cloche s'il vient d'un autre Espace.
+    """Ouvre un fichier, sous cloche s'il vient d'ailleurs.
 
-    Destiné à être le gestionnaire par défaut DANS les Espaces : c'est là que
-    la question se pose, puisqu'on y sait où l'on est. Sur le bureau, il n'y a
-    pas d'« ici », donc rien à franchir — voir provenance.doit_isoler.
+    Gestionnaire par défaut des documents, dans les Espaces comme sur le
+    bureau (/etc/xdg/mimeapps.list). Dans un Espace, « ailleurs » veut dire
+    un autre Espace. Sur le bureau, il n'y a pas d'« ici » entre Espaces —
+    voir provenance.doit_isoler — mais il y a les clés USB et les disques
+    externes qu'on ne connaît pas.
     """
     cible = os.path.abspath(os.path.expanduser(chemin))
     if not os.path.isfile(cible):
@@ -2038,7 +2091,8 @@ def cmd_ouvrir(espaces, chemin, lanceur=None):
 
     courant = _espace_courant()
     venue = provenance.origine(cible, chemins.DONNEES)
-    choix = decider_ouverture(venue, courant)
+    support = supports.etat_de(cible)
+    choix = decider_ouverture(venue, courant, support)
 
     if lanceur is None:
         def lanceur(argv):
@@ -2046,27 +2100,88 @@ def cmd_ouvrir(espaces, chemin, lanceur=None):
                              stderr=subprocess.DEVNULL)
 
     if choix == "jetable":
-        autre = espaces.get(venue)
-        journal("ouverture sous cloche d'un fichier venu de %s" % venue)
-        _prevenir(_("Ouvert sous cloche"),
-                  _("Ce fichier vient de l'Espace %s. Il s'ouvre isolé et sans "
-                    "réseau, et disparaîtra à la fermeture.")
-                  % (autre["nom"] if autre else venue))
+        if provenance.doit_isoler(venue, courant):
+            autre = espaces.get(venue)
+            journal("ouverture sous cloche d'un fichier venu de %s" % venue)
+            _prevenir(_("Ouvert sous cloche"),
+                      _("Ce fichier vient de l'Espace %s. Il s'ouvre isolé et sans "
+                        "réseau, et disparaîtra à la fermeture.")
+                      % (autre["nom"] if autre else venue))
+        else:
+            # Ni le nom du fichier ni celui de la clé : le journal dit ce qui
+            # s'est passé, pas ce que vous transportez.
+            journal("ouverture sous cloche d'un fichier venu d'un support externe")
+            _prevenir(_("Ouvert sous cloche"),
+                      _("Ce document est sur une clé USB ou un disque externe que "
+                        "vous n'avez pas déclaré de confiance. Il s'ouvre isolé et "
+                        "sans réseau, et vos modifications ne seront pas gardées. "
+                        "Si cette clé est la vôtre : clic droit sur le fichier, "
+                        "« Faire confiance à cette clé »."))
         try:
             lanceur(["/usr/bin/codebyr-jetable", cible])
         except OSError as exc:
-            # Échouer ici empêcherait d'ouvrir un document parfaitement
-            # légitime. On le dit, et on ouvre normalement.
+            # Ouvrir quand même hors de la cloche serait exactement ce que la
+            # cloche devait empêcher. On le dit, et le fichier reste fermé.
             sys.stderr.write("codebyr-space : Jetable indisponible (%s)\n" % exc)
             _prevenir(_("Ouverture refusée"), _("Le Jetable est indisponible. Le fichier reste fermé."))
             return 1
 
     if choix == "normale":
+        argv = _commande_normale(cible)
+        if argv is None:
+            _prevenir(_("Aucune application pour ce document"),
+                      _("Aucune application installée ne sait ouvrir ce type de "
+                        "document. Vous pouvez en installer une depuis Logiciels."))
+            return 1
         try:
-            lanceur(_visionneuse_pour(cible) + [cible])
+            lanceur(argv)
         except OSError as exc:
             sys.stderr.write("codebyr-space : ouverture impossible (%s)\n" % exc)
             return 1
+    return 0
+
+
+def cmd_confiance(espaces, chemin, accorder=True):
+    """Fait (ou ne fait plus) confiance à la clé qui porte ce fichier.
+
+    Réservé au bureau : la confiance est celle du compte qui branche la clé, et
+    un Espace n'a pas à décider de ce que le bureau ouvrira sans cloche.
+    """
+    if _espace_courant():
+        sys.stderr.write(_("La confiance envers une clé se donne depuis le bureau, "
+                           "pas depuis un Espace.\n"))
+        return 2
+    cible = os.path.abspath(os.path.expanduser(chemin))
+    if not os.path.exists(cible):
+        sys.stderr.write(_("Fichier introuvable : %s\n") % chemin)
+        return 2
+    support = supports.decrire(cible)
+    if support is None:
+        print(_("Ce fichier n'est pas sur une clé USB ni sur un disque externe : "
+                "rien à faire."))
+        return 0
+    if not support["uuid"]:
+        message = _("Cette clé ne donne pas d'identifiant : Codebyr ne peut pas "
+                    "s'en souvenir. Ses documents continueront de s'ouvrir sous cloche.")
+        sys.stderr.write(message + "\n")
+        _prevenir(_("Clé impossible à reconnaître"), message)
+        return 1
+    if accorder:
+        if not supports.faire_confiance(support["uuid"]):
+            return 1
+        journal("confiance accordée à un support externe")
+        message = _("Les documents de cette clé s'ouvriront désormais normalement. "
+                    "Pour revenir en arrière : clic droit, « Ne plus faire "
+                    "confiance à cette clé ».")
+        _prevenir(_("Clé de confiance"), message)
+    else:
+        if not supports.retirer_confiance(support["uuid"]):
+            print(_("Cette clé n'était pas de confiance : rien à faire."))
+            return 0
+        journal("confiance retirée à un support externe")
+        message = _("Les documents de cette clé s'ouvriront de nouveau sous cloche.")
+        _prevenir(_("Clé à nouveau inconnue"), message)
+    print(message)
     return 0
 
 
@@ -2163,6 +2278,10 @@ ACTIONS = {
                    lambda espaces, a: cmd_ouvrir(espaces, a[0])),
     "adopter":    (1, "adopter <fichier>",
                    lambda espaces, a: cmd_adopter(espaces, a[0])),
+    "faire-confiance": (1, "faire-confiance <fichier sur la clé>",
+                        lambda espaces, a: cmd_confiance(espaces, a[0])),
+    "retirer-confiance": (1, "retirer-confiance <fichier sur la clé>",
+                          lambda espaces, a: cmd_confiance(espaces, a[0], accorder=False)),
     "contagion":  (1, "contagion <espace>",
                    lambda espaces, a: cmd_contagion(espaces, a[0])),
     "nettoyer-registre": (0, "nettoyer-registre",

@@ -26,6 +26,16 @@ compris sur une autre machine Codebyr — et, faute de Codebyr, sur n'importe
 quel Linux, avec `gpg` (le mode d'emploi est sur la clé). Les Espaces que vous
 avez créés reviennent avec leur nom et leur couleur.
 
+**Un document d'une clé USB inconnue s'ouvre sous cloche.** Une clé trouvée,
+prêtée ou reçue est l'un des plus vieux moyens de piéger un poste. Désormais,
+un PDF, un document de bureautique ou une page web ouvert directement depuis
+une clé USB ou un disque externe s'ouvre dans le Jetable : isolé, sans réseau,
+effacé à la fermeture. Si la clé est la vôtre, un clic droit sur un de ses
+fichiers → « Faire confiance à cette clé » : ses documents s'ouvrent alors
+normalement (et « Ne plus faire confiance à cette clé » revient en arrière).
+Les autres documents du poste s'ouvrent exactement comme avant, dans votre
+visionneuse ou votre traitement de texte habituels.
+
 **Un site refusé dans l'Espace Banque s'explique enfin** (bouclier
 anti-hameçonnage 1.6, signé par Mozilla). Firefox n'affichait que son erreur
 technique, « La connexion a été refusée par le serveur proxy », qui avait l'air

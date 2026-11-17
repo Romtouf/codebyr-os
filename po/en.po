@@ -1131,6 +1131,14 @@ msgid "Fichier introuvable : %s\n"
 msgstr "File not found: %s\n"
 
 #: usr/bin/codebyr-space
+msgid "Sur une clé USB ou un disque externe inconnu : ce fichier s'ouvre sous cloche."
+msgstr "On an unknown USB stick or external disk: this file opens in quarantine."
+
+#: usr/bin/codebyr-space
+msgid "Sur une clé USB ou un disque externe de confiance."
+msgstr "On a trusted USB stick or external disk."
+
+#: usr/bin/codebyr-space
 msgid "Origine inconnue — ce fichier n'a jamais transité par un Espace,\nou il a perdu sa marque (clé USB, pièce jointe, partage réseau)."
 msgstr "Unknown origin — this file never went through a Space,\nor it lost its mark (USB stick, attachment, network share)."
 
@@ -1151,12 +1159,60 @@ msgid "Ce fichier vient de l'Espace %s. Il s'ouvre isolé et sans réseau, et di
 msgstr "This file comes from the %s Space. It opens isolated and without network, and will disappear when closed."
 
 #: usr/bin/codebyr-space
+msgid "Ce document est sur une clé USB ou un disque externe que vous n'avez pas déclaré de confiance. Il s'ouvre isolé et sans réseau, et vos modifications ne seront pas gardées. Si cette clé est la vôtre : clic droit sur le fichier, « Faire confiance à cette clé »."
+msgstr "This document is on a USB stick or external disk you have not marked as trusted. It opens isolated and without network, and your changes will not be kept. If this stick is yours: right-click the file, “Trust this stick”."
+
+#: usr/bin/codebyr-space
 msgid "Ouverture refusée"
 msgstr "Opening refused"
 
 #: usr/bin/codebyr-space
 msgid "Le Jetable est indisponible. Le fichier reste fermé."
 msgstr "Disposable is unavailable. The file stays closed."
+
+#: usr/bin/codebyr-space
+msgid "Aucune application pour ce document"
+msgstr "No application for this document"
+
+#: usr/bin/codebyr-space
+msgid "Aucune application installée ne sait ouvrir ce type de document. Vous pouvez en installer une depuis Logiciels."
+msgstr "No installed application can open this type of document. You can install one from Software."
+
+#: usr/bin/codebyr-space
+msgid "La confiance envers une clé se donne depuis le bureau, pas depuis un Espace.\n"
+msgstr "Trust in a stick is given from the desktop, not from a Space.\n"
+
+#: usr/bin/codebyr-space
+msgid "Ce fichier n'est pas sur une clé USB ni sur un disque externe : rien à faire."
+msgstr "This file is not on a USB stick or an external disk: nothing to do."
+
+#: usr/bin/codebyr-space
+msgid "Cette clé ne donne pas d'identifiant : Codebyr ne peut pas s'en souvenir. Ses documents continueront de s'ouvrir sous cloche."
+msgstr "This stick gives no identifier: Codebyr cannot remember it. Its documents will keep opening in quarantine."
+
+#: usr/bin/codebyr-space
+msgid "Clé impossible à reconnaître"
+msgstr "Stick cannot be recognised"
+
+#: usr/bin/codebyr-space
+msgid "Les documents de cette clé s'ouvriront désormais normalement. Pour revenir en arrière : clic droit, « Ne plus faire confiance à cette clé »."
+msgstr "Documents on this stick will now open normally. To undo: right-click, “Stop trusting this stick”."
+
+#: usr/bin/codebyr-space
+msgid "Clé de confiance"
+msgstr "Trusted stick"
+
+#: usr/bin/codebyr-space
+msgid "Cette clé n'était pas de confiance : rien à faire."
+msgstr "This stick was not trusted: nothing to do."
+
+#: usr/bin/codebyr-space
+msgid "Les documents de cette clé s'ouvriront de nouveau sous cloche."
+msgstr "Documents on this stick will open in quarantine again."
+
+#: usr/bin/codebyr-space
+msgid "Clé à nouveau inconnue"
+msgstr "Stick unknown again"
 
 #: usr/bin/codebyr-space
 msgid "Adopter n'a de sens que DANS un Espace : c'est là qu'un fichier peut appartenir\nà quelque part. Lancez cette commande depuis l'Espace où vous voulez le garder.\n"
@@ -1751,6 +1807,22 @@ msgstr[1] "These {n} files are mine"
 #: usr/share/nautilus-python/extensions/codebyr-provenance.py
 msgid "Après l'avoir examiné : il s'ouvrira normalement dans cet Espace, au lieu de partir sous cloche à chaque fois."
 msgstr "After examining it: it will open normally in this Space, instead of going into quarantine every time."
+
+#: usr/share/nautilus-python/extensions/codebyr-provenance.py
+msgid "Ne plus faire confiance à cette clé"
+msgstr "Stop trusting this stick"
+
+#: usr/share/nautilus-python/extensions/codebyr-provenance.py
+msgid "Ses documents s'ouvriront de nouveau isolés et sans réseau."
+msgstr "Its documents will open isolated and without network again."
+
+#: usr/share/nautilus-python/extensions/codebyr-provenance.py
+msgid "Faire confiance à cette clé"
+msgstr "Trust this stick"
+
+#: usr/share/nautilus-python/extensions/codebyr-provenance.py
+msgid "Si cette clé est la vôtre : ses documents s'ouvriront normalement, au lieu de partir sous cloche."
+msgstr "If this stick is yours: its documents will open normally, instead of going into quarantine."
 
 #: usr/share/nautilus-python/extensions/codebyr-provenance.py
 msgid "Espace d'origine"

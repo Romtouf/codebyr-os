@@ -51,6 +51,7 @@ for chemin in \
 	usr/share/glib-2.0/schemas/90_codebyr.gschema.override \
 	usr/share/plymouth/themes/codebyr \
 	etc/xdg/autostart/codebyr-bienvenue.desktop \
+	etc/xdg/mimeapps.list \
 	etc/skel \
 	etc/codebyr/espaces.json \
 	etc/sysctl.d/91-codebyr-noyau.conf \

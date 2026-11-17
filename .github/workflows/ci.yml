@@ -184,7 +184,12 @@ jobs:
 
   isolation-linux:
     name: Frontières réelles sous Debian 13
-    runs-on: ubuntu-latest
+    # Épinglé : sur un hôte ubuntu-26.04, bwrap ne peut plus créer ses espaces
+    # de noms dans ce conteneur, même privilégié et avec les réglages
+    # ci-dessous (« No permissions to create a new namespace ») — les tests
+    # des frontières réelles échouaient sans que le code ait changé. À revoir
+    # quand ubuntu-24.04 sera retiré des machines de GitHub.
+    runs-on: ubuntu-24.04
     container:
       image: debian:trixie
       options: --privileged

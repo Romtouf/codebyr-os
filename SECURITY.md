@@ -380,10 +380,12 @@ surface applicative minimale (`--apt-recommends false`).
   Une liste blanche saisie à la main peut donc casser une authentification
   forte. Les domaines refusés sont notés dans Configuration Codebyr →
   « Sites bloqués », d'où un clic les autorise ; ou utilisez un autre Espace le
-  temps de l'opération — mais ne désactivez pas la protection. Pour un site en
-  HTTPS, Firefox n'affiche que sa propre erreur (« connexion refusée par le
-  serveur proxy ») : la page d'explication de Codebyr n'apparaît que pour un
-  site en HTTP simple.
+  temps de l'opération — mais ne désactivez pas la protection. Depuis le
+  bouclier 1.6, une page de Codebyr remplace l'onglet d'un site refusé et dit
+  quoi faire ; avant, Firefox n'affichait pour un site HTTPS que sa propre
+  erreur (« connexion refusée par le serveur proxy »). Cette page explique, elle
+  ne protège pas : c'est toujours le filtre réseau, hors du navigateur, qui
+  refuse.
 
 ## Historique des correctifs de sécurité
 

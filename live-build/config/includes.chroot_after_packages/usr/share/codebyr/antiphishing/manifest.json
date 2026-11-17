@@ -3,7 +3,7 @@
   "name": "__MSG_nom_extension__",
   "description": "__MSG_description_extension__",
   "default_locale": "en",
-  "version": "1.5",
+  "version": "1.6",
   "browser_specific_settings": {
     "gecko": {
       "id": "antiphishing@codebyr.io",

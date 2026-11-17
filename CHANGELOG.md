@@ -26,6 +26,13 @@ compris sur une autre machine Codebyr — et, faute de Codebyr, sur n'importe
 quel Linux, avec `gpg` (le mode d'emploi est sur la clé). Les Espaces que vous
 avez créés reviennent avec leur nom et leur couleur.
 
+**Un site refusé dans l'Espace Banque s'explique enfin** (bouclier
+anti-hameçonnage 1.6, signé par Mozilla). Firefox n'affichait que son erreur
+technique, « La connexion a été refusée par le serveur proxy », qui avait l'air
+d'une panne. Une page de Codebyr dit désormais pourquoi le site n'est pas
+ouvert, et comment l'autoriser s'il appartient à votre banque. Elle n'autorise
+rien elle-même : la liste se modifie dans Configuration Codebyr.
+
 **Le menu du Sceau dit l'état du poste** : depuis quand les mises à jour ont
 été vérifiées, avec un avertissement si elles ne l'ont plus été depuis
 plusieurs jours, et « Vérifier ce poste » pour lancer l'autotest complet.

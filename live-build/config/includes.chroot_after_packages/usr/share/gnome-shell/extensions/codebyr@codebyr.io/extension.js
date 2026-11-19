@@ -1021,6 +1021,55 @@ class PressePapiers {
     }
 }
 
+// Un menu de GNOME ne défile pas. Arrivé à la hauteur de l'écran, c'est le
+// sous-menu qu'on déplie qui est écrasé, à zéro pixel : sur un écran de 768
+// pixels de haut — un portable d'entrée de gamme —, déplier un Espace
+// n'affichait plus rien, ni ses applications ni « Fermer cet Espace ». Le
+// contenu du menu est donc placé dans une zone qui défile ; GNOME borne déjà
+// sa hauteur à celle de l'écran (PanelMenu.Button), il ne lui manquait que de
+// pouvoir rétrécir.
+function rendreDefilant(menu) {
+    const cadre = menu.box.get_parent();
+    if (!cadre || typeof cadre.set_child !== 'function')
+        return null;    // structure inattendue : le menu reste tel quel, sans défilement
+    cadre.set_child(null);
+    const defil = new St.ScrollView({
+        style_class: 'vfade',
+        hscrollbar_policy: St.PolicyType.NEVER,
+        vscrollbar_policy: St.PolicyType.AUTOMATIC,
+        // Superposée : une barre réservée élargirait le menu même quand il
+        // tient à l'écran, c'est-à-dire presque toujours.
+        overlay_scrollbars: true,
+        child: menu.box,
+    });
+    cadre.set_child(defil);
+    return defil;
+}
+
+// Où placer le défilement pour voir la zone [haut, bas], ou null si elle est
+// déjà visible. Plus haute que la fenêtre, on en montre le HAUT : c'est le nom
+// de l'Espace qu'on vient de déplier, le reste se trouve en dessous.
+function defilementPourMontrer(haut, bas, valeur, page, min, max) {
+    let cible;
+    if (bas - haut >= page || haut < valeur)
+        cible = haut;
+    else if (bas > valeur + page)
+        cible = bas - page;
+    else
+        return null;
+    return Math.max(min, Math.min(cible, max - page));
+}
+
+function montrerDans(defil, premier, dernier) {
+    if (!defil || !premier.get_stage() || !dernier.get_stage())
+        return;
+    const adj = defil.vadjustment;
+    const cible = defilementPourMontrer(premier.get_allocation_box().y1,
+        dernier.get_allocation_box().y2, adj.value, adj.page_size, adj.lower, adj.upper);
+    if (cible !== null)
+        adj.set_value(cible);
+}
+
 const Indicateur = GObject.registerClass(
 class Indicateur extends PanelMenu.Button {
     _init(extension) {
@@ -1046,12 +1095,41 @@ class Indicateur extends PanelMenu.Button {
         this.add_child(boite);
         this.accessible_name = 'Codebyr';
 
+        this._defil = rendreDefilant(this.menu);
+        // Au clavier, l'élément choisi reste à l'écran. Pas à la souris : un
+        // élément à moitié caché, survolé, ferait défiler le menu sous le
+        // pointeur, qui en survolerait aussitôt un autre.
+        this.menu.connect('active-changed', (m, element) => {
+            const ev = Clutter.get_current_event();
+            if (element && ev && ev.type() === Clutter.EventType.KEY_PRESS)
+                montrerDans(this._defil, element, element);
+        });
+        this.connect('destroy', () => this._oublierDefilement());
+
         // Menu reconstruit à chaque ouverture : reflète les Espaces personnalisés.
         this.menu.connect('open-state-changed', (m, open) => {
             if (open)
                 this._rebuild();
         });
         this._rebuild();
+    }
+
+    _oublierDefilement() {
+        if (this._idDefil) {
+            GLib.Source.remove(this._idDefil);
+            this._idDefil = 0;
+        }
+    }
+
+    // Un Espace qu'on déplie est amené à l'écran, une fois son sous-menu
+    // déployé (GNOME l'anime pendant un quart de seconde).
+    _montrerEspace(sub) {
+        this._oublierDefilement();
+        this._idDefil = GLib.timeout_add(GLib.PRIORITY_DEFAULT, 350, () => {
+            this._idDefil = 0;
+            montrerDans(this._defil, sub, sub.menu.actor);
+            return GLib.SOURCE_REMOVE;
+        });
     }
 
     afficherEspace(esp) {
@@ -1069,6 +1147,9 @@ class Indicateur extends PanelMenu.Button {
 
     _rebuild() {
         this.menu.removeAll();
+        this._oublierDefilement();
+        if (this._defil)
+            this._defil.vadjustment.set_value(0);
         this._apps = chargerApps();
         const espaces = chargerEspaces();
 
@@ -1346,6 +1427,10 @@ class Indicateur extends PanelMenu.Button {
                 sub.menu.addAction(_('Supprimer cet Espace'), () => this._gerer('delete', e.id, e.nom));
         }
         this.menu.addMenuItem(sub);
+        sub.menu.connect('open-state-changed', (m, ouvert) => {
+            if (ouvert)
+                this._montrerEspace(sub);
+        });
     }
 
     // Toutes les applications installées (magasin, apt, Flatpak…), via leurs

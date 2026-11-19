@@ -92,6 +92,48 @@ class LEtatDuPoste(unittest.TestCase):
         self.assertIn("codebyr-space verifier-poste", menu)
 
 
+@unittest.skipUnless(shutil.which("node"), "node absent : l'extension ne peut pas être exécutée")
+class LeMenuDefile(unittest.TestCase):
+    """Un menu plus haut que l'écran défile, au lieu d'écraser à zéro pixel
+    l'Espace qu'on déplie (vu sur la VM, écran de 768 pixels, en 1.22.0)."""
+
+    def _position(self, *args):
+        fonctions = "\n".join((
+            re.search(r"function defilementPourMontrer\([\s\S]*?\n\}", _source()).group(),
+            "console.log(JSON.stringify(defilementPourMontrer(%s)));" % ", ".join(map(str, args))))
+        r = subprocess.run(["node", "-e", fonctions],
+                           capture_output=True, text=True, encoding="utf-8", timeout=10)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        return json.loads(r.stdout)
+
+    # Arguments : haut, bas de la zone ; défilement actuel, hauteur visible,
+    # bornes du défilement.
+    def test_deja_visible(self):
+        self.assertIsNone(self._position(100, 300, 0, 700, 0, 1000))
+
+    def test_sous_le_bas_de_l_ecran(self):
+        self.assertEqual(self._position(600, 900, 0, 700, 0, 1000), 200)
+
+    def test_au_dessus_du_haut(self):
+        self.assertEqual(self._position(50, 150, 200, 700, 0, 1000), 50)
+
+    def test_plus_haute_que_l_ecran_on_en_montre_le_haut(self):
+        """Le nom de l'Espace déplié reste visible."""
+        self.assertEqual(self._position(400, 1300, 0, 700, 0, 1400), 400)
+
+    def test_jamais_au_dela_des_bornes(self):
+        self.assertEqual(self._position(900, 990, 0, 700, 0, 1000), 290)
+        self.assertEqual(self._position(950, 1200, 0, 700, 0, 1000), 300)
+
+    def test_le_menu_est_rendu_defilant(self):
+        source = _source()
+        self.assertIn("this._defil = rendreDefilant(this.menu);", source)
+        self.assertIn("this._montrerEspace(sub)", _methode(source, "_ajouterEspace"))
+        # Une source GLib laissée derrière soi après désactivation est un motif
+        # de refus sur extensions.gnome.org, et une erreur dans le journal.
+        self.assertIn("GLib.Source.remove(this._idDefil)", source)
+
+
 class LeModeInvite(unittest.TestCase):
     """L'écran de connexion ne se laisse pas présélectionner un compte : on dit
     avant d'y aller ce qu'il faudra choisir."""

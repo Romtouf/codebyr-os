@@ -47,6 +47,9 @@ rien elle-même : la liste se modifie dans Configuration Codebyr.
 été vérifiées, avec un avertissement si elles ne l'ont plus été depuis
 plusieurs jours, et « Vérifier ce poste » pour lancer l'autotest complet.
 
+Le menu du Sceau défile quand il ne tient plus à l'écran. Sur un écran de
+768 pixels de haut, déplier un Espace n'affichait plus rien.
+
 L'installeur : le diaporama couvre désormais toute sa zone (une bordure
 blanche l'entourait).
 
